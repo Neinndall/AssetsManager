@@ -13,7 +13,7 @@ namespace AssetsManager.Views.Models.Controls
     {
         private readonly NotificationService _notificationService;
         private int _notificationCount;
-        private bool _isLogVisible;
+        private bool _isLogVisible = true;
         private bool _hasActiveStatus;
 
         public event PropertyChangedEventHandler PropertyChanged;

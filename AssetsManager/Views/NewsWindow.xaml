@@ -135,19 +135,16 @@
             </Grid.RowDefinitions>
 
             <!-- 0. DYNAMIC IDENTITY HEADER -->
-            <Border Grid.Row="0" Style="{StaticResource SettingsCard}" Margin="32,24,32,0" Padding="24,20">
+            <Border Grid.Row="0" Style="{StaticResource CompactModuleHeader}">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/> <!-- Hero Icon -->
-                        <ColumnDefinition Width="Auto"/> <!-- Technical Separator -->
+                        <ColumnDefinition Width="16"/> <!-- Icon-to-title gap -->
                         <ColumnDefinition Width="*"/>    <!-- Dynamic Titles -->
                     </Grid.ColumnDefinitions>
 
-                    <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="10" Width="48" Height="48">
+                    <Border Grid.Column="0" Background="{StaticResource SidebarBackground}" CornerRadius="10" Width="48" Height="48">
                         <materialIcons:MaterialIcon Width="26" Height="26" HorizontalAlignment="Center" VerticalAlignment="Center">
-                            <materialIcons:MaterialIcon.Effect>
-                                <DropShadowEffect Color="#FF5C85FF" BlurRadius="12" ShadowDepth="0" Opacity="0.4"/>
-                            </materialIcons:MaterialIcon.Effect>
                             <materialIcons:MaterialIcon.Style>
                                 <Style TargetType="materialIcons:MaterialIcon">
                                     <Setter Property="Kind" Value="NewspaperVariantOutline"/>
@@ -183,10 +180,8 @@
                         </materialIcons:MaterialIcon>
                     </Border>
 
-                    <Rectangle Grid.Column="1" Width="1" Fill="{StaticResource BorderColor}" Margin="20,8" VerticalAlignment="Stretch" Opacity="0.5"/>
-
                     <StackPanel Grid.Column="2" VerticalAlignment="Center">
-                        <TextBlock FontWeight="SemiBold" FontSize="22" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,2">
+                        <TextBlock FontWeight="SemiBold" FontSize="22" TextTrimming="CharacterEllipsis" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,2">
                             <TextBlock.Style>
                                 <Style TargetType="TextBlock">
                                     <Setter Property="Text" Value="NEWS CENTER"/>
@@ -201,7 +196,7 @@
                                 </Style>
                             </TextBlock.Style>
                         </TextBlock>
-                        <TextBlock FontSize="12" Foreground="{StaticResource TextSecondary}" Opacity="0.8">
+                        <TextBlock FontSize="12" TextTrimming="CharacterEllipsis" Foreground="{StaticResource TextSecondary}" Opacity="0.8">
                             <TextBlock.Style>
                                 <Style TargetType="TextBlock">
                                     <Setter Property="Text" Value="Official Riot Games news feed for League of Legends."/>
@@ -221,7 +216,7 @@
             </Border>
 
             <!-- 1. TOOLBAR -->
-            <Border Grid.Row="1" Style="{StaticResource SettingsCard}" Margin="32,16,32,16" Padding="20,14">
+            <Border Grid.Row="1" Style="{StaticResource SettingsCard}" Margin="28,16,28,16" Padding="20,14">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/> <!-- Category Label -->
@@ -285,7 +280,7 @@
             </Border>
 
             <!-- 2. CONTENT AREA -->
-            <Grid Grid.Row="2" Margin="32,4,32,32">
+            <Grid Grid.Row="2" Margin="28,4,28,32">
                 <!-- News List (Virtualized) -->
                 <ListBox x:Name="NewsListBox"
                          ItemsSource="{Binding Items}"

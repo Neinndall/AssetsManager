@@ -25,6 +25,23 @@
         </Setter>
     </Style>
 
+    <Style x:Key="CompactModuleHeader" TargetType="Border">
+        <Setter Property="Background">
+            <Setter.Value>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                    <GradientStop Color="#FF252E4B" Offset="0"/>
+                    <GradientStop Color="#FF20283E" Offset="0.55"/>
+                    <GradientStop Color="#FF1E2233" Offset="1"/>
+                </LinearGradientBrush>
+            </Setter.Value>
+        </Setter>
+        <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="12"/>
+        <Setter Property="Padding" Value="20,20"/>
+        <Setter Property="Margin" Value="28,12,28,0"/>
+    </Style>
+
     <!-- 1. Diagnostic Badge Styles (Stats Bar & Status) -->
     <Style x:Key="DiagnosticBadgeStyle" TargetType="Border">
         <Setter Property="CornerRadius" Value="6"/>

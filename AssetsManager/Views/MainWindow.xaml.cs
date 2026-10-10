@@ -68,7 +68,7 @@ namespace AssetsManager.Views
         private List<SerializableChunkDiff> _diffsForExtraction;
 
         private GridLength _lastLogHeight = new GridLength(180);
-        private bool _isLogMinimized = true;
+        private bool _isLogMinimized;
 
         public MainWindow(
             IServiceProvider serviceProvider,

@@ -35,7 +35,7 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="*"/>    <!-- 0: Content Area -->
                 <RowDefinition Height="Auto"/> <!-- 1: Glinder Row -->
-                <RowDefinition x:Name="LogViewRow" Height="38" MinHeight="38"/> <!-- 2: LogView Row -->
+                <RowDefinition x:Name="LogViewRow" Height="180" MinHeight="38"/> <!-- 2: LogView Row -->
                 <RowDefinition Height="Auto"/> <!-- 3: Status Bar Row -->
             </Grid.RowDefinitions>
 

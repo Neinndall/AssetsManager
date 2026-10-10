@@ -5,51 +5,25 @@
         <ResourceDictionary Source="/Themes/Colors.xaml"/>
     </ResourceDictionary.MergedDictionaries>
 
-    <!-- Hash Method List Item DataTemplate -->
     <DataTemplate x:Key="HashGuessingTemplate">
-        <Grid>
+        <Grid ToolTip="{Binding Description}">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="42"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
-
-            <Border Width="38"
-                    Height="38"
-                    CornerRadius="8"
-                    Background="{StaticResource SidebarBackground}"
-                    BorderBrush="{StaticResource BorderColor}"
-                    BorderThickness="1"
-                    HorizontalAlignment="Center"
-                    VerticalAlignment="Center">
-                <materialIcons:MaterialIcon Kind="{Binding IconKind}"
-                                            Width="20"
-                                            Height="20"
-                                            Foreground="{Binding BadgeBrush}"
-                                            HorizontalAlignment="Center"
-                                            VerticalAlignment="Center"/>
+            <Border Width="42" Height="42" CornerRadius="10" Background="{StaticResource SidebarBackground}" VerticalAlignment="Center">
+                <materialIcons:MaterialIcon Kind="{Binding IconKind}" Width="22" Height="22" Foreground="{Binding BadgeBrush}"/>
             </Border>
-
-            <StackPanel Grid.Column="1"
-                        Margin="10,0,0,0"
-                        VerticalAlignment="Center">
-                <TextBlock Text="{Binding Name}"
-                           FontSize="12"
-                           FontWeight="Bold"
-                           Foreground="{StaticResource TextPrimary}"
-                           TextTrimming="CharacterEllipsis"/>
-                <TextBlock Text="{Binding Description}"
-                           Margin="0,2,0,0"
-                           FontSize="9.5"
-                           Foreground="{StaticResource TextSecondary}"
-                           TextWrapping="Wrap"/>
+            <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
+                <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" TextWrapping="Wrap"/>
+                <TextBlock Text="{Binding Category}" FontSize="10" Foreground="{StaticResource TextSecondary}" Margin="0,4,0,0" TextTrimming="CharacterEllipsis"/>
             </StackPanel>
         </Grid>
     </DataTemplate>
 
-    <!-- Hash Method List Item Style -->
     <Style x:Key="HashGuessingItemStyle" TargetType="ListBoxItem">
         <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
         <Setter Property="Padding" Value="0"/>
         <Setter Property="Margin" Value="0,0,0,6"/>
         <Setter Property="Cursor" Value="Hand"/>
@@ -57,23 +31,19 @@
             <Setter.Value>
                 <ControlTemplate TargetType="ListBoxItem">
                     <Grid SnapsToDevicePixels="True">
-                        <Border x:Name="BackgroundLayer"
-                                Background="{StaticResource CardBackground}"
-                                BorderBrush="{StaticResource BorderColor}"
-                                BorderThickness="1"
-                                CornerRadius="8"/>
-                        <ContentPresenter Margin="10,8"/>
+                        <Border x:Name="BackgroundLayer" Background="{StaticResource CardBackground}" CornerRadius="10"/>
+                        <ContentPresenter Margin="12,10" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
+                        <Border x:Name="Outline" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="10" IsHitTestVisible="False"/>
                     </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="BackgroundLayer"
-                                    Property="Background"
-                                    Value="{StaticResource HoverColor}"/>
+                            <Setter TargetName="BackgroundLayer" Property="Background" Value="{StaticResource HoverColor}"/>
                         </Trigger>
                         <Trigger Property="IsSelected" Value="True">
-                            <Setter TargetName="BackgroundLayer"
-                                    Property="Background"
-                                    Value="{StaticResource HoverColor}"/>
+                            <Setter TargetName="BackgroundLayer" Property="Background" Value="{StaticResource HoverColor}"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.5"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -81,39 +51,65 @@
         </Setter>
     </Style>
 
-    <!-- Sub-Method Card Item DataTemplate -->
+    <Style x:Key="HashGuessingStrategyCheckBox" TargetType="CheckBox">
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="CheckBox">
+                    <Grid Background="Transparent">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="16"/>
+                            <ColumnDefinition Width="10"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid Width="16" Height="16" VerticalAlignment="Center">
+                            <Border x:Name="CheckBackground" Background="{StaticResource DarkBackground}" CornerRadius="4"/>
+                            <Path x:Name="CheckMark" Data="M3.5,8 L6.5,11 L12.5,4.5" Stroke="White" StrokeThickness="1.8"
+                                  StrokeStartLineCap="Round" StrokeEndLineCap="Round" Stretch="Uniform" Margin="3" Visibility="Collapsed"/>
+                            <Border x:Name="CheckOutline" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="4" IsHitTestVisible="False"/>
+                        </Grid>
+                        <ContentPresenter Grid.Column="2" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="Center"/>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="CheckBackground" Property="Background" Value="{StaticResource AccentBrush}"/>
+                            <Setter TargetName="CheckOutline" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                            <Setter TargetName="CheckMark" Property="Visibility" Value="Visible"/>
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="CheckOutline" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.5"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <DataTemplate x:Key="HashGuessingSubItemTemplate">
-        <Border Background="{StaticResource CardBackground}"
-                BorderBrush="{StaticResource BorderColor}"
-                BorderThickness="1"
-                CornerRadius="8"
-                Padding="10,8"
-                Margin="0,0,0,6">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-
-                <CheckBox Grid.Column="0"
-                          IsChecked="{Binding IsSelected, Mode=TwoWay}"
-                          Style="{StaticResource ModernCheckBox}"
-                          Margin="0,0,10,0"
-                          VerticalAlignment="Center"/>
-
-                <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                    <TextBlock Text="{Binding Name}"
-                               FontWeight="Bold"
-                               FontSize="11.5"
-                               Foreground="{StaticResource TextPrimary}"
-                               TextTrimming="CharacterEllipsis"/>
-                    <TextBlock Text="{Binding Description}"
-                               Margin="0,2,0,0"
-                               FontSize="9.5"
-                               Foreground="{StaticResource TextSecondary}"
-                               TextWrapping="Wrap"/>
+        <Grid Margin="0,0,0,6">
+            <Border x:Name="StrategyBackground" Background="{StaticResource SidebarBackground}" CornerRadius="8"/>
+            <CheckBox x:Name="StrategyCheckBox" IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                      Style="{StaticResource HashGuessingStrategyCheckBox}" Margin="12,10" HorizontalContentAlignment="Stretch"
+                      ToolTip="{Binding Description}">
+                <StackPanel>
+                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="12" Foreground="{StaticResource TextPrimary}" TextWrapping="Wrap"/>
+                    <TextBlock Text="{Binding Description}" Margin="0,2,0,0" FontSize="11" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
                 </StackPanel>
-            </Grid>
-        </Border>
+            </CheckBox>
+            <Border x:Name="StrategyOutline" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="8" IsHitTestVisible="False"/>
+        </Grid>
+        <DataTemplate.Triggers>
+            <Trigger SourceName="StrategyCheckBox" Property="IsMouseOver" Value="True">
+                <Setter TargetName="StrategyBackground" Property="Background" Value="{StaticResource HoverColor}"/>
+                <Setter TargetName="StrategyOutline" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+            </Trigger>
+            <Trigger SourceName="StrategyCheckBox" Property="IsKeyboardFocusWithin" Value="True">
+                <Setter TargetName="StrategyOutline" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+            </Trigger>
+        </DataTemplate.Triggers>
     </DataTemplate>
 </ResourceDictionary>

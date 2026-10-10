@@ -181,6 +181,11 @@ New Features
   - Monitor / Version Manager: Fetch Versions now flags newly discovered manifests with an inline NEW tag (icon + text) next to the publish date.
 
 Improvements
+  - Interface / The main log now starts expanded and can still be collapsed or resized.
+  - Hash Lab / Added small icons to the target, method selection, execution and resolved matches headings.
+  - Interface / Added breathing room to shared headers, muted the Hash Lab empty state and removed unused space from methods without sub-strategies.
+  - Interface / Unified compact headers in Comparator, Hash Lab, News Center and Monitor; restored Hash Lab fonts, softened method selection and removed estimated runtimes.
+  - Hash Lab / Redesigned the workspace with clearer method selection, strategy controls, live progress and resolved results.
   - Hash Lab / Reduced repeated work when guessing reused GAME files.
   - Viewer / Improved compatibility of native shaders used for instanced drawing.
   - 3D Studio / Project Files now shows thumbnails by default, groups Explorer access with navigation and displays texture names above the preview.
