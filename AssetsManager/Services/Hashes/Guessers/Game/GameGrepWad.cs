@@ -64,6 +64,15 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             void CheckGameCandidates(IEnumerable<HashGuessCandidate> candidates) =>
                 CheckIter(engine, candidates, sourceWadPath, cancellationToken, sourceChunkHash: sourceChunkHash);
 
+            void CheckBinPath(string path)
+            {
+                if (path.EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
+                    CheckGameCandidates(ExpandGrepFilePath(path, HashGuessStrategy.BinLengthPath));
+                else CheckGame(path);
+                if (path.EndsWith(".png", StringComparison.OrdinalIgnoreCase))
+                    CheckGame(path[..^4] + ".dds", HashGuessStrategy.ImageExtensionVariant);
+            }
+
             if (sourcePath.Equals("data/all_lua_files.manifest", StringComparison.OrdinalIgnoreCase))
             {
                 CheckGameCandidates(ExtractLuaManifestCandidates(data, cancellationToken));
@@ -78,12 +87,13 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             if (engine.RemainingUnknownCount == 0) return;
 
             string extension = Path.GetExtension(sourcePath).TrimStart('.').ToLowerInvariant();
-            if (!ShouldGrepExtension(extension))
+            bool isPropertyBin = FileTypeDetector.IsPropertyBin(data.AsSpan());
+            if (!isPropertyBin && !ShouldGrepExtension(extension))
             {
                 return; // don't grep filetypes known to not contain full paths
             }
 
-            bool isBin = extension is "bin" or "inibin";
+            bool isBin = isPropertyBin || extension is "bin" or "inibin";
             if (isBin)
             {
                 string text = Encoding.Latin1.GetString(data.Array, data.Offset, data.Count);
@@ -99,29 +109,23 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                     if (!IsAscii(path)) continue;
                     path = NormalizePath(path);
                     if (!seenPaths.Add(path)) continue;
+                    CheckBinPath(path);
 
                     if (path.StartsWith("characters/", StringComparison.OrdinalIgnoreCase))
                     {
-                        CheckGame(path);
-                        CheckGame($"assets/{path}");
-                        CheckGame($"data/{path}");
-                    }
-                    else if (path.EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
-                    {
-                        string prefix = path[..^4];
-                        CheckGame(path);
-                        CheckGame(prefix + ".luabin", HashGuessStrategy.LuaVariant);
-                        CheckGame(prefix + ".luabin64", HashGuessStrategy.LuaVariant);
-                        CheckGame(prefix + ".preload", HashGuessStrategy.LuaVariant);
+                        CheckBinPath($"assets/{path}");
+                        CheckBinPath($"data/{path}");
                     }
                     else if (path.StartsWith("shaders/", StringComparison.OrdinalIgnoreCase) ||
                              path.StartsWith("assets/shaders/", StringComparison.OrdinalIgnoreCase) ||
                              path.StartsWith("data/shaders/", StringComparison.OrdinalIgnoreCase))
                     {
+                        string shaderExtension = ShaderExtensions.FirstOrDefault(ext => path.EndsWith(ext, StringComparison.OrdinalIgnoreCase));
+                        string shaderBase = shaderExtension == null ? path : path[..^shaderExtension.Length];
                         var candidateBases = path.StartsWith("assets/", StringComparison.OrdinalIgnoreCase) ||
                                              path.StartsWith("data/", StringComparison.OrdinalIgnoreCase)
-                            ? new[] { path }
-                            : new[] { $"assets/{path}", $"data/{path}", $"assets/shaders/generated/{path}" };
+                            ? new[] { shaderBase }
+                            : new[] { $"assets/{shaderBase}", $"data/{shaderBase}", $"assets/shaders/generated/{shaderBase}" };
                         foreach (string candidateBase in candidateBases)
                         {
                             CheckGameIter(
@@ -145,15 +149,16 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                     }
                     else if (path.StartsWith("maps/mapgeometry/", StringComparison.OrdinalIgnoreCase))
                     {
-                        CheckGame($"data/{path}.mapgeo");
-                        CheckGame($"data/{path}.materials.bin");
+                        string geometryBase = path.EndsWith(".materials.bin", StringComparison.OrdinalIgnoreCase)
+                            ? path[..^14] : path.EndsWith(".mapgeo", StringComparison.OrdinalIgnoreCase) ? path[..^7] : path;
+                        CheckGame($"data/{geometryBase}.mapgeo");
+                        CheckGame($"data/{geometryBase}.materials.bin");
                     }
                     else if (path.StartsWith("clientstates/", StringComparison.OrdinalIgnoreCase) ||
                              path.StartsWith("patching/", StringComparison.OrdinalIgnoreCase) ||
                              path.StartsWith("loadouts/", StringComparison.OrdinalIgnoreCase) ||
                              path.StartsWith("maps/", StringComparison.OrdinalIgnoreCase))
                     {
-                        CheckGame(path);
                         int separator = path.LastIndexOf('/');
                         if (separator > 0)
                         {
@@ -163,16 +168,10 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                             if (parentSeparator > 0) CheckGame(parent[..parentSeparator]);
                         }
                     }
-                    else
-                    {
-                        CheckGame(path);
-                        if (path.EndsWith(".png", StringComparison.OrdinalIgnoreCase))
-                            CheckGame(path[..^4] + ".dds", HashGuessStrategy.ImageExtensionVariant);
-                    }
                 }
 
                 GuessDottedBinPaths(engine, data, sourceWadPath, sourceChunkHash, cancellationToken);
-                if (data.Array is not null && data.Count >= sizeof(int) && FileTypeDetector.IsPropertyBin(data.AsSpan()))
+                if (isPropertyBin)
                 {
                     BinTree cachedTree = null;
                     bool binParseAttempted = false;
@@ -207,10 +206,12 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                 string text = Encoding.Latin1.GetString(data.Array, data.Offset, data.Count);
                 string directory = PathUtils.NormalizeSeparators(Path.GetDirectoryName(sourcePath));
 
-                foreach (Match match in Regex.Matches(text, @"Name=""([^""]+)"""))
+                foreach (Match match in Regex.Matches(text, @"\bName\s*=\s*(?:""([^""\r\n]+)""|'([^'\r\n]+)')"))
                 {
-                    if (!IsAscii(match.Groups[1].Value)) continue;
-                    string path = NormalizePath(match.Groups[1].Value);
+                    cancellationToken.ThrowIfCancellationRequested();
+                    string value = match.Groups[1].Success ? match.Groups[1].Value : match.Groups[2].Value;
+                    if (!IsAscii(value)) continue;
+                    string path = NormalizePath(value);
                     if (path.EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
                     {
                         string prefix = path[..^4];
@@ -221,6 +222,8 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                     else if (path.EndsWith(".troy", StringComparison.OrdinalIgnoreCase))
                     {
                         CheckGame($"data/shared/particles/{path[..^5]}.troybin", HashGuessStrategy.PreloadReference);
+                        if (path.StartsWith("data/", StringComparison.OrdinalIgnoreCase) || path.StartsWith("assets/", StringComparison.OrdinalIgnoreCase))
+                            CheckGame(path[..^5] + ".troybin", HashGuessStrategy.PreloadReference);
                     }
                     else if (path.StartsWith("shaders", StringComparison.OrdinalIgnoreCase))
                     {
@@ -235,7 +238,8 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                     }
                     else if (!string.IsNullOrEmpty(directory))
                     {
-                        CheckGame(directory + "/" + path + ".preload", HashGuessStrategy.PreloadReference);
+                        string reference = path.EndsWith(".preload", StringComparison.OrdinalIgnoreCase) ? path : path + ".preload";
+                        CheckGame(ResolveGrepReference(directory, reference), HashGuessStrategy.PreloadReference);
                     }
                 }
                 return;
@@ -246,12 +250,12 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                 string text = Encoding.Latin1.GetString(data.Array, data.Offset, data.Count);
                 string directory = PathUtils.NormalizeSeparators(Path.GetDirectoryName(sourcePath));
                 if (string.IsNullOrEmpty(directory)) return;
-                foreach (Match match in Regex.Matches(text, @"#include ""([^""]+)"""))
+                foreach (Match match in Regex.Matches(text, @"^[ \t]*#[ \t]*include[ \t]*(?:""([^""\r\n]+)""|<([^>\r\n]+)>)", RegexOptions.Multiline | RegexOptions.CultureInvariant))
                 {
-                    if (!IsAscii(match.Groups[1].Value)) continue;
-                    CheckGame(
-                        NormalizePath(PathUtils.NormalizeVirtualPath($"{directory}/{match.Groups[1].Value}")),
-                        HashGuessStrategy.ShaderInclude);
+                    cancellationToken.ThrowIfCancellationRequested();
+                    string reference = match.Groups[1].Success ? match.Groups[1].Value : match.Groups[2].Value;
+                    if (!IsAscii(reference)) continue;
+                    CheckGame(ResolveGrepReference(directory, reference), HashGuessStrategy.ShaderInclude);
                 }
                 return;
             }
@@ -263,15 +267,22 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                 if (string.IsNullOrEmpty(directory)) return;
                 foreach (string line in text.Split('\n'))
                 {
-                    if (!IsAscii(line)) continue;
-                    CheckGame(
-                        NormalizePath(Path.Combine(directory, line.Trim())),
-                        HashGuessStrategy.AtlasReference);
+                    cancellationToken.ThrowIfCancellationRequested();
+                    string reference = line.Trim();
+                    if (reference.Length == 0 || !IsAscii(reference)) continue;
+                    CheckGame(ResolveGrepReference(directory, reference), HashGuessStrategy.AtlasReference);
                 }
                 return;
             }
 
             CheckGameCandidates(GrepFile(data, cancellationToken));
+        }
+
+        private static string ResolveGrepReference(string directory, string reference)
+        {
+            string path = NormalizePath(reference);
+            bool rooted = path.StartsWith('/') || path.StartsWith("assets/", StringComparison.Ordinal) || path.StartsWith("data/", StringComparison.Ordinal);
+            return NormalizePath(PathUtils.NormalizeVirtualPath(rooted ? path.TrimStart('/') : $"{directory}/{path}"));
         }
 
         /// <summary>

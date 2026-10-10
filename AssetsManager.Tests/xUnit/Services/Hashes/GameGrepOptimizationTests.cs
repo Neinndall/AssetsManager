@@ -4,12 +4,15 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
+using System.Threading.Tasks;
+using AssetsManager.Tests.xUnit.Infrastructure;
 using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Hashes.Guessers;
 using AssetsManager.Services.Hashes.Guessers.Game;
 using AssetsManager.Views.Models.Hashes;
 using LeagueToolkit.Core.Meta;
 using LeagueToolkit.Core.Meta.Properties;
+using LeagueToolkit.Core.Wad;
 using LeagueToolkit.Hashing;
 using Xunit;
 
@@ -17,6 +20,103 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
 {
     public class GameGrepOptimizationTests
     {
+        [Fact]
+        public async Task GrepServiceAppliesCachedExtensionsToRepeatedUnknownChunkPaths()
+        {
+            using var bridge = new AssetsManagerTestBridge();
+            bridge.Directories.CreateHashesDirectories();
+            string root = bridge.CreateDirectory("Game");
+            const string chunkPath = "data/shared/unknown.preload", target = "data/shared/particles/rare_effect.troybin";
+            foreach (var fixture in new[] { ("a.wad.client", "PreLoadBuildingBlocks = {}"),
+                ("b.wad.client", "PreLoadBuildingBlocks = {Name=\"rare_effect.troy\"}") })
+                bridge.BakeWad(root, fixture.Item1, (chunkPath, fixture.Item2));
+            var store = new HashGuessingStore(bridge.Directories);
+            var targets = new HashSet<ulong> { XxHash64Ext.Hash(target) };
+            await store.SaveUnknownHashesAsync(HashGuessDomain.Game, targets, targets, "", CancellationToken.None);
+            using var resolver = new HashResolverService(bridge.Directories, bridge.LogService);
+            var persistence = new HashGuessPersistenceService(store, new BinRstHashGuessingStore(bridge.Directories));
+            var service = new HashGuessingService(resolver, store, persistence, bridge.LogService, bridge.Directories);
+
+            var result = await service.RunEmbeddedPathGrepAsync(HashGuessDomain.Game, root, null, CancellationToken.None);
+
+            Assert.Equal(target, Assert.Single(result.Matches).Path);
+            Assert.Equal(2, result.ScannedChunks);
+            Assert.Empty(await store.LoadUnknownHashesAsync(HashGuessDomain.Game, CancellationToken.None));
+        }
+
+        [Theory]
+        [InlineData("0123456789abcdef", false)]
+        [InlineData("0123456789abcdef", true)]
+        [InlineData("example.bin", false)]
+        [InlineData("example.dat", false)]
+        [InlineData("example.tex", false)]
+        public void PropertyBinSignaturesSelectStructuredGrepRegardlessOfFilename(string source, bool patch)
+        {
+            const string target = "assets/ui/cards/moon_guardian.tex";
+            var tree = new BinTree(new[] { new BinTreeObject(1, 100, new BinTreeProperty[]
+            {
+                new BinTreeString(20, "moon_guardian"), new BinTreeString(30, "assets/ui/cards/forest_spirit.tex"),
+                new BinTreeWadChunkLink(40, XxHash64Ext.Hash(target))
+            }) }, Array.Empty<string>());
+            using var serialized = new MemoryStream();
+            if (patch) { using var writer = new BinaryWriter(serialized, System.Text.Encoding.ASCII, true); writer.Write("PTCH"u8); writer.Write(1U); writer.Write(0U); }
+            tree.Write(serialized);
+            if (patch) { using var writer = new BinaryWriter(serialized, System.Text.Encoding.ASCII, true); writer.Write(0U); }
+            AssertGrepReference(serialized.ToArray(), source, target);
+        }
+
+        [Theory]
+        [InlineData("characters/example/scripts/action.lua", "assets/characters/example/scripts/action.luabin64")]
+        [InlineData("characters/example/images/icon.png", "assets/characters/example/images/icon.dds")]
+        [InlineData("maps/mapgeometry/example/example", "maps/mapgeometry/example/example")]
+        [InlineData("maps/mapgeometry/example/example.mapgeo", "data/maps/mapgeometry/example/example.mapgeo")]
+        [InlineData("maps/mapgeometry/example/example.materials.bin", "data/maps/mapgeometry/example/example.materials.bin")]
+        [InlineData("assets/shaders/test.ps", "assets/shaders/test.ps")]
+        [InlineData("shaders/test.ps", "assets/shaders/generated/shaders/test.ps-dx11_2")]
+        public void BinReferencesPreservePathsAndExpandTheirActualExtensions(string reference, string expected)
+        {
+            byte[] text = System.Text.Encoding.ASCII.GetBytes(reference);
+            byte[] bytes = new byte[text.Length + 2];
+            bytes[0] = (byte)text.Length;
+            bytes[1] = (byte)(text.Length >> 8);
+            text.CopyTo(bytes, 2);
+            AssertGrepReference(bytes, "data/test.bin", expected);
+        }
+
+        [Theory]
+        [InlineData("#include\t\"../shared/common.hlsl\"", "assets/shaders/shared/common.hlsl")]
+        [InlineData("  # include  \"../shared/common.hlsl\"", "assets/shaders/shared/common.hlsl")]
+        [InlineData("#include \"assets/shaders/shared/common.hlsl\"", "assets/shaders/shared/common.hlsl")]
+        [InlineData("#include <../shared/common.hlsl>", "assets/shaders/shared/common.hlsl")]
+        public void ShaderIncludesResolveWhitespaceAndVirtualPaths(string text, string expected)
+            => AssertGrepReference(System.Text.Encoding.ASCII.GetBytes(text), "assets/shaders/effects/main.hlsl", expected);
+
+        [Theory]
+        [InlineData("../shared/icon.tex\r\n", "assets/ui/shared/icon.tex")]
+        [InlineData("assets/ui/shared/icon.tex\n", "assets/ui/shared/icon.tex")]
+        public void TextAtlasReferencesResolveVirtualPaths(string text, string expected)
+            => AssertGrepReference(System.Text.Encoding.ASCII.GetBytes(text), "assets/ui/cards/main.atlas", expected);
+
+        [Theory]
+        [InlineData("Name = 'logic/test.preload'", "data/shared/logic/test.preload")]
+        [InlineData("Name=\"../logic/test\"", "data/logic/test.preload")]
+        [InlineData("Name=\"data/shared/particles/test.troy\"", "data/shared/particles/test.troybin")]
+        public void PreloadReferencesPreserveExtensionsAndResolvePaths(string text, string expected)
+            => AssertGrepReference(System.Text.Encoding.ASCII.GetBytes(text), "data/shared/test.preload", expected);
+
+        private static void AssertGrepReference(byte[] bytes, string source, string expected)
+        {
+            var buffer = new byte[bytes.Length + 23];
+            bytes.CopyTo(buffer, 11);
+            var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong> { XxHash64Ext.Hash(expected), 42 });
+            var guesser = new GameHashGuesser(new HashFile(HashGuessDomain.Game, Array.Empty<string>()));
+            guesser.GrepWad(engine, new ArraySegment<byte>(buffer, 11, bytes.Length), source, "example.wad", 7);
+            var match = Assert.Single(engine.Matches).Value;
+            Assert.Equal(expected, match.Path);
+            Assert.Equal(7UL, match.SourceChunkHash);
+            Assert.Equal(new[] { 42UL }, engine.UnknownHashes);
+        }
+
         [Fact]
         public void SiblingPathsReachPatchOverrideStructures()
         {

@@ -145,6 +145,7 @@ namespace AssetsManager.Services.Hashes
 
                             string resolvedChunkPath = _hashResolverService.ResolveHash(chunk.PathHash);
                             string chunkExt = Path.GetExtension(resolvedChunkPath).TrimStart('.').ToLowerInvariant();
+                            bool hasResolvedExtension = chunkExt.Length > 0;
                             if (chunkExt.Length == 0 && inferredExtensions.TryGetValue(chunk.PathHash, out string cachedExtension))
                                 chunkExt = cachedExtension;
 
@@ -159,8 +160,8 @@ namespace AssetsManager.Services.Hashes
                                 {
                                     chunkExt = InferChunkExtension(data, domain == HashGuessDomain.Lcu);
                                     inferredExtensions[chunk.PathHash] = chunkExt;
-                                    if (chunkExt.Length > 0) resolvedChunkPath += "." + chunkExt;
                                 }
+                                if (!hasResolvedExtension && chunkExt.Length > 0) resolvedChunkPath += "." + chunkExt;
                                 guesser.GrepWad(engine, data, resolvedChunkPath, wadPath, chunk.PathHash, cancellationToken);
                             }
                             catch (Exception ex) when (ex is not OperationCanceledException)
