@@ -4,6 +4,12 @@
         <ResourceDictionary Source="/Themes/Colors.xaml"/>
     </ResourceDictionary.MergedDictionaries>
 
+    <Style x:Key="SectionCaption" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="10"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+    </Style>
+
     <!-- Tool Section Label Style (Used in Toolbars) -->
     <Style x:Key="ToolSectionLabel" TargetType="TextBlock">
         <Setter Property="FontSize" Value="10"/>

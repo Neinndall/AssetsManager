@@ -4,6 +4,13 @@
         <ResourceDictionary Source="/Themes/Colors.xaml"/>
     </ResourceDictionary.MergedDictionaries>
 
+    <Style x:Key="PanelSurface" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource CardBackground}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="12"/>
+    </Style>
+
     <!-- Card Style -->
     <Style x:Key="SettingsCard" TargetType="Border">
         <Setter Property="Background" Value="{StaticResource CardBackground}"/>
