@@ -308,34 +308,8 @@
                     </Grid>
                 </Border>
 
-                <GridSplitter Grid.Row="1" Height="16" HorizontalAlignment="Stretch" VerticalAlignment="Center"
-                              ResizeDirection="Rows" ResizeBehavior="PreviousAndNext" ShowsPreview="False"
-                              Cursor="SizeNS" ToolTip="Drag to resize strategies and results">
-                    <GridSplitter.Style>
-                        <Style TargetType="GridSplitter">
-                            <Setter Property="Background" Value="Transparent"/>
-                            <Setter Property="Foreground" Value="{StaticResource BorderColor}"/>
-                            <Setter Property="Template">
-                                <Setter.Value>
-                                    <ControlTemplate TargetType="GridSplitter">
-                                        <Border Background="{TemplateBinding Background}">
-                                            <Border Width="40" Height="3" CornerRadius="1.5" Background="{TemplateBinding Foreground}"
-                                                    HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                        </Border>
-                                    </ControlTemplate>
-                                </Setter.Value>
-                            </Setter>
-                            <Style.Triggers>
-                                <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
-                                </Trigger>
-                                <Trigger Property="IsKeyboardFocusWithin" Value="True">
-                                    <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
-                                </Trigger>
-                            </Style.Triggers>
-                        </Style>
-                    </GridSplitter.Style>
-                </GridSplitter>
+                <GridSplitter Grid.Row="1" Style="{StaticResource ModernGlinderStyle}"
+                              ToolTip="Drag to resize strategies and results"/>
 
                 <Border Grid.Row="2" Style="{StaticResource LabSurface}">
                     <Grid Margin="16">

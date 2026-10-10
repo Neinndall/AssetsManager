@@ -181,6 +181,7 @@ New Features
   - Monitor / Version Manager: Fetch Versions now flags newly discovered manifests with an inline NEW tag (icon + text) next to the publish date.
 
 Improvements
+  - Hash Lab / The results divider now widens and glows on hover like the logger divider.
   - Hash Lab / Added a checklist icon to the Included Strategies heading.
   - Hash Lab / Results have more room by default, with a draggable divider to resize strategies and matches.
   - Hash Lab / Restored the sync indicator and shortened the Run button to leave more room for status messages.
