@@ -26,6 +26,16 @@ namespace AssetsManager.Tests.Diagnostics
 
         static async Task Main(string[] args)
         {
+            if (args.Length > 0 && args[0] == "game-context-patterns")
+            {
+                GameContextPatternsDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
+            if (args.Length > 0 && args[0] == "game-scoped-textures")
+            {
+                GameScopedTextureBuildListDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
             if (args.Length > 0 && args[0] == "game-learned-links")
             {
                 GameLearnedLinksDiagnostic.Run(args.Skip(1).ToArray());

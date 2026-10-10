@@ -1,0 +1,125 @@
+using System;
+using System.Buffers.Binary;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Threading;
+using AssetsManager.Services.Hashes;
+using AssetsManager.Views.Models.Hashes;
+using LeagueToolkit.Core.Meta;
+using LeagueToolkit.Core.Wad;
+using LeagueToolkit.Hashing;
+
+namespace AssetsManager.Services.Hashes.Guessers.Game;
+
+internal sealed partial class GameHashGuesser
+{
+    private HashSet<(string Character, string Container)> FindPendingAnimationContainers(
+        string rootDirectory, HashGuessEngine engine, CancellationToken cancellationToken)
+    {
+        var containers = new HashSet<(string, string)>();
+        var visited = new HashSet<(ulong Hash, ulong Checksum)>();
+        var known = HashFile.Load();
+        byte[] animationField = new byte[4];
+        BinaryPrimitives.WriteUInt32LittleEndian(animationField, Fnv1a.HashLower("mAnimationFilePath"));
+        foreach (string wadPath in FindWads(rootDirectory))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                using var wad = new WadFile(wadPath);
+                if (!wad.Chunks.Keys.Any(engine.UnknownHashes.Contains)) continue;
+                foreach (var (hash, chunk) in wad.Chunks)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (chunk.Compression == WadChunkCompression.Satellite || !known.TryGetValue(hash, out string path) ||
+                        !path.StartsWith("data/characters/", StringComparison.OrdinalIgnoreCase) ||
+                        !path.Contains("/animations/", StringComparison.OrdinalIgnoreCase) ||
+                        !path.EndsWith(".bin", StringComparison.OrdinalIgnoreCase) || visited.Contains((hash, chunk.Checksum))) continue;
+                    string[] parts = path.ToLowerInvariant().Split('/');
+                    if (parts.Length != 5 || parts[3] != "animations") continue;
+                    try
+                    {
+                        using var data = wad.LoadChunkDecompressed(chunk);
+                        visited.Add((hash, chunk.Checksum));
+                        // Reject irrelevant BINs cheaply; a parsed property still verifies every accepted link.
+                        var remaining = data.Span;
+                        bool pending = false;
+                        while (remaining.Length >= 13)
+                        {
+                            cancellationToken.ThrowIfCancellationRequested();
+                            int offset = remaining.IndexOf(animationField);
+                            if (offset < 0 || remaining.Length - offset < 13) break;
+                            if (engine.UnknownHashes.Contains(BinaryPrimitives.ReadUInt64LittleEndian(remaining.Slice(offset + 5, 8))))
+                            {
+                                pending = true;
+                                break;
+                            }
+                            remaining = remaining[(offset + 1)..];
+                        }
+                        if (!pending) continue;
+                        var bytes = data.DangerousGetArray();
+                        using var stream = new MemoryStream(bytes.Array, bytes.Offset, bytes.Count, false);
+                        var tree = new BinTree(stream);
+                        if (EnumerateAnimationFileLinks(tree).Any(link => engine.UnknownHashes.Contains(link.PathHash)))
+                            containers.Add((parts[2], parts[4][..^4]));
+                    }
+                    catch (Exception exception) when (exception is not OperationCanceledException)
+                    {
+                        _logService?.LogDebug($"GAME animation context skipped '{path}': {exception.Message}");
+                    }
+                }
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                _logService?.LogDebug($"GAME animation context skipped '{wadPath}': {exception.Message}");
+            }
+        }
+        return containers;
+    }
+
+    internal long SubstituteReferencedAnimationSuffixes(HashGuessEngine engine,
+        IReadOnlySet<(string Character, string Container)> containers, CancellationToken cancellationToken,
+        long candidateBudget = long.MaxValue, Action<long> progress = null)
+    {
+        if (containers.Count == 0 || candidateBudget <= 0 || engine.RemainingUnknownCount == 0) return 0;
+        var prefixes = new HashSet<string>(StringComparer.Ordinal);
+        var suffixes = new HashSet<string>(StringComparer.Ordinal);
+        foreach (string path in KnownPaths)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!path.EndsWith(".anm", StringComparison.OrdinalIgnoreCase)) continue;
+            string normalized = path.ToLowerInvariant();
+            int slash = normalized.LastIndexOf('/');
+            if (slash < 0) continue;
+            string[] words = normalized[(slash + 1)..^4].Split('_');
+            for (int count = 1; count < Math.Min(5, words.Length); count++)
+                suffixes.Add(string.Join('_', words[^count..]) + ".anm");
+            string[] folders = normalized[..slash].Split('/');
+            if (folders.Length < 5 || folders[1] != "characters") continue;
+            bool active = containers.Any(container => container.Character == folders[2] &&
+                (folders.Skip(3).Contains(container.Container) ||
+                 container.Container == "base" && folders.Skip(3).Contains("skin0")));
+            if (!active) continue;
+            for (int count = 1; count < Math.Min(4, words.Length); count++)
+                prefixes.Add(normalized[..(slash + 1)] + string.Join('_', words[..count]) + "_");
+        }
+        string[] orderedPrefixes = prefixes.OrderBy(value => value, StringComparer.Ordinal).ToArray();
+        long checkedCandidates = 0;
+        foreach (string suffix in suffixes.OrderBy(value => value, StringComparer.Ordinal))
+        foreach (string prefix in orderedPrefixes)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (checkedCandidates >= candidateBudget || engine.RemainingUnknownCount == 0)
+            {
+                progress?.Invoke(checkedCandidates);
+                return checkedCandidates;
+            }
+            engine.CheckPrefixSuffix(prefix, suffix, HashGuessStrategy.WordlistVariant,
+                "GAME Custom: BIN-referenced animation suffixes");
+            if ((++checkedCandidates & 0x3fff) == 0) progress?.Invoke(checkedCandidates);
+        }
+        progress?.Invoke(checkedCandidates);
+        return checkedCandidates;
+    }
+}

@@ -181,6 +181,11 @@ New Features
   - Monitor / Version Manager: Fetch Versions now flags newly discovered manifests with an inline NEW tag (icon + text) next to the publish date.
 
 Improvements
+  - Hash Lab / Compact execution controls leave more room for strategies and show progress only when active or available.
+  - Hash Lab / GAME Basic now finds TEX textures using image names from the LCU catalog.
+  - Hash Lab / Animation Build List prioritizes containers whose BINs reference unknown animations.
+  - Hash Lab / Added read-only diagnostics to compare targeted texture and animation guesses against existing methods.
+  - Interface / Standard dropdown text now uses an 11 px font size.
   - Interface / The main log now starts expanded and can still be collapsed or resized.
   - Hash Lab / Added small icons to the target, method selection, execution and resolved matches headings.
   - Interface / Added breathing room to shared headers, muted the Hash Lab empty state and removed unused space from methods without sub-strategies.
@@ -512,6 +517,7 @@ Improvements
   - Input and confirmation dialogs now support Enter/Escape keys with automatic focus.
 
 Changes
+  - Hash Lab / Exploratory diagnostics now run in C# without Python dependencies.
   - Hash Lab / Renamed BIN XXH3-64 unknown files to match their hash catalog.
   - Viewer / Removed the classic model viewer; 3D Studio is now the only 3D workspace.
   - Viewer / Renamed VFX Studio to 3D Studio with compact entry cards for models, chromas, animations, maps and visual effects.

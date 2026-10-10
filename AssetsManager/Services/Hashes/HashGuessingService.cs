@@ -917,7 +917,7 @@ namespace AssetsManager.Services.Hashes
             {
                 Action<HashGuessMatch> reportMatch = matchProgress is null ? null : matchProgress.Report;
                 engine = new HashGuessEngine(HashGuessDomain.Game, unknown, reportMatch);
-                int checkedCandidates = _gameGuesser.RunCustomAttacks(engine, progress, cancellationToken, selectedSubMethods);
+                int checkedCandidates = _gameGuesser.RunCustomAttacks(engine, progress, cancellationToken, selectedSubMethods, rootDirectory);
                 var matches = engine.Matches.Values.OrderBy(value => value.Path, StringComparer.OrdinalIgnoreCase).ToList();
                 return (matches, checkedCandidates, engine.UnknownHashes);
             }, cancellationToken), () => engine, HashGuessDomain.Game, inventory);

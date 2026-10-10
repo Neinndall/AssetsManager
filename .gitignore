@@ -5,3 +5,7 @@ obj/
 # Local planning and build metadata
 TO-DO.json
 build.txt
+
+# Local diagnostic reports
+AssetsManager.Tests/artifacts/**/*.txt
+AssetsManager.Tests/artifacts/**/*.json

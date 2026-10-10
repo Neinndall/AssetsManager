@@ -1622,7 +1622,7 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
             Assert.DoesNotContain(lcuEngine.Matches.Values, match => match.Path == webp);
             Assert.Equal(3, lcuCheckedCandidates);
 
-            string[] expectedGameCandidates = { "assets/client/icon.dds", "data/client/config.json" };
+            string[] expectedGameCandidates = { "assets/client/icon.dds", "assets/client/icon.tex", "data/client/config.json" };
             var gameEngine = new HashGuessEngine(
                 HashGuessDomain.Game,
                 expectedGameCandidates
@@ -1631,7 +1631,7 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
                     .ToHashSet());
             int gameCheckedCandidates = game.GuessFromLcuHashes(gameEngine, lcu, CancellationToken.None);
             Assert.Equal(1, gameEngine.RemainingUnknownCount);
-            Assert.Equal(2, gameCheckedCandidates);
+            Assert.Equal(3, gameCheckedCandidates);
             Assert.All(expectedGameCandidates, expected =>
                 Assert.Contains(gameEngine.Matches.Values, match => match.Path == expected));
             Assert.DoesNotContain(gameEngine.Matches.Values, match => match.Path == "assets/client/already.dds");
@@ -1663,7 +1663,28 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
 
             int checkedCandidates = game.GuessFromLcuHashes(engine, lcu, CancellationToken.None);
 
-            Assert.Equal(1, checkedCandidates);
+            Assert.Equal(2, checkedCandidates);
+        }
+
+        [Theory]
+        [InlineData(0, false)]
+        [InlineData(1, false)]
+        [InlineData(2, true)]
+        public void GameCrossDomainTexGuessRespectsCandidateBudget(int budget, bool resolves)
+        {
+            const string texture = "assets/ux/kiwi/augments/icons/mercysstrike_small.tex";
+            var game = new GameHashGuesser();
+            var lcu = new LcuHashGuesser(new[]
+            {
+                "plugins/rcp-be-lol-game-data/global/default/assets/ux/kiwi/augments/icons/mercysstrike_small.png"
+            }, null);
+            var engine = CreateEngine(HashGuessDomain.Game, texture);
+
+            int attempts = game.GuessFromLcuHashes(engine, lcu, CancellationToken.None, budget);
+
+            Assert.Equal(budget, attempts);
+            Assert.Equal((long)attempts, engine.CheckedCandidates);
+            Assert.Equal(resolves, engine.Matches.ContainsKey(XxHash64Ext.Hash(texture)));
         }
 
         [Fact]

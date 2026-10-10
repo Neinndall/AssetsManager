@@ -36,7 +36,8 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             HashGuessEngine engine,
             IProgress<HashGuessProgress> progress,
             CancellationToken cancellationToken,
-            IReadOnlySet<string> selectedSubMethods = null)
+            IReadOnlySet<string> selectedSubMethods = null,
+            string rootDirectory = null)
         {
             int checkedCandidates = 0;
             if (engine.RemainingUnknownCount == 0) return checkedCandidates;
@@ -66,7 +67,8 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                     cancellationToken,
                     progress: count => progress?.Report(engine.CreateProgress(
                         "GAME Custom: animation actions build-list",
-                        (int)Math.Min(int.MaxValue, progressOffset + count))));
+                        (int)Math.Min(int.MaxValue, progressOffset + count))),
+                    rootDirectory: rootDirectory);
                 checkedCandidates = (int)Math.Min(int.MaxValue, checkedCandidates + animationCheckedCandidates);
                 if (engine.RemainingUnknownCount == 0) return checkedCandidates;
             }
@@ -130,9 +132,20 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             HashGuessEngine engine,
             CancellationToken cancellationToken,
             long candidateBudget = long.MaxValue,
-            Action<long> progress = null)
+            Action<long> progress = null,
+            string rootDirectory = null)
         {
             if (engine.RemainingUnknownCount == 0 || candidateBudget <= 0) return 0;
+
+            long checkedCandidates = 0;
+            if (!string.IsNullOrWhiteSpace(rootDirectory))
+            {
+                progress?.Invoke(0);
+                var containers = FindPendingAnimationContainers(rootDirectory, engine, cancellationToken);
+                checkedCandidates = SubstituteReferencedAnimationSuffixes(engine, containers, cancellationToken,
+                    Math.Min(candidateBudget, 50_000_000), progress);
+                if (engine.RemainingUnknownCount == 0 || checkedCandidates >= candidateBudget) return checkedCandidates;
+            }
 
             IReadOnlyList<string> animPaths = Corpus.GetOrCreate(
                 "custom-character-anm-paths",
@@ -144,7 +157,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                     .ToList());
 
             IReadOnlyList<string> words = GetExpandedGlobalAnimationActions(cancellationToken);
-            if (animPaths.Count == 0 || words.Count == 0) return 0;
+            if (animPaths.Count == 0 || words.Count == 0) return checkedCandidates;
 
             IReadOnlyList<string> prioritizedWords = GetGlobalAnimationActions(cancellationToken)
                 .Concat(words)
@@ -166,7 +179,6 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .ToList());
 
-            long checkedCandidates = 0;
             int processedFormats = 0;
             var formats = new HashSet<(string Prefix, string Suffix, string Family, bool WholeBasename)>();
             var tokenRegex = new Regex(@"[^/_.-]+", RegexOptions.Compiled);

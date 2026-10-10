@@ -166,7 +166,7 @@ namespace AssetsManager.Views
                 EstimatedTime = "Variable"
             };
             gameCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "game-custom-shaders", Name = "SubstituteShaderVocabWords", Description = "Custom shader vocabulary and compound names", BadgeText = "⏳ DEEP", BadgeBrush = accentOrange });
-            gameCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "game-custom-animations", Name = "SubstituteAnimationBuildListWords", Description = "Animation actions build-list (loop_in, tokens) across skins", BadgeText = "⏳ DEEP", BadgeBrush = accentOrange });
+            gameCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "game-custom-animations", Name = "SubstituteAnimationBuildListWords", Description = "Learned animation suffixes across skins and themes, prioritizing BIN references", BadgeText = "⏳ DEEP", BadgeBrush = accentOrange });
             gameCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "game-custom-textures", Name = "SubstituteTextureBuildListWords", Description = "Texture families across skins, companion themes and maps, plus particle role variants", BadgeText = "⏳ DEEP", BadgeBrush = accentOrange });
             _allMethods.Add(gameCustom);
 

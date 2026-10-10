@@ -79,13 +79,14 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
             }
             if (args.Contains("--compare-animations", StringComparer.Ordinal))
             {
+                long started = Stopwatch.GetTimestamp();
                 var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong>(unknown),
-                    match => Console.WriteLine($"MATCH animation: {match.Hash:x16} {match.Path}"));
+                    match => Console.WriteLine($"MATCH animation: {match.Hash:x16} {match.Path} [elapsed={Stopwatch.GetElapsedTime(started).TotalSeconds:F2}s]"));
                 using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
                 var timer = Stopwatch.StartNew();
                 long allocated = GC.GetAllocatedBytesForCurrentThread();
                 bool complete = true;
-                try { guesser.SubstituteAnimationBuildListWords(engine, cancellation.Token); }
+                try { guesser.SubstituteAnimationBuildListWords(engine, cancellation.Token, rootDirectory: args.Contains("--directed", StringComparer.Ordinal) ? root : null); }
                 catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { complete = false; }
                 Console.WriteLine($"Animation: {unknown.Count} unknowns; {engine.CheckedCandidates:N0} candidates; {engine.Matches.Count} matches; {timer.Elapsed.TotalSeconds:F1}s; {(GC.GetAllocatedBytesForCurrentThread() - allocated) / 1_000_000:N0} MB allocated; complete={complete}");
                 Console.WriteLine("Nothing persisted. A partial run does not establish exhaustive coverage.");
