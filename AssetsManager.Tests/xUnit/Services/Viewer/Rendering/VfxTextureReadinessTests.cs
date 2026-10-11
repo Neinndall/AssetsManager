@@ -421,14 +421,95 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
             }
         }
 
+        public static IEnumerable<object[]> ColorPhaseDistortionCases()
+        {
+            foreach (var primitive in new[] { VfxPrimitiveKind.CameraQuad, VfxPrimitiveKind.Mesh, VfxPrimitiveKind.AttachedMesh })
+            foreach (int scenario in Enumerable.Range(0, 5))
+                yield return new object[] { primitive, scenario };
+        }
+
+        [Theory]
+        [MemberData(nameof(ColorPhaseDistortionCases))]
+        public void ColorPhaseWithDistortionBlockDrawsLikeTheSameEmitterWithoutIt(VfxPrimitiveKind primitive, int scenario)
+        {
+            string install = InstalledSkins.FindInstall();
+            Assert.False(string.IsNullOrWhiteSpace(install), "An installed client is required for this GPU regression.");
+            using var context = new HiddenWglContext();
+            using GL gl = GL.GetApi(context.GetProcAddress);
+            using var renderer = new VfxOpenGlRenderer();
+            renderer.Initialize(gl, InstalledSkins.Settings(install));
+            uint target = CreateTexture(gl, 64, 64, new byte[64 * 64 * 4]);
+            uint framebuffer = gl.GenFramebuffer();
+            gl.BindFramebuffer(FramebufferTarget.Framebuffer, framebuffer);
+            gl.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment0,
+                TextureTarget.Texture2D, target, 0);
+            Assert.Equal(GLEnum.FramebufferComplete, gl.CheckFramebufferStatus(FramebufferTarget.Framebuffer));
+            uint texture = CreateTexture(gl, 1, 1, new byte[] { 16, 192, 48, 255 });
+            try
+            {
+                bool mesh = primitive != VfxPrimitiveKind.CameraQuad;
+                var definition = new VfxEmitterDefinition("color phase distortion", VfxCurveF.Const(1), VfxCurveF.Const(1),
+                    null, 0, 0, false, false, 4, VfxCurve3.Const(Vector3.One), null,
+                    VfxCurve4.Const(Vector4.One), null, null, null, null, VfxCurve3.Const(Vector3.Zero),
+                    "base.tex", Vector2.One, 1, false, mesh, PrimitiveKind: primitive,
+                    RenderState: VfxEmitterRenderState.Default with
+                    {
+                        DisableBackfaceCull = true,
+                        RenderPhase = scenario == 3 ? (byte)0 : scenario == 4 ? (byte)4 : (byte)7
+                    }, IsGroundLayer: scenario == 1, IsHudLayer: scenario == 2);
+                float[] instance = new float[VfxPlaybackRuntime.InstanceStride];
+                instance[3] = instance[4] = instance[18] = 0.75f;
+                instance[5] = instance[6] = instance[7] = instance[8] = 1;
+                instance[21] = instance[22] = instance[31] = instance[32] = 1;
+                instance[36] = instance[40] = instance[44] = 1;
+                VfxPlaybackRuntime.EmitterState Make(VfxEmitterDefinition def)
+                {
+                    var state = new VfxPlaybackRuntime.EmitterState
+                    {
+                        Def = def, Instances = instance, InstanceCount = 1,
+                        Texture = texture, TextureWidth = 1, TextureHeight = 1
+                    };
+                    if (mesh)
+                        renderer.UploadEmitterMesh(state,
+                            scenario == 1 ? new float[] { -1, 0, -1, 1, 0, -1, 0, 0, 1 }
+                                : new float[] { -1, -1, 0, 1, -1, 0, 0, 1, 0 },
+                            new float[] { 0, 0, 1, 0, 0, 1, 0, 0, 1 },
+                            new float[] { 0, 0, 1, 0, 0.5f, 1 }, null);
+                    return state;
+                }
+                Matrix4x4 camera = scenario == 1 ? Matrix4x4.CreateRotationX(MathF.PI / 2) : Matrix4x4.Identity;
+                var reference = Make(definition);
+                byte[] expected = Draw(gl, renderer, reference, framebuffer, camera);
+                Assert.Null(renderer.GameParticleFallback(reference, mesh));
+                Assert.Contains(Enumerable.Range(0, 64 * 64), at => expected[at * 4 + 1] > 32);
+                var tested = Make(definition with
+                {
+                    Distortion = new VfxDistortionDefinition(0.1f, scenario == 0 ? 0 : 1, null)
+                });
+                Assert.False(tested.Def.DrawsAsDistortion);
+                byte[] actual = Draw(gl, renderer, tested, framebuffer, camera);
+                Assert.Null(renderer.GameParticleFallback(tested, mesh));
+                Assert.Equal(expected, actual);
+                Assert.Equal(GLEnum.NoError, gl.GetError());
+            }
+            finally
+            {
+                gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+                gl.DeleteFramebuffer(framebuffer);
+                gl.DeleteTexture(target);
+                gl.DeleteTexture(texture);
+            }
+        }
+
         private static byte[] Draw(GL gl, VfxOpenGlRenderer renderer,
-            VfxPlaybackRuntime.EmitterState emitter, uint framebuffer)
+            VfxPlaybackRuntime.EmitterState emitter, uint framebuffer, Matrix4x4? view = null)
         {
             gl.BindFramebuffer(FramebufferTarget.Framebuffer, framebuffer);
             gl.Viewport(0, 0, 64, 64);
             gl.ClearColor(0, 0, 0, 1);
             gl.Clear(ClearBufferMask.ColorBufferBit);
-            renderer.Render(new[] { new VfxRenderQueueEntry(emitter, 0, 0) }, Matrix4x4.Identity, Matrix4x4.Identity);
+            Matrix4x4 camera = view ?? Matrix4x4.Identity;
+            renderer.Render(new[] { new VfxRenderQueueEntry(emitter, 0, 0) }, camera, camera);
             var pixels = new byte[64 * 64 * 4];
             gl.ReadPixels(0, 0, 64, 64, PixelFormat.Rgba, PixelType.UnsignedByte, pixels.AsSpan());
             return pixels;

@@ -179,6 +179,81 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
             }
         }
 
+        public static System.Collections.Generic.IEnumerable<object[]> DistortionPhaseSelections()
+        {
+            foreach (var primitive in new[] { VfxPrimitiveKind.CameraQuad, VfxPrimitiveKind.Mesh, VfxPrimitiveKind.AttachedMesh })
+            {
+                yield return new object[] { primitive, 1, (byte)7, false, false, true, true };
+                yield return new object[] { primitive, 0, (byte)7, false, false, true, false };
+                yield return new object[] { primitive, 1, (byte)7, true, false, true, false };
+                yield return new object[] { primitive, 1, (byte)7, false, true, true, false };
+                yield return new object[] { primitive, 1, (byte)0, false, false, true, false };
+                yield return new object[] { primitive, 1, (byte)4, false, false, true, false };
+                yield return new object[] { primitive, 0, (byte)3, false, false, true, true };
+                yield return new object[] { primitive, 0, (byte)7, false, false, false, false };
+            }
+        }
+
+        [Theory]
+        [MemberData(nameof(DistortionPhaseSelections))]
+        public void NativeSelectionFollowsResolvedDistortionPhaseAndPreservesColorFeatures(
+            VfxPrimitiveKind primitive, int mode, byte phase, bool ground, bool hud, bool present, bool distorts)
+        {
+            bool mesh = primitive != VfxPrimitiveKind.CameraQuad;
+            var emitter = Emitter() with
+            {
+                PrimitiveKind = primitive,
+                IsMeshPrimitive = mesh,
+                RenderState = VfxEmitterRenderState.Default with { AlphaReference = 127, RenderPhase = phase },
+                Distortion = present ? new VfxDistortionDefinition(0.1f, mode, null) : null,
+                IsGroundLayer = ground,
+                IsHudLayer = hud,
+                TextureMultPath = "mult.tex",
+                AlphaErosion = new VfxAlphaErosionDefinition("erosion.tex", VfxCurveF.Const(1f), 0.25f, 0.5f, 0),
+                SoftParticle = new VfxSoftParticleDefinition(0f, 1f, 0f, 1f)
+            };
+            Assert.Equal(distorts, emitter.DrawsAsDistortion);
+            string color = primitive switch
+            {
+                VfxPrimitiveKind.Mesh => "ParticleSystem/MESH",
+                VfxPrimitiveKind.AttachedMesh => "SkinnedMesh/PARTICLE",
+                _ => "ParticleSystem/QUAD"
+            };
+            string distortion = primitive switch
+            {
+                VfxPrimitiveKind.Mesh => "ParticleSystem/DISTORTION_MESH",
+                VfxPrimitiveKind.AttachedMesh => "SkinnedMesh/PARTICLE_DISTORTION",
+                _ => "ParticleSystem/DISTORTION"
+            };
+            var program = GameParticleProgramResolver.Create(emitter, mesh);
+            Assert.NotNull(program);
+            var pass = Assert.Single(program.Passes);
+            Assert.Equal(distorts ? distortion : color, pass.ShaderPath);
+            string[] expected = distorts ? new[] { "ALPHA_TEST" }
+                : mesh ? new[] { "ALPHA_TEST", "ALPHA_EROSION", "MULT_PASS", "SOFT_PARTICLES", "USE_VERTEX_COLORS" }
+                : new[] { "ALPHA_TEST", "ALPHA_EROSION", "MULT_PASS", "SOFT_PARTICLES" };
+            Assert.Equal(expected.OrderBy(name => name), pass.Defines.Select(define => define.Name).OrderBy(name => name));
+        }
+
+        [Theory]
+        [InlineData(1, false)]
+        [InlineData(2, false)]
+        [InlineData(0, true)]
+        public void DisabledDistortionKeepsUnsupportedColorQuadsOnStockPrograms(int uvMode, bool reflective)
+        {
+            var emitter = Emitter() with
+            {
+                UvMode = (byte)uvMode,
+                Distortion = new VfxDistortionDefinition(0.1f, 0, null),
+                Reflection = reflective ? new VfxReflectionDefinition(1, 1, 1, 1, Vector4.One, Vector4.One, null) : null
+            };
+            Assert.Null(GameParticleProgramResolver.Create(emitter, false));
+            Assert.NotNull(GameParticleProgramResolver.Create(emitter with
+            {
+                RenderState = emitter.RenderState with { RenderPhase = 3 }
+            }, false));
+        }
+
         [Fact]
         public void PairSelectionUsesSeparateScreenFixedMeshAttachedAndDistortionHlslFiles()
         {

@@ -555,6 +555,7 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - VFX Studio / Effects keep their colors when distortion is disabled or their draw phase requires color.
   - VFX Studio / Effects use the fallback material while a named base texture is unavailable and resume game shaders when it loads.
   - VFX Studio / Map effects and map character clips now include independently referenced particle emission meshes when preparing scene resources.
   - Monitor / Maintenance notices consistently update the server card and overall Dashboard alert.

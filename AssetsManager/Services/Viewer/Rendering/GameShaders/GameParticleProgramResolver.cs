@@ -56,7 +56,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
         }
 
         internal static bool CanCreateNativeProgram(VfxEmitterDefinition emitter, bool meshGeometry) =>
-            emitter.Distortion is not null ||
+            emitter.DrawsAsDistortion ||
             meshGeometry ||
             (emitter.Reflection is null && emitter.UvMode is not (1 or 2));
 
@@ -64,7 +64,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
         {
             bool attachedMesh = meshGeometry &&
                                 emitter.PrimitiveKind == VfxPrimitiveKind.AttachedMesh;
-            if (emitter.Distortion is not null)
+            if (emitter.DrawsAsDistortion)
             {
                 if (attachedMesh)
                 {
@@ -125,7 +125,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             if (alphaReference != 0)
                 Add("ALPHA_TEST");
 
-            if (emitter.Distortion is not null)
+            if (emitter.DrawsAsDistortion)
                 return defines;
 
             if (emitter.AlphaErosion is not null)
