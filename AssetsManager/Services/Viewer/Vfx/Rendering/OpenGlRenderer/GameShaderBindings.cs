@@ -35,10 +35,20 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
 
         internal string GameParticleFallback(VfxPlaybackRuntime.EmitterState emitter, bool mesh) =>
             GameParticleFallback(emitter.Def, mesh) ??
-            (HasGameParticleResources(emitter) ? null : "Palette texture is unavailable.");
+            ParticleResourceFallback(emitter);
 
         private static bool HasGameParticleResources(VfxPlaybackRuntime.EmitterState emitter) =>
-            emitter.Def.HasResolvedCustomMaterial || emitter.Def.PaletteDefinition is null || emitter.PaletteTexture != 0;
+            ParticleResourceFallback(emitter) is null;
+
+        private static string ParticleResourceFallback(VfxPlaybackRuntime.EmitterState emitter)
+        {
+            if (emitter.Def.HasResolvedCustomMaterial) return null;
+            if (emitter.Texture == 0 && !string.IsNullOrWhiteSpace(emitter.Def.TexturePath))
+                return "Base texture is unavailable.";
+            return emitter.Def.PaletteDefinition is not null && emitter.PaletteTexture == 0
+                ? "Palette texture is unavailable."
+                : null;
+        }
 
         private static bool HasParticleDraw(VfxPlaybackRuntime.EmitterState emitter) =>
             emitter.InstanceCount > 0 && emitter.IsVisible && (!emitter.Def.IsMeshPrimitive || emitter.MeshVao != 0);
@@ -64,7 +74,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
 
         private bool UseGameParticle(VfxPlaybackRuntime.EmitterState emitter, bool mesh, int pass, bool wireframe)
         {
-            // A palettized native pass cannot use a white substitute while its palette uploads or is missing.
+            // LTK keeps the stock material while a named base or palette sampler is unavailable.
             uint program = wireframe || !HasGameParticleResources(emitter)
                 ? 0 : _gameShaders?.UseParticleProgram(emitter.Def, mesh, pass) ?? 0;
             if (program == 0)
@@ -111,9 +121,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
 
         private uint? ParticleTexture(VfxPlaybackRuntime.EmitterState emitter, string name) => name switch
         {
-            // An emitter naming no texture binds the engine's 1x1 transparent black, as does one whose texture failed to
-            // load: it draws nothing itself and only carries its children (Evelynn W mark's Start_flash). A custom
-            // material keeps its own sampler neutrals.
+            // An unnamed base binds transparent black; a missing named base uses the stock material.
+            // Custom materials keep their own sampler neutrals.
             "TEXTURE" => emitter.Texture != 0 ? emitter.Texture : emitter.Def.HasResolvedCustomMaterial ? null : _textures.FallbackTransparentTexture,
             "TEXTUREMULT" => emitter.TextureMult != 0 ? emitter.TextureMult : null,
             "PARTICLE_COLOR_TEXTURE" => emitter.ColorGradientTexture != 0 ? emitter.ColorGradientTexture : null,
