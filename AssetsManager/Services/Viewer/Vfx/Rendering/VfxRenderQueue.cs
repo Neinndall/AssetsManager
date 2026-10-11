@@ -220,6 +220,19 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
 
             // LTK Quads.tsx sorts farthest first by squared eye distance.
             Array.Sort(depthScratch, orderScratch, 0, instanceCount);
+            // Restore stable ties before the reverse copy: Array.Sort itself is unstable.
+            // Descending source indices here become original input order in the output.
+            for (int start = 0; start < instanceCount;)
+            {
+                int end = start + 1;
+                while (end < instanceCount && depthScratch[end] == depthScratch[start]) end++;
+                if (end - start > 1)
+                {
+                    Array.Sort(orderScratch, start, end - start);
+                    Array.Reverse(orderScratch, start, end - start);
+                }
+                start = end;
+            }
             for (int destinationIndex = 0; destinationIndex < instanceCount; destinationIndex++)
             {
                 int sourceIndex = orderScratch[instanceCount - 1 - destinationIndex];

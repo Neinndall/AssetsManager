@@ -123,6 +123,76 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
             }
         }
 
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void EqualDistanceQuadsComposeInStableInputOrder(bool fallback)
+        {
+            string install = InstalledSkins.FindInstall();
+            Assert.False(string.IsNullOrWhiteSpace(install), "An installed client is required for this GPU regression.");
+            using var context = new HiddenWglContext();
+            using GL gl = GL.GetApi(context.GetProcAddress);
+            using var renderer = new VfxOpenGlRenderer();
+            renderer.Initialize(gl, InstalledSkins.Settings(install));
+            uint target = Texture(gl, 64, 64, new byte[64 * 64 * 4]);
+            uint framebuffer = gl.GenFramebuffer();
+            gl.BindFramebuffer(FramebufferTarget.Framebuffer, framebuffer);
+            gl.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment0,
+                TextureTarget.Texture2D, target, 0);
+            Assert.Equal(GLEnum.FramebufferComplete, gl.CheckFramebufferStatus(FramebufferTarget.Framebuffer));
+            uint white = Texture(gl, 1, 1, new byte[] { 255, 255, 255, 255 });
+            try
+            {
+                var definition = new VfxEmitterDefinition("stable alpha", VfxCurveF.Const(1), VfxCurveF.Const(1),
+                    null, 0, 0, false, false, 1, VfxCurve3.Const(Vector3.One), null,
+                    VfxCurve4.Const(Vector4.One), null, null, null, null, VfxCurve3.Const(Vector3.Zero),
+                    "white.tex", Vector2.One, 1, false, false, PrimitiveKind: VfxPrimitiveKind.CameraQuad,
+                    RenderState: VfxEmitterRenderState.Default with { DisableBackfaceCull = true },
+                    PaletteDefinition: fallback ? new VfxPaletteDefinition(0, VfxCurve3.Const(Vector3.Zero)) : null);
+                const int stride = VfxPlaybackRuntime.InstanceStride;
+                var instances = new float[2 * stride];
+                Vector4 red = new(1, 0, 0, 0.5f), blue = new(0, 0, 1, 0.5f);
+                for (int index = 0; index < 2; index++)
+                {
+                    int at = index * stride;
+                    instances[at + 2] = 0.2f;
+                    instances[at + 3] = instances[at + 4] = instances[at + 18] = 0.5f;
+                    Vector4 color = index == 0 ? red : blue;
+                    instances[at + 5] = color.X;
+                    instances[at + 6] = color.Y;
+                    instances[at + 7] = color.Z;
+                    instances[at + 8] = color.W;
+                    instances[at + 21] = instances[at + 22] = instances[at + 31] = instances[at + 32] = 1;
+                    instances[at + 36] = instances[at + 40] = instances[at + 44] = 1;
+                }
+                var emitter = new VfxPlaybackRuntime.EmitterState
+                {
+                    Def = definition, Texture = white, TextureWidth = 1, TextureHeight = 1,
+                    Instances = instances, InstanceCount = 2
+                };
+                gl.Viewport(0, 0, 64, 64);
+                gl.ClearColor(0, 0, 0, 0);
+                gl.Clear(ClearBufferMask.ColorBufferBit);
+                renderer.Render(new[] { new VfxRenderQueueEntry(emitter, 0, 0) }, Matrix4x4.Identity, Matrix4x4.Identity);
+                Assert.Equal(fallback ? "Palette with no rows." : null, renderer.GameParticleFallback(emitter, false));
+                var pixel = new byte[4];
+                gl.ReadPixels(32, 32, 1, 1, PixelFormat.Rgba, PixelType.UnsignedByte, pixel.AsSpan());
+                // LTK's stable tie draws red first, then blue, with authored alpha blending.
+                Vector4 expected = Compose(1, blue, Compose(1, red, Vector4.Zero));
+                for (int channel = 0; channel < 4; channel++)
+                    Assert.InRange((int)pixel[channel], (int)MathF.Round(expected[channel] * 255) - 2,
+                        (int)MathF.Round(expected[channel] * 255) + 2);
+                Assert.Equal(GLEnum.NoError, gl.GetError());
+            }
+            finally
+            {
+                gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+                gl.DeleteFramebuffer(framebuffer);
+                gl.DeleteTexture(target);
+                gl.DeleteTexture(white);
+            }
+        }
+
         private static Vector4 Compose(int mode, Vector4 color, Vector4 background)
         {
             Vector4 source = mode is 0 or 2

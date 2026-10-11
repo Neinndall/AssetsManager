@@ -3924,6 +3924,37 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             });
         }
 
+        [Theory]
+        [InlineData(2)]
+        [InlineData(32)]
+        [InlineData(4096)]
+        public void QuadSortingPreservesInputOrderWhenDistancesTie(int count)
+        {
+            const int stride = 4;
+            var source = new float[count * stride];
+            for (int index = 0; index < count; index++)
+            {
+                source[index * stride] = index % 2 == 0 ? -1f : 1f;
+                source[index * stride + 3] = index;
+            }
+            var original = (float[])source.Clone();
+            var destination = new float[source.Length];
+            VfxRenderQueue.CopyInstancesBackToFront(source, count, stride, Matrix4x4.Identity,
+                destination, new float[count], new int[count]);
+            Assert.Equal(original, destination);
+            Assert.Equal(original, source);
+        }
+
+        [Fact]
+        public void QuadSortingKeepsFartherTiesBeforeNearerParticles()
+        {
+            var source = new float[] { 0, 0, 3, 0, 0, 0, 1, 1, 0, 0, -3, 2 };
+            var destination = new float[source.Length];
+            VfxRenderQueue.CopyInstancesBackToFront(source, 3, 4, Matrix4x4.Identity,
+                destination, new float[3], new int[3]);
+            Assert.Equal(new float[] { 0, 2, 1 }, new[] { destination[3], destination[7], destination[11] });
+        }
+
         [Fact]
         public void QuadSortingUsesSquaredEyeDistanceInsteadOfViewDepth()
         {
