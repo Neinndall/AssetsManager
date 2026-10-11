@@ -216,6 +216,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
                     Add(requests, emitter.MeshAnimationPath, AnimationExtensions);
                     foreach (string variant in emitter.MeshAnimationVariants ?? Array.Empty<string>())
                         Add(requests, variant, AnimationExtensions);
+                    Add(requests, emitter.EmissionMesh?.MeshPath, VfxMeshFormatSemantics.SceneExtensions);
                     if (emitter.EmissionSurface is { } surface)
                     {
                         Add(requests, surface.MeshPath, VfxMeshFormatSemantics.SceneExtensions);

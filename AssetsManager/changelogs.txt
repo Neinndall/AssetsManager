@@ -555,6 +555,7 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - VFX Studio / Map effects and map character clips now include independently referenced particle emission meshes when preparing scene resources.
   - Monitor / Maintenance notices consistently update the server card and overall Dashboard alert.
   - 3D Studio / An incompatible BIN no longer interrupts discovery of the remaining project files.
   - Hash synchronization compares actual local file sizes, preserves larger catalogs and reports failed downloads accurately.

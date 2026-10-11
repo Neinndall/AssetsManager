@@ -48,6 +48,60 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
             Assert.Contains(".gmesh", request.Extensions, StringComparer.OrdinalIgnoreCase);
         }
 
+        [Theory]
+        [InlineData(null)]
+        [InlineData("assets/vfx/visible.scb")]
+        [InlineData("assets/vfx/emission.scb")]
+        public void StaticEmissionMeshIsRequestedIndependentlyOfTheVisibleMesh(string visibleMesh)
+        {
+            const string emissionMesh = "assets/vfx/emission.scb";
+            VfxEmitterDefinition emitter = Emitter(null, visibleMesh) with
+            {
+                EmissionMesh = new VfxEmissionMeshDefinition(emissionMesh)
+            };
+
+            IReadOnlyList<VfxSceneResourceContext.ResourceRequest> requests =
+                VfxSceneResourceContext.CollectRequests(Catalog(emitter));
+
+            VfxSceneResourceContext.ResourceRequest request =
+                Assert.Single(requests, item => item.AuthoredPath == emissionMesh);
+            Assert.Contains(".scb", request.Extensions, StringComparer.OrdinalIgnoreCase);
+            if (visibleMesh != null)
+                Assert.Contains(requests, item => item.AuthoredPath == visibleMesh);
+        }
+
+        [Fact]
+        public async Task SharedSceneContextMaterializesAnIndependentStaticEmissionMesh()
+        {
+            string root = Path.Combine(Path.GetTempPath(), "AssetsManagerTests", Guid.NewGuid().ToString("N"));
+            const string emissionMesh = "assets/vfx/emission.scb";
+            string source = Path.Combine(root, "assets", "vfx", "emission.scb");
+            byte[] bytes = { 1, 2, 3, 4 };
+
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(source));
+                await File.WriteAllBytesAsync(source, bytes);
+                VfxEmitterDefinition emitter = Emitter(null, null) with
+                {
+                    EmissionMesh = new VfxEmissionMeshDefinition(emissionMesh)
+                };
+
+                using VfxSceneResourceContext context = await VfxSceneResourceContext.CreateAsync(
+                    Catalog(emitter).Systems, root, new MapAssetResolver(null, null),
+                    hashResolver: null, logService: null);
+
+                string destination = Path.Combine(context.SearchDirectory, "assets", "vfx", "emission.scb");
+                Assert.True(File.Exists(destination));
+                Assert.Equal(bytes, await File.ReadAllBytesAsync(destination));
+            }
+            finally
+            {
+                if (Directory.Exists(root))
+                    Directory.Delete(root, recursive: true);
+            }
+        }
+
         [Fact]
         public void SharedSceneContextCollectsSkinnedVariantsEmissionSurfacesAndOwnerAssets()
         {
