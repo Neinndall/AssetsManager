@@ -110,6 +110,119 @@ public sealed class BinEntryPathPatternTests
         Assert.Equal(new[] { "A", "A😀" }, BinEntryPathPatternSource.CharacterPrefixes("A😀B"));
     }
 
+    [Theory]
+    [InlineData("ResourceResolver", false)]
+    [InlineData("ResourceResolver", true)]
+    [InlineData("GlobalResourceResolver", false)]
+    [InlineData("GlobalResourceResolver", true)]
+    [InlineData("MapContainer", false)]
+    [InlineData("MapContainer", true)]
+    [InlineData("ItemData", false)]
+    [InlineData("ItemData", true)]
+    public void ResourceKeysResolveRegardlessOfLinkedEntryOrder(string type, bool targetFirst)
+    {
+        const string target = "Particles/Test_Skin01_Trail";
+        const string keyName = "Test_Trail";
+        var targets = new Dictionary<InternalHashKind, HashSet<ulong>>
+        {
+            [InternalHashKind.BinEntries] = new() { Hash(target) },
+            [InternalHashKind.BinHashes] = new() { Hash(keyName) }
+        };
+        var matcher = new InternalHashEvidenceMatcher(targets);
+        var patterns = new BinEntryPathPatternSource();
+        var map = new BinTreeMap(Hash(type == "MapContainer" ? "chunks" : "resourceMap"),
+            BinPropertyType.Hash, BinPropertyType.ObjectLink,
+            new[] { new KeyValuePair<BinTreeProperty, BinTreeProperty>(new BinTreeHash(0, Hash(keyName)), new BinTreeObjectLink(0, Hash(target))) });
+        BinTreeProperty property = type == "ItemData"
+            ? new BinTreeStruct(Hash("mVFXResourceResolver"), Hash("ResourceResolver"), new BinTreeProperty[] { map })
+            : map;
+        var owner = Tree(Entry("Resources/Synthetic", type, property));
+        var linked = Tree(Entry(target, "StaticMaterialDef", Text("name", target)));
+        if (targetFirst) Scan(linked, matcher, patterns: patterns, source: "target.bin");
+        Scan(owner, matcher, patterns: patterns, source: "resources.bin");
+        if (!targetFirst) Scan(linked, matcher, patterns: patterns, source: "target.bin");
+        patterns.Apply(matcher);
+
+        Assert.Equal(0, matcher.Remaining);
+        var match = Assert.Single(matcher.Matches, match => match.Kind == InternalHashKind.BinHashes);
+        Assert.Equal(keyName, match.Value);
+        Assert.Equal("resources.bin", match.Source);
+        Assert.All(matcher.Matches, match => Assert.True(match.CanPromote));
+    }
+
+    [Theory]
+    [InlineData("Base", true)]
+    [InlineData("Base", false)]
+    [InlineData("Skin07", false)]
+    public void SkinFallbackPreservesItsPathForResourceAndAnimationLinks(string skin, bool useIcon)
+    {
+        string path = $"Characters/Test/Skins/{skin}";
+        string resources = $"{path}/Resources";
+        string animation = $"Characters/Test/Animations/{skin}";
+        var matcher = Matcher(InternalHashKind.BinEntries, path, resources, animation);
+        var fields = new List<BinTreeProperty>
+        {
+            new BinTreeObjectLink(Hash("mResourceResolver"), Hash(resources)),
+            new BinTreeStruct(Hash("skinAnimationProperties"), Hash("SkinAnimationProperties"),
+                new BinTreeProperty[] { new BinTreeObjectLink(Hash("animationGraphData"), Hash(animation)) })
+        };
+        if (useIcon) fields.Add(Text("iconSquare", "ASSETS/Characters/Test/HUD/Test_square.dds"));
+        Scan(Tree(Entry(path, "SkinCharacterDataProperties", fields.ToArray())), matcher,
+            source: useIcon ? "synthetic.bin" : $"data/characters/Test/skins/{skin}.bin");
+        Assert.Equal(0, matcher.Remaining);
+        Assert.Equal(3, matcher.Matches.Count);
+        Assert.All(matcher.Matches, match => Assert.True(match.CanPromote));
+    }
+
+    [Fact]
+    public void ItemGroupUsesAResourceKeyLearnedInTheFinalCorrelation()
+    {
+        const string keyName = "SyntheticGroup";
+        const string target = "Particles/SyntheticGroup";
+        const string group = "Items/ItemGroup/SyntheticGroup";
+        var targets = new Dictionary<InternalHashKind, HashSet<ulong>>
+        {
+            [InternalHashKind.BinEntries] = new() { Hash(target), Hash(group) },
+            [InternalHashKind.BinHashes] = new() { Hash(keyName) }
+        };
+        var matcher = new InternalHashEvidenceMatcher(targets);
+        var patterns = new BinEntryPathPatternSource();
+        var map = new BinTreeMap(Hash("resourceMap"), BinPropertyType.Hash, BinPropertyType.ObjectLink,
+            new[] { new KeyValuePair<BinTreeProperty, BinTreeProperty>(new BinTreeHash(0, Hash(keyName)), new BinTreeObjectLink(0, Hash(target))) });
+        Scan(Tree(Entry(group, "ItemGroup", new BinTreeHash(Hash("mItemGroupID"), Hash(keyName)))), matcher, patterns: patterns, source: "group.bin");
+        Scan(Tree(Entry("Resources/Synthetic", "ResourceResolver", map)), matcher, patterns: patterns);
+        Scan(Tree(Entry(target, "StaticMaterialDef", Text("name", target))), matcher, patterns: patterns);
+        patterns.Apply(matcher);
+        Assert.Equal(0, matcher.Remaining);
+        Assert.Equal("group.bin", Assert.Single(matcher.Matches, match => match.Value == group).Source);
+    }
+
+    [Theory]
+    [InlineData("ItemShopGameModeData", "RecOverrideSmiteStartingItems")]
+    [InlineData("ItemShopGameModeData", "PurchasedItemExclusionItems")]
+    [InlineData("ItemShopGameModeData", "CompletedItems")]
+    [InlineData("ItemShopGameModeData", "ConsumablesQuickBuyData")]
+    [InlineData("GameModeItemList", "mItems")]
+    public void ItemListsUseEntryNamesLearnedAfterScanning(string type, string field)
+    {
+        const string item = "Items/777";
+        var matcher = new InternalHashEvidenceMatcher(new Dictionary<InternalHashKind, HashSet<ulong>>
+        {
+            [InternalHashKind.BinEntries] = new() { Hash(item) }, [InternalHashKind.BinHashes] = new() { Hash(item) }
+        });
+        var patterns = new BinEntryPathPatternSource();
+        BinTreeProperty list = new BinTreeContainer(Hash(field == "ConsumablesQuickBuyData" ? "items" : field), BinPropertyType.Hash,
+            new BinTreeProperty[] { new BinTreeHash(0, Hash(item)) });
+        if (field == "ConsumablesQuickBuyData")
+            list = new BinTreeStruct(Hash(field), Hash("ConsumablesQuickBuyData"), new[] { list });
+        Scan(Tree(Entry("Shop/Synthetic", type, list)), matcher, patterns: patterns, source: "shop.bin");
+        Scan(Tree(Entry(item, "ItemData")), matcher, patterns: patterns, source: "item.bin");
+        matcher.CheckContextualCandidate(InternalHashKind.BinEntries, item, "learned.bin", observedHash: Hash(item));
+        patterns.Apply(matcher);
+        Assert.Equal(0, matcher.Remaining);
+        Assert.Equal("shop.bin", Assert.Single(matcher.Matches, match => match.Kind == InternalHashKind.BinHashes).Source);
+    }
+
     [Fact]
     public void AudioPatternsIncludeEveryUpstreamMapId()
     {
@@ -128,6 +241,7 @@ public sealed class BinEntryPathPatternTests
     [InlineData("MapAudioDataProperties", null, null, "Maps/Shipping/Map11/Audio")]
     [InlineData("MapAudioDataProperties", null, null, "Maps/Shipping/Map453/Audio")]
     [InlineData("TftUnitPropertyDefinition", "name", "TestProperty", "Maps/Shipping/Map22/UnitProperties/TestProperty")]
+    [InlineData("DesignerEvent", "name", "TestEvent", "Globals/DesignerEvents/TestEvent")]
     [InlineData("AnvilData", "AugmentNameId", "TestAnvil", "Maps/Shipping/Map30/Anvils/TestAnvil")]
     [InlineData("AnvilData", "AugmentNameId", "TestAnvil", "Maps/Shipping/Map453/Anvils/TestAnvil")]
     [InlineData("MapSkin", "name", "Default", "Maps/Shipping/Map453/MapSkins/Default")]
@@ -148,6 +262,19 @@ public sealed class BinEntryPathPatternTests
         var match = Assert.Single(matcher.Matches);
         Assert.Equal(expected, match.Value);
         Assert.True(match.CanPromote);
+        Assert.Equal(1, matcher.Remaining);
+    }
+
+    [Theory]
+    [InlineData("UnrelatedClass", "name")]
+    [InlineData("DesignerEvent", "mName")]
+    [InlineData("DesignerEvent", null)]
+    public void DesignerEventPatternRequiresItsClassAndNameField(string type, string field)
+    {
+        const string expected = "Globals/DesignerEvents/TestEvent";
+        var matcher = Matcher(InternalHashKind.BinEntries, expected);
+        Scan(Tree(Entry(expected, type, field == null ? Array.Empty<BinTreeProperty>() : new[] { Text(field, "TestEvent") })), matcher);
+        Assert.Empty(matcher.Matches);
         Assert.Equal(1, matcher.Remaining);
     }
 
@@ -403,5 +530,40 @@ public sealed class BinEntryPathPatternTests
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
             Task.FromResult(new HttpResponseMessage { Content = new StringContent("{\"latest\":\"test\",\"classes\":{}}") });
+    }
+
+    [Fact]
+    public async Task ProductionGuessingPersistsResourceKeysFromAnEntryInALaterWad()
+    {
+        using var bridge = new AssetsManagerTestBridge();
+        bridge.Directories.CreateHashesDirectories();
+        string root = bridge.CreateDirectory("Game");
+        const string target = "Particles/Synthetic_Skin01_Trail", keyName = "Synthetic_Trail";
+        var map = new BinTreeMap(Hash("resourceMap"), BinPropertyType.Hash, BinPropertyType.ObjectLink,
+            new[] { new KeyValuePair<BinTreeProperty, BinTreeProperty>(new BinTreeHash(0, Hash(keyName)), new BinTreeObjectLink(0, Hash(target))) });
+        Bake("A.wad.client", "resources", Tree(Entry("Resources/Synthetic", "ResourceResolver", map)));
+        Bake("Z.wad.client", "material", Tree(Entry(target, "StaticMaterialDef", Text("name", target))));
+        using var resolver = new HashResolverService(bridge.Directories, bridge.LogService);
+        var store = new BinRstHashGuessingStore(bridge.Directories);
+        var persistence = new HashGuessPersistenceService(new HashGuessingStore(bridge.Directories), store);
+        using var http = new HttpClient(new EmptySchemaHandler());
+        var service = new BinRstHashGuessingService(store, persistence, resolver, bridge.Directories, bridge.LogService,
+            new MetaSchemaHashSource(http, bridge.Directories, bridge.LogService));
+        await service.BuildInventoryAsync(root, true, false, null, CancellationToken.None);
+        var result = await service.RunContentGuessingAsync(root, true, false, null, CancellationToken.None, selectedSubMethods: Structures);
+        Assert.Contains(result.Matches, match => match.Kind == InternalHashKind.BinEntries && match.Value == target);
+        Assert.Contains(result.Matches, match => match.Kind == InternalHashKind.BinHashes && match.Value == keyName);
+        Assert.Equal(keyName, (await store.LoadKnownAsync(InternalHashKind.BinHashes, CancellationToken.None))[Hash(keyName)]);
+        Assert.DoesNotContain((ulong)Hash(keyName), await store.LoadUnknownAsync(InternalHashKind.BinHashes, CancellationToken.None));
+        Assert.Equal(keyName, resolver.ResolveBinHash(Hash(keyName)));
+
+        void Bake(string wad, string path, BinTree tree)
+        {
+            using var output = new MemoryStream();
+            tree.Write(output);
+            byte[] data = output.ToArray();
+            WadBuilder.Bake(new[] { new WadBakeEntry(path, () => new MemoryStream(data), WadChunkCompression.Zstd) },
+                Path.Combine(root, wad), new WadBakeSettings());
+        }
     }
 }

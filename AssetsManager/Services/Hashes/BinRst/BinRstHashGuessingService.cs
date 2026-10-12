@@ -140,7 +140,7 @@ namespace AssetsManager.Services.Hashes
                                 using var stream = new MemoryStream(buffer.Array, buffer.Offset, buffer.Count, false);
                                 if (isBin)
                                 {
-                                    ReadBinInventory(stream, observed);
+                                    ReadBinInventory(stream, observed, cancellationToken);
                                     scannedBins++;
                                 }
                                 else
@@ -185,7 +185,7 @@ namespace AssetsManager.Services.Hashes
                                 FileShare.Read,
                                 64 * 1024,
                                 FileOptions.SequentialScan);
-                            ReadBinInventory(stream, observed);
+                            ReadBinInventory(stream, observed, cancellationToken);
                             scannedBins++;
                         }
                         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -817,49 +817,15 @@ namespace AssetsManager.Services.Hashes
             [InternalHashKind.RstXxh64] = new()
         };
 
-        private static void ReadBinInventory(Stream stream, Dictionary<InternalHashKind, HashSet<ulong>> observed)
+        private static void ReadBinInventory(Stream stream, Dictionary<InternalHashKind, HashSet<ulong>> observed, CancellationToken cancellationToken)
         {
             var tree = new BinTree(stream);
-            ReadBinInventory(tree, observed);
+            ReadBinInventory(tree, observed, cancellationToken);
         }
 
-        internal static void ReadBinInventory(BinTree tree, Dictionary<InternalHashKind, HashSet<ulong>> observed)
-        {
-            foreach (var pair in tree.Objects)
-            {
-                if (pair.Key != 0) observed[InternalHashKind.BinEntries].Add(pair.Key);
-                if (pair.Value.ClassHash != 0) observed[InternalHashKind.BinTypes].Add(pair.Value.ClassHash);
-                foreach (var property in pair.Value.Properties.Values) VisitBinProperty(property, observed);
-            }
-            foreach (var item in tree.DataOverrides)
-            {
-                if (item.ObjectPathHash != 0) observed[InternalHashKind.BinEntries].Add(item.ObjectPathHash);
-                VisitBinProperty(item.Property, observed);
-            }
-        }
-
-        private static void VisitBinProperty(BinTreeProperty property, Dictionary<InternalHashKind, HashSet<ulong>> observed)
-        {
-            if (property.NameHash != 0) observed[InternalHashKind.BinFields].Add(property.NameHash);
-            switch (property)
-            {
-                case BinTreeHash64 hash when hash.Value != 0: observed[InternalHashKind.BinXxh3].Add(hash.Value); break;
-                case BinTreeHash hash when hash.Value != 0: observed[InternalHashKind.BinHashes].Add(hash.Value); break;
-                case BinTreeObjectLink link when link.Value != 0: observed[InternalHashKind.BinEntries].Add(link.Value); break;
-                case BinTreeStruct structure:
-                    if (structure.ClassHash != 0) observed[InternalHashKind.BinTypes].Add(structure.ClassHash);
-                    foreach (var child in structure.Properties.Values) VisitBinProperty(child, observed);
-                    break;
-                case BinTreeContainer container:
-                    foreach (var child in container.Elements) VisitBinProperty(child, observed);
-                    break;
-                case BinTreeOptional option when option.Value != null: VisitBinProperty(option.Value, observed); break;
-                case BinTreeMap map:
-                    foreach (var child in map) { VisitBinProperty(child.Key, observed); VisitBinProperty(child.Value, observed); }
-                    break;
-            }
-        }
-
+        internal static void ReadBinInventory(BinTree tree, Dictionary<InternalHashKind, HashSet<ulong>> observed,
+            CancellationToken cancellationToken = default) =>
+            BinContentEvidenceSource.CollectBinHashes(tree, observed, cancellationToken);
 
         internal static void ReadRstInventory(
             Stream stream,

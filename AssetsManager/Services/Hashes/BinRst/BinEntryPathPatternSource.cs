@@ -27,6 +27,13 @@ internal sealed class BinEntryPathPatternSource
     private static readonly uint AudioType = Fnv1a.HashLower("MapAudioDataProperties");
     private static readonly uint UnitPropertyType = Fnv1a.HashLower("TftUnitPropertyDefinition");
     private static readonly uint AnvilType = Fnv1a.HashLower("AnvilData");
+    private static readonly uint DesignerEventType = Fnv1a.HashLower("DesignerEvent");
+    private static readonly HashSet<uint> ResourceResolverTypes = Types("ResourceResolver", "GlobalResourceResolver");
+    private static readonly uint MapContainerType = Fnv1a.HashLower("MapContainer");
+    private static readonly uint ItemDataType = Fnv1a.HashLower("ItemData");
+    private static readonly uint ItemShopType = Fnv1a.HashLower("ItemShopGameModeData");
+    private static readonly uint ItemListType = Fnv1a.HashLower("GameModeItemList");
+    private static readonly HashSet<uint> ItemGroupTypes = new() { Fnv1a.HashLower("ItemGroup"), Fnv1a.HashLower("ItemGroupData"), 0x160b6ce9 };
     private readonly HashResolverService _resolver;
     private readonly HashSet<string> _characters = new(StringComparer.Ordinal);
     private readonly Dictionary<uint, uint> _entryTypes = new();
@@ -36,9 +43,14 @@ internal sealed class BinEntryPathPatternSource
     private readonly HashSet<HashReference> _entryPathHashes = new();
     private readonly HashSet<ModeLink> _modeLinks = new();
     private readonly HashSet<uint> _modeOwners = new();
+    private readonly HashSet<ResourceLink> _resourceLinks = new();
+    private readonly HashSet<GroupNameReference> _itemGroups = new();
+    private readonly HashSet<HashReference> _itemHashReferences = new();
     private sealed record NamedEntry(uint Hash, string Name, string Source, string Wad);
     private sealed record HashReference(uint Hash, string Source, string Wad);
     private sealed record ModeLink(uint Owner, uint Target, uint? Field, string Source, string Wad);
+    private sealed record ResourceLink(uint Key, uint Target, string Source, string Wad);
+    private sealed record GroupNameReference(uint Owner, uint NameHash, string Source, string Wad);
 
     static BinEntryPathPatternSource() => EntryPathHashTypes.Add(0x409a5657);
 
@@ -51,6 +63,8 @@ internal sealed class BinEntryPathPatternSource
         uint type = entry.ClassHash;
         if (type == AudioType)
             foreach (int map in MapIds) yield return $"Maps/Shipping/Map{map}/Audio";
+        else if (type == DesignerEventType && Text(entry, "name") is string eventName)
+            yield return $"Globals/DesignerEvents/{eventName}";
         else if (type == UnitPropertyType && Text(entry, "name") is string unit)
             yield return $"Maps/Shipping/Map22/UnitProperties/{unit}";
         else if (type == AnvilType && Text(entry, "AugmentNameId") is string augment)
@@ -114,6 +128,45 @@ internal sealed class BinEntryPathPatternSource
             }
             if (EntryPathHashTypes.Contains(type))
                 foreach (var property in entry.Properties.Values) CollectHashes(property);
+            if (ResourceResolverTypes.Contains(type)) CollectResourceLinks(entry.Properties, "resourceMap");
+            else if (type == MapContainerType) CollectResourceLinks(entry.Properties, "chunks");
+            else if (type == ItemDataType &&
+                     entry.Properties.TryGetValue(Fnv1a.HashLower("mVFXResourceResolver"), out var resolver) && resolver is BinTreeStruct structure)
+                CollectResourceLinks(structure.Properties, "resourceMap");
+            if (ItemGroupTypes.Contains(type) && matcher.IsRemaining(InternalHashKind.BinEntries, hash) &&
+                entry.Properties.TryGetValue(Fnv1a.HashLower("mItemGroupID"), out var id) && id is BinTreeHash nameHash)
+                _itemGroups.Add(new(hash, nameHash.Value, source, wad));
+            if (type == ItemShopType)
+            {
+                foreach (string field in new[] { "RecOverrideSmiteStartingItems", "PurchasedItemExclusionItems", "CompletedItems" })
+                    CollectItemList(entry.Properties, field);
+                if (entry.Properties.TryGetValue(Fnv1a.HashLower("ConsumablesQuickBuyData"), out var quickBuy) && quickBuy is BinTreeStruct quickBuyData)
+                    CollectItemList(quickBuyData.Properties, "items");
+            }
+            else if (type == ItemListType) CollectItemList(entry.Properties, "mItems");
+        }
+
+        void CollectItemList(Dictionary<uint, BinTreeProperty> properties, string field)
+        {
+            if (!properties.TryGetValue(Fnv1a.HashLower(field), out var property) || property is not BinTreeContainer list) return;
+            foreach (var item in list.Elements.OfType<BinTreeHash>())
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (matcher.IsTargetOrMatched(InternalHashKind.BinHashes, item.Value))
+                    _itemHashReferences.Add(new(item.Value, source, wad));
+            }
+        }
+
+        void CollectResourceLinks(Dictionary<uint, BinTreeProperty> properties, string field)
+        {
+            if (!properties.TryGetValue(Fnv1a.HashLower(field), out var property) || property is not BinTreeMap map) return;
+            foreach (var pair in map)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (pair.Key is BinTreeHash key && pair.Value is BinTreeObjectLink link &&
+                    matcher.IsTargetOrMatched(InternalHashKind.BinHashes, key.Value))
+                    _resourceLinks.Add(new(key.Value, link.Value, source, wad));
+            }
         }
 
         void CollectHashes(BinTreeProperty property)
@@ -182,6 +235,31 @@ internal sealed class BinEntryPathPatternSource
                 return matcher.CheckContextualCandidate(InternalHashKind.BinEntries, value, link.Source, link.Wad, link.Target);
             }
         }
+        foreach (var link in _resourceLinks)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!matcher.IsTargetOrMatched(InternalHashKind.BinHashes, link.Key) ||
+                Resolve(matcher, InternalHashKind.BinEntries, link.Target) is not string target) continue;
+            foreach (string candidate in ResourcePathCandidates(target))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (matcher.CheckContextualCandidate(InternalHashKind.BinHashes, candidate, link.Source, link.Wad, link.Key)) break;
+            }
+        }
+        foreach (var group in _itemGroups)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!matcher.IsRemaining(InternalHashKind.BinEntries, group.Owner) ||
+                Resolve(matcher, InternalHashKind.BinHashes, group.NameHash) is not string name) continue;
+            foreach (string directory in new[] { "Items/ItemGroup", "Items/ItemGroups", "Items/ItemGroups/Unique" })
+                if (matcher.CheckContextualCandidate(InternalHashKind.BinEntries, $"{directory}/{name}", group.Source, group.Wad, group.Owner)) break;
+        }
+        var itemHashes = matcher.GetCollectedItemHashCandidates().ToHashSet();
+        foreach (var hash in _itemHashReferences)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (itemHashes.Contains(hash.Hash)) PromoteEntryHash(matcher, hash.Hash, hash.Source, hash.Wad);
+        }
         foreach (var hash in _entryPathHashes)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -208,6 +286,7 @@ internal sealed class BinEntryPathPatternSource
         string value = kind switch
         {
             InternalHashKind.BinEntries => _resolver?.ResolveBinEntry(hash),
+            InternalHashKind.BinHashes => _resolver?.ResolveBinHashGeneral(hash),
             InternalHashKind.BinFields => _resolver?.ResolveBinField(hash),
             InternalHashKind.BinTypes => _resolver?.ResolveBinType(hash),
             _ => null
@@ -268,6 +347,25 @@ internal sealed class BinEntryPathPatternSource
             for (int i = 0; i < tokens.Length - 1; i++) yield return WithoutTokens(i, 2);
 
         string WithoutTokens(int start, int count) => string.Join("_", tokens.Take(start).Concat(tokens.Skip(start + count)));
+    }
+
+    internal static IEnumerable<string> ResourcePathCandidates(string target)
+    {
+        yield return target;
+        int slash = target.LastIndexOf('/');
+        if (slash < 0) yield break;
+        string basename = target[(slash + 1)..];
+        yield return basename;
+        yield return basename + "_BV2";
+        foreach (string candidate in ResourceKeyCandidates(basename)) yield return candidate;
+        // Keep the legacy single-token variant when a basename contains several skins.
+        for (int skin = 1; skin < 90; skin++)
+        {
+            string token = $"Skin{skin:00}_";
+            if (!basename.Contains(token, StringComparison.Ordinal)) continue;
+            yield return basename.Replace(token, "", StringComparison.Ordinal);
+            break;
+        }
     }
 
     private static string ReplaceTokens(string value, bool skin, string replacement)

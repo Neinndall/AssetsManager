@@ -76,9 +76,13 @@ namespace AssetsManager.Services.Hashes
             ["VFXDynamicPerParticleInstanceCBPS"] = "VFXDynamicPerParticlePS"
         };
 
-        private static void VisitBinStrings(BinTree tree, Action<string> check)
+        private static void VisitBinStrings(BinTree tree, Action<string> check, CancellationToken cancellationToken)
         {
-            foreach (string dependency in tree.Dependencies) check(dependency);
+            foreach (string dependency in tree.Dependencies)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                check(dependency);
+            }
             foreach (var item in tree.Objects.Values)
                 foreach (var property in item.Properties.Values) Visit(property);
             foreach (var item in tree.DataOverrides)
@@ -89,6 +93,7 @@ namespace AssetsManager.Services.Hashes
 
             void Visit(BinTreeProperty property)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 switch (property)
                 {
                     case BinTreeString text: check(text.Value); break;
@@ -118,7 +123,7 @@ namespace AssetsManager.Services.Hashes
             CancellationToken cancellationToken = default)
         {
             bool ShouldRun(string id) => selectedSubMethods == null || selectedSubMethods.Contains(id);
-            IReadOnlyDictionary<InternalHashKind, HashSet<ulong>> localTargets = CollectLocalTargets(tree);
+            IReadOnlyDictionary<InternalHashKind, HashSet<ulong>> localTargets = CollectLocalTargets(tree, cancellationToken);
 
             // File paths run first: the entries they name feed objectPath and link hooks below.
             if (ShouldRun("bin-context-filepath"))
@@ -154,16 +159,16 @@ namespace AssetsManager.Services.Hashes
                     ulong hash = InternalHashEvidenceMatcher.ComputeBinXxh3(value);
                     if (localTargets[InternalHashKind.BinXxh3].Contains(hash))
                         matcher.CheckBinXxh3Candidate(value, path, wadPath, path, hash);
-                });
+                }, cancellationToken);
             }
             if (matcher.Remaining > 0 &&
                 (ShouldRun("bin-context-strings") || ShouldRun("rst-content-binstrings")))
             {
-                VisitBinStrings(tree, value => matcher.Check(value, InternalHashGuessStrategy.BinContent, path, wadPath, path, localTargets));
+                VisitBinStrings(tree, value => matcher.Check(value, InternalHashGuessStrategy.BinContent, path, wadPath, path, localTargets), cancellationToken);
             }
         }
 
-        private static IReadOnlyDictionary<InternalHashKind, HashSet<ulong>> CollectLocalTargets(BinTree tree)
+        private static IReadOnlyDictionary<InternalHashKind, HashSet<ulong>> CollectLocalTargets(BinTree tree, CancellationToken cancellationToken)
         {
             var targets = new Dictionary<InternalHashKind, HashSet<ulong>>
             {
@@ -173,20 +178,31 @@ namespace AssetsManager.Services.Hashes
                 [InternalHashKind.BinHashes] = new(),
                 [InternalHashKind.BinXxh3] = new()
             };
+            CollectBinHashes(tree, targets, cancellationToken);
+            return targets;
+        }
+
+        internal static void CollectBinHashes(BinTree tree, Dictionary<InternalHashKind, HashSet<ulong>> targets,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
             foreach (var pair in tree.Objects)
             {
-                targets[InternalHashKind.BinEntries].Add(pair.Key);
+                cancellationToken.ThrowIfCancellationRequested();
+                if (pair.Key != 0) targets[InternalHashKind.BinEntries].Add(pair.Key);
                 if (pair.Value.ClassHash != 0) targets[InternalHashKind.BinTypes].Add(pair.Value.ClassHash);
                 foreach (BinTreeProperty property in pair.Value.Properties.Values) Visit(property);
             }
             foreach (var item in tree.DataOverrides)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (item.ObjectPathHash != 0) targets[InternalHashKind.BinEntries].Add(item.ObjectPathHash);
                 Visit(item.Property);
             }
 
             void Visit(BinTreeProperty property)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (property.NameHash != 0) targets[InternalHashKind.BinFields].Add(property.NameHash);
                 switch (property)
                 {
@@ -206,8 +222,6 @@ namespace AssetsManager.Services.Hashes
                         break;
                 }
             }
-
-            return targets;
         }
 
         /// <summary>
@@ -865,7 +879,7 @@ namespace AssetsManager.Services.Hashes
             BinPathCasing casing = null,
             CancellationToken cancellationToken = default)
         {
-            localTargets ??= CollectLocalTargets(tree);
+            localTargets ??= CollectLocalTargets(tree, cancellationToken);
             casing ??= BinPathCasing.Empty;
             foreach (var pair in tree.Objects)
             {
@@ -1074,7 +1088,6 @@ namespace AssetsManager.Services.Hashes
                             TryGetString(item.Properties, "name", out passAssetName))
                         {
                             MatchObservedEntry(entryHash, $"Passes/TFT/Assets/{passAssetName}");
-                            MatchObservedEntry(entryHash, $"Passes/Tft/Assets/{passAssetName}");
                         }
                     }
                     else if (classHash == Fnv1a.HashLower("CharacterRecord") || classHash == Fnv1a.HashLower("TFTCharacterRecord"))
@@ -1677,8 +1690,9 @@ namespace AssetsManager.Services.Hashes
                         if (slash > 0)
                         {
                             string champ = sub[..slash];
-                            MatchObservedEntry(entryHash, $"Characters/{champ}/Skins/Base");
-                            for (int i = 0; i < 200; i++)
+                            string basePath = $"Characters/{champ}/Skins/Base";
+                            if (MatchObservedEntry(entryHash, basePath)) skinPath = basePath;
+                            for (int i = 0; i < 200 && skinPath == null; i++)
                             {
                                 string candidate = $"Characters/{champ}/Skins/Skin{i}";
                                 if (MatchObservedEntry(entryHash, candidate))
@@ -1702,8 +1716,9 @@ namespace AssetsManager.Services.Hashes
                         if (slash > 0)
                         {
                             string champName = sub[..slash];
-                            MatchObservedEntry(entryHash, $"Characters/{champName}/Skins/Base");
-                            for (int skin = 0; skin < 200; skin++)
+                            string basePath = $"Characters/{champName}/Skins/Base";
+                            if (MatchObservedEntry(entryHash, basePath)) skinPath = basePath;
+                            for (int skin = 0; skin < 200 && skinPath == null; skin++)
                             {
                                 string candidate = $"Characters/{champName}/Skins/Skin{skin}";
                                 if (MatchObservedEntry(entryHash, candidate))
@@ -1711,7 +1726,12 @@ namespace AssetsManager.Services.Hashes
                                     skinPath = candidate;
                                     break;
                                 }
-                                MatchObservedEntry(entryHash, $"Characters/{champName}/Skins/Skin{skin:00}");
+                                string paddedPath = $"Characters/{champName}/Skins/Skin{skin:00}";
+                                if (MatchObservedEntry(entryHash, paddedPath))
+                                {
+                                    skinPath = paddedPath;
+                                    break;
+                                }
                             }
                         }
                     }
@@ -1901,24 +1921,8 @@ namespace AssetsManager.Services.Hashes
                     if (!matcher.IsTargetOrMatched(InternalHashKind.BinHashes, key.Value)) continue;
                     string target = ResolveEntryPath(link.Value);
                     if (string.IsNullOrWhiteSpace(target)) continue;
-                    if (matcher.CheckContextualCandidate(InternalHashKind.BinHashes, target, path, wadPath, key.Value)) continue;
-                    int slash = target.LastIndexOf('/');
-                    if (slash < 0) continue;
-                    string basename = target[(slash + 1)..];
-                    if (matcher.CheckContextualCandidate(InternalHashKind.BinHashes, basename, path, wadPath, key.Value) ||
-                        matcher.CheckContextualCandidate(InternalHashKind.BinHashes, basename + "_BV2", path, wadPath, key.Value)) continue;
-                    foreach (string candidate in BinEntryPathPatternSource.ResourceKeyCandidates(basename))
+                    foreach (string candidate in BinEntryPathPatternSource.ResourcePathCandidates(target))
                         if (matcher.CheckContextualCandidate(InternalHashKind.BinHashes, candidate, path, wadPath, key.Value)) break;
-                    // Preserve the previous single-skin-token rule when several different skins occur.
-                    if (matcher.IsRemaining(InternalHashKind.BinHashes, key.Value))
-                        for (int skin = 1; skin < 90; skin++)
-                        {
-                            string token = $"Skin{skin:00}_";
-                            if (!basename.Contains(token, StringComparison.Ordinal)) continue;
-                            matcher.CheckContextualCandidate(InternalHashKind.BinHashes,
-                                basename.Replace(token, "", StringComparison.Ordinal), path, wadPath, key.Value);
-                            break;
-                        }
                 }
             }
 
@@ -2057,6 +2061,7 @@ namespace AssetsManager.Services.Hashes
 
             void Visit(BinTreeProperty property, uint parentClassHash = 0)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (property is BinTreeContainer containerProp && parentClassHash != 0)
                 {
                     MatchContainerElementEvidence(parentClassHash, property.NameHash, containerProp);

@@ -184,6 +184,7 @@ New Features
   - Monitor / Version Manager: Fetch Versions now flags newly discovered manifests with an inline NEW tag (icon + text) next to the publish date.
 
 Improvements
+  - Hash Lab / BIN Context resolves DesignerEvent entry paths from their name field.
   - Monitor / Dashboard adds a System card with live indicators, separates status and activity cards and refreshes navigation and empty activity.
   - Hash Lab / Simplified the unknown hash summary and removed strategy and results divider tooltips.
   - Hash Lab / Strategy rows keep their neutral border on hover and focus.
@@ -555,6 +556,7 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - Hash Lab / BIN Context preserves Base and padded skin paths and resolves resource and item references learned after scanning.
   - VFX Studio / Overlapping transparent particles preserve their draw order when their distances to the camera match.
   - VFX Studio / Effects keep their colors when distortion is disabled or their draw phase requires color.
   - VFX Studio / Effects use the fallback material while a named base texture is unavailable and resume game shaders when it loads.
