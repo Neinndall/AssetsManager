@@ -88,24 +88,8 @@ namespace AssetsManager.Services.Hashes
 
             HashGuesser guesser = CreateWadGuesser(domain);
             string[] wadPaths = guesser.FindWads(rootDirectory);
-            var unknownHashes = await _store.LoadUnknownHashesAsync(domain, cancellationToken);
-            unknownHashes.RemoveWhere(hash => _hashResolverService.IsKnownHash(hash));
-
-            HashUnknownInventory inventory;
-            if (unknownHashes.Count == 0)
-            {
-                inventory = await BuildUnknownInventoryAsync(domain, wadPaths, cancellationToken);
-                unknownHashes = inventory.All;
-            }
-            else
-            {
-                inventory = new HashUnknownInventory
-                {
-                    All = unknownHashes,
-                    Current = unknownHashes,
-                    PatchFingerprint = string.Empty
-                };
-            }
+            var inventory = await LoadPersistedInventoryAsync(domain, rootDirectory, cancellationToken, null, progress);
+            var unknownHashes = inventory.All;
 
             HashGuessEngine engine = null;
             var runResult = await RunWithCancellationPersistenceAsync(() => Task.Run(() =>
@@ -937,7 +921,9 @@ namespace AssetsManager.Services.Hashes
             IReadOnlySet<ulong> sessionResolved = null,
             IProgress<HashGuessProgress> progress = null)
         {
-            var unknownHashes = await _store.LoadUnknownHashesAsync(domain, cancellationToken);
+            await _hashResolverService.LoadAllHashesAsync();
+            var inventory = await _store.LoadUnknownInventoryAsync(domain, cancellationToken);
+            var unknownHashes = inventory?.All ?? await _store.LoadUnknownHashesAsync(domain, cancellationToken);
             unknownHashes.RemoveWhere(hash => _hashResolverService.IsKnownHash(hash));
             if (sessionResolved != null)
             {
@@ -954,8 +940,8 @@ namespace AssetsManager.Services.Hashes
             return new HashUnknownInventory
             {
                 All = unknownHashes,
-                Current = unknownHashes,
-                PatchFingerprint = string.Empty
+                Current = inventory?.Current.Intersect(unknownHashes).ToHashSet() ?? unknownHashes.ToHashSet(),
+                PatchFingerprint = inventory?.PatchFingerprint ?? string.Empty
             };
         }
 
