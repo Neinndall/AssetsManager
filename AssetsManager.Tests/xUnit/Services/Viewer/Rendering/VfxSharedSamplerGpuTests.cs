@@ -240,6 +240,100 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
             }
         }
 
+        public static IEnumerable<object[]> DistortionCases()
+        {
+            foreach (bool mesh in new[] { false, true })
+            foreach (bool game in new[] { false, true })
+            for (int mode = 0; mode < 4; mode++)
+            foreach (float offset in new[] { 2.25f, -0.25f })
+                yield return new object[] { mesh, game, mode, offset };
+        }
+
+        [Theory]
+        [MemberData(nameof(DistortionCases))]
+        public void DistortionNormalMapUsesTheBaseAddressMode(bool mesh, bool game, int mode, float offset)
+        {
+            string install = InstalledSkins.FindInstall();
+            Assert.False(game && string.IsNullOrWhiteSpace(install), "The native regression requires an installed client.");
+            using var context = new HiddenWglContext();
+            using GL gl = GL.GetApi(context.GetProcAddress);
+            using var renderer = new VfxOpenGlRenderer();
+            renderer.Initialize(gl, game ? InstalledSkins.Settings(install) : null);
+            uint target = Texture(gl, 32, 32, new byte[32 * 32 * 4]);
+            uint framebuffer = gl.GenFramebuffer();
+            gl.BindFramebuffer(FramebufferTarget.Framebuffer, framebuffer);
+            gl.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment0,
+                TextureTarget.Texture2D, target, 0);
+            Assert.Equal(GLEnum.FramebufferComplete, gl.CheckFramebufferStatus(FramebufferTarget.Framebuffer));
+            uint white = Texture(gl, 1, 1, new byte[] { 255, 255, 255, 255 });
+            uint normal = Texture(gl, 2, 1, new byte[] { 128, 128, 255, 32, 128, 128, 255, 224 });
+            try
+            {
+                var definition = new VfxEmitterDefinition("normal addressing", VfxCurveF.Const(1), VfxCurveF.Const(1),
+                    null, 0, 0, false, false, 3, VfxCurve3.Const(Vector3.One), null,
+                    VfxCurve4.Const(Vector4.One), null, null, null, null, VfxCurve3.Const(Vector3.Zero),
+                    "white.tex", Vector2.One, 1, false, mesh,
+                    PrimitiveKind: mesh ? VfxPrimitiveKind.Mesh : VfxPrimitiveKind.CameraQuad,
+                    RenderState: VfxEmitterRenderState.Default with
+                    { TextureAddressMode = mode, DisableBackfaceCull = true, RenderPhase = 3 },
+                    UvTransformCenter: Vector2.Zero,
+                    Distortion: new VfxDistortionDefinition(0f, 1, "normal.tex"));
+                Assert.True(definition.DrawsAsDistortion);
+                var instances = new float[VfxPlaybackRuntime.InstanceStride];
+                instances[3] = instances[4] = instances[18] = 0.75f;
+                instances[5] = instances[6] = instances[7] = instances[8] = 1;
+                instances[19] = offset;
+                instances[20] = 0.5f;
+                // A constant normal coordinate isolates addressing from interpolation and geometry.
+                instances[36] = instances[40] = instances[44] = 1;
+                var emitter = new VfxPlaybackRuntime.EmitterState
+                { Def = definition, Texture = white, DistortionTexture = normal,
+                    Instances = instances, InstanceCount = 1, TextureWidth = 1, TextureHeight = 1 };
+                if (mesh)
+                    renderer.UploadEmitterMesh(emitter,
+                        new float[] { -1, -1, 0, 1, -1, 0, 0, 1, 0 },
+                        new float[] { 0, 0, 1, 0, 0, 1, 0, 0, 1 },
+                        new float[] { 0, 0, 1, 0, 0.5f, 1 }, null);
+                Matrix4x4 view = Matrix4x4.CreateLookAt(new Vector3(0, 0, 3), Vector3.Zero, Vector3.UnitY);
+                Matrix4x4 projection = Matrix4x4.CreateOrthographic(2, 2, 0.1f, 10);
+                gl.Viewport(0, 0, 32, 32);
+                byte[] Draw()
+                {
+                    gl.ClearColor(1, 1, 1, 0);
+                    gl.Clear(ClearBufferMask.ColorBufferBit);
+                    renderer.CaptureScene(32, 32, true, false);
+                    renderer.Render(new[] { new VfxRenderQueueEntry(emitter, 0, 0) }, view * projection, view);
+                    var pixels = new byte[32 * 32 * 4];
+                    gl.ReadPixels(0, 0, 32, 32, PixelFormat.Rgba, PixelType.UnsignedByte, pixels.AsSpan());
+                    return pixels;
+                }
+                byte[] actual = Draw();
+                if (game) Assert.Null(renderer.GameParticleFallback(emitter, mesh));
+                // Native border matches the upstream ClampToEdge sampler; stock implements transparent border.
+                int mask = mode switch
+                {
+                    0 => offset > 0 ? 32 : 224,
+                    1 => 32,
+                    3 when !game => 0,
+                    _ => offset > 0 ? 224 : 32
+                };
+                // Distortion alpha blending multiplies source alpha by itself over a clear target.
+                int expectedAlpha = (int)MathF.Round(mask * mask / 255f);
+                Assert.InRange((int)actual[(16 * 32 + 16) * 4 + 3], Math.Max(0, expectedAlpha - 1), expectedAlpha + 1);
+                Assert.Equal(actual, Draw());
+                gl.BindTexture(TextureTarget.Texture2D, normal);
+                gl.GetTexParameter(TextureTarget.Texture2D, GLEnum.TextureWrapS, out int wrap);
+                Assert.Equal((int)TextureWrapMode.ClampToEdge, wrap);
+                Assert.Equal(GLEnum.NoError, gl.GetError());
+            }
+            finally
+            {
+                gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+                gl.DeleteFramebuffer(framebuffer);
+                foreach (uint texture in new[] { target, white, normal }) gl.DeleteTexture(texture);
+            }
+        }
+
         private static uint Texture(GL gl, uint width, uint height, byte[] pixels)
         {
             uint texture = gl.GenTexture();

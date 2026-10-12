@@ -641,7 +641,7 @@ void main(){
         internal const string DistortedScene = @"
 vec4 distortedScene(vec2 uv, vec2 normalUv, vec4 color){
     vec4 ramp = applyParticleColor(vec4(1.0));
-    vec4 normalSample = texture(uDistortionTex, normalUv);
+    vec4 normalSample = sampleAddressed(uDistortionTex, normalUv, uAddressMode);
     float alpha = normalSample.a * ramp.a;
     if (uAlphaTest != 0 && alpha < uAlphaCutoff) discard;
     vec2 push = (normalSample.xy * 2.0 - vec2(1.0)) * uDistortionStrength * ramp.a;

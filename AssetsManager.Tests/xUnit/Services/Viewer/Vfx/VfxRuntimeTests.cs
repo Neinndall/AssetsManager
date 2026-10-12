@@ -1118,6 +1118,33 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.InRange(state.Instances[19], 0.16f, 0.1603f);
         }
 
+        [Theory]
+        [InlineData(0, false, 0.4f, 0.75f)]
+        [InlineData(1, false, 1.4f, 1.75f)]
+        [InlineData(2, false, -0.6f, -0.25f)]
+        [InlineData(3, false, -0.6f, -0.25f)]
+        [InlineData(2, true, -0.6f, -1f)]
+        [InlineData(3, true, -0.6f, -1f)]
+        public void NegativeBirthUvRampsKeepTheirSignBeforeEachLayersAddressFold(
+            int mode, bool clamped, float expectedU, float expectedV)
+        {
+            var emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default with
+            { TextureAddressMode = mode, ClampUvScroll = clamped }) with
+            {
+                BirthUvOffset = VfxCurve2.Const(new Vector2(-0.6f, -1.25f)),
+                TextureMultBirthUvOffset = VfxCurve2.Const(new Vector2(-1.25f, -0.6f)),
+                TextureMultAddressMode = mode, TextureMultClampUvScroll = clamped
+            };
+            var runtime = new VfxPlaybackRuntime(7);
+            runtime.SetSystem(new VfxSystemDefinition(1, "signed-uv", "signed-uv", new[] { emitter }), Vector3.Zero);
+            runtime.Update(0.01f);
+            var state = Assert.Single(runtime.Emitters);
+            Assert.Equal(expectedU, state.Instances[19], 4);
+            Assert.Equal(expectedV, state.Instances[20], 4);
+            Assert.Equal(expectedV, state.Instances[29], 4);
+            Assert.Equal(expectedU, state.Instances[30], 4);
+        }
+
         [Fact]
         public void BirthRandomIsDeterministicAndPackedForColorLookup()
         {

@@ -5,7 +5,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Semantics
 {
     /// <summary>
     /// League's UV bookkeeping before the shader samples a texture cell. Birth ramps are
-    /// clamped only when authored to clamp; otherwise they wrap inside one cell. Long-running
+    /// clamped only when authored to clamp; otherwise they retain their signed fraction. Long-running
     /// wrap/mirror offsets are folded on the CPU so float attributes retain texel precision.
     /// </summary>
     internal static class VfxUvSemantics
@@ -13,7 +13,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Semantics
         internal static Vector2 BirthRamp(Vector2 value, bool clamped)
             => clamped
                 ? Vector2.Clamp(value, new Vector2(-1f), Vector2.One)
-                : new Vector2(Fract(value.X), Fract(value.Y));
+                // The engine uses modff: negative ramps must stay negative before addressing.
+                : new Vector2(value.X % 1f, value.Y % 1f);
 
         // The emitter pan lands after the layer flips. Its pre-flip carrier must cancel their sign.
         internal static Vector2 PreFlipEmitterScroll(Vector2 rate, float time, bool flipU, bool flipV)
@@ -31,8 +32,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Semantics
                 ? new Vector2(PositiveModulo(value.X, period), PositiveModulo(value.Y, period))
                 : value;
         }
-
-        private static float Fract(float value) => value - MathF.Floor(value);
 
         private static float PositiveModulo(float value, float period)
         {

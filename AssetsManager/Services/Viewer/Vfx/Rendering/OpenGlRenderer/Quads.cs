@@ -167,7 +167,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                     _gl.BindTexture(
                         TextureTarget.Texture2D,
                         es.DistortionTexture != 0 ? es.DistortionTexture : _textures.FallbackTransparentTexture);
-                    BindStockSampler(3, 2);
+                    BindStockSampler(3, renderState.TextureAddressMode);
                     _gl.ActiveTexture(TextureUnit.Texture0);
                 }
                 if (es.ErosionTexture != 0)

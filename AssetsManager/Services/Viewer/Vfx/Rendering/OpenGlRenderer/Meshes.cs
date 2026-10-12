@@ -203,7 +203,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 _gl.BindTexture(
                     TextureTarget.Texture2D,
                     es.DistortionTexture != 0 ? es.DistortionTexture : _textures.FallbackTransparentTexture);
-                BindStockSampler(2, 2);
+                BindStockSampler(2, renderState.TextureAddressMode);
                 _gl.ActiveTexture(TextureUnit.Texture3);
                 _gl.BindTexture(TextureTarget.Texture2D, _capture.ColorTexture);
                 _gl.ActiveTexture(TextureUnit.Texture0);

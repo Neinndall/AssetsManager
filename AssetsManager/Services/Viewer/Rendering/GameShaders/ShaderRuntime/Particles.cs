@@ -112,7 +112,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                 // VFX decoded textures carry one level, as in LTK's useVfxTextures.
                 int mode = own switch
                 {
-                    "TEXTURE" => emitter.RenderState?.TextureAddressMode ?? 0,
+                    "TEXTURE" or "NORMAL_MAP" => emitter.RenderState?.TextureAddressMode ?? 0,
                     "TEXTUREMULT" => emitter.TextureMultAddressMode,
                     "sPalettesTexture" => emitter.PaletteDefinition?.AddressMode ?? 0,
                     "sAlphaErosionTexture" => emitter.AlphaErosion?.AddressMode ?? 0,
