@@ -116,6 +116,98 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
             }
         }
 
+        public static IEnumerable<object[]> BorderCases()
+        {
+            foreach (VfxPrimitiveKind primitive in new[] { VfxPrimitiveKind.CameraQuad, VfxPrimitiveKind.Mesh, VfxPrimitiveKind.AttachedMesh })
+            foreach (string slot in new[] { "base", "mult", "palette", "erosion" })
+            foreach (float coordinate in new[] { -0.01f, 0f, 1f, 1.01f })
+                yield return new object[] { primitive, slot, coordinate };
+        }
+
+        [Theory]
+        [MemberData(nameof(BorderCases))]
+        public void NativeBorderLayersMaskOutsideAndKeepClampProgramsIndependent(
+            VfxPrimitiveKind primitive, string slot, float coordinate)
+        {
+            string install = InstalledSkins.FindInstall();
+            Assert.False(string.IsNullOrWhiteSpace(install), "Native border coverage requires an installed client.");
+            using var context = new HiddenWglContext();
+            using GL gl = GL.GetApi(context.GetProcAddress);
+            using var renderer = new VfxOpenGlRenderer();
+            renderer.Initialize(gl, InstalledSkins.Settings(install));
+            uint target = Texture(gl, 32, 32, new byte[32 * 32 * 4]);
+            uint framebuffer = gl.GenFramebuffer();
+            gl.BindFramebuffer(FramebufferTarget.Framebuffer, framebuffer);
+            gl.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment0,
+                TextureTarget.Texture2D, target, 0);
+            Assert.Equal(GLEnum.FramebufferComplete, gl.CheckFramebufferStatus(FramebufferTarget.Framebuffer));
+            uint white = Texture(gl, 1, 1, new byte[] { 255, 255, 255, 255 });
+            uint erosionTexture = Texture(gl, 1, 1, new byte[] { 0, 0, 0, 128 });
+            try
+            {
+                bool mesh = primitive != VfxPrimitiveKind.CameraQuad;
+                VfxEmitterDefinition Definition(int mode) => new("border layer", VfxCurveF.Const(1), VfxCurveF.Const(1),
+                    null, 0, 0, false, false, 3, VfxCurve3.Const(Vector3.One), null,
+                    VfxCurve4.Const(Vector4.One), null, null, null, null, VfxCurve3.Const(Vector3.Zero),
+                    "white.tex", Vector2.One, 1, false, mesh, PrimitiveKind: primitive,
+                    RenderState: VfxEmitterRenderState.Default with
+                    { DisableBackfaceCull = true, TextureAddressMode = slot == "base" ? mode : 2 },
+                    UvTransformCenter: Vector2.Zero, TextureMultTransformCenter: Vector2.Zero,
+                    TextureMultPath: slot == "mult" ? "white.tex" : null,
+                    TextureMultAddressMode: slot == "mult" ? mode : 2,
+                    PaletteDefinition: slot == "palette" ? new VfxPaletteDefinition(1,
+                        VfxCurve3.Const(Vector3.Zero), "white.tex", Vector4.Zero,
+                        ScrollU: VfxCurveF.Const(coordinate), AddressMode: mode) : null,
+                    AlphaErosion: slot == "erosion" ? new VfxAlphaErosionDefinition("erosion.tex",
+                        VfxCurveF.Const(0.25f), 0.1f, 0.1f, mode, VfxCurve4.Const(Vector4.UnitW), SliceWidth: 0.5f) : null);
+                VfxEmitterDefinition clamp = Definition(2), border = Definition(3);
+                var instance = new float[VfxPlaybackRuntime.InstanceStride];
+                instance[3] = instance[4] = instance[18] = 0.75f;
+                instance[5] = instance[6] = instance[7] = instance[8] = 1;
+                instance[19] = slot is "base" or "erosion" ? coordinate : 0.5f;
+                instance[20] = instance[30] = 0.5f;
+                instance[29] = slot == "mult" ? coordinate : 0.5f;
+                instance[24] = 0.25f; instance[28] = 1;
+                instance[36] = instance[40] = instance[44] = 1;
+                var emitter = new VfxPlaybackRuntime.EmitterState
+                { Def = clamp, Texture = white, TextureMult = slot == "mult" ? white : 0,
+                    PaletteTexture = slot == "palette" ? white : 0, ErosionTexture = slot == "erosion" ? erosionTexture : 0,
+                    Instances = instance, InstanceCount = 1 };
+                if (mesh)
+                    renderer.UploadEmitterMesh(emitter,
+                        new float[] { -1, -1, 0, 1, -1, 0, 0, 1, 0 },
+                        new float[] { 0, 0, 1, 0, 0, 1, 0, 0, 1 },
+                        new float[] { 0, 0, 1, 0, 0.5f, 1 }, null);
+                gl.Viewport(0, 0, 32, 32);
+                byte[] Draw(VfxEmitterDefinition definition)
+                {
+                    emitter.Def = definition;
+                    gl.ClearColor(0, 0, 0, 0);
+                    gl.Clear(ClearBufferMask.ColorBufferBit);
+                    renderer.Render(new[] { new VfxRenderQueueEntry(emitter, 0, 0) }, Matrix4x4.Identity, Matrix4x4.Identity);
+                    Assert.Null(renderer.GameParticleFallback(emitter, mesh));
+                    var pixel = new byte[4];
+                    gl.ReadPixels(16, 16, 1, 1, PixelFormat.Rgba, PixelType.UnsignedByte, pixel.AsSpan());
+                    return pixel;
+                }
+                byte[] inside = Draw(clamp);
+                Assert.Equal(new byte[] { 255, 255, 255, 255 }, inside);
+                byte[] expected = coordinate is >= 0 and <= 1 ? inside :
+                    slot == "palette" ? new byte[] { 0, 0, 0, 255 } : new byte[4];
+                // The authored default alpha test discards fully eroded fragments.
+                Assert.Equal(expected, Draw(border));
+                Assert.Equal(inside, Draw(clamp));
+                Assert.Equal(expected, Draw(border));
+                Assert.Equal(GLEnum.NoError, gl.GetError());
+            }
+            finally
+            {
+                gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+                gl.DeleteFramebuffer(framebuffer);
+                foreach (uint texture in new[] { target, white, erosionTexture }) gl.DeleteTexture(texture);
+            }
+        }
+
         private static uint Texture(GL gl, uint width, uint height, byte[] pixels)
         {
             uint texture = gl.GenTexture();

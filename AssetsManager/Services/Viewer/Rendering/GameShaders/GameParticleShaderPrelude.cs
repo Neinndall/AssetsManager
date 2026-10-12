@@ -10,7 +10,8 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
 {
     internal static class GameParticleShaderPrelude
     {
-        internal static GameShaderTranslator.TranslatedProgram Compose(GameShaderTranslator.TranslatedProgram program, bool mesh)
+        internal static GameShaderTranslator.TranslatedProgram Compose(GameShaderTranslator.TranslatedProgram program, bool mesh,
+            IReadOnlyList<string> borderedTextures = null)
         {
             string feed = mesh ? VfxShaderSource.MeshVertex : VfxShaderSource.ParticleVertex;
             feed = Regex.Replace(feed, @"^out (\w+) (\w+);", "$1 $2;", RegexOptions.Multiline);
@@ -88,6 +89,12 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             vertex += "\nvoid main(){ particleGeometry(); particleFeed();\n" + assignments + handoff + "    gameParticleMain();\n}\n";
             pixel = RewriteMembers(pixel, program.Pixel.Sidecar, pixelValues);
             pixel = WithScreenCopy(pixel);
+            if (borderedTextures?.Count > 0)
+                foreach (var texture in program.Pixel.Sidecar.Textures)
+                    if (texture.Dimension == GameShaderTranslator.TextureDimension.Texture2D &&
+                        borderedTextures.Any(name => texture.Name == name || texture.Name == name + "__TX"))
+                        foreach (var sampler in texture.Samplers)
+                            pixel = WithBorder(pixel, sampler.GlslName);
             return program with
             {
                 Vertex = program.Vertex with { Glsl = vertex },
@@ -120,6 +127,20 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                     .Replace(declaration, declaration + helpers);
             }
             return source;
+        }
+
+        internal static string WithBorder(string source, string sampler)
+        {
+            string declaration = "uniform highp sampler2D " + sampler + ";";
+            string read = "particleBorder_" + sampler;
+            if (!source.Contains(declaration, StringComparison.Ordinal) ||
+                source.Contains(read + "(", StringComparison.Ordinal)) return source;
+            // Sample before testing coverage to retain implicit texture derivatives.
+            string helper = "\nvec4 " + read + "(vec2 at){\n" +
+                "    vec4 texel = texture(" + sampler + ", at);\n" +
+                "    return clamp(at, 0.0, 1.0) == at ? texel : vec4(0.0);\n}\n";
+            return source.Replace("texture(" + sampler + ", ", read + "(", StringComparison.Ordinal)
+                .Replace(declaration, declaration + helper, StringComparison.Ordinal);
         }
 
         private static string[] Identity() => new[] { "vec4(1.0,0.0,0.0,0.0)", "vec4(0.0,1.0,0.0,0.0)", "vec4(0.0,0.0,1.0,0.0)", "vec4(0.0,0.0,0.0,1.0)" };

@@ -558,6 +558,7 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - VFX Studio / Native particle shaders now preserve transparent texture borders instead of stretching edge pixels.
   - VFX Studio / Corrected negative texture scrolling and distortion texture addressing.
   - VFX Studio / Timeline scrubbing now holds playback until release without changing Play/Pause, and emitter controls no longer move the playhead.
   - Hash Lab / GAME and LCU guessing preserve current and historical unknowns and their patch reference when reusing a saved inventory.

@@ -11,6 +11,23 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
     public sealed class GameShaderRuntimeSemanticsTests
     {
         [Fact]
+        public void BorderSamplingRetainsDerivativesAndOnlyRewritesTheNamedSamplerOnce()
+        {
+            const string source = "uniform highp sampler2D TEXTURE_TX;\n" +
+                "uniform highp sampler2D OTHER_TX;\n" +
+                "void main(){ vec4 a = texture(TEXTURE_TX, vec2(1.5)); vec4 b = texture(OTHER_TX, vec2(0.5)); }";
+            string patched = GameParticleShaderPrelude.WithBorder(source, "TEXTURE_TX");
+            Assert.Contains("vec4 a = particleBorder_TEXTURE_TX(vec2(1.5))", patched);
+            Assert.Contains("texture(OTHER_TX, vec2(0.5))", patched);
+            Assert.Contains("vec4 texel = texture(TEXTURE_TX, at);", patched);
+            Assert.Contains("return clamp(at, 0.0, 1.0) == at ? texel : vec4(0.0);", patched);
+            Assert.Equal(patched, GameParticleShaderPrelude.WithBorder(patched, "TEXTURE_TX"));
+            Assert.Equal(source, GameParticleShaderPrelude.WithBorder(source, "ABSENT"));
+            Assert.Equal("uniform highp samplerCube CUBE;", GameParticleShaderPrelude.WithBorder(
+                "uniform highp samplerCube CUBE;", "CUBE"));
+        }
+
+        [Fact]
         public void CompactSkinPaletteIncludesAnimatedRigJointsAbove255()
         {
             Matrix4x4[] joints = Enumerable.Repeat(Matrix4x4.Identity, 361).ToArray();

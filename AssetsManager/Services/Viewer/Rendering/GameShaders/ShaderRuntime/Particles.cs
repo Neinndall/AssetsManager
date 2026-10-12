@@ -11,7 +11,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
     internal sealed partial class GameShaderRuntime
     {
         internal AssetsManager.Services.Viewer.Rendering.Core.GlDrawBindings ParticleDrawBindings { get; set; }
-        private sealed record ParticleMaterial(GameMaterialProgram Program);
+        private sealed record ParticleMaterial(GameMaterialProgram Program, IReadOnlyList<string> BorderedTextures);
         private readonly Dictionary<VfxEmitterDefinition, ParticleMaterial[]> _particleMaterials =
             new(ReferenceEqualityComparer.Instance);
 
@@ -24,9 +24,11 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                 materials[slot] = new ParticleMaterial(emitter.HasResolvedCustomMaterial
                     ? emitter.CustomMaterial.Program : emitter.PaletteDefinition is { } palette &&
                         (palette.PaletteCount <= 0 || string.IsNullOrWhiteSpace(palette.PaletteTexturePath))
-                        ? null : GameParticleProgramResolver.Create(emitter, mesh));
+                        ? null : GameParticleProgramResolver.Create(emitter, mesh),
+                    GameParticleProgramResolver.BorderedTextures(emitter));
             var material = materials[slot];
-            return (material.Program == null ? null : GetOrCreate(material, material.Program, mesh), material);
+            return (material.Program == null ? null : GetOrCreate(material, material.Program, mesh,
+                material.BorderedTextures), material);
         }
 
         internal (bool Depth, bool Color) ParticleSceneInputs(VfxEmitterDefinition emitter, bool mesh)
@@ -110,14 +112,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                 _gl.ActiveTexture((TextureUnit)((int)TextureUnit.Texture0 + sampler.Unit));
                 _gl.BindTexture(target, texture.Value);
                 // VFX decoded textures carry one level, as in LTK's useVfxTextures.
-                int mode = own switch
-                {
-                    "TEXTURE" or "NORMAL_MAP" => emitter.RenderState?.TextureAddressMode ?? 0,
-                    "TEXTUREMULT" => emitter.TextureMultAddressMode,
-                    "sPalettesTexture" => emitter.PaletteDefinition?.AddressMode ?? 0,
-                    "sAlphaErosionTexture" => emitter.AlphaErosion?.AddressMode ?? 0,
-                    _ => 2
-                };
+                int mode = GameParticleProgramResolver.TextureAddressMode(emitter, own);
                 uint samplerObject;
                 if (sampler.Dimension == GameShaderTranslator.TextureDimension.Buffer)
                     samplerObject = ResolveNeutralSampler(true, sampler.Dimension);

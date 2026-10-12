@@ -14,6 +14,25 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
 {
     public sealed class GameParticleProgramResolverTests
     {
+        [Fact]
+        public void NativeBorderSelectionIncludesEveryAuthoredLayerAndExcludesCustomMaterials()
+        {
+            var emitter = Emitter() with
+            {
+                RenderState = VfxEmitterRenderState.Default with { TextureAddressMode = 3 },
+                TextureMultPath = "mult.tex", TextureMultAddressMode = 3,
+                ParticleColorTexturePath = "color.tex",
+                PaletteDefinition = new VfxPaletteDefinition(1, VfxCurve3.Const(Vector3.Zero), "palette.tex", AddressMode: 3),
+                AlphaErosion = new VfxAlphaErosionDefinition("erosion.tex", VfxCurveF.Const(0.5f), 0.1f, 0.1f, 3)
+            };
+            Assert.Equal(new[] { "TEXTURE", "TEXTUREMULT", "sPalettesTexture", "sAlphaErosionTexture", "NORMAL_MAP" },
+                GameParticleProgramResolver.BorderedTextures(emitter));
+            Assert.Equal(2, GameParticleProgramResolver.TextureAddressMode(emitter, "PARTICLE_COLOR_TEXTURE"));
+            Assert.Empty(GameParticleProgramResolver.BorderedTextures(Emitter()));
+            Assert.Empty(GameParticleProgramResolver.BorderedTextures(emitter with
+                { CustomMaterial = ModelMaterialDefinition.TextureOnly("custom.tex") }));
+        }
+
         public static System.Collections.Generic.IEnumerable<object[]> SoftDepthVariants()
         {
             foreach (bool mesh in new[] { false, true })

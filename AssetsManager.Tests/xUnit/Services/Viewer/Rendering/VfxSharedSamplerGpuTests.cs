@@ -309,12 +309,12 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
                 }
                 byte[] actual = Draw();
                 if (game) Assert.Null(renderer.GameParticleFallback(emitter, mesh));
-                // Native border matches the upstream ClampToEdge sampler; stock implements transparent border.
+                // Both paths return transparent black outside a border-addressed normal map.
                 int mask = mode switch
                 {
                     0 => offset > 0 ? 32 : 224,
                     1 => 32,
-                    3 when !game => 0,
+                    3 => 0,
                     _ => offset > 0 ? 224 : 32
                 };
                 // Distortion alpha blending multiplies source alpha by itself over a clear target.

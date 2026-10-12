@@ -16,7 +16,8 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
         [ThreadStatic]
         internal static Action<string, double> PreparationMeasured;
 
-        private CacheEntry GetOrCreate(object owner, GameMaterialProgram program, bool? particleMesh = null)
+        private CacheEntry GetOrCreate(object owner, GameMaterialProgram program, bool? particleMesh = null,
+            IReadOnlyList<string> borderedTextures = null)
         {
             if (owner != null && _programs.TryGetValue(owner, out CacheEntry cached))
                 return cached;
@@ -58,6 +59,8 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                             }
 
                             string key = program.Kind + "|" + particleMesh + "|" + ProgramKey(passRead.Pass, passRead.Bytecode.Program);
+                            // Border rewrites the pixel stage; clamp and border cannot share a linked program.
+                            if (borderedTextures?.Count > 0) key += "|border:" + string.Join(",", borderedTextures);
                             if (!_sharedPrograms.TryGetValue(key, out ProgramRuntime ready))
                             {
                                 started = measure != null ? Stopwatch.GetTimestamp() : 0;
@@ -79,7 +82,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                                 {
                                     started = measure != null ? Stopwatch.GetTimestamp() : 0;
                                     ready = CreateProgram(particleMesh.HasValue
-                                        ? GameParticleShaderPrelude.Compose(translated.Program, particleMesh.Value)
+                                        ? GameParticleShaderPrelude.Compose(translated.Program, particleMesh.Value, borderedTextures)
                                         : translated.Program, program.Kind, particleMesh.HasValue);
                                     ready.WritesBloom = WritesSecondTarget(translated.Program.Pixel.Glsl);
                                     _sharedPrograms[key] = ready;

@@ -29,6 +29,27 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
         internal const string DistortionAttachedVertexPath = "ASSETS/Shaders/HLSL/SkinnedMesh/PARTICLE_DISTORTION_VS.vs";
         internal const string DistortionAttachedPixelPath = "ASSETS/Shaders/HLSL/SkinnedMesh/PARTICLE_DISTORTION_PS.ps";
 
+        internal static int TextureAddressMode(VfxEmitterDefinition emitter, string name) => name switch
+        {
+            "TEXTURE" or "NORMAL_MAP" => emitter.RenderState?.TextureAddressMode ?? 0,
+            "TEXTUREMULT" => emitter.TextureMultAddressMode,
+            "sPalettesTexture" => emitter.PaletteDefinition?.AddressMode ?? 1,
+            "sAlphaErosionTexture" => emitter.AlphaErosion?.AddressMode ?? 2,
+            _ => 2
+        };
+
+        private static readonly string[] AddressedTextures =
+            { "TEXTURE", "TEXTUREMULT", "sPalettesTexture", "sAlphaErosionTexture", "NORMAL_MAP" };
+
+        internal static IReadOnlyList<string> BorderedTextures(VfxEmitterDefinition emitter)
+        {
+            if (emitter.HasResolvedCustomMaterial) return Array.Empty<string>();
+            var names = new List<string>();
+            foreach (string name in AddressedTextures)
+                if (TextureAddressMode(emitter, name) == 3) names.Add(name);
+            return names;
+        }
+
         internal static GameMaterialProgram Create(VfxEmitterDefinition emitter, bool meshGeometry)
         {
             ArgumentNullException.ThrowIfNull(emitter);
