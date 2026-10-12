@@ -279,12 +279,20 @@ namespace AssetsManager.Views.Controls.Viewer
 
         internal void TimelineGrid_PreviewMouseDown(object sender, MouseButtonEventArgs e)
         {
+            if (e.ChangedButton != MouseButton.Left || _model == null || _model.TotalDuration <= 0 ||
+                StudioTimelineView.TracksCanvasContainer == null) return;
             if (_isDraggingLoopStart || _isDraggingLoopBoundary) return;
             if (e.OriginalSource is FrameworkElement fe &&
                 (fe == StudioTimelineView.LoopStartHandle || fe == StudioTimelineView.LoopBoundaryHandle || fe == StudioTimelineView.LoopBoundaryCanvas ||
-                 fe == StudioTimelineView.LoopStartLine || fe == StudioTimelineView.LoopBoundaryLine || fe == StudioTimelineView.LoopRangeBand)) return;
+                 fe == StudioTimelineView.LoopStartLine || fe == StudioTimelineView.LoopBoundaryLine || fe == StudioTimelineView.LoopRangeBand ||
+                 StudioTimelineView.LoopStartHandle.IsAncestorOf(fe) || StudioTimelineView.LoopBoundaryHandle.IsAncestorOf(fe))) return;
+            double mouseX = e.GetPosition(StudioTimelineView.TracksCanvasContainer).X;
+            // Emitter labels and controls share this grid but do not seek the playhead.
+            double trackWidth = GetTimelineTrackWidth();
+            if (trackWidth <= 0 || mouseX < 0 || mouseX > trackWidth) return;
+            if (!((UIElement)sender).CaptureMouse()) return;
             _isTimelineDragging = true;
-            UpdateSeekFromTimeline(e.GetPosition(StudioTimelineView.TracksCanvasContainer).X);
+            UpdateSeekFromTimeline(mouseX);
         }
 
         internal void TimelineGrid_PreviewMouseMove(object sender, MouseEventArgs e)
@@ -297,8 +305,13 @@ namespace AssetsManager.Views.Controls.Viewer
 
         internal void TimelineGrid_PreviewMouseUp(object sender, MouseButtonEventArgs e)
         {
+            if (e.ChangedButton != MouseButton.Left || !_isTimelineDragging) return;
             _isTimelineDragging = false;
+            ((UIElement)sender).ReleaseMouseCapture();
         }
+
+        internal void TimelineGrid_LostMouseCapture(object sender, MouseEventArgs e)
+            => _isTimelineDragging = false;
 
         private void UpdateSeekFromTimeline(double mouseX)
         {

@@ -382,7 +382,7 @@ namespace AssetsManager.Views.Controls.Viewer
             if (!HasSelectedMapClipReady())
                 return;
 
-            if (_model.IsPlaying && !_isUserSeeking)
+            if (_model.IsPlaying && !IsPlaybackScrubbing)
             {
                 double next;
                 if (_vfxRenderer?.ActiveSystem != null)

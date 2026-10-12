@@ -572,7 +572,7 @@ namespace AssetsManager.Views.Controls.Viewer
             // MAP character clips own the same VFX session clock themselves so their pose, cues
             // and ParticleEventData stay on one timeline. Other previews keep the generic session clock.
             if (HasSelectedMapClipReady() ||
-                !_model.IsPlaying || _isUserSeeking || _vfxRenderer?.ActiveSystem == null)
+                !_model.IsPlaying || IsPlaybackScrubbing || _vfxRenderer?.ActiveSystem == null)
             {
                 return;
             }

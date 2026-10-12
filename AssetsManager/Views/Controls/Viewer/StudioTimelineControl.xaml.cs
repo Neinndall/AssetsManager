@@ -40,6 +40,7 @@ namespace AssetsManager.Views.Controls.Viewer
         private void TimelineGrid_PreviewMouseDown(object sender, MouseButtonEventArgs e) => Owner?.TimelineGrid_PreviewMouseDown(sender, e);
         private void TimelineGrid_PreviewMouseMove(object sender, MouseEventArgs e) => Owner?.TimelineGrid_PreviewMouseMove(sender, e);
         private void TimelineGrid_PreviewMouseUp(object sender, MouseButtonEventArgs e) => Owner?.TimelineGrid_PreviewMouseUp(sender, e);
+        private void TimelineGrid_LostMouseCapture(object sender, MouseEventArgs e) => Owner?.TimelineGrid_LostMouseCapture(sender, e);
         private void TimelineLoopToggleButton_Click(object sender, RoutedEventArgs e) => Owner?.TimelineLoopToggleButton_Click(sender, e);
         private void TimelineOptionsButton_Click(object sender, RoutedEventArgs e) => Owner?.TimelineOptionsButton_Click(sender, e);
         private void TimelineOptionsPopup_Closed(object sender, EventArgs e) => Owner?.TimelineOptionsPopup_Closed(sender, e);

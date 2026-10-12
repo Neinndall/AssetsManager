@@ -170,6 +170,7 @@ namespace AssetsManager.Views.Controls.Viewer
         /// </summary>
         public void Deactivate()
         {
+            CancelPlaybackScrub();
             _pendingSnapshot = null;
             StudioViewportView.OpenTkControl.Opacity = 0d;
             CloseAllToolbarPopups();
@@ -185,6 +186,7 @@ namespace AssetsManager.Views.Controls.Viewer
         private void OnControlVisibilityChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
             if (_isCleanedUp) return;
+            if (!IsVisible) CancelPlaybackScrub();
             if (IsVisible)
             {
                 _discardNextSimulationDelta = true;

@@ -81,6 +81,16 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private bool _isUserSeeking;
 
+        internal bool IsPlaybackScrubbing => _isUserSeeking || _isTimelineDragging;
+
+        private void CancelPlaybackScrub()
+        {
+            _isUserSeeking = false;
+            _isTimelineDragging = false;
+            if (StudioTimelineView?.TimelineInteractiveGrid.IsMouseCaptured == true)
+                StudioTimelineView.TimelineInteractiveGrid.ReleaseMouseCapture();
+        }
+
         internal void TimeSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
             if (!_model.IsPlaying || _isUserSeeking)

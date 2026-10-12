@@ -380,7 +380,8 @@
                             <Grid x:Name="TimelineInteractiveGrid" Background="Transparent"
                                   PreviewMouseDown="TimelineGrid_PreviewMouseDown"
                                   PreviewMouseMove="TimelineGrid_PreviewMouseMove"
-                                  PreviewMouseUp="TimelineGrid_PreviewMouseUp">
+                                  PreviewMouseUp="TimelineGrid_PreviewMouseUp"
+                                  LostMouseCapture="TimelineGrid_LostMouseCapture">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="280"/> <!-- Names, Thumbnails, Toggles & Solos Column -->
                                     <ColumnDefinition Width="*"/>   <!-- Tracks Canvas Column -->
