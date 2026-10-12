@@ -12,14 +12,6 @@ using AssetsManager.Views.Models.Hashes;
 
 namespace AssetsManager.Services.Hashes
 {
-    public enum HashResolutionOrigin
-    {
-        Unknown,
-        Official
-    }
-
-    public readonly record struct HashResolution(string Value, HashResolutionOrigin Origin);
-
     public class HashResolverService : IDisposable
     {
         internal static readonly SemaphoreSlim _hashFileAccessLock = new SemaphoreSlim(1, 1);
@@ -213,26 +205,6 @@ namespace AssetsManager.Services.Hashes
             if (result != null) return result;
 
             return hash.ToString("x8");
-        }
-
-        internal HashResolution ResolveBinHashDetailed(uint hash)
-            => ResolveDetailed(_binHashCache, hash);
-
-        internal HashResolution ResolveBinEntryDetailed(uint hash)
-            => ResolveDetailed(_binEntryCache, hash);
-
-        internal HashResolution ResolveBinFieldDetailed(uint hash)
-            => ResolveDetailed(_binFieldCache, hash);
-
-        internal HashResolution ResolveBinTypeDetailed(uint hash)
-            => ResolveDetailed(_binTypeCache, hash);
-
-        private static HashResolution ResolveDetailed(BinaryHashCache cache, uint hash)
-        {
-            string result = cache?.Resolve(hash);
-            if (result != null) return new HashResolution(result, HashResolutionOrigin.Official);
-
-            return new HashResolution(hash.ToString("x8"), HashResolutionOrigin.Unknown);
         }
 
         public string ResolveRstHash(ulong rstHash)

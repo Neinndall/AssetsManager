@@ -39,8 +39,6 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
             Assert.Equal("0000000012345678", resolver.ResolveBinXxh3(0x12345678));
             Assert.Equal("abcdef0212345678", resolver.ResolveBinXxh3(0xabcdef0212345678));
             Assert.Equal("deadbeef", resolver.ResolveBinHashGeneral(0xdeadbeef));
-            Assert.Equal(HashResolutionOrigin.Official, resolver.ResolveBinEntryDetailed(2).Origin);
-            Assert.Equal(HashResolutionOrigin.Unknown, resolver.ResolveBinEntryDetailed(3).Origin);
         }
 
         [Fact]
