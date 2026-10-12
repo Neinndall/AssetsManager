@@ -184,6 +184,7 @@ New Features
   - Monitor / Version Manager: Fetch Versions now flags newly discovered manifests with an inline NEW tag (icon + text) next to the publish date.
 
 Improvements
+  - Hash Lab / Unified hash loading before GAME and LCU guessing, removing duplicate startup checks.
   - Hash Lab / BIN Context resolves DesignerEvent entry paths from their name field.
   - Monitor / Dashboard adds a System card with live indicators, separates status and activity cards and refreshes navigation and empty activity.
   - Hash Lab / Simplified the unknown hash summary and removed strategy and results divider tooltips.

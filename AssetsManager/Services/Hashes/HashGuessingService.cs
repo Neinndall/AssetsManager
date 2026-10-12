@@ -81,8 +81,6 @@ namespace AssetsManager.Services.Hashes
             CancellationToken cancellationToken,
             IProgress<HashGuessMatch> matchProgress = null)
         {
-            await _hashResolverService.LoadAllHashesAsync();
-
             if (string.IsNullOrWhiteSpace(rootDirectory) || !Directory.Exists(rootDirectory))
                 throw new DirectoryNotFoundException("The selected game directory does not exist.");
 
@@ -289,7 +287,6 @@ namespace AssetsManager.Services.Hashes
             IProgress<HashGuessMatch> matchProgress = null,
             IReadOnlySet<string> selectedSubMethods = null)
         {
-            await _hashResolverService.LoadAllHashesAsync();
             var inventory = await LoadPersistedInventoryAsync(HashGuessDomain.Game, rootDirectory, cancellationToken, null, progress);
             return await RunGameBasicMethodsGuessingAsync(
                 rootDirectory,
@@ -466,7 +463,6 @@ namespace AssetsManager.Services.Hashes
             IProgress<HashGuessMatch> matchProgress = null,
             IReadOnlySet<string> selectedSubMethods = null)
         {
-            await _hashResolverService.LoadAllHashesAsync();
             var inventory = await LoadPersistedInventoryAsync(HashGuessDomain.Lcu, rootDirectory, cancellationToken, null, progress);
             return await RunLcuBasicMethodsGuessingAsync(
                 progress,
@@ -812,7 +808,6 @@ namespace AssetsManager.Services.Hashes
             CancellationToken cancellationToken,
             IProgress<HashGuessMatch> matchProgress = null)
         {
-            await _hashResolverService.LoadAllHashesAsync();
             var inventory = await LoadPersistedInventoryAsync(HashGuessDomain.Lcu, rootDirectory, cancellationToken, null, progress);
             var unknown = inventory.All;
             int initial = unknown.Count;
