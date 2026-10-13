@@ -6,6 +6,7 @@ MAJOR UPDATE
 This hotfix separates the BIN diffing and WAD comparison work from the previous release line. It focuses on semantic BIN output, faster WAD comparisons, and the optional-value crash fix.
 
 New Features
+  - CDN Tracker / Grouped the catalog source contract with its implementation.
   - Monitor / Separated watched files from CDN tracking and removed redundant service forwarding and unused dependencies.
   - Monitor / Tracker pagination and its separator now appear only with multiple pages; renamed the API Center heading.
   - CDN Tracker / Fetch Catalog now respects the selected category and queries known IDs and ranges to recover inactive API articles, including skin augments.

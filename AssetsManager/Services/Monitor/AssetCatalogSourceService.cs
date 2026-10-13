@@ -14,6 +14,11 @@ using AssetsManager.Views.Models.Settings;
 
 namespace AssetsManager.Services.Monitor;
 
+public interface IAssetCatalogSource
+{
+    Task<AssetCatalogImportBatch> ReadAsync(CancellationToken cancellationToken, AssetCatalogQuery query = null);
+}
+
 public sealed class AssetCatalogSourceService : IAssetCatalogSource
 {
     private readonly AppSettings _settings;
