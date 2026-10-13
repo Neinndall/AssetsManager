@@ -19,7 +19,7 @@ namespace AssetsManager.Views.Controls.Monitor
     public partial class AssetTrackerControl : UserControl
     {
         // Public properties for dependency injection from the container
-        public MonitorService MonitorService { get; set; }
+        public AssetCatalogService CatalogService { get; set; }
         public AssetDownloader AssetDownloader { get; set; }
         public LogService LogService { get; set; }
         public CustomMessageBoxService CustomMessageBoxService { get; set; }
@@ -44,11 +44,11 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private void AssetTrackerControl_Loaded(object sender, RoutedEventArgs e)
         {
-            if (MonitorService == null) return;
+            if (CatalogService == null) return;
 
             _lifetimeCancellation = new CancellationTokenSource();
-            MonitorService.Catalog.Changed -= OnCatalogChanged;
-            MonitorService.Catalog.Changed += OnCatalogChanged;
+            CatalogService.Changed -= OnCatalogChanged;
+            CatalogService.Changed += OnCatalogChanged;
 
             if (AppSettings != null)
             {
@@ -57,12 +57,12 @@ namespace AssetsManager.Views.Controls.Monitor
                 AppSettings.ConfigurationSaved += OnConfigurationSaved;
             }
 
-            // Sync with MonitorService events using defensive pattern
-            MonitorService.CategoryCheckStarted -= OnCategoryCheckStarted;
-            MonitorService.CategoryCheckStarted += OnCategoryCheckStarted;
+            // Subscribe directly to the shared catalog.
+            CatalogService.CategoryCheckStarted -= OnCategoryCheckStarted;
+            CatalogService.CategoryCheckStarted += OnCategoryCheckStarted;
             
-            MonitorService.CategoryCheckCompleted -= OnCategoryCheckCompleted;
-            MonitorService.CategoryCheckCompleted += OnCategoryCheckCompleted;
+            CatalogService.CategoryCheckCompleted -= OnCategoryCheckCompleted;
+            CatalogService.CategoryCheckCompleted += OnCategoryCheckCompleted;
 
             LoadTrackerData();
         }
@@ -75,8 +75,8 @@ namespace AssetsManager.Views.Controls.Monitor
         private void LoadTrackerData()
         {
             string selectedId = (CategoryComboBox.SelectedItem as AssetCategory)?.Id ?? ViewModel.SelectedCategory?.Id;
-            MonitorService.LoadAssetCategories();
-            ViewModel.Categories.ReplaceRange(MonitorService.AssetCategories);
+            CatalogService.RefreshCategories();
+            ViewModel.Categories.ReplaceRange(CatalogService.Categories);
 
             CategoryComboBox.ItemsSource = ViewModel.Categories;
 
@@ -90,9 +90,9 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private async void SyncCatalogButton_Click(object sender, RoutedEventArgs e)
         {
-            if (MonitorService == null || ViewModel.IsBusy) return;
+            if (CatalogService == null || ViewModel.IsBusy) return;
             string categoryId = ViewModel.SelectedCategory?.Id;
-            await RunOperationAsync(async token => { await MonitorService.Catalog.SyncSourcesAsync(token, categoryId); });
+            await RunOperationAsync(async token => { await CatalogService.SyncSourcesAsync(token, categoryId); });
         }
 
         private void CancelButton_Click(object sender, RoutedEventArgs e) => _operationCancellation?.Cancel();
@@ -148,13 +148,13 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private void RefreshAssetList()
         {
-            if (ViewModel.SelectedCategory == null || MonitorService == null)
+            if (ViewModel.SelectedCategory == null || CatalogService == null)
             {
                 ViewModel.Assets.Clear();
                 return;
             }
 
-            var assetsFromService = MonitorService.GetAssetListForCategory(ViewModel.SelectedCategory);
+            var assetsFromService = CatalogService.GetAssetListForCategory(ViewModel.SelectedCategory);
             ViewModel.Assets.ReplaceRange(assetsFromService);
             ViewModel.Paginator.SetFullList(ViewModel.Assets, true);
             AssetsItemsControl.ItemsSource = ViewModel.Paginator.PagedItems;
@@ -204,12 +204,12 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private void LoadMoreButton_Click(object sender, RoutedEventArgs e)
         {
-            if (MonitorService == null || ViewModel.SelectedCategory == null) return;
+            if (CatalogService == null || ViewModel.SelectedCategory == null) return;
 
             ViewModel.IsBusy = true;
             try
             {
-                var newAssets = MonitorService.GenerateMoreAssets(ViewModel.Assets, ViewModel.SelectedCategory, 10);
+                var newAssets = CatalogService.GenerateMoreAssets(ViewModel.Assets, ViewModel.SelectedCategory, 10);
                 ViewModel.Assets.AddRange(newAssets);
                 ViewModel.Paginator.SetFullList(ViewModel.Assets);
                 ViewModel.Paginator.GoToLastPage();
@@ -226,7 +226,7 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private async void CheckButton_Click(object sender, RoutedEventArgs e)
         {
-            if (MonitorService == null || ViewModel.SelectedCategory == null || ViewModel.IsBusy) return;
+            if (CatalogService == null || ViewModel.SelectedCategory == null || ViewModel.IsBusy) return;
 
             var assetsToCheck = ViewModel.Assets.Where(a => a.State != TrackedAssetState.Available).ToList();
             if (!assetsToCheck.Any())
@@ -242,19 +242,19 @@ namespace AssetsManager.Views.Controls.Monitor
             var category = ViewModel.SelectedCategory;
             await RunOperationAsync(async token =>
             {
-                await MonitorService.CheckAssetsAsync(assetsToCheck, category, token);
-                var foundCount = assetsToCheck.Count(a => a.Status == "OK");
+                var scanResult = await CatalogService.ScanAsync(category, assetsToCheck, token);
+                var foundCount = scanResult.Available;
                 if (IsLoaded) CustomMessageBoxService.ShowInfo("Info", $"Check finished. {foundCount} images are available.", Window.GetWindow(this));
             });
         }
 
         private void AssetTrackerControl_Unloaded(object sender, RoutedEventArgs e)
         {
-            if (MonitorService != null)
+            if (CatalogService != null)
             {
-                MonitorService.Catalog.Changed -= OnCatalogChanged;
-                MonitorService.CategoryCheckStarted -= OnCategoryCheckStarted;
-                MonitorService.CategoryCheckCompleted -= OnCategoryCheckCompleted;
+                CatalogService.Changed -= OnCatalogChanged;
+                CatalogService.CategoryCheckStarted -= OnCategoryCheckStarted;
+                CatalogService.CategoryCheckCompleted -= OnCategoryCheckCompleted;
             }
             _lifetimeCancellation?.Cancel();
             _lifetimeCancellation?.Dispose();
@@ -330,7 +330,7 @@ namespace AssetsManager.Views.Controls.Monitor
             var result = CustomMessageBoxService.ShowYesNo("Information", $"Are you sure you want to remove '{assetToRemove.DisplayName}'?", Window.GetWindow(this));
             if (result == true)
             {
-                MonitorService.RemoveAsset(ViewModel.SelectedCategory, assetToRemove);
+                CatalogService.RemoveAsset(ViewModel.SelectedCategory, assetToRemove);
                 RefreshAssetList();
             }
         }
@@ -342,7 +342,7 @@ namespace AssetsManager.Views.Controls.Monitor
             var result = CustomMessageBoxService.ShowYesNo("Clear Tracker", $"Are you sure you want to remove ALL found assets?", Window.GetWindow(this));
             if (result == true)
             {
-                MonitorService.RemoveAllFoundAssets(ViewModel.SelectedCategory);
+                CatalogService.RemoveAllFoundAssets(ViewModel.SelectedCategory);
                 RefreshAssetList();
             }
         }

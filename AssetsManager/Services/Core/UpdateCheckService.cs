@@ -23,7 +23,8 @@ namespace AssetsManager.Services.Core
         private readonly UpdateManager _updateManager;
         private readonly GitHubApiService _gitHubApiService;
         private readonly LogService _logService;
-        private readonly MonitorService _monitorService;
+        private readonly MonitoredFilesService _monitoredFilesService;
+        private readonly AssetCatalogService _assetCatalog;
         private readonly PbeStatusService _pbeStatusService;
         private readonly NewsService _newsService;
         private Timer _updateTimer;
@@ -41,14 +42,15 @@ namespace AssetsManager.Services.Core
 
         public string AvailableVersion { get; private set; }
 
-        public UpdateCheckService(AppSettings appSettings, Status status, UpdateManager updateManager, GitHubApiService gitHubApiService, LogService logService, MonitorService monitorService, PbeStatusService pbeStatusService, NewsService newsService)
+        public UpdateCheckService(AppSettings appSettings, Status status, UpdateManager updateManager, GitHubApiService gitHubApiService, LogService logService, MonitoredFilesService monitoredFilesService, AssetCatalogService assetCatalog, PbeStatusService pbeStatusService, NewsService newsService)
         {
             _appSettings = appSettings;
             _status = status;
             _updateManager = updateManager;
             _gitHubApiService = gitHubApiService;
             _logService = logService;
-            _monitorService = monitorService;
+            _monitoredFilesService = monitoredFilesService;
+            _assetCatalog = assetCatalog;
             _pbeStatusService = pbeStatusService;
             _newsService = newsService;
         }
@@ -176,7 +178,7 @@ namespace AssetsManager.Services.Core
             bool completed = await _assetTrackerJob.TryRunAsync(async cancellationToken =>
             {
                 var updatedCategoryNames = new List<string>();
-                await _monitorService.CheckAllAssetCategoriesAsync(true, (categoryName) =>
+                await _assetCatalog.ScanAllAsync((categoryName) =>
                 {
                     if (!updatedCategoryNames.Contains(categoryName))
                     {
@@ -342,7 +344,7 @@ namespace AssetsManager.Services.Core
 
                 async Task CheckMonitoredAssetsAsync()
                 {
-                    var (anyUpdated, updatedNames) = await _monitorService.CheckAssetsUpdatesAsync(silent);
+                    var (anyUpdated, updatedNames) = await _monitoredFilesService.CheckAssetsUpdatesAsync(silent);
                     cancellationToken.ThrowIfCancellationRequested();
                     if (!anyUpdated) return;
 

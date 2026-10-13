@@ -14,7 +14,7 @@ namespace AssetsManager.Views
     public partial class MonitorWindow : UserControl
     {
         private readonly IServiceProvider _serviceProvider;
-        private readonly MonitorService _monitorService;
+        private readonly MonitoredFilesService _monitoredFilesService;
         private readonly PbeStatusService _pbeStatusService;
         private readonly AppSettings _appSettings;
         private readonly VersionService _versionService;
@@ -37,7 +37,7 @@ namespace AssetsManager.Views
 
         public MonitorWindow(
             IServiceProvider serviceProvider,
-            MonitorService monitorService,
+            MonitoredFilesService monitoredFilesService,
             PbeStatusService pbeStatusService,
             AppSettings appSettings,
             VersionService versionService,
@@ -58,7 +58,7 @@ namespace AssetsManager.Views
             InitializeComponent();
 
             _serviceProvider = serviceProvider;
-            _monitorService = monitorService;
+            _monitoredFilesService = monitoredFilesService;
             _pbeStatusService = pbeStatusService;
             _appSettings = appSettings;
             _versionService = versionService;
@@ -139,7 +139,8 @@ namespace AssetsManager.Views
         {
             return new MonitorDashboardControl
             {
-                MonitorService = _monitorService,
+                MonitoredFilesService = _monitoredFilesService,
+                CatalogService = _assetCatalog,
                 PbeStatusService = _pbeStatusService,
                 AppSettings = _appSettings,
                 VersionService = _versionService,
@@ -152,7 +153,7 @@ namespace AssetsManager.Views
         {
             return new AssetWatcherControl
             {
-                MonitorService = _monitorService,
+                MonitoredFilesService = _monitoredFilesService,
                 ServiceProvider = _serviceProvider,
                 DiffViewService = _diffViewService,
                 AssetWatcherService = _assetWatcherService,
@@ -179,7 +180,7 @@ namespace AssetsManager.Views
         {
             return new AssetTrackerControl
             {
-                MonitorService = _monitorService,
+                CatalogService = _assetCatalog,
                 AssetDownloader = _assetDownloader,
                 LogService = _logService,
                 CustomMessageBoxService = _customMessageBoxService,

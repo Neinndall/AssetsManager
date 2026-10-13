@@ -49,7 +49,6 @@ namespace AssetsManager.Views
         private readonly UpdateCheckService _updateCheckService;
         private readonly ProgressUIManager _progressUIManager;
         private readonly DiffViewService _diffViewService;
-        private readonly MonitorService _monitorService;
         private readonly VersionService _versionService;
         private readonly ExtractionService _extractionService;
         private readonly ReportGenerationService _reportGenerationService;
@@ -84,7 +83,6 @@ namespace AssetsManager.Views
             UpdateCheckService updateCheckService,
             ProgressUIManager progressUIManager,
             DiffViewService diffViewService,
-            MonitorService monitorService,
             VersionService versionService,
             ExtractionService extractionService,
             ReportGenerationService reportGenerationService,
@@ -108,7 +106,6 @@ namespace AssetsManager.Views
             _updateCheckService = updateCheckService;
             _progressUIManager = progressUIManager;
             _diffViewService = diffViewService;
-            _monitorService = monitorService;
             _versionService = versionService;
             _extractionService = extractionService;
             _reportGenerationService = reportGenerationService;

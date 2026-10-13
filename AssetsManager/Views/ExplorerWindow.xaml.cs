@@ -37,7 +37,7 @@ namespace AssetsManager.Views
             TaskCancellationManager taskCancellationManager,
             FavoritesManager favoritesManager,
             ImageMergerService imageMergerService,
-            MonitorService monitorService,
+            MonitoredFilesService monitoredFilesService,
             BackupManager backupManager,
             AssetWatcherService assetWatcherService,
             ProgressUIManager progressUIManager,
@@ -62,7 +62,7 @@ namespace AssetsManager.Views
             FileExplorer.TaskCancellationManager = taskCancellationManager;
             FileExplorer.FavoritesManager = favoritesManager;
             FileExplorer.ImageMergerService = imageMergerService;
-            FileExplorer.MonitorService = monitorService;
+            FileExplorer.MonitoredFilesService = monitoredFilesService;
             FileExplorer.BackupManager = backupManager;
             FileExplorer.AssetWatcherService = assetWatcherService;
             FileExplorer.ProgressUIManager = progressUIManager;

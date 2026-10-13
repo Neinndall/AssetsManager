@@ -144,7 +144,7 @@ namespace AssetsManager
       services.AddSingleton<Requests>();
        
       // Monitor Services
-      services.AddSingleton<MonitorService>();
+      services.AddSingleton<MonitoredFilesService>();
       services.AddSingleton<AssetTrackerScannerService>();
       services.AddSingleton<IAssetCatalogSource, AssetCatalogSourceService>();
       services.AddSingleton<AssetCatalogService>();

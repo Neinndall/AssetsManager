@@ -20,7 +20,8 @@ namespace AssetsManager.Views.Models.Monitor
 {
     public class MonitorDashboardModel : INotifyPropertyChanged, IDisposable
     {
-        private readonly MonitorService _monitorService;
+        private readonly MonitoredFilesService _monitoredFilesService;
+        private readonly AssetCatalogService _assetCatalog;
         private readonly PbeStatusService _pbeStatusService;
         private readonly AppSettings _appSettings;
         private readonly VersionService _versionService;
@@ -247,9 +248,10 @@ namespace AssetsManager.Views.Models.Monitor
             AppVersionFooterText = $"Channel: {BuildType}{shaPart}";
         }
 
-        public MonitorDashboardModel(MonitorService monitorService, PbeStatusService pbeStatusService, AppSettings appSettings, VersionService versionService, Status statusService, UpdateCheckService updateCheckService)
+        public MonitorDashboardModel(MonitoredFilesService monitoredFilesService, AssetCatalogService assetCatalog, PbeStatusService pbeStatusService, AppSettings appSettings, VersionService versionService, Status statusService, UpdateCheckService updateCheckService)
         {
-            _monitorService = monitorService;
+            _monitoredFilesService = monitoredFilesService;
+            _assetCatalog = assetCatalog;
             _pbeStatusService = pbeStatusService;
             _appSettings = appSettings;
             _versionService = versionService;
@@ -292,16 +294,16 @@ namespace AssetsManager.Views.Models.Monitor
             }
 
             // Subscriptions
-            _monitorService.MonitoredAssets.CollectionChanged += MonitoredItems_CollectionChanged;
+            _monitoredFilesService.MonitoredAssets.CollectionChanged += MonitoredItems_CollectionChanged;
 
             // Subscribe to PropertyChanged for existing items
-            foreach (var item in _monitorService.MonitoredAssets)
+            foreach (var item in _monitoredFilesService.MonitoredAssets)
             {
                 item.PropertyChanged += MonitoredItem_PropertyChanged;
             }
 
-            _monitorService.CategoryCheckCompleted += OnCategoryCheckCompleted;
-            _monitorService.CategoryCheckStarted += OnCategoryCheckStarted;
+            _assetCatalog.CategoryCheckCompleted += OnCategoryCheckCompleted;
+            _assetCatalog.CategoryCheckStarted += OnCategoryCheckStarted;
             _appSettings.ConfigurationSaved += OnConfigurationSaved;
             _pbeStatusService.StatusChecked += OnPbeStatusChecked;
             _statusService.HashSyncStarted += OnHashSyncStarted;
@@ -466,15 +468,15 @@ namespace AssetsManager.Views.Models.Monitor
 
         public void RefreshFileWatcherData()
         {
-            if (_monitorService.MonitoredAssets == null) return;
+            if (_monitoredFilesService.MonitoredAssets == null) return;
 
-            MonitoredFilesCount = _monitorService.MonitoredAssets.Count;
-            MonitoredFilesChangedCount = _monitorService.MonitoredAssets.Count(x => x.HasChanges);
+            MonitoredFilesCount = _monitoredFilesService.MonitoredAssets.Count;
+            MonitoredFilesChangedCount = _monitoredFilesService.MonitoredAssets.Count(x => x.HasChanges);
 
-            var changedAssets = _monitorService.MonitoredAssets.Where(x => x.HasChanges).OrderByDescending(x => x.LastUpdated).ToList();
+            var changedAssets = _monitoredFilesService.MonitoredAssets.Where(x => x.HasChanges).OrderByDescending(x => x.LastUpdated).ToList();
             LastChangedFileName = changedAssets.FirstOrDefault()?.Alias ?? "None";
 
-            var lastItem = _monitorService.MonitoredAssets.OrderByDescending(x => x.LastUpdated).FirstOrDefault();
+            var lastItem = _monitoredFilesService.MonitoredAssets.OrderByDescending(x => x.LastUpdated).FirstOrDefault();
             WatcherLastUpdate = lastItem != null && lastItem.LastUpdated != DateTime.MinValue
                 ? (lastItem.LastUpdated.Date == DateTime.Today ? lastItem.LastUpdated.ToString("HH:mm") : lastItem.LastUpdated.ToString("dd/MM HH:mm"))
                 : "Never";
@@ -495,12 +497,12 @@ namespace AssetsManager.Views.Models.Monitor
 
         public void RefreshAssetTrackerData()
         {
-            if (!_monitorService.AssetCategories.Any()) _monitorService.LoadAssetCategories();
+            if (!_assetCatalog.Categories.Any()) _assetCatalog.RefreshCategories();
 
-            AssetTrackerCategoriesCount = _monitorService.AssetCategories.Count;
-            AssetTrackerTotalFound = _monitorService.AssetCategories.Sum(category => CountFoundAssets(category));
+            AssetTrackerCategoriesCount = _assetCatalog.Categories.Count;
+            AssetTrackerTotalFound = _assetCatalog.Categories.Sum(category => CountFoundAssets(category));
 
-            var lastActiveCategory = _monitorService.AssetCategories
+            var lastActiveCategory = _assetCatalog.Categories
                 .Where(category => CountFoundAssets(category) > 0)
                 .OrderByDescending(category => MaxFoundAssetId(category))
                 .FirstOrDefault();
@@ -516,7 +518,7 @@ namespace AssetsManager.Views.Models.Monitor
                 LastDiscoveredAssetId = "N/A";
             }
 
-            if (_monitorService.AssetCategories.All(c => c.Status == CategoryStatus.Idle || c.Status == CategoryStatus.CompletedSuccess))
+            if (_assetCatalog.Categories.All(c => c.Status == CategoryStatus.Idle || c.Status == CategoryStatus.CompletedSuccess))
             {
                 AssetTrackerStatus = "Idle";
             }
@@ -581,7 +583,7 @@ namespace AssetsManager.Views.Models.Monitor
         {
             Application.Current.Dispatcher.InvokeAsync(() =>
             {
-                bool anyOtherChecking = _monitorService.AssetCategories
+                bool anyOtherChecking = _assetCatalog.Categories
                     .Where(c => c != category)
                     .Any(c => c.Status == CategoryStatus.Checking);
 
@@ -638,15 +640,15 @@ namespace AssetsManager.Views.Models.Monitor
                 _updateCheckService.UpdatesFound -= OnUpdatesFound;
             }
 
-            if (_monitorService != null)
+            if (_monitoredFilesService != null)
             {
-                _monitorService.MonitoredAssets.CollectionChanged -= MonitoredItems_CollectionChanged;
-                foreach (var item in _monitorService.MonitoredAssets)
+                _monitoredFilesService.MonitoredAssets.CollectionChanged -= MonitoredItems_CollectionChanged;
+                foreach (var item in _monitoredFilesService.MonitoredAssets)
                 {
                     item.PropertyChanged -= MonitoredItem_PropertyChanged;
                 }
-                _monitorService.CategoryCheckCompleted -= OnCategoryCheckCompleted;
-                _monitorService.CategoryCheckStarted -= OnCategoryCheckStarted;
+                _assetCatalog.CategoryCheckCompleted -= OnCategoryCheckCompleted;
+                _assetCatalog.CategoryCheckStarted -= OnCategoryCheckStarted;
                 _appSettings.ConfigurationSaved -= OnConfigurationSaved;
             }
 

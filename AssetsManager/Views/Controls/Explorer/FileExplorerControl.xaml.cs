@@ -80,7 +80,7 @@ namespace AssetsManager.Views.Controls.Explorer
         public HashResolverService HashResolverService { get; set; }
         public AssetWatcherService AssetWatcherService { get; set; }
         public VersionService VersionService { get; set; }
-        public MonitorService MonitorService { get; set; }
+        public MonitoredFilesService MonitoredFilesService { get; set; }
         public BackupManager BackupManager { get; set; }
         public TaskCancellationManager TaskCancellationManager { get; set; }
         public ImageMergerService ImageMergerService { get; set; }
@@ -871,7 +871,7 @@ namespace AssetsManager.Views.Controls.Explorer
                     return;
                 }
 
-                MonitorService?.LoadMonitoredAssets();
+                MonitoredFilesService?.LoadMonitoredAssets();
                 LogService.LogSuccess($"Asset added to watcher: {selectedNode.Name}");
             }
         }
