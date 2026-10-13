@@ -146,6 +146,8 @@ namespace AssetsManager
       // Monitor Services
       services.AddSingleton<MonitorService>();
       services.AddSingleton<AssetTrackerScannerService>();
+      services.AddSingleton<IAssetCatalogSource, AssetCatalogSourceService>();
+      services.AddSingleton<AssetCatalogService>();
       services.AddSingleton<PbeStatusService>();
       services.AddSingleton<RiotApiService>(); // LCU Service
       services.AddSingleton<VersionService>();

@@ -55,6 +55,43 @@ namespace AssetsManager.Tests.xUnit.Services.Monitor
             Assert.Equal(1, category.Entries[100].FailureCount);
         }
 
+        [Theory]
+        [InlineData(null)]
+        [InlineData("text/html")]
+        [InlineData("application/json")]
+        public async Task ProbeUrl_DoesNotAccept200WithoutImageContent(string mediaType)
+        {
+            using var http = new HttpClient(new ProbeHandler(_ => Response(HttpStatusCode.OK, mediaType)));
+            var result = await new AssetTrackerScannerService(http).ProbeUrlAsync("https://cdn.example/assets/100.png");
+            Assert.False(result.IsAvailable);
+            Assert.False(result.IsTemporaryFailure);
+        }
+
+        [Fact]
+        public async Task NumericBundleDiscoveryCanFindSuffixedImageBeforeCatalogMetadata()
+        {
+            using var http = new HttpClient(new ProbeHandler(request => request.RequestUri.AbsolutePath.EndsWith("99901659_1.png", StringComparison.Ordinal)
+                ? Response(HttpStatusCode.OK, "image/png") : Response(HttpStatusCode.Forbidden)));
+            var category = AssetsManager.Views.Models.Monitor.DefaultCategories.Get().Single(item => item.Id == "2");
+            var result = await new AssetTrackerScannerService(http).ScanAsync(category, new long[] { 99901659 }, default);
+            Assert.Equal(1, result.NewDiscoveries);
+            Assert.Equal(99901659, category.Entries.Single().Key);
+            Assert.EndsWith("99901659_1.png", category.Entries.Single().Value.Url);
+        }
+
+        [Theory]
+        [InlineData(HttpStatusCode.TooManyRequests)]
+        [InlineData(HttpStatusCode.ServiceUnavailable)]
+        public async Task ProbeUrl_RetriesTemporaryFailuresBeforeAcceptingImage(HttpStatusCode status)
+        {
+            int count = 0;
+            using var http = new HttpClient(new ProbeHandler(_ => ++count < 3 ? Response(status) : Response(HttpStatusCode.OK, "image/png")));
+            var result = await new AssetTrackerScannerService(http).ProbeUrlAsync("https://cdn.example/assets/100.png");
+            Assert.True(result.IsAvailable);
+            Assert.False(result.IsTemporaryFailure);
+            Assert.Equal(3, result.AttemptCount);
+        }
+
         private static AssetCategory Category() => new()
         {
             Id = "test",

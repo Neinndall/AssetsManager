@@ -56,7 +56,7 @@
                                     <DataTrigger Binding="{Binding IsChecked, ElementName=TabAssetTracker}" Value="True"><Setter Property="Text" Value="ASSET TRACKER"/></DataTrigger>
                                     <DataTrigger Binding="{Binding IsChecked, ElementName=TabVersions}" Value="True"><Setter Property="Text" Value="VERSION MANAGER"/></DataTrigger>
                                     <DataTrigger Binding="{Binding IsChecked, ElementName=TabBackups}" Value="True"><Setter Property="Text" Value="BACKUPS REPOSITORY"/></DataTrigger>
-                                    <DataTrigger Binding="{Binding IsChecked, ElementName=TabApi}" Value="True"><Setter Property="Text" Value="RIOT API CENTER"/></DataTrigger>
+                                    <DataTrigger Binding="{Binding IsChecked, ElementName=TabApi}" Value="True"><Setter Property="Text" Value="API CENTER"/></DataTrigger>
                                 </Style.Triggers>
                             </Style>
                         </TextBlock.Style>

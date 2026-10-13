@@ -525,16 +525,16 @@ namespace AssetsManager.Views.Models.Monitor
 
         private static int CountFoundAssets(AssetCategory category)
         {
-            var removed = new HashSet<long>(category.UserRemovedUrls);
+            var removed = new HashSet<string>(category.UserRemovedAssetUrls, StringComparer.Ordinal);
             return category.Entries.Values.Count(entry =>
-                entry.State == TrackedAssetState.Available && !removed.Contains(entry.AssetId));
+                entry.State == TrackedAssetState.Available && !removed.Contains(entry.Url));
         }
 
         private static long MaxFoundAssetId(AssetCategory category)
         {
-            var removed = new HashSet<long>(category.UserRemovedUrls);
+            var removed = new HashSet<string>(category.UserRemovedAssetUrls, StringComparer.Ordinal);
             return category.Entries.Values
-                .Where(entry => entry.State == TrackedAssetState.Available && !removed.Contains(entry.AssetId))
+                .Where(entry => entry.State == TrackedAssetState.Available && !removed.Contains(entry.Url))
                 .Max(entry => entry.AssetId);
         }
 

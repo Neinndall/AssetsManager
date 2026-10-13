@@ -18,6 +18,7 @@ using Microsoft.Win32;
 using AssetsManager.Utils;
 using AssetsManager.Services.Monitor;
 using AssetsManager.Services.Core;
+using AssetsManager.Services.Downloads;
 using AssetsManager.Views.Models.Monitor;
 using AssetsManager.Views.Models.Shared;
 
@@ -31,6 +32,8 @@ namespace AssetsManager.Views.Controls.Monitor
         public CustomMessageBoxService CustomMessageBoxService { get; set; }
         public LogService LogService { get; set; }
         public DirectoriesCreator DirectoriesCreator { get; set; }
+        public AssetCatalogService CatalogService { get; set; }
+        public AssetDownloader AssetDownloader { get; set; }
 
         private DispatcherTimer _lcuConnectionTimer;
         private Task _cachedDataLoadTask;
@@ -57,6 +60,13 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private async void ApiControl_Loaded(object sender, RoutedEventArgs e)
         {
+            CdnCatalogControl.CatalogService = CatalogService;
+            CdnCatalogControl.AssetDownloader = AssetDownloader;
+            CdnCatalogControl.AppSettings = AppSettings;
+            CdnCatalogControl.LogService = LogService;
+            CdnCatalogControl.CustomMessageBoxService = CustomMessageBoxService;
+            CdnCatalogControl.CatalogFetched -= CdnCatalogFetched;
+            CdnCatalogControl.CatalogFetched += CdnCatalogFetched;
             if (_viewModel != null)
             {
                 _viewModel.PropertyChanged -= ViewModel_PropertyChanged;
@@ -677,6 +687,7 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private void ApiControl_Unloaded(object sender, RoutedEventArgs e)
         {
+            CdnCatalogControl.CatalogFetched -= CdnCatalogFetched;
             if (_lcuConnectionTimer != null)
             {
                 _lcuConnectionTimer.Stop();
@@ -708,6 +719,22 @@ namespace AssetsManager.Views.Controls.Monitor
         {
             MainTabControl.SelectedIndex = 2;
         }
+
+        private void TabCdnTracker_Click(object sender, RoutedEventArgs e)
+        {
+            MainTabControl.SelectedIndex = 3;
+        }
+
+        private void CdnCatalogFetched(AssetCatalogImportBatch batch)
+        {
+            UpdateConnectionStatus(batch.ClientReadSucceeded);
+            ViewModel.SetClientProfile(batch.SummonerId, batch.Region);
+            if (batch.ClientReadSucceeded) _lcuConnectionTimer.Start();
+        }
+
+        private async void CdnSync_Click(object sender, RoutedEventArgs e) => await CdnCatalogControl.SynchronizeAsync();
+        private async void CdnScan_Click(object sender, RoutedEventArgs e) => await CdnCatalogControl.VerifyAsync();
+        private async void CdnDownload_Click(object sender, RoutedEventArgs e) => await CdnCatalogControl.DownloadPageAsync();
 
 
         private async void RequestsPassRewards_Click(object sender, RoutedEventArgs e)

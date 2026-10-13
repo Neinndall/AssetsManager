@@ -132,20 +132,6 @@ namespace AssetsManager.Utils
             set => _diffHistory = WrapList(value);
         }
 
-        private ConcurrentDictionary<string, List<long>> _assetTrackerUserRemovedIds = new ConcurrentDictionary<string, List<long>>();
-        public IDictionary<string, List<long>> AssetTrackerUserRemovedIds
-        {
-            get => _assetTrackerUserRemovedIds;
-            set => _assetTrackerUserRemovedIds = WrapDictionary(value);
-        }
-
-        private ConcurrentDictionary<string, Dictionary<long, AssetTrackerEntry>> _assetTrackerEntries = new ConcurrentDictionary<string, Dictionary<long, AssetTrackerEntry>>();
-        public IDictionary<string, Dictionary<long, AssetTrackerEntry>> AssetTrackerEntries
-        {
-            get => _assetTrackerEntries;
-            set => _assetTrackerEntries = WrapDictionary(value);
-        }
-
         private IList<string> _favoritePaths = new SafeList<string>();
         public IList<string> FavoritePaths
         {
@@ -327,8 +313,6 @@ namespace AssetsManager.Utils
                 }
                 settings.MonitoredAssets ??= new SafeList<MonitoredAsset>();
                 settings.DiffHistory ??= new SafeList<HistoryEntry>();
-                settings.AssetTrackerUserRemovedIds ??= new ConcurrentDictionary<string, List<long>>();
-                settings.AssetTrackerEntries ??= new ConcurrentDictionary<string, Dictionary<long, AssetTrackerEntry>>();
                 settings.FavoritePaths ??= new SafeList<string>();
                 settings.SearchHistory ??= new SafeList<string>();
                 settings.AudioPlaylists ??= new SafeList<AudioPlaylistPack>();
@@ -423,8 +407,6 @@ namespace AssetsManager.Utils
                 HashesSizes = new ConcurrentDictionary<string, long>(),
                 MonitoredAssets = new SafeList<MonitoredAsset>(),
                 DiffHistory = new SafeList<HistoryEntry>(),
-                AssetTrackerUserRemovedIds = new ConcurrentDictionary<string, List<long>>(),
-                AssetTrackerEntries = new ConcurrentDictionary<string, Dictionary<long, AssetTrackerEntry>>(),
                 FavoritePaths = new SafeList<string>(),
                 SearchHistory = new SafeList<string>(),
                 AudioPlaylists = new SafeList<AudioPlaylistPack>(),
@@ -482,8 +464,6 @@ namespace AssetsManager.Utils
             DiffHistory = defaultSettings.DiffHistory;
             AssetTrackerTimer = defaultSettings.AssetTrackerTimer;
             AssetTrackerFrequency = defaultSettings.AssetTrackerFrequency;
-            AssetTrackerUserRemovedIds = defaultSettings.AssetTrackerUserRemovedIds;
-            AssetTrackerEntries = defaultSettings.AssetTrackerEntries;
             FavoritePaths = defaultSettings.FavoritePaths;
             SearchHistory = defaultSettings.SearchHistory;
             AudioPlaylists = defaultSettings.AudioPlaylists;

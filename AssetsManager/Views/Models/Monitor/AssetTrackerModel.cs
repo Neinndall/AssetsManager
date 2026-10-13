@@ -5,6 +5,7 @@ using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using AssetsManager.Utils.Framework;
+using AssetsManager.Views.Models.Shared;
 
 namespace AssetsManager.Views.Models.Monitor
 {
@@ -41,6 +42,9 @@ namespace AssetsManager.Views.Models.Monitor
             Assets = new ObservableRangeCollection<TrackedAsset>();
         }
 
+        public PaginationModel<TrackedAsset> Paginator { get; } = new() { PageSize = 12 };
+        public bool CanInteract => !IsBusy;
+
         public ObservableRangeCollection<AssetCategory> Categories
         {
             get => _categories;
@@ -62,7 +66,7 @@ namespace AssetsManager.Views.Models.Monitor
         public bool IsBusy
         {
             get => _isBusy;
-            set { if (_isBusy != value) { _isBusy = value; OnPropertyChanged(); } }
+            set { if (_isBusy != value) { _isBusy = value; OnPropertyChanged(); OnPropertyChanged(nameof(CanInteract)); } }
         }
 
         protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
@@ -81,6 +85,7 @@ namespace AssetsManager.Views.Models.Monitor
         public string BaseUrl { get; set; }
         public string Extension { get; set; }
         public List<string> Extensions { get; set; } = new List<string>();
+        public List<string> FileNameSuffixes { get; set; } = new() { "" };
         public int ForwardScanWindow { get; set; } = 10;
         public int MaxConcurrency { get; set; } = 6;
         
@@ -91,8 +96,15 @@ namespace AssetsManager.Views.Models.Monitor
             set { if (_start != value) { _start = value; OnPropertyChanged(); } }
         }
 
-        public List<long> UserRemovedUrls { get; set; } = new List<long>();
+        public List<string> UserRemovedAssetUrls { get; set; } = new List<string>();
         public Dictionary<long, AssetTrackerEntry> Entries { get; set; } = new Dictionary<long, AssetTrackerEntry>();
+
+        public List<AssetTrackerRange> Ranges { get; set; } = new List<AssetTrackerRange>();
+
+        public string RangeSummary => Ranges == null || Ranges.Count == 0
+            ? string.Empty
+            : string.Join(", ", Ranges.OrderBy(range => range.Start)
+                .Select(range => $"{range.Start}->{range.NextId}"));
 
         private bool _hasNewAssets;
         public bool HasNewAssets
@@ -116,6 +128,15 @@ namespace AssetsManager.Views.Models.Monitor
     }
 
     /// <summary>
+    /// Persistent forward cursor for one independent numeric discovery range.
+    /// </summary>
+    public sealed class AssetTrackerRange
+    {
+        public long Start { get; set; }
+        public long NextId { get; set; }
+    }
+
+    /// <summary>
     /// SUB-MODEL: Individual Tracked Asset
     /// </summary>
     public class TrackedAsset : INotifyPropertyChanged
@@ -135,7 +156,15 @@ namespace AssetsManager.Views.Models.Monitor
         public string Url
         {
             get => _url;
-            set { if (_url != value) { _url = value; OnPropertyChanged(); } }
+            set
+            {
+                if (_url != value)
+                {
+                    _url = value;
+                    OnPropertyChanged();
+                    OnPropertyChanged(nameof(CanDownload));
+                }
+            }
         }
 
         public string DisplayName
@@ -157,17 +186,41 @@ namespace AssetsManager.Views.Models.Monitor
         }
 
         public long AssetId { get; set; }
+
+        public string CategoryId { get; set; }
+        public string CategoryName { get; set; }
+        public string InventoryType { get; set; }
+        public long? ItemId { get; set; }
+        public string Source { get; set; }
+        public string Environment { get; set; }
+        public DateTime? FirstSeenCdn { get; set; }
+        public DateTime? FirstSeenApi { get; set; }
+        public DateTime? LastChecked { get; set; }
+        public bool CanDownload => State == TrackedAssetState.Available && !string.IsNullOrWhiteSpace(Url);
+        public string IdentityText { get; set; }
+        public string TimingText { get; set; }
+        public bool IsGenerated { get; set; }
+
         public TrackedAssetState State
         {
             get => _state;
-            set { if (_state != value) { _state = value; Status = GetStatusText(value); OnPropertyChanged(); } }
+            set
+            {
+                if (_state != value)
+                {
+                    _state = value;
+                    Status = GetStatusText(value);
+                    OnPropertyChanged();
+                    OnPropertyChanged(nameof(CanDownload));
+                }
+            }
         }
         private static string GetStatusText(TrackedAssetState state) => state switch
         {
             TrackedAssetState.Available => "OK",
             TrackedAssetState.Checking => "Checking",
             TrackedAssetState.Missing => "Not Found",
-            TrackedAssetState.TemporaryError => "Pending",
+            TrackedAssetState.TemporaryError => "Temporary Error",
             TrackedAssetState.RemovedCandidate => "Not Found",
             TrackedAssetState.Removed => "Not Found",
             _ => "Pending"

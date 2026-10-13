@@ -144,7 +144,7 @@
                                     <Style TargetType="StackPanel">
                                         <Setter Property="Visibility" Value="Collapsed"/>
                                         <Style.Triggers>
-                                            <DataTrigger Binding="{Binding IsAuthenticated}" Value="True">
+                                            <DataTrigger Binding="{Binding HasClientProfile}" Value="True">
                                                 <Setter Property="Visibility" Value="Visible"/>
                                             </DataTrigger>
                                         </Style.Triggers>
@@ -159,7 +159,8 @@
                 </Border>
 
                 <!-- CENTER: Connect Button Card -->
-                <Button Grid.Column="1" Click="ConnectButton_Click" Style="{StaticResource SelectionCardButtonStyle}" Margin="0,0,8,0" Width="140" Height="90" Padding="0">
+                <Button Grid.Column="1" Click="ConnectButton_Click" Margin="0,0,8,0" Width="140" Height="90" Padding="0">
+                    <Button.Style><Style TargetType="Button" BasedOn="{StaticResource SelectionCardButtonStyle}"/></Button.Style>
                     <StackPanel VerticalAlignment="Center">
                         <materialIcons:MaterialIcon Kind="Link" Width="24" Height="24" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
                         <TextBlock Text="{Binding ButtonContent}" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
@@ -223,6 +224,30 @@
                         </Button>
                     </StackPanel>
 
+                    <!-- CDN Tracker -->
+                    <StackPanel Orientation="Horizontal" Visibility="{Binding IsChecked, ElementName=TabCdnTracker, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <Button Click="CdnSync_Click" IsEnabled="{Binding CanInteract, ElementName=CdnCatalogControl}" Style="{StaticResource SelectionCardButtonStyle}" Margin="0,0,8,0" Width="140" Height="90" Padding="0">
+                            <StackPanel VerticalAlignment="Center">
+                                <materialIcons:MaterialIcon Kind="Sync" Width="24" Height="24" Foreground="{StaticResource AccentTeal}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                                <TextBlock Text="Fetch Catalog" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
+                                <TextBlock Text="Read client API" FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Click="CdnScan_Click" IsEnabled="{Binding CanInteract, ElementName=CdnCatalogControl}" Style="{StaticResource SelectionCardButtonStyle}" Margin="0,0,8,0" Width="140" Height="90" Padding="0">
+                            <StackPanel VerticalAlignment="Center">
+                                <materialIcons:MaterialIcon Kind="Radar" Width="24" Height="24" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                                <TextBlock Text="Check Images" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
+                                <TextBlock Text="Verify CDN URLs" FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Click="CdnDownload_Click" IsEnabled="{Binding CanInteract, ElementName=CdnCatalogControl}" Style="{StaticResource SelectionCardButtonStyle}" Margin="0" Width="140" Height="90" Padding="0">
+                            <StackPanel VerticalAlignment="Center">
+                                <materialIcons:MaterialIcon Kind="DownloadOutline" Width="24" Height="24" Foreground="{StaticResource AccentBlue}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                                <TextBlock Text="Download Page" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
+                                <TextBlock Text="Save found images" FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
                 </StackPanel>
             </Grid>
         </Grid>
@@ -238,6 +263,7 @@
                     <RadioButton x:Name="TabSales" Content="Sales" Click="TabSales_Click" IsChecked="True" GroupName="ApiTabs" Style="{StaticResource SegmentedRadioButtonStyle}" MinWidth="120"/>
                     <RadioButton x:Name="TabMythic" Content="Mythic Shop" Click="TabMythic_Click" GroupName="ApiTabs" Style="{StaticResource SegmentedRadioButtonStyle}" MinWidth="120"/>
                     <RadioButton x:Name="TabPass" Content="Pass Rewards" Click="TabPass_Click" GroupName="ApiTabs" Style="{StaticResource SegmentedRadioButtonStyle}" MinWidth="120"/>
+                    <RadioButton x:Name="TabCdnTracker" Content="CDN Tracker" Click="TabCdnTracker_Click" GroupName="ApiTabs" Style="{StaticResource SegmentedRadioButtonStyle}" MinWidth="120"/>
                 </StackPanel>
             </Border>
             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
@@ -316,6 +342,9 @@
                         </ItemsPanelTemplate>
                     </ItemsControl.ItemsPanel>
                 </ItemsControl>
+            </TabItem>
+            <TabItem>
+                <local:CdnTrackerCatalogControl x:Name="CdnCatalogControl"/>
             </TabItem>
         </TabControl>
     </Grid>

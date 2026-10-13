@@ -8,189 +8,386 @@ using System.Threading;
 using System.Threading.Tasks;
 using AssetsManager.Views.Models.Monitor;
 
-namespace AssetsManager.Services.Monitor
+namespace AssetsManager.Services.Monitor;
+
+/// <summary>
+/// Performs bounded CDN probes for both numeric tracker candidates and catalog URLs.
+/// </summary>
+public sealed class AssetTrackerScannerService
 {
-    public sealed class AssetTrackerScannerService
+    private readonly HttpClient _httpClient;
+
+    public AssetTrackerScannerService(HttpClient httpClient)
     {
-        private readonly HttpClient _httpClient;
+        _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
+    }
 
-        public AssetTrackerScannerService(HttpClient httpClient)
+    public TimeSpan RequestTimeout { get; set; } = TimeSpan.FromSeconds(10);
+
+    public int MaxAttempts { get; set; } = 3;
+
+    public IReadOnlyList<long> BuildCandidateIds(AssetCategory category)
+    {
+        if (category == null) return Array.Empty<long>();
+
+        EnsureRanges(category);
+        var candidates = new SortedSet<long>();
+        int window = Math.Max(1, category.ForwardScanWindow);
+
+        foreach (var entry in category.Entries.Values
+                     .Where(entry => entry.State is TrackedAssetState.Missing or TrackedAssetState.TemporaryError or TrackedAssetState.RemovedCandidate)
+                     .OrderBy(entry => entry.AssetId).Take(window))
+            candidates.Add(entry.AssetId);
+
+        var ranges = category.Ranges.OrderBy(range => range.Start).ToArray();
+        var cursors = ranges.Select(range => Math.Max(range.Start, range.NextId)).ToArray();
+        int guard = 0;
+        while (candidates.Count < window && guard++ < 1_000_000)
         {
-            _httpClient = httpClient;
-        }
-
-        public IReadOnlyList<long> BuildCandidateIds(AssetCategory category)
-        {
-            if (category == null) return Array.Empty<long>();
-
-            var candidates = new SortedSet<long>();
-            int candidateLimit = Math.Max(1, category.ForwardScanWindow);
-            foreach (AssetTrackerEntry entry in category.Entries.Values
-                         .Where(entry => entry.State is TrackedAssetState.Missing or TrackedAssetState.TemporaryError or TrackedAssetState.RemovedCandidate)
-                         .OrderBy(entry => entry.AssetId)
-                         .Take(candidateLimit))
+            bool progressed = false;
+            for (int index = 0; index < ranges.Length && candidates.Count < window; index++)
             {
-                candidates.Add(entry.AssetId);
-            }
-            candidates.ExceptWith(category.UserRemovedUrls);
-
-            long highestCdnProbe = category.Entries.Values
-                .Where(entry => entry.WasCdnProbed)
-                .Select(entry => entry.AssetId)
-                .DefaultIfEmpty(category.Start - 1)
-                .Max();
-            long frontier = Math.Max(category.Start, highestCdnProbe + 1);
-            for (int offset = 0; candidates.Count < candidateLimit; offset++)
-            {
-                long candidate = frontier + offset;
-                if (!category.UserRemovedUrls.Contains(candidate)) candidates.Add(candidate);
-            }
-            return candidates.ToList();
-        }
-
-        public async Task<AssetTrackerScanResult> ScanAsync(
-            AssetCategory category,
-            IEnumerable<long> assetIds,
-            CancellationToken cancellationToken)
-        {
-            if (category == null) throw new ArgumentNullException(nameof(category));
-
-            long[] ids = assetIds?.Distinct().OrderBy(id => id).ToArray() ?? Array.Empty<long>();
-            if (ids.Length == 0) return new AssetTrackerScanResult();
-
-            var results = new ConcurrentBag<AssetProbeResult>();
-            using var limiter = new SemaphoreSlim(Math.Clamp(category.MaxConcurrency, 1, 8));
-            Task[] tasks = ids.Select(async id =>
-            {
-                await limiter.WaitAsync(cancellationToken);
-                try
+                long limit = GetNextRangeStart(category, ranges[index]);
+                while (cursors[index] < limit && cursors[index] < long.MaxValue)
                 {
-                    results.Add(await ProbeAsync(category, id, cancellationToken));
+                    long id = cursors[index]++;
+                    progressed = true;
+                    if (candidates.Contains(id) || (category.Entries.TryGetValue(id, out var entry) && entry.WasCdnProbed)) continue;
+                    candidates.Add(id);
+                    break;
                 }
-                finally
-                {
-                    limiter.Release();
-                }
-            }).ToArray();
-
-            await Task.WhenAll(tasks);
-            var scanResult = new AssetTrackerScanResult();
-            foreach (AssetProbeResult result in results.OrderBy(result => result.AssetId))
-            {
-                AssetTrackerEntry entry = ApplyResult(category, result, DateTime.UtcNow);
-                scanResult.Checked++;
-                if (entry.State == TrackedAssetState.Available) scanResult.Available++;
-                if (result.WasNewDiscovery) scanResult.NewDiscoveries++;
-                if (entry.State == TrackedAssetState.TemporaryError) scanResult.TemporaryErrors++;
             }
-
-            return scanResult;
+            if (!progressed) break;
         }
 
-        private async Task<AssetProbeResult> ProbeAsync(AssetCategory category, long assetId, CancellationToken cancellationToken)
+        return candidates.ToArray();
+    }
+
+    /// <summary>
+    /// Advances only the ranges that supplied forward candidates. Retry candidates do not move a
+    /// cursor, so a transient CDN failure remains eligible for a later pass.
+    /// </summary>
+    public void AdvanceRanges(AssetCategory category, IEnumerable<long> candidateIds)
+    {
+        if (category == null || candidateIds == null) return;
+        EnsureRanges(category);
+
+        foreach (long id in candidateIds.Distinct())
         {
-            IReadOnlyList<string> extensions = category.Extensions?.Count > 0
-                ? category.Extensions
-                : new[] { category.Extension };
-            AssetProbeResult lastResult = null;
-
-            foreach (string extension in extensions.Where(value => !string.IsNullOrWhiteSpace(value)).Distinct(StringComparer.OrdinalIgnoreCase))
-            {
-                string url = $"{category.BaseUrl}{assetId}.{extension.TrimStart('.')}";
-                lastResult = await ProbeUrlAsync(assetId, url, extension, cancellationToken);
-                if (lastResult.IsAvailable || lastResult.IsTemporaryFailure) return lastResult;
-            }
-
-            return lastResult ?? new AssetProbeResult(assetId, null, category.Extension, HttpStatusCode.NotFound, false, false);
+            AssetTrackerRange range = category.Ranges
+                .OrderByDescending(item => item.Start)
+                .FirstOrDefault(item => id >= item.Start);
+            if (range == null || id < range.NextId) continue;
+            range.NextId = id == long.MaxValue ? long.MaxValue : id + 1;
         }
+    }
 
-        private async Task<AssetProbeResult> ProbeUrlAsync(long assetId, string url, string extension, CancellationToken cancellationToken)
+    public async Task<AssetTrackerScanResult> ScanAsync(
+        AssetCategory category,
+        IEnumerable<long> assetIds,
+        CancellationToken cancellationToken = default)
+    {
+        if (category == null) throw new ArgumentNullException(nameof(category));
+
+        long[] ids = assetIds?.Distinct().OrderBy(id => id).ToArray() ?? Array.Empty<long>();
+        if (ids.Length == 0) return new AssetTrackerScanResult();
+
+        using var limiter = new SemaphoreSlim(Math.Clamp(category.MaxConcurrency, 1, 8));
+        var results = new ConcurrentBag<AssetTrackerUrlProbeResult>();
+        Task[] tasks = ids.Select(async id =>
         {
+            await limiter.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
             {
-                using var request = new HttpRequestMessage(HttpMethod.Head, url);
-                using HttpResponseMessage response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-                bool image = response.Content.Headers.ContentType?.MediaType?.StartsWith("image/", StringComparison.OrdinalIgnoreCase) == true;
-                bool available = response.IsSuccessStatusCode && image;
-                bool temporary = response.StatusCode == HttpStatusCode.TooManyRequests || (int)response.StatusCode >= 500;
-                return new AssetProbeResult(assetId, url, extension, response.StatusCode, available, temporary);
+                results.Add(await ProbeGeneratedUrlAsync(category, id, cancellationToken).ConfigureAwait(false));
             }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            finally
             {
-                throw;
+                limiter.Release();
             }
-            catch (HttpRequestException)
-            {
-                return new AssetProbeResult(assetId, url, extension, null, false, true);
-            }
+        }).ToArray();
+
+        await Task.WhenAll(tasks).ConfigureAwait(false);
+
+        var scanResult = new AssetTrackerScanResult();
+        foreach (AssetTrackerUrlProbeResult result in results.OrderBy(item => item.AssetId))
+        {
+            ApplyResult(category, result, DateTime.UtcNow, preserveAvailableOnUnavailable: false);
+            scanResult.Add(result);
         }
 
-        private static AssetTrackerEntry ApplyResult(AssetCategory category, AssetProbeResult result, DateTime utcNow)
-        {
-            bool existed = category.Entries.TryGetValue(result.AssetId, out AssetTrackerEntry entry);
-            entry ??= new AssetTrackerEntry { AssetId = result.AssetId };
-            bool wasAvailable = entry.State == TrackedAssetState.Available;
+        return scanResult;
+    }
 
-            entry.LastChecked = utcNow;
-            entry.WasCdnProbed = true;
-            entry.LastHttpStatus = result.StatusCode.HasValue ? (int)result.StatusCode.Value : null;
-            if (result.IsAvailable)
+    /// <summary>
+    /// Probes a complete URL as supplied by the catalog. The URL is never reconstructed from a
+    /// trailing numeric token, which preserves variants such as image_123_1.png.
+    /// </summary>
+    public Task<AssetTrackerUrlProbeResult> ProbeUrlAsync(
+        string url,
+        CancellationToken cancellationToken = default) => ProbeUrlCoreAsync(url, null, null, cancellationToken);
+
+    public Task<AssetTrackerUrlProbeResult> ProbeUrlAsync(
+        long assetId,
+        string url,
+        string extension,
+        CancellationToken cancellationToken = default) => ProbeUrlCoreAsync(url, assetId, extension, cancellationToken);
+
+    public async Task<AssetTrackerUrlScanResult> ScanUrlsAsync(
+        AssetCategory category,
+        IEnumerable<TrackedAsset> assets,
+        CancellationToken cancellationToken = default)
+    {
+        if (category == null) throw new ArgumentNullException(nameof(category));
+
+        string[] urls = assets?.Select(asset => asset?.Url)
+            .Where(url => !string.IsNullOrWhiteSpace(url))
+            .Distinct(StringComparer.Ordinal)
+            .ToArray() ?? Array.Empty<string>();
+        if (urls.Length == 0) return new AssetTrackerUrlScanResult();
+
+        using var limiter = new SemaphoreSlim(Math.Clamp(category.MaxConcurrency, 1, 8));
+        var results = new ConcurrentBag<AssetTrackerUrlProbeResult>();
+        Task[] tasks = urls.Select(async url =>
+        {
+            await limiter.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
             {
-                entry.Url = result.Url;
-                entry.Extension = result.Extension.TrimStart('.');
-                entry.State = TrackedAssetState.Available;
-                entry.FirstSeen ??= utcNow;
-                entry.LastSeen = utcNow;
-                entry.FailureCount = 0;
-                result.WasNewDiscovery = !existed || !wasAvailable;
+                results.Add(await ProbeUrlAsync(url, cancellationToken).ConfigureAwait(false));
             }
-            else if (result.IsTemporaryFailure)
+            finally
             {
-                entry.State = TrackedAssetState.TemporaryError;
-                entry.FailureCount++;
+                limiter.Release();
             }
-            else
-            {
-                entry.FailureCount++;
-                entry.State = wasAvailable
+        }).ToArray();
+
+        await Task.WhenAll(tasks).ConfigureAwait(false);
+
+        var scanResult = new AssetTrackerUrlScanResult();
+        foreach (AssetTrackerUrlProbeResult result in results.OrderBy(item => item.Url, StringComparer.Ordinal))
+            scanResult.Add(result);
+        return scanResult;
+    }
+
+    public static void ApplyResult(
+        AssetCategory category,
+        AssetTrackerUrlProbeResult result,
+        DateTime utcNow,
+        bool preserveAvailableOnUnavailable)
+    {
+        if (category == null || result == null || !result.AssetId.HasValue) return;
+
+        bool existed = category.Entries.TryGetValue(result.AssetId.Value, out AssetTrackerEntry entry);
+        entry ??= new AssetTrackerEntry { AssetId = result.AssetId.Value };
+        bool wasAvailable = entry.State == TrackedAssetState.Available;
+
+        entry.LastChecked = utcNow;
+        entry.WasCdnProbed = true;
+        entry.LastHttpStatus = result.StatusCode.HasValue ? (int)result.StatusCode.Value : null;
+        if (result.IsAvailable)
+        {
+            entry.Url = result.Url;
+
+            entry.Extension = result.Extension?.TrimStart('.')
+                ?? PathExtension(result.Url);
+            entry.State = TrackedAssetState.Available;
+            entry.FirstSeen ??= utcNow;
+            entry.LastSeen = utcNow;
+            entry.FailureCount = 0;
+            result.WasNewDiscovery = !existed || !wasAvailable;
+        }
+        else if (result.IsTemporaryFailure)
+        {
+            entry.State = TrackedAssetState.TemporaryError;
+            entry.FailureCount++;
+        }
+        else
+        {
+            entry.FailureCount++;
+            entry.State = preserveAvailableOnUnavailable && wasAvailable
+                ? TrackedAssetState.Available
+                : wasAvailable
                     ? TrackedAssetState.RemovedCandidate
                     : entry.State == TrackedAssetState.RemovedCandidate && entry.FailureCount >= 3
                         ? TrackedAssetState.Removed
                         : TrackedAssetState.Missing;
+        }
+
+        category.Entries[result.AssetId.Value] = entry;
+    }
+
+    private async Task<AssetTrackerUrlProbeResult> ProbeGeneratedUrlAsync(
+        AssetCategory category,
+        long assetId,
+        CancellationToken cancellationToken)
+    {
+        IReadOnlyList<string> extensions = category.Extensions?.Count > 0
+            ? category.Extensions
+            : new[] { category.Extension };
+        AssetTrackerUrlProbeResult last = null;
+
+        foreach (string suffix in (category.FileNameSuffixes ?? new() { "" }).Where(value => value != null).Distinct(StringComparer.Ordinal))
+        foreach (string extension in extensions.Where(value => !string.IsNullOrWhiteSpace(value))
+                     .Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            string cleanExtension = extension.TrimStart('.');
+            string url = $"{category.BaseUrl}{assetId}{suffix}.{cleanExtension}";
+            last = await ProbeUrlAsync(assetId, url, cleanExtension, cancellationToken).ConfigureAwait(false);
+            if (last.IsAvailable || last.IsTemporaryFailure) return last;
+        }
+
+        return last ?? new AssetTrackerUrlProbeResult
+        {
+            AssetId = assetId,
+            Extension = category.Extension,
+            StatusCode = HttpStatusCode.NotFound
+        };
+    }
+
+    private async Task<AssetTrackerUrlProbeResult> ProbeUrlCoreAsync(
+        string url,
+        long? assetId,
+        string extension,
+        CancellationToken cancellationToken)
+    {
+        var result = new AssetTrackerUrlProbeResult
+        {
+            AssetId = assetId ?? AssetCatalogRouting.GetImageNumber(url),
+            Url = url,
+            Extension = extension ?? PathExtension(url)
+        };
+
+        if (!Uri.TryCreate(url, UriKind.Absolute, out _)) return result;
+
+        int attempts = Math.Clamp(MaxAttempts, 1, 5);
+        for (int attempt = 1; attempt <= attempts; attempt++)
+        {
+            result.AttemptCount = attempt;
+            try
+            {
+                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                if (RequestTimeout > TimeSpan.Zero && RequestTimeout != Timeout.InfiniteTimeSpan)
+                    timeout.CancelAfter(RequestTimeout);
+
+                using var request = new HttpRequestMessage(HttpMethod.Head, url);
+                using HttpResponseMessage response = await _httpClient.SendAsync(
+                    request,
+                    HttpCompletionOption.ResponseHeadersRead,
+                    timeout.Token).ConfigureAwait(false);
+
+                bool hasImageContent = response.Content.Headers.ContentType?.MediaType?.StartsWith("image/", StringComparison.OrdinalIgnoreCase) == true;
+                result.StatusCode = response.StatusCode;
+                result.IsAvailable = response.StatusCode == HttpStatusCode.OK && hasImageContent;
+                result.IsTemporaryFailure = IsTemporaryStatus(response.StatusCode);
+                if (!result.IsTemporaryFailure || attempt == attempts) return result;
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                result.IsTemporaryFailure = true;
+                result.Error = "The CDN request timed out.";
+                if (attempt == attempts) return result;
+            }
+            catch (HttpRequestException ex)
+            {
+                result.IsTemporaryFailure = true;
+                result.Error = ex.Message;
+                if (attempt == attempts) return result;
+            }
+            catch (TimeoutException ex)
+            {
+                result.IsTemporaryFailure = true;
+                result.Error = ex.Message;
+                if (attempt == attempts) return result;
             }
 
-            category.Entries[result.AssetId] = entry;
-            return entry;
+            await Task.Delay(TimeSpan.FromMilliseconds(25 * attempt), cancellationToken).ConfigureAwait(false);
         }
 
+        return result;
     }
 
-    public sealed class AssetTrackerScanResult
+    private static bool IsTemporaryStatus(HttpStatusCode statusCode) =>
+        statusCode == HttpStatusCode.TooManyRequests || (int)statusCode >= 500;
+
+    private static string PathExtension(string url)
     {
-        public int Checked { get; set; }
-        public int Available { get; set; }
-        public int NewDiscoveries { get; set; }
-        public int TemporaryErrors { get; set; }
+        if (!Uri.TryCreate(url, UriKind.Absolute, out Uri uri)) return null;
+        string extension = System.IO.Path.GetExtension(uri.AbsolutePath);
+        return string.IsNullOrWhiteSpace(extension) ? null : extension.TrimStart('.');
     }
 
-    internal sealed class AssetProbeResult
+    private static void EnsureRanges(AssetCategory category)
     {
-        public AssetProbeResult(long assetId, string url, string extension, HttpStatusCode? statusCode, bool isAvailable, bool isTemporaryFailure)
+        category.Ranges ??= new List<AssetTrackerRange>();
+        if (category.Ranges.Count == 0)
+            category.Ranges.Add(new AssetTrackerRange { Start = category.Start, NextId = category.Start });
+
+        foreach (AssetTrackerRange range in category.Ranges)
         {
-            AssetId = assetId;
-            Url = url;
-            Extension = extension;
-            StatusCode = statusCode;
-            IsAvailable = isAvailable;
-            IsTemporaryFailure = isTemporaryFailure;
-        }
+            if (range.NextId < range.Start) range.NextId = range.Start;
+            long limit = GetNextRangeStart(category, range);
+            while (range.NextId < limit && range.NextId < long.MaxValue
+                   && category.Entries.TryGetValue(range.NextId, out var entry) && entry.WasCdnProbed)
+                range.NextId++;
 
-        public long AssetId { get; }
-        public string Url { get; }
-        public string Extension { get; }
-        public HttpStatusCode? StatusCode { get; }
-        public bool IsAvailable { get; }
-        public bool IsTemporaryFailure { get; }
-        public bool WasNewDiscovery { get; set; }
+        }
     }
+
+    private static long GetNextRangeStart(AssetCategory category, AssetTrackerRange range)
+    {
+        return category.Ranges.Where(item => item.Start > range.Start)
+            .Select(item => item.Start)
+            .DefaultIfEmpty(long.MaxValue)
+            .Min();
+    }
+
+    private static bool IsInRange(long id, long start, long nextStart) =>
+        id >= start && (nextStart == long.MaxValue || id < nextStart);
+}
+
+public sealed class AssetTrackerScanResult
+{
+    public int Checked { get; set; }
+    public int Available { get; set; }
+    public int NewDiscoveries { get; set; }
+    public int TemporaryErrors { get; set; }
+    public List<AssetTrackerUrlProbeResult> Results { get; } = new();
+
+    internal void Add(AssetTrackerUrlProbeResult result)
+    {
+        Results.Add(result);
+        Checked++;
+        if (result.IsAvailable) Available++;
+        if (result.WasNewDiscovery) NewDiscoveries++;
+        if (result.IsTemporaryFailure) TemporaryErrors++;
+    }
+}
+
+public sealed class AssetTrackerUrlScanResult
+{
+    public int Checked { get; private set; }
+    public int Available { get; private set; }
+    public int TemporaryErrors { get; private set; }
+    public List<AssetTrackerUrlProbeResult> Results { get; } = new();
+
+    internal void Add(AssetTrackerUrlProbeResult result)
+    {
+        Results.Add(result);
+        Checked++;
+        if (result.IsAvailable) Available++;
+        if (result.IsTemporaryFailure) TemporaryErrors++;
+    }
+}
+
+public sealed class AssetTrackerUrlProbeResult
+{
+    public long? AssetId { get; set; }
+    public string Url { get; set; }
+    public string Extension { get; set; }
+    public HttpStatusCode? StatusCode { get; set; }
+    public bool IsAvailable { get; set; }
+    public bool IsTemporaryFailure { get; set; }
+    public bool WasNewDiscovery { get; set; }
+    public int AttemptCount { get; set; }
+    public string Error { get; set; }
 }

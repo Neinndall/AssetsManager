@@ -6,6 +6,18 @@ MAJOR UPDATE
 This hotfix separates the BIN diffing and WAD comparison work from the previous release line. It focuses on semantic BIN output, faster WAD comparisons, and the optional-value crash fix.
 
 New Features
+  - Monitor / Tracker pagination and its separator now appear only with multiple pages; renamed the API Center heading.
+  - CDN Tracker / Fetch Catalog now respects the selected category and queries known IDs and ranges to recover inactive API articles, including skin augments.
+  - CDN Tracker / Fetch Catalog now reads only the client API; Check Images verifies saved catalog URLs, with the shared LCU header showing connection, Summoner ID and region.
+  - CDN Tracker / Aligned image cards in four columns, matched both tracker status headers and added icons to copy and save buttons with unclipped labels.
+  - Asset Tracker / Restored found images plus a batch of up to ten checks, prioritizing failed IDs and filling only free slots with new candidates. Catalog synchronization no longer skips numeric progress or runs implicitly during Monitor scans.
+  - Monitor / Removed repeated image ID captions and made tracker action cards equal in width and spacing.
+  - Monitor / Aligned CDN Tracker actions with API Center header cards, grouped discovery status and pagination, and unified CDN Tracker scrolling with Monitor.
+  - API Center / Added CDN Tracker with category selection, search, image previews, header action cards and paged downloads; the view uses Monitor scrolling.
+  - Asset Tracker / Kept discovery in Monitor with independent numeric ranges, local and LCU catalog candidates, full image URLs and separate API/CDN observation times.
+  - Asset Tracker / Added bounded retries and cancellation, kept missing images as Not Found for later checks, and retained CDN scans when the client is closed. Client login remains manual.
+  - Asset Tracker / Stores history only in its catalog cache; removed tracker history fields from settings and redundant persistence code.
+  - Downloads / Cancelled or interrupted asset downloads now preserve existing destination files.
   - Hash Lab / GAME Basic Suite also discovers original PNG and JPG assets shared with the client.
   - Settings / Added Stage visibility alongside Ground, Grid and Sky for 3D Studio.
   - Hash Lab / GAME Basic Suite also finds shorter texture and animation filenames by removing individual name tokens.

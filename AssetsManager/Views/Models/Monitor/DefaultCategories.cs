@@ -6,7 +6,7 @@ namespace AssetsManager.Views.Models.Monitor
     {
         public static List<AssetCategory> Get()
         {
-            return new List<AssetCategory>
+            var categories = new List<AssetCategory>
             {
                 new AssetCategory { Id = "1", Name = "Bundles Chromas", BaseUrl = "https://d392eissrffsyf.cloudfront.net/storeImages/bundles/", Start = 79900910, Extension = "jpg", Extensions = new List<string> { "jpg", "png" } },
                 new AssetCategory { Id = "2", Name = "Bundles Skins and Borders", BaseUrl = "https://d392eissrffsyf.cloudfront.net/storeImages/bundles/", Start = 99901652, Extension = "png", Extensions = new List<string> { "png", "jpg" } },
@@ -18,9 +18,23 @@ namespace AssetsManager.Views.Models.Monitor
                 new AssetCategory { Id = "7", Name = "Capsules and Orbs", BaseUrl = "https://d392eissrffsyf.cloudfront.net/storeImages/hextechCrafting/", Start = 810, Extension = "png", Extensions = new List<string> { "png", "jpg" } },
                 // new AssetCategory { Id = "8", Name = "Chibis", BaseUrl = "https://d392eissrffsyf.cloudfront.net/storeImages/bundles/", Start = 33300247, Extension = "png" },
                 new AssetCategory { Id = "8", Name = "Banners", BaseUrl = "https://d392eissrffsyf.cloudfront.net/storeImages/regaliaBanner/regalia_banner_", Start = 13, Extension = "png", Extensions = new List<string> { "png", "jpg" } },
-                new AssetCategory { Id = "9", Name = "Skins Augments", BaseUrl = "https://d392eissrffsyf.cloudfront.net/storeImages/skinaugment/", Start = 5, Extension = "png", Extensions = new List<string> { "png", "jpg" } },
+                new AssetCategory
+                {
+                    Id = "9", Name = "Skins Augments",
+                    BaseUrl = "https://d392eissrffsyf.cloudfront.net/storeImages/skinaugment/",
+                    Start = 5, Extension = "png", Extensions = new List<string> { "png", "jpg" },
+                    Ranges = new List<AssetTrackerRange>
+                    {
+                        new AssetTrackerRange { Start = 5, NextId = 5 },
+                        new AssetTrackerRange { Start = 60007, NextId = 60007 }
+                    }
+                },
                 new AssetCategory { Id = "10", Name = "Skins Variants", BaseUrl = "https://d392eissrffsyf.cloudfront.net/storeImages/bundles/", Start = 91000011, Extension = "png", Extensions = new List<string> { "png", "jpg" } }
             };
+            foreach (var category in categories)
+                if (category.BaseUrl.EndsWith("/bundles/", System.StringComparison.Ordinal))
+                    category.FileNameSuffixes = new() { "", "_1" };
+            return categories;
         }
     }
 }

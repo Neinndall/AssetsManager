@@ -5,6 +5,7 @@ using System.Net.Http;
 using Serilog;
 using System.Threading.Tasks;
 using System.Collections.Generic;
+using System.Threading;
 using AssetsManager.Services.Core; // For LogService
 using AssetsManager.Utils;
 
@@ -23,9 +24,10 @@ namespace AssetsManager.Services.Downloads
             _directoriesCreator = directoriesCreator;
         }
 
-        public async Task DownloadAssetToCustomPathAsync(string url, string fullDestinationPath)
+        public async Task DownloadAssetToCustomPathAsync(string url, string fullDestinationPath, CancellationToken cancellationToken = default)
         {
             bool completed = false;
+            string temporaryPath = fullDestinationPath + "." + Guid.NewGuid().ToString("N") + ".partial";
             try
             {
                 string dir = Path.GetDirectoryName(fullDestinationPath);
@@ -34,19 +36,24 @@ namespace AssetsManager.Services.Downloads
                     _directoriesCreator.CreateDirectory(dir);
                 }
 
-                using var response = await _httpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
+                using var response = await _httpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
                 response.EnsureSuccessStatusCode(); // This will throw on non-2xx status codes
 
                 long? expectedLength = response.Content.Headers.ContentLength;
-                await using var fs = new FileStream(fullDestinationPath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, useAsync: true);
-                await response.Content.CopyToAsync(fs);
-
-                if (expectedLength.HasValue && fs.Length != expectedLength.Value)
+                await using (var fs = new FileStream(temporaryPath, FileMode.CreateNew, FileAccess.Write, FileShare.None, 81920, useAsync: true))
                 {
-                    throw new IOException($"Incomplete download from {url}: received {fs.Length}/{expectedLength.Value} bytes.");
+                    await response.Content.CopyToAsync(fs, cancellationToken);
+                    if (expectedLength.HasValue && fs.Length != expectedLength.Value)
+                        throw new IOException($"Incomplete download from {url}: received {fs.Length}/{expectedLength.Value} bytes.");
                 }
-
+                cancellationToken.ThrowIfCancellationRequested();
+                File.Move(temporaryPath, fullDestinationPath, overwrite: true);
                 completed = true;
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                _logService.LogDebug("Asset download cancelled.");
+                throw;
             }
             catch (Exception ex)
             {
@@ -56,9 +63,10 @@ namespace AssetsManager.Services.Downloads
             }
             finally
             {
-                if (!completed && File.Exists(fullDestinationPath))
+                if (!completed && File.Exists(temporaryPath))
                 {
-                    try { File.Delete(fullDestinationPath); } catch { /* best-effort cleanup of partial file */ }
+                    try { File.Delete(temporaryPath); }
+                    catch (Exception ex) { _logService.LogError(ex, "Could not clean up a partial asset download."); }
                 }
             }
         }

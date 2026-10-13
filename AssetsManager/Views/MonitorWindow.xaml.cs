@@ -30,6 +30,7 @@ namespace AssetsManager.Views
         private readonly BackupManager _backupManager;
         private readonly RiotApiService _riotApiService;
         private readonly DirectoriesCreator _directoriesCreator;
+        private readonly AssetCatalogService _assetCatalog;
 
         private readonly Dictionary<string, UserControl> _tabControls = new(StringComparer.Ordinal);
         private string _activeTab;
@@ -51,7 +52,8 @@ namespace AssetsManager.Views
             TaskCancellationManager taskCancellationManager,
             BackupManager backupManager,
             RiotApiService riotApiService,
-            DirectoriesCreator directoriesCreator)
+            DirectoriesCreator directoriesCreator,
+            AssetCatalogService assetCatalog)
         {
             InitializeComponent();
 
@@ -72,6 +74,7 @@ namespace AssetsManager.Views
             _backupManager = backupManager;
             _riotApiService = riotApiService;
             _directoriesCreator = directoriesCreator;
+            _assetCatalog = assetCatalog;
 
             TabDashboard.Checked += MonitorTab_Checked;
             TabFileWatcher.Checked += MonitorTab_Checked;
@@ -219,7 +222,9 @@ namespace AssetsManager.Views
                 CustomMessageBoxService = _customMessageBoxService,
                 RiotApiService = _riotApiService,
                 AppSettings = _appSettings,
-                DirectoriesCreator = _directoriesCreator
+                DirectoriesCreator = _directoriesCreator,
+                CatalogService = _assetCatalog,
+                AssetDownloader = _assetDownloader
             };
         }
 
