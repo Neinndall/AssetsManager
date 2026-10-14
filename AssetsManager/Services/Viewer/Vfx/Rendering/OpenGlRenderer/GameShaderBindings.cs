@@ -45,7 +45,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             if (emitter.Def.HasResolvedCustomMaterial) return null;
             if (emitter.Texture == 0 && !string.IsNullOrWhiteSpace(emitter.Def.TexturePath))
                 return "Base texture is unavailable.";
-            return emitter.Def.PaletteDefinition is not null && emitter.PaletteTexture == 0
+            return emitter.Def.PaletteDefinition is { PaletteCount: > 0 } && emitter.PaletteTexture == 0
                 ? "Palette texture is unavailable."
                 : null;
         }

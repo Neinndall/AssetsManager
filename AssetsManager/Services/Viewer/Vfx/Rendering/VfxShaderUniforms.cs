@@ -113,7 +113,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         internal readonly int HasTex;
         internal readonly int HasTexMult;
         internal readonly int IsDistortion;
-        internal readonly int IsGroundLayer;
         internal readonly int LegacyOrientation;
         internal readonly int MaterialAddressU;
         internal readonly int MaterialAddressV;
@@ -228,7 +227,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             HasTex = gl.GetUniformLocation(program, "uHasTex");
             HasTexMult = gl.GetUniformLocation(program, "uHasTexMult");
             IsDistortion = gl.GetUniformLocation(program, "uIsDistortion");
-            IsGroundLayer = gl.GetUniformLocation(program, "uIsGroundLayer");
             LegacyOrientation = gl.GetUniformLocation(program, "uLegacyOrientation");
             MaterialAddressU = gl.GetUniformLocation(program, "uMaterialAddressU");
             MaterialAddressV = gl.GetUniformLocation(program, "uMaterialAddressV");

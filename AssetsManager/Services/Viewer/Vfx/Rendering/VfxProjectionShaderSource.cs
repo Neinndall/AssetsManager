@@ -75,6 +75,13 @@ void main(){
     internal const string Fragment = VfxShaderSource.TextureSampling + @"
 uniform sampler2D uTex;
 uniform sampler2D uColorMap;
+uniform sampler2D uPaletteMap;
+uniform int uHasPalette;
+uniform int uPaletteCount;
+uniform int uPaletteAddressMode;
+uniform float uPaletteSelector;
+uniform vec4 uPaletteMixMask;
+uniform vec2 uPaletteScroll;
 uniform sampler2D uTexMult;
 uniform sampler2D uErosionTex;
 uniform sampler2D uTerrainDepth;
@@ -145,6 +152,11 @@ void main(){
     }
 #endif
     vec4 texel = uHasTex != 0 ? sampleAddressed(uTex,uv,uAddressMode) : vec4(1.0);
+    if(uHasPalette != 0){
+        vec2 at = vec2(clamp(dot(texel, uPaletteMixMask), 0.0, 1.0),
+            (uPaletteSelector + 0.5) / max(float(uPaletteCount), 1.0)) + uPaletteScroll;
+        texel.rgb = sampleAddressed(uPaletteMap, at, uPaletteAddressMode).rgb;
+    }
     if(uHasColor != 0) texel *= texture(uColorMap,vLookup);
     if(uHasTexMult != 0) texel *= sampleAddressed(uTexMult,multUv(uv),uAddressModeMult);
     vec4 lit = texel * vColor;

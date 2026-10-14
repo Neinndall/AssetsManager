@@ -533,7 +533,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 }
                 if (es.Def.DrawsAsProjection)
                 {
-                    RenderProjection(es, instancesSpan, renderInstanceCount, viewProj, useWireframe, wireOpacity);
+                    RenderProjection(es, instancesSpan, renderInstanceCount, viewProj, sharedPalettePhase, useWireframe, wireOpacity);
                     continue;
                 }
                 RenderQuadEmitter(es, instancesSpan, renderInstanceCount, sharedPalettePhase, useWireframe, wireOpacity, camPos, camRight, camUp, passIndex);

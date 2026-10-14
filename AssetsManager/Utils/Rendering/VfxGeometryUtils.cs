@@ -62,9 +62,6 @@ namespace AssetsManager.Utils.Rendering
             return !erosionEnabled && !(hasMultLayer && (mesh || definition.UvMode == 2));
         }
 
-        public static bool ShouldProjectToGround(VfxEmitterDefinition definition)
-            => definition is not null && definition.IsGroundLayer;
-
         public static bool ShouldUseSoftParticles(VfxEmitterDefinition definition, bool hasSceneDepth)
         {
             if (!hasSceneDepth || definition?.SoftParticle is null) return false;

@@ -123,9 +123,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         internal static bool ShouldUseColorRamp(VfxEmitterDefinition definition, bool hasColorRampTexture)
             => VfxGeometryUtils.ShouldUseColorRamp(definition, hasColorRampTexture);
 
-        internal static bool ShouldProjectToGround(VfxEmitterDefinition definition)
-            => VfxGeometryUtils.ShouldProjectToGround(definition);
-
         internal static bool ShouldUseSoftParticles(VfxEmitterDefinition definition, bool hasSceneDepth)
             => VfxGeometryUtils.ShouldUseSoftParticles(definition, hasSceneDepth);
 

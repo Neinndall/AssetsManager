@@ -29,7 +29,7 @@ public sealed partial class VfxOpenGlRenderer
     private readonly VfxProjectionGeometry _projectionGeometry = new();
 
     private void RenderProjection(VfxPlaybackRuntime.EmitterState emitter, ReadOnlySpan<float> instances,
-        int count, Matrix4x4 viewProj, bool wireframe, float wireOpacity)
+        int count, Matrix4x4 viewProj, float sharedPalettePhase, bool wireframe, float wireOpacity)
     {
         if (_projectionProgram == 0)
         {
@@ -68,6 +68,16 @@ public sealed partial class VfxOpenGlRenderer
         uniforms.Uniform1(uniforms.ColorMap, 7);
         uniforms.Uniform1(uniforms.HasTex, emitter.Texture != 0 ? 1 : 0);
         uniforms.Uniform1(uniforms.HasColor, UsesProjectionColorRamp(definition, emitter.ColorGradientTexture != 0) ? 1 : 0);
+        VfxPaletteDefinition palette = definition.PaletteDefinition;
+        uniforms.Uniform1(uniforms.PaletteMap, 8);
+        uniforms.Uniform1(uniforms.HasPalette, emitter.PaletteTexture != 0 && palette is { PaletteCount: > 0 } ? 1 : 0);
+        uniforms.Uniform1(uniforms.PaletteCount, Math.Max(1, palette?.PaletteCount ?? 1));
+        uniforms.Uniform1(uniforms.PaletteAddressMode, palette?.AddressMode ?? 1);
+        uniforms.Uniform1(uniforms.PaletteSelector, PaletteSelectorAtZero(palette));
+        Vector4 paletteMix = palette?.PaletteSourceMixColor ?? Vector4.Zero;
+        uniforms.Uniform4(uniforms.PaletteMixMask, paletteMix.X, paletteMix.Y, paletteMix.Z, paletteMix.W);
+        Vector2 scroll = VfxShaderParameterUtils.ResolvePaletteScroll(palette, sharedPalettePhase);
+        uniforms.Uniform2(uniforms.PaletteScroll, scroll.X, scroll.Y);
         uniforms.Uniform1(uniforms.TexMult, 1);
         uniforms.Uniform1(uniforms.HasTexMult, emitter.TextureMult != 0 ? 1 : 0);
         uniforms.Uniform1(uniforms.AddressModeMult, definition.TextureMultAddressMode);
@@ -110,6 +120,10 @@ public sealed partial class VfxOpenGlRenderer
         _gl.BindTexture(TextureTarget.Texture2D, emitter.ColorGradientTexture != 0
             ? emitter.ColorGradientTexture : _textures.FallbackTransparentTexture);
         BindStockSampler(7, 2);
+        _gl.ActiveTexture(TextureUnit.Texture8);
+        _gl.BindTexture(TextureTarget.Texture2D, emitter.PaletteTexture != 0
+            ? emitter.PaletteTexture : _textures.FallbackTransparentTexture);
+        BindStockSampler(8, palette?.AddressMode ?? 1);
         if (emitter.TextureMult != 0)
         {
             _gl.ActiveTexture(TextureUnit.Texture1);

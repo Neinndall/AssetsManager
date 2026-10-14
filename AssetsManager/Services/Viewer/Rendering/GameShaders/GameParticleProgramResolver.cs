@@ -176,7 +176,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                 Add("USE_VERTEX_COLORS");
             }
 
-            if (emitter.PaletteDefinition is not null)
+            if (emitter.PaletteDefinition is { PaletteCount: > 0 })
                 Add("PALETTIZE_TEXTURES");
             if (emitter.SoftParticle is not null)
                 Add("SOFT_PARTICLES");

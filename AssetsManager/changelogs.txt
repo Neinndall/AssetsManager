@@ -10,6 +10,10 @@ Improvements
   - 3D Studio / Project Browser groups parent navigation and breadcrumbs in a bordered path bar that keeps the current folder visible on long paths.
   - 3D Studio / Aligned Project Browser header icons and grouped thumbnail and Explorer controls with color-only hover feedback.
 
+Bug Fixes
+  - 3D Studio / Fixed ground-layer particle placement and palette handling, including palette colors on projected effects.
+  - 3D Studio / Fixed beam segment emission limits, replay resets and child effect targets.
+
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 AssetsManager - League of Legends | v4.1.0.0

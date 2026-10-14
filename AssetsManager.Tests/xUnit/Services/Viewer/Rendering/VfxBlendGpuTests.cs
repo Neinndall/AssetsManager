@@ -41,7 +41,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
             using var context = new HiddenWglContext();
             using GL gl = GL.GetApi(context.GetProcAddress);
             using var renderer = new VfxOpenGlRenderer();
-            renderer.Initialize(gl, InstalledSkins.Settings(install));
+            renderer.Initialize(gl, fallback ? null : InstalledSkins.Settings(install));
             uint target = Texture(gl, 64, 64, new byte[64 * 64 * 4]);
             uint framebuffer = gl.GenFramebuffer();
             gl.BindFramebuffer(FramebufferTarget.Framebuffer, framebuffer);
@@ -111,7 +111,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
                 gl.ClearColor(background.X, background.Y, background.Z, background.W);
                 gl.Clear(ClearBufferMask.ColorBufferBit);
                 renderer.Render(new[] { new VfxRenderQueueEntry(emitter, 0, 0) }, Matrix4x4.Identity, Matrix4x4.Identity);
-                Assert.Equal(fallback ? "Palette with no rows." : null, renderer.GameParticleFallback(emitter, mesh));
+                Assert.Equal(fallback ? "ShaderCache.dx11.wad.client was not found in the configured game installs." : null, renderer.GameParticleFallback(emitter, mesh));
                 var pixel = new byte[4];
                 gl.ReadPixels(32, 32, 1, 1, PixelFormat.Rgba, PixelType.UnsignedByte, pixel.AsSpan());
                 Vector4 expected = Compose(mode, authored, background);
@@ -139,7 +139,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
             using var context = new HiddenWglContext();
             using GL gl = GL.GetApi(context.GetProcAddress);
             using var renderer = new VfxOpenGlRenderer();
-            renderer.Initialize(gl, InstalledSkins.Settings(install));
+            renderer.Initialize(gl, fallback ? null : InstalledSkins.Settings(install));
             uint target = Texture(gl, 64, 64, new byte[64 * 64 * 4]);
             uint framebuffer = gl.GenFramebuffer();
             gl.BindFramebuffer(FramebufferTarget.Framebuffer, framebuffer);
@@ -180,7 +180,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
                 gl.ClearColor(0, 0, 0, 0);
                 gl.Clear(ClearBufferMask.ColorBufferBit);
                 renderer.Render(new[] { new VfxRenderQueueEntry(emitter, 0, 0) }, Matrix4x4.Identity, Matrix4x4.Identity);
-                Assert.Equal(fallback ? "Palette with no rows." : null, renderer.GameParticleFallback(emitter, false));
+                Assert.Equal(fallback ? "ShaderCache.dx11.wad.client was not found in the configured game installs." : null, renderer.GameParticleFallback(emitter, false));
                 var pixel = new byte[4];
                 gl.ReadPixels(32, 32, 1, 1, PixelFormat.Rgba, PixelType.UnsignedByte, pixel.AsSpan());
                 // LTK's stable tie draws red first, then blue, with authored alpha blending.

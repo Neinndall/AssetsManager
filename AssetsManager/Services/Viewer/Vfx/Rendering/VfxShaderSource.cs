@@ -25,7 +25,6 @@ uniform int uAlignYawToCamera;
 uniform int uMeshSkinned;
 uniform int uAttachedMesh;
 uniform int uUseSkinning;
-uniform int uIsGroundLayer;
 uniform vec3 uOrbitRotation;
 uniform vec3 uGameLookupDrivers;
 const int MAX_BONES = 512;
@@ -143,7 +142,6 @@ void main(){
         p = placementRight * carried.x + placementUp * carried.y + placementForward * carried.z + uWorldPos;
         worldSurface = placementRight * carriedSurface.x + placementUp * carriedSurface.y + placementForward * carriedSurface.z;
     }
-    if (uIsGroundLayer != 0) p.y = 0.0;
 
     // mesh_vs in LTK does not apply PARTICLE_DEPTH_PUSH_PULL. It derives the rim and
     // reflected ray from the real surface normal and the eye-to-surface direction.
@@ -234,7 +232,6 @@ uniform int uDirectionOriented;
 uniform int uArbitraryQuad;
 uniform int uLegacyOrientation;
 uniform int uPivotUp;
-uniform int uIsGroundLayer;
 uniform int uPrimitiveKind;
 uniform int uUvMode;
 uniform int uFlipU;
@@ -326,8 +323,6 @@ void main(){
     } else {
         world = aCenter + right * (rc.x * aSize.x) + up * (rc.y * aSize.y);
     }
-    // LTK's GROUND_LAYER is a final world-space projection shared by quads, ribbons and meshes.
-    if (uIsGroundLayer != 0) world.y = 0.0;
     vec3 eyeRay = world - uCamPos;
     if (uDepthPushPull != 0.0 && dot(eyeRay, eyeRay) > 0.000001)
         world += normalize(eyeRay) * uDepthPushPull;

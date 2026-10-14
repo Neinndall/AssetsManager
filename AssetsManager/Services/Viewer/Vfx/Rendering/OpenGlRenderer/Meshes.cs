@@ -135,7 +135,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _meshUniforms.Uniform1(_meshUniforms.AlignPitchToCamera, cameraAlignedMesh && es.Def.MeshAlignPitchToCamera ? 1 : 0);
             _meshUniforms.Uniform1(_meshUniforms.AlignYawToCamera, cameraAlignedMesh && es.Def.MeshAlignYawToCamera ? 1 : 0);
             _meshUniforms.Uniform1(_meshUniforms.MeshSkinned, es.Def.MeshIsSkinned ? 1 : 0);
-            _meshUniforms.Uniform1(_meshUniforms.IsGroundLayer, es.Def.IsGroundLayer ? 1 : 0);
             _meshUniforms.Uniform1(_meshUniforms.Tex, 0);
             _meshUniforms.Uniform1(_meshUniforms.TexMult, 1);
             _meshUniforms.Uniform1(_meshUniforms.ColorMap, 7);

@@ -52,7 +52,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
             using var context = new HiddenWglContext();
             using GL gl = GL.GetApi(context.GetProcAddress);
             using var renderer = new VfxOpenGlRenderer();
-            renderer.Initialize(gl, InstalledSkins.Settings(install));
+            renderer.Initialize(gl, fallback ? null : InstalledSkins.Settings(install));
 
             uint target = Texture(gl, 64, 64, new byte[64 * 64 * 4]);
             uint framebuffer = gl.GenFramebuffer();
@@ -127,7 +127,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
                 gl.ClearColor(0, 0, 0, 1);
                 gl.Clear(ClearBufferMask.ColorBufferBit);
                 renderer.Render(new[] { new VfxRenderQueueEntry(emitter, 0, 0) }, Matrix4x4.Identity, Matrix4x4.Identity);
-                Assert.Equal(fallback ? "Palette with no rows." : null, renderer.GameParticleFallback(emitter, mesh));
+                Assert.Equal(fallback ? "ShaderCache.dx11.wad.client was not found in the configured game installs." : null, renderer.GameParticleFallback(emitter, mesh));
                 var pixels = new byte[64 * 64 * 4];
                 gl.ReadPixels(0, 0, 64, 64, PixelFormat.Rgba, PixelType.UnsignedByte, pixels.AsSpan());
                 int[] lit = Enumerable.Range(0, 64 * 64)

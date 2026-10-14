@@ -3603,16 +3603,16 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
-        public void FollowingTerrainAloneDoesNotUseGroundLayerProjection()
+        public void GroundLayerClassificationDoesNotMakeAnEmitterAPlanarProjection()
         {
             VfxEmitterDefinition regular = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default);
             VfxEmitterDefinition terrain = regular with { IsFollowingTerrain = true };
             VfxEmitterDefinition ground = regular with { IsGroundLayer = true };
             VfxEmitterDefinition projection = regular with { PrimitiveKind = VfxPrimitiveKind.PlanarProjection };
 
-            Assert.False(VfxOpenGlRenderer.ShouldProjectToGround(terrain));
-            Assert.True(VfxOpenGlRenderer.ShouldProjectToGround(ground));
-            Assert.False(VfxOpenGlRenderer.ShouldProjectToGround(projection));
+            Assert.False(terrain.DrawsAsProjection);
+            Assert.False(ground.DrawsAsProjection);
+            Assert.True(projection.DrawsAsProjection);
             Assert.True(projection.IsVisual);
         }
 
@@ -3641,7 +3641,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             {
                 BirthRotation = VfxCurve3.Const(new Vector3(-90f, -90f, 0f))
             };
-            Assert.False(VfxOpenGlRenderer.ShouldProjectToGround(groundRotation));
+            Assert.False(groundRotation.DrawsAsProjection);
             Assert.True(VfxOpenGlRenderer.ShouldUseSoftParticles(groundRotation, hasSceneDepth: true));
         }
 
@@ -3699,7 +3699,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
-        public void GroundProjectionRequiresTheAuthoredGroundLayerFlag()
+        public void GroundLayerFlagKeepsTiltedMeshesOnTheMeshDrawPath()
         {
             VfxEmitterDefinition tiltedMesh = CreateEmitter(
                 Vector3.One,
@@ -3710,8 +3710,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 BirthRotation = VfxCurve3.Const(new Vector3(-90f, 0f, 0f))
             };
 
-            Assert.False(VfxOpenGlRenderer.ShouldProjectToGround(tiltedMesh));
-            Assert.True(VfxOpenGlRenderer.ShouldProjectToGround(tiltedMesh with { IsGroundLayer = true }));
+            Assert.True(tiltedMesh.DrawsAsMesh);
+            Assert.True((tiltedMesh with { IsGroundLayer = true }).DrawsAsMesh);
         }
 
         [Fact]
