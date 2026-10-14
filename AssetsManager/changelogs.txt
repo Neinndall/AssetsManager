@@ -3,7 +3,7 @@
 AssetsManager - League of Legends | v4.1.0.0
 
 MAJOR UPDATE
-This hotfix separates the BIN diffing and WAD comparison work from the previous release line. It focuses on semantic BIN output, faster WAD comparisons, and the optional-value crash fix.
+After more than three long months of development, the biggest AssetsManager update to date has arrived. This release brings a renewed 3D Studio with animated characters, visual effects, interactive maps and expanded Chroma Library tools, alongside a more powerful Hash Guessing Lab and new CDN asset tracking. Improved WAD comparisons, clearer BIN differences, broader audio export options and extensive performance and stability fixes make exploring, comparing and extracting League of Legends assets easier than ever.
 
 New Features
   - Hash Lab / Faster Custom shader and texture searches while keeping the same candidate paths.
@@ -965,5 +965,4 @@ Bug Fixes
   - Viewer / Fixed opaque SKN color-map alpha creating transparent holes in champion models.
   - VFX Studio / Fixed loading crashes for particle lifetimes using single-value probability tables.
   - Viewer / Fixed authored SKN face culling so champion materials render their outward-facing geometry.
-
-Map shader preview now preserves authored pass texture bindings and correct terrain fallback lighting.
+	- Map shader preview now preserves authored pass texture bindings and correct terrain fallback lighting.
