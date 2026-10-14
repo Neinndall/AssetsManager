@@ -113,6 +113,7 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             CancelWork();
             _root = _folder = null;
+            UpButton.IsEnabled = false;
             _rootFolders.Clear();
             FoldersTree.ItemsSource = null;
             _files.Clear();
@@ -133,6 +134,7 @@ namespace AssetsManager.Views.Controls.Viewer
             var cancellation = new CancellationTokenSource();
             _browseCancellation = cancellation;
             string root = _root, folder = _folder, query = SearchBox.Text;
+            UpButton.IsEnabled = !string.Equals(root, folder, StringComparison.OrdinalIgnoreCase);
             string[] roots = _rootFolders.Select(item => item.FullPath).ToArray();
             try
             {
@@ -227,6 +229,11 @@ namespace AssetsManager.Views.Controls.Viewer
         private void Breadcrumbs_ItemClicked(object sender, BreadcrumbItemClickedEventArgs e)
         {
             if (e.Value is string path) Navigate(path);
+        }
+        private void BreadcrumbScroll_ScrollChanged(object sender, ScrollChangedEventArgs e)
+        {
+            if (sender is ScrollViewer scroll && (e.ExtentWidthChange != 0 || e.ViewportWidthChange != 0))
+                scroll.ScrollToHorizontalOffset(scroll.ScrollableWidth);
         }
         private void Navigate(string path, string rootPath = null)
         {

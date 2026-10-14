@@ -7,6 +7,21 @@
              xmlns:viewer="clr-namespace:AssetsManager.Views.Controls.Viewer"
              xmlns:models="clr-namespace:AssetsManager.Views.Models.Viewer">
     <UserControl.Resources>
+        <Style x:Key="ProjectToolbarButton" TargetType="Button" BasedOn="{StaticResource TransparentIconButton}">
+            <Setter Property="Width" Value="28"/>
+            <Setter Property="Height" Value="28"/>
+            <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+            <Style.Triggers>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Opacity" Value="0.4"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="ProjectToolbarToggle" TargetType="ToggleButton" BasedOn="{StaticResource TransparentIconToggleButton}">
+            <Setter Property="Width" Value="28"/>
+            <Setter Property="Height" Value="28"/>
+            <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+        </Style>
         <Style x:Key="ProjectFolderStyle" TargetType="TreeViewItem" BasedOn="{StaticResource ModernTreeViewItem}">
             <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
             <EventSetter Event="Expanded" Handler="Folder_Expanded"/>
@@ -51,37 +66,56 @@
         <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
         <Grid>
             <Border Background="{StaticResource CardBackground}"/>
-            <Grid Margin="12,6">
+            <Grid Margin="12,8">
                 <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="200"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <icons:MaterialIcon Kind="FolderOutline" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" Margin="0,0,8,0"/>
-                    <TextBlock Text="PROJECTS" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                    <Button Click="ChangeProject_Click" Style="{StaticResource TransparentIconButton}" Width="26" Height="26" Padding="0" ToolTip="Choose project folder"
-                            Visibility="{Binding IsStandalone, ElementName=BrowserRoot, Converter={StaticResource BooleanToVisibilityConverter}}">
-                        <icons:MaterialIcon Kind="FolderPlusOutline" Width="14" Height="14"/>
-                    </Button>
-                    <ToggleButton IsChecked="{Binding IsThumbnailEnabled, ElementName=BrowserRoot, Mode=TwoWay}" Style="{StaticResource TransparentIconToggleButton}" Width="26" Height="26" Padding="0" ToolTip="Texture thumbnails">
-                        <icons:MaterialIcon Kind="ImageOutline" Width="14" Height="14"/>
-                    </ToggleButton>
-                    <Button Click="Reveal_Click" Style="{StaticResource TransparentIconButton}" Width="26" Height="26" Padding="0" ToolTip="Show in Explorer">
-                        <icons:MaterialIcon Kind="OpenInNew" Width="14" Height="14"/>
-                    </Button>
+                    <Grid Width="32" Height="32" Margin="0,0,8,0">
+                        <Border Background="{StaticResource SidebarBackground}" CornerRadius="8"/>
+                        <icons:MaterialIcon Kind="FolderMultipleOutline" Width="18" Height="18" Foreground="{StaticResource AccentBrush}"/>
+                        <Border BorderBrush="{StaticResource AccentBrush}" BorderThickness="1" CornerRadius="8" Opacity="0.25" IsHitTestVisible="False"/>
+                    </Grid>
+                    <TextBlock Text="PROJECTS" FontSize="10.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                    <Grid Height="32" Margin="12,0,0,0">
+                        <Border Background="{StaticResource SidebarBackground}" CornerRadius="8"/>
+                        <StackPanel Orientation="Horizontal" Margin="2,0" VerticalAlignment="Center">
+                            <Button Click="ChangeProject_Click" Style="{StaticResource ProjectToolbarButton}" ToolTip="Choose project folder"
+                                    Visibility="{Binding IsStandalone, ElementName=BrowserRoot, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <icons:MaterialIcon Kind="FolderPlusOutline" Width="15" Height="15"/>
+                            </Button>
+                            <ToggleButton IsChecked="{Binding IsThumbnailEnabled, ElementName=BrowserRoot, Mode=TwoWay}" Style="{StaticResource ProjectToolbarToggle}" ToolTip="Texture thumbnails">
+                                <icons:MaterialIcon Kind="ImageOutline" Width="15" Height="15"/>
+                            </ToggleButton>
+                            <Button Click="Reveal_Click" Style="{StaticResource ProjectToolbarButton}" ToolTip="Show in Explorer">
+                                <icons:MaterialIcon Kind="OpenInNew" Width="15" Height="15"/>
+                            </Button>
+                        </StackPanel>
+                        <Border BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="8" IsHitTestVisible="False"/>
+                    </Grid>
                 </StackPanel>
-                <Grid Grid.Column="1" Margin="12,0">
-                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                    <Button Click="Up_Click" Style="{StaticResource TransparentIconButton}" Width="26" Height="26" Padding="0" Margin="0,0,10,0" ToolTip="Parent folder">
-                        <icons:MaterialIcon Kind="ArrowUp" Width="14" Height="14"/>
-                    </Button>
-                    <explorer:BreadcrumbControl x:Name="Breadcrumbs" Grid.Column="1" FontSize="10" ItemClicked="Breadcrumbs_ItemClicked"/>
+                <Grid Grid.Column="1" Height="32" Margin="12,0" ClipToBounds="True">
+                    <Border Background="{StaticResource SidebarBackground}" CornerRadius="8"/>
+                    <Grid Margin="2,0,8,0">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                        <Button x:Name="UpButton" Click="Up_Click" Style="{StaticResource ProjectToolbarButton}" VerticalAlignment="Center" IsEnabled="False" ToolTip="Go to parent folder">
+                            <icons:MaterialIcon Kind="ArrowUp" Width="15" Height="15"/>
+                        </Button>
+                        <Border Grid.Column="1" Width="1" Height="16" Background="{StaticResource BorderColor}" Margin="4,0,10,0" VerticalAlignment="Center"/>
+                        <icons:MaterialIcon Grid.Column="2" Kind="FolderOpenOutline" Width="14" Height="14" Foreground="{StaticResource TextMuted}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                        <ScrollViewer Grid.Column="3" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled"
+                                      VerticalAlignment="Center" ScrollChanged="BreadcrumbScroll_ScrollChanged">
+                            <explorer:BreadcrumbControl x:Name="Breadcrumbs" FontSize="10.5" ItemClicked="Breadcrumbs_ItemClicked"/>
+                        </ScrollViewer>
+                    </Grid>
+                    <Border BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="8" IsHitTestVisible="False"/>
                 </Grid>
-                <shared:SearchBoxControl x:Name="SearchBox" Grid.Column="2" Height="26" Tag="Search project files..." SearchTextChanged="Search_TextChanged"/>
-                <StackPanel Grid.Column="3" Orientation="Horizontal" Margin="6,0,0,0">
-                    <Button Click="OpenStudio_Click" Style="{StaticResource TransparentIconButton}" Width="26" Height="26" Padding="0" ToolTip="Open project in 3D Studio"
+                <shared:SearchBoxControl x:Name="SearchBox" Grid.Column="2" Height="32" Tag="Search project files..." SearchTextChanged="Search_TextChanged"/>
+                <StackPanel Grid.Column="3" Orientation="Horizontal" Margin="8,0,0,0" VerticalAlignment="Center">
+                    <Button Click="OpenStudio_Click" Style="{StaticResource ProjectToolbarButton}" ToolTip="Open project in 3D Studio"
                             Visibility="{Binding IsStandalone, ElementName=BrowserRoot, Converter={StaticResource BooleanToVisibilityConverter}}">
-                        <icons:MaterialIcon Kind="CubeOutline" Width="14" Height="14"/>
+                        <icons:MaterialIcon Kind="CubeOutline" Width="15" Height="15"/>
                     </Button>
-                    <Button Click="Close_Click" Style="{StaticResource TransparentIconButton}" Width="26" Height="26" Padding="0" ToolTip="Close project browser">
-                        <icons:MaterialIcon Kind="Close" Width="14" Height="14"/>
+                    <Button Click="Close_Click" Style="{StaticResource ProjectToolbarButton}" ToolTip="Close project browser">
+                        <icons:MaterialIcon Kind="Close" Width="15" Height="15"/>
                     </Button>
                 </StackPanel>
             </Grid>

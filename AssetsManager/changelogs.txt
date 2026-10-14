@@ -1,12 +1,22 @@
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
+AssetsManager - League of Legends | v4.1.0.1
+
+New Features
+  - 3D Studio / Use Open/Add to load multiple project folders with separate trees and shared search; Remove from project preserves files and open scenes.
+
+Improvements
+  - 3D Studio / Project Browser groups parent navigation and breadcrumbs in a bordered path bar that keeps the current folder visible on long paths.
+  - 3D Studio / Aligned Project Browser header icons and grouped thumbnail and Explorer controls with color-only hover feedback.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
 AssetsManager - League of Legends | v4.1.0.0
 
 MAJOR UPDATE
 After more than three long months of development, the biggest AssetsManager update to date has arrived. This release brings a renewed 3D Studio with animated characters, visual effects, interactive maps and expanded Chroma Library tools, alongside a more powerful Hash Guessing Lab and new CDN asset tracking. Improved WAD comparisons, clearer BIN differences, broader audio export options and extensive performance and stability fixes make exploring, comparing and extracting League of Legends assets easier than ever.
 
 New Features
-  - 3D Studio / Add and remove project folders with separate trees and shared search while keeping files and open scenes.
   - Hash Lab / Faster Custom shader and texture searches while keeping the same candidate paths.
   - Hash Lab / GAME guessing discovers directory-named shaders, letter variants and unnumbered texture and animation filenames.
   - Hash Lab / BIN-referenced animation guessing now finds numbered actions with shortened filenames.
