@@ -885,11 +885,11 @@ namespace AssetsManager.Views
                 if (result.Matches.Count > 0)
                 {
                     await Task.Run(() => _hashGuessingService.SaveMatchesAsync(result.Matches, CancellationToken.None));
-                    _viewModel.StatusText = $"Completed in {elapsedTime}: {result.Matches.Count:N0} paths resolved and automatically added to main hash files.";
+                    _viewModel.StatusText = $"Completed in {elapsedTime}: {result.Matches.Count:N0} hashes resolved and saved.";
                 }
                 else
                 {
-                    _viewModel.StatusText = $"Completed in {elapsedTime}: {result.Matches.Count:N0} paths resolved from {result.UnknownHashesAtStart:N0} unknown hashes.";
+                    _viewModel.StatusText = $"Completed in {elapsedTime}: {result.Matches.Count:N0} hashes resolved from {result.UnknownHashesAtStart:N0} unknown hashes.";
                 }
             }
             catch (OperationCanceledException)

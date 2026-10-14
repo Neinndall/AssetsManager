@@ -206,7 +206,6 @@ namespace AssetsManager.Views
             return new BackupsControl
             {
                 BackupManager = _backupManager,
-                VersionService = _versionService,
                 LogService = _logService,
                 AppSettings = _appSettings,
                 CustomMessageBoxService = _customMessageBoxService,

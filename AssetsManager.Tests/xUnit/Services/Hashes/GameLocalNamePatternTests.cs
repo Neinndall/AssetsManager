@@ -73,6 +73,37 @@ public sealed class GameLocalNamePatternTests
         Assert.Empty(engine.Matches);
     }
 
+    [Theory]
+    [InlineData("empowered_eyes_tx_cm.tex", "dadbot_eyes_tx_cm.tex", "empowered_outfit_tx_cm.tex")]
+    [InlineData("dadbot_f1_scrollmask_cm.tex", "dadbot_f1_tx_cm.tex", "gun_f2_scrollmask_tx_cm.tex")]
+    [InlineData("spell1_start.anm", "idle_start.anm", "spell1_loop.anm")]
+    public void ReplacesTokensUsingOnlyTheLocalDirectoryVocabulary(string targetName, string seed, string evidence)
+    {
+        const string directory = "assets/characters/example/skins/skin80/";
+        string target = directory + "example_skin80_" + targetName;
+        var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong> { XxHash64Ext.Hash(target) });
+        GameHashGuesser.SubstituteLocalNameWords(engine, new[]
+        {
+            directory + "example_skin80_" + seed,
+            directory + "example_skin80_" + evidence
+        }, CancellationToken.None);
+        Assert.Equal(target, Assert.Single(engine.Matches).Value.Path);
+    }
+
+    [Fact]
+    public void ReplacementDoesNotBorrowEvidenceFromAnotherSkinDirectory()
+    {
+        const string directory = "assets/characters/example/skins/skin80/";
+        const string target = directory + "example_skin80_empowered_eyes_tx_cm.tex";
+        var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong> { XxHash64Ext.Hash(target) });
+        GameHashGuesser.SubstituteLocalNameWords(engine, new[]
+        {
+            directory + "example_skin80_dadbot_eyes_tx_cm.tex",
+            "assets/characters/example/skins/skin81/example_skin81_empowered_outfit_tx_cm.tex"
+        }, CancellationToken.None);
+        Assert.Empty(engine.Matches);
+    }
+
     [Fact]
     public void RespectsBudgetCancellationAndProgress()
     {

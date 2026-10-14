@@ -76,6 +76,13 @@ internal sealed partial class GameHashGuesser
                     foreach (string insertion in insertions)
                         if (!Check(path.AsSpan(0, at), insertion, path.AsSpan(at))) return Finish();
                     int separator = path.IndexOf('_', at);
+                    int tokenEnd = separator < 0 ? end : separator;
+                    // Rare compound suffixes may never reach the global vocabulary; reuse local evidence.
+                    foreach (string replacement in words)
+                    {
+                        if (path.AsSpan(at, tokenEnd - at).Equals(replacement, StringComparison.Ordinal)) continue;
+                        if (!Check(path.AsSpan(0, at), replacement, path.AsSpan(tokenEnd))) return Finish();
+                    }
                     if (separator < 0) break;
                     at = separator + 1;
                 }

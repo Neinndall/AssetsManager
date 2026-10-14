@@ -6,6 +6,10 @@ MAJOR UPDATE
 This hotfix separates the BIN diffing and WAD comparison work from the previous release line. It focuses on semantic BIN output, faster WAD comparisons, and the optional-value crash fix.
 
 New Features
+  - Hash Lab / Custom texture and animation guessing now substitutes words learned from the same directory to recover additional filenames.
+  - Hash Lab / Shortened the completion message to show hashes resolved and saved.
+  - Backups / Unified copy and cancellation handling, grouped inventory refreshes, and report failed replacement cleanup accurately.
+  - Backups / Overwriting a snapshot now refreshes the list after the operation finishes, without briefly showing an extra backup.
   - CDN Tracker / Grouped the catalog source contract with its implementation.
   - Monitor / Separated watched files from CDN tracking and removed redundant service forwarding and unused dependencies.
   - Monitor / Tracker pagination and its separator now appear only with multiple pages; renamed the API Center heading.

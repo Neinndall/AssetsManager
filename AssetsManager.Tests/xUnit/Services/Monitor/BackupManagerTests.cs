@@ -14,6 +14,33 @@ namespace AssetsManager.Tests.xUnit.Services.Monitor
 {
     public sealed class BackupManagerTests
     {
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task CancellationAfterLastCopiedFileDoesNotPublishSuccessAndPreservesSource(bool clone)
+        {
+            using var bridge = new AssetsManagerTestBridge();
+            string sourcePath = bridge.CreateDirectory("League of Legends_old_original");
+            await File.WriteAllTextAsync(Path.Combine(sourcePath, "game.dat"), "original");
+            string destinationPath = Path.Combine(bridge.RootPath, "League of Legends_old_new");
+            var manager = new BackupManager(bridge.Directories, bridge.LogService, new AppSettings(), null);
+            using var cancellation = new CancellationTokenSource();
+            int changedCount = 0;
+            bool? completed = null;
+            manager.BackupsChanged += () => changedCount++;
+            manager.BackupProgressChanged += (_, _, _) => cancellation.Cancel();
+            manager.BackupCompleted += success => { completed = success; return Task.CompletedTask; };
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => clone
+                ? manager.CloneBackupAsync(sourcePath, destinationPath, cancellation.Token)
+                : manager.CreateBackupAsync(sourcePath, destinationPath, cancellation.Token));
+
+            Assert.Equal(0, changedCount);
+            Assert.False(completed);
+            Assert.False(Directory.Exists(destinationPath));
+            Assert.Equal("original", await File.ReadAllTextAsync(Path.Combine(sourcePath, "game.dat")));
+        }
+
         [Fact]
         public void ConfiguredMainInstallationCannotBeDeleted()
         {
@@ -43,7 +70,7 @@ namespace AssetsManager.Tests.xUnit.Services.Monitor
 
             BackupManager.BackupStorageEstimate estimate = await manager.GetStorageEstimateAsync(
                 sourcePath, destinationPath, CancellationToken.None);
-            await manager.CreateLolPbeDirectoryBackupAsync(
+            await manager.CreateBackupAsync(
                 sourcePath,
                 destinationPath,
                 CancellationToken.None);
@@ -73,7 +100,7 @@ namespace AssetsManager.Tests.xUnit.Services.Monitor
                 await releaseObserver.Task;
             };
 
-            Task backupTask = manager.CreateLolPbeDirectoryBackupAsync(
+            Task backupTask = manager.CreateBackupAsync(
                 sourcePath,
                 destinationPath,
                 CancellationToken.None);
@@ -138,7 +165,7 @@ namespace AssetsManager.Tests.xUnit.Services.Monitor
             int eventCount = 0;
             manager.BackupsChanged += () => eventCount++;
 
-            await manager.CreateLolPbeDirectoryBackupAsync(sourcePath, backupPath, CancellationToken.None);
+            await manager.CreateBackupAsync(sourcePath, backupPath, CancellationToken.None);
             Assert.Equal(1, eventCount);
 
             await manager.CloneBackupAsync(backupPath, clonePath, CancellationToken.None);

@@ -37,11 +37,25 @@ namespace AssetsManager.Services.Monitor
 
         public readonly record struct BackupStorageEstimate(int FileCount, long TotalBytes, long AvailableBytes);
 
-        public async Task CreateLolPbeDirectoryBackupAsync(
-            string sourceLolPath,
-            string destinationBackupPath,
+        public Task CreateBackupAsync(
+            string sourcePath,
+            string destinationPath,
             CancellationToken cancellationToken,
-            string logMessage = "Starting backup...")
+            string logMessage = "Starting backup...") =>
+            CopyBackupAsync(sourcePath, destinationPath, cancellationToken, logMessage);
+
+        public Task CloneBackupAsync(
+            string sourcePath,
+            string destinationPath,
+            CancellationToken cancellationToken) =>
+            CopyBackupAsync(sourcePath, destinationPath, cancellationToken,
+                $"Cloning backup: {Path.GetFileName(sourcePath)}...");
+
+        private async Task CopyBackupAsync(
+            string sourcePath,
+            string destinationPath,
+            CancellationToken cancellationToken,
+            string logMessage)
         {
             BackupStarted?.Invoke(0);
             await Task.Run(async () =>
@@ -49,84 +63,29 @@ namespace AssetsManager.Services.Monitor
                 try
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-
-                    if (Directory.Exists(destinationBackupPath))
-                    {
-                        Directory.Delete(destinationBackupPath, true);
-                    }
-
+                    if (Directory.Exists(destinationPath)) Directory.Delete(destinationPath, true);
                     _logService.Log(logMessage);
-                    
-                    DirectoryMetrics metrics = MeasureDirectory(sourceLolPath, cancellationToken);
+                    DirectoryMetrics metrics = MeasureDirectory(sourcePath, cancellationToken);
                     BackupStarted?.Invoke(metrics.FileCount);
-
                     int processedFiles = 0;
-                    CopyDirectoryRecursive(sourceLolPath, destinationBackupPath, ref processedFiles, metrics.FileCount, cancellationToken);
-                    
-                    MarkCurrentSessionBackup(destinationBackupPath);
-                    await NotifyBackupCompletedAsync(true);
-                }
-                catch (OperationCanceledException)
-                {
-                    // Clean up partially created backup if cancelled
-                    if (Directory.Exists(destinationBackupPath))
-                    {
-                        try { Directory.Delete(destinationBackupPath, true); } 
-                        catch (Exception ex) { _logService.LogError(ex, "Could not clean up directory after cancelled operation."); }
-                    }
-                    await NotifyBackupCompletedAsync(false);
-                    throw;
-                }
-                catch (Exception ex)
-                {
-                    _logService.LogError(ex, $"Backup failed for source: {sourceLolPath}");
-                    await NotifyBackupCompletedAsync(false);
-                    throw; 
-                }
-            }, cancellationToken);
-        }
-
-        public async Task CloneBackupAsync(
-            string sourceBackupPath,
-            string destinationBackupPath,
-            CancellationToken cancellationToken)
-        {
-            BackupStarted?.Invoke(0);
-            await Task.Run(async () =>
-            {
-                try
-                {
+                    CopyDirectoryRecursive(sourcePath, destinationPath, ref processedFiles, metrics.FileCount, cancellationToken);
                     cancellationToken.ThrowIfCancellationRequested();
-
-                    if (Directory.Exists(destinationBackupPath))
-                    {
-                        Directory.Delete(destinationBackupPath, true);
-                    }
-
-                    _logService.Log($"Cloning backup: {Path.GetFileName(sourceBackupPath)}...");
-
-                    DirectoryMetrics metrics = MeasureDirectory(sourceBackupPath, cancellationToken);
-                    BackupStarted?.Invoke(metrics.FileCount);
-
-                    int processedFiles = 0;
-                    CopyDirectoryRecursive(sourceBackupPath, destinationBackupPath, ref processedFiles, metrics.FileCount, cancellationToken);
-
-                    MarkCurrentSessionBackup(destinationBackupPath);
+                    MarkCurrentSessionBackup(destinationPath);
                     await NotifyBackupCompletedAsync(true);
                 }
-                catch (OperationCanceledException)
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {
-                    if (Directory.Exists(destinationBackupPath))
+                    try
                     {
-                        try { Directory.Delete(destinationBackupPath, true); } 
-                        catch (Exception ex) { _logService.LogError(ex, "Could not clean up directory after failed/cancelled operation."); }
+                        if (Directory.Exists(destinationPath)) Directory.Delete(destinationPath, true);
                     }
+                    catch (Exception ex) { _logService.LogError(ex, "Could not clean up a cancelled backup."); }
                     await NotifyBackupCompletedAsync(false);
                     throw;
                 }
                 catch (Exception ex)
                 {
-                    _logService.LogError(ex, $"Error cloning backup: {sourceBackupPath} to {destinationBackupPath}");
+                    _logService.LogError(ex, $"Backup failed: {sourcePath} to {destinationPath}");
                     await NotifyBackupCompletedAsync(false);
                     throw;
                 }
@@ -240,7 +199,7 @@ namespace AssetsManager.Services.Monitor
                     backups.Add(new BackupModel
                     {
                         Name = Path.GetFileName(dir),
-                        DisplayName = GetBackupDisplayName(null, dir),
+                        DisplayName = GetBackupDisplayName(dir),
                         Version = version,
                         IsPbe = isPbe,
                         Path = dir,
@@ -350,12 +309,7 @@ namespace AssetsManager.Services.Monitor
             return null;
         }
 
-        private bool IsSameOrSubPath(string root, string sub)
-        {
-            return PathUtils.IsSameOrSubPath(root, sub);
-        }
-
-        private string GetBackupDisplayName(string folderName, string virtualPath)
+        private string GetBackupDisplayName(string virtualPath)
         {
             var (isPbe, _) = GetPathIdentification(virtualPath);
             return isPbe ? "League of Legends PBE" : "League of Legends LIVE";

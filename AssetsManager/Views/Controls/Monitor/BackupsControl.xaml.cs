@@ -1,7 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -24,7 +22,6 @@ namespace AssetsManager.Views.Controls.Monitor
     {
         // Public properties for dependency injection from the container
         public BackupManager BackupManager { get; set; }
-        public VersionService VersionService { get; set; }
         public LogService LogService { get; set; }
         public AppSettings AppSettings { get; set; }
         public CustomMessageBoxService CustomMessageBoxService { get; set; }
@@ -91,7 +88,19 @@ namespace AssetsManager.Views.Controls.Monitor
             _loadCancellation = null;
         }
 
-        private async void OnBackupsChanged() => await LoadBackupsAsync();
+        private async void OnBackupsChanged()
+        {
+            try
+            {
+                Task loadTask = await Dispatcher.InvokeAsync(() =>
+                    IsLoaded && !ViewModel.IsBusy ? LoadBackupsAsync() : Task.CompletedTask);
+                await loadTask;
+            }
+            catch (Exception ex)
+            {
+                LogService.LogError(ex, "Error refreshing the backup inventory.");
+            }
+        }
 
         private async void OnConfigurationSaved(object sender, EventArgs e)
         {
@@ -105,14 +114,17 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private async Task LoadBackupsAsync()
         {
-            if (BackupManager == null) return;
+            if (BackupManager == null || ViewModel.IsBusy) return;
 
             try
             {
                 _loadCancellation?.Cancel();
                 _loadCancellation?.Dispose();
                 _loadCancellation = new CancellationTokenSource();
-                var backups = await BackupManager.GetBackupsAsync(_loadCancellation.Token);
+                CancellationToken token = _loadCancellation.Token;
+                var backups = await BackupManager.GetBackupsAsync(token);
+                token.ThrowIfCancellationRequested();
+                if (!IsLoaded || ViewModel.IsBusy) return;
 
                 _loadedBackups.Clear();
                 _loadedBackups.AddRange(backups);
@@ -127,6 +139,7 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private async void DeleteSelectedBackups_Click(object sender, RoutedEventArgs e)
         {
+            if (ViewModel.IsBusy) return;
             var selectedBackups = ViewModel.AllBackups.Where(b => b.IsSelected && b.CanModify).ToList();
 
             if (!selectedBackups.Any())
@@ -136,28 +149,32 @@ namespace AssetsManager.Views.Controls.Monitor
             }
 
             var result = CustomMessageBoxService.ShowYesNo("Delete Backup", $"Are you sure you want to delete the selected backup? This action is irreversible.", Window.GetWindow(this));
-            if (result == true)
+            if (result != true) return;
+            BeginOperation();
+            try
             {
                 int deletedCount = 0;
                 foreach (var backup in selectedBackups)
-                {
-                    if (BackupManager.DeleteBackup(backup.Path))
-                    {
-                        ViewModel.AllBackups.Remove(backup);
-                        deletedCount++;
-                    }
-                }
-
-                if(deletedCount > 0)
-                {
-                    await LoadBackupsAsync();
+                    if (BackupManager.DeleteBackup(backup.Path)) deletedCount++;
+                if (deletedCount > 0)
                     CustomMessageBoxService.ShowInfo("Success", $"Successfully deleted {deletedCount} backup(s).", Window.GetWindow(this));
-                }
                 else
-                {
                     CustomMessageBoxService.ShowError("Error", "Could not delete the selected backups.", Window.GetWindow(this));
-                }
             }
+            finally { await FinishOperationAsync(); }
+        }
+
+        private void BeginOperation()
+        {
+            ViewModel.IsBusy = true;
+            // Keep intermediate copy/delete notifications out of the visible inventory.
+            _loadCancellation?.Cancel();
+        }
+
+        private async Task FinishOperationAsync()
+        {
+            ViewModel.IsBusy = false;
+            if (IsLoaded) await LoadBackupsAsync();
         }
 
         private void FilterOrSort_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -184,8 +201,7 @@ namespace AssetsManager.Views.Controls.Monitor
                 _ => query.OrderByDescending(backup => backup.CreationDate)
             };
             List<BackupModel> filteredBackups = query.ToList();
-            ViewModel.AllBackups.Clear();
-            foreach (BackupModel backup in filteredBackups) ViewModel.AllBackups.Add(backup);
+            ViewModel.AllBackups.ReplaceRange(filteredBackups);
 
             List<BackupModel> snapshots = filteredBackups.Where(backup => !backup.IsMainClient).ToList();
             ViewModel.TotalBackupsCount = snapshots.Count;
@@ -262,7 +278,7 @@ namespace AssetsManager.Views.Controls.Monitor
                 return;
             }
 
-            ViewModel.IsBusy = true;
+            BeginOperation();
             try
             {
                 var cancellationToken = TaskCancellationManager.PrepareNewOperation();
@@ -288,7 +304,7 @@ namespace AssetsManager.Views.Controls.Monitor
                 else
                 {
                     string logMsg = !string.IsNullOrEmpty(oldBackupPathToDelete) ? "Overwriting backup..." : "Creating backup...";
-                    await BackupManager.CreateLolPbeDirectoryBackupAsync(sourcePath, destinationPath, cancellationToken, logMsg);
+                    await BackupManager.CreateBackupAsync(sourcePath, destinationPath, cancellationToken, logMsg);
                 }
                 
                 if (!cancellationToken.IsCancellationRequested)
@@ -296,13 +312,13 @@ namespace AssetsManager.Views.Controls.Monitor
                     // SAFE-REFRESH: Delete old backup only after success
                     if (!string.IsNullOrEmpty(oldBackupPathToDelete) && destinationPath != oldBackupPathToDelete)
                     {
-                        BackupManager.DeleteBackup(oldBackupPathToDelete, false);
+                        if (!BackupManager.DeleteBackup(oldBackupPathToDelete, false))
+                            throw new IOException("The new snapshot was created, but the previous backup could not be removed.");
                     }
 
                     LogService.LogSuccess("Backup completed successfully.");
                     CustomMessageBoxService.ShowInfo("Backup", $"Operation completed successfully as:\n{System.IO.Path.GetFileName(destinationPath)}", Window.GetWindow(this));
                 }
-                await LoadBackupsAsync();
             }
             catch (OperationCanceledException)
             {
@@ -315,7 +331,7 @@ namespace AssetsManager.Views.Controls.Monitor
             }
             finally
             {
-                ViewModel.IsBusy = false;
+                await FinishOperationAsync();
             }
         }
 
