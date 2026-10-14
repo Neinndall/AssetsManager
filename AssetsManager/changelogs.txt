@@ -6,6 +6,7 @@ MAJOR UPDATE
 This hotfix separates the BIN diffing and WAD comparison work from the previous release line. It focuses on semantic BIN output, faster WAD comparisons, and the optional-value crash fix.
 
 New Features
+  - Hash Lab / GAME guessing discovers directory-named shaders, letter variants and unnumbered texture and animation filenames.
   - Hash Lab / BIN-referenced animation guessing now finds numbered actions with shortened filenames.
   - Hash Lab / Custom texture and animation guessing now substitutes words learned from the same directory to recover additional filenames.
   - Hash Lab / Shortened the completion message to show hashes resolved and saved.

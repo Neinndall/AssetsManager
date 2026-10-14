@@ -36,6 +36,20 @@ internal static class GamePatternLabDiagnostic
             m => Console.WriteLine($"MATCH {m.Hash:x16} {m.Path} [{m.SourceWadPath}]"));
         var timer = Stopwatch.StartNew();
         Console.WriteLine($"Pattern lab: {unknown.Count} unknowns, persistence disabled");
+        if (args.Contains("--remove-tokens", StringComparer.Ordinal))
+        {
+            var guesser = new GameHashGuesser(new HashFile(HashGuessDomain.Game, known.Values));
+            int count = guesser.RemoveBasenameTokens(engine, cancellation.Token);
+            Console.WriteLine($"Basename removal: {count:N0} checks; {engine.Matches.Count} matches; {timer.Elapsed.TotalSeconds:F1}s; no persistence");
+            return;
+        }
+        if (args.Contains("--shader-variants", StringComparer.Ordinal))
+        {
+            var guesser = new GameHashGuesser(new HashFile(HashGuessDomain.Game, known.Values));
+            int count = guesser.GuessShaderVariants(engine, cancellation.Token, rootDirectory: root);
+            Console.WriteLine($"Shader variants: {count:N0} checks; {engine.Matches.Count} matches; {timer.Elapsed.TotalSeconds:F1}s; no persistence");
+            return;
+        }
         if (args.Contains("--bin-animations", StringComparer.Ordinal))
         {
             var guesser = new GameHashGuesser(new HashFile(HashGuessDomain.Game, known.Values));

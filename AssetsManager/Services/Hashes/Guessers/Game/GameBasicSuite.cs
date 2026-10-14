@@ -134,6 +134,16 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                     }
                     tokenStart = tokenEnd + 1;
                 }
+                int counter = end;
+                while (counter > start && char.IsAsciiDigit(path[counter - 1])) counter--;
+                if (counter < end && counter > start && char.IsAsciiLetter(path[counter - 1]))
+                {
+                    engine.CheckNormalizedParts(path.AsSpan(0, counter), ReadOnlySpan<char>.Empty, path.AsSpan(end),
+                        HashGuessStrategy.WordlistVariant, "GAME basename token removal");
+                    checkedCount++;
+                    if ((checkedCount & 0x3FFF) == 0) progress?.Invoke(checkedCount);
+                    if (checkedCount >= candidateBudget || engine.RemainingUnknownCount == 0) return checkedCount;
+                }
             }
             return checkedCount;
         }
@@ -654,16 +664,28 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
 
             var shaderPattern = new Regex(@".*\.(?:[pv]s(?:_[23]_0)?|cs)(?=$|[.-])", RegexOptions.IgnoreCase | RegexOptions.Compiled);
             var shaderPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var directoryShaders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (string path in KnownPaths)
             {
                 Match match = shaderPattern.Match(path);
-                if (match.Success) shaderPaths.Add(match.Value);
+                if (!match.Success) continue;
+                shaderPaths.Add(match.Value);
+                if (!path.StartsWith("assets/shaders/", StringComparison.OrdinalIgnoreCase) &&
+                    !path.StartsWith("data/shaders/", StringComparison.OrdinalIgnoreCase)) continue;
+                int separator = match.Value.LastIndexOf('/');
+                string directory = match.Value[..separator];
+                string family = directory[(directory.LastIndexOf('/') + 1)..];
+                // Some families add a stage whose filename is the enclosing directory name.
+                foreach (string extension in ShaderExtensions)
+                    directoryShaders.Add($"{directory}/{family}{extension}");
             }
             AddExecutableShaderReferences(shaderPaths, rootDirectory, cancellationToken);
 
             int checkedCount = 0;
             foreach (string path in ProgressIterator(
-                         shaderPaths.OrderBy(value => value, StringComparer.Ordinal).ToList(),
+                         shaderPaths.OrderBy(value => value, StringComparer.Ordinal)
+                             .Concat(directoryShaders.Except(shaderPaths, StringComparer.OrdinalIgnoreCase)
+                                 .OrderBy(value => value, StringComparer.Ordinal)).ToList(),
                          value => value,
                          cancellationToken))
             {

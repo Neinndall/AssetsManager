@@ -43,6 +43,7 @@ internal sealed partial class GameHashGuesser
     {
         if (engine.RemainingUnknownCount == 0 || candidateBudget <= 0) return 0;
         long checkedCandidates = 0;
+        string[] variantLetters = Enumerable.Range('a', 26).Select(value => ((char)value).ToString()).ToArray();
         foreach (var family in paths.Distinct(StringComparer.Ordinal)
                      .GroupBy(path => path[..path.LastIndexOf('/')], StringComparer.Ordinal)
                      .OrderBy(group => group.Key, StringComparer.Ordinal))
@@ -83,6 +84,12 @@ internal sealed partial class GameHashGuesser
                         if (path.AsSpan(at, tokenEnd - at).Equals(replacement, StringComparison.Ordinal)) continue;
                         if (!Check(path.AsSpan(0, at), replacement, path.AsSpan(tokenEnd))) return Finish();
                     }
+                    // Number-letter names and initial 'a' variants can have uncatalogued letter siblings.
+                    if (tokenEnd - at >= 2 && char.IsAsciiLetterLower(path[tokenEnd - 1]) &&
+                        (path[tokenEnd - 1] == 'a' || char.IsAsciiDigit(path[tokenEnd - 2])))
+                        foreach (string letter in variantLetters)
+                            if (letter[0] != path[tokenEnd - 1] &&
+                                !Check(path.AsSpan(0, tokenEnd - 1), letter, path.AsSpan(tokenEnd))) return Finish();
                     if (separator < 0) break;
                     at = separator + 1;
                 }

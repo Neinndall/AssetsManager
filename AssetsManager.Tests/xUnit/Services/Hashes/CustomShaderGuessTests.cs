@@ -134,6 +134,28 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
             Assert.Contains(matches, m => m.Path == "assets/shaders/hlsl/ssao/ssao.cs-dx11_0");
         }
 
+        [Theory]
+        [InlineData("assets")]
+        [InlineData("data")]
+        public void ShaderStagesCanUseTheKnownDirectoryNameWithoutTheExactBaseFile(string root)
+        {
+            string directory = root + "/shaders/hlsl/example/";
+            string table = directory + "example.cs-dx11", compiled = table + "_0";
+            string unrelated = root + "/textures/example/example.cs-dx11";
+            var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong>
+            {
+                XxHash64Ext.Hash(table), XxHash64Ext.Hash(compiled), XxHash64Ext.Hash(unrelated)
+            });
+            var guesser = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
+            {
+                directory + "example_simple.ps-dx11",
+                root + "/textures/example/other.ps-dx11"
+            }));
+            guesser.GuessShaderVariants(engine, System.Threading.CancellationToken.None);
+            Assert.Equal(2, engine.Matches.Count);
+            Assert.Contains(XxHash64Ext.Hash(unrelated), engine.UnknownHashes);
+        }
+
         [Fact]
         public void GuessShaderVariants_DiscoversSmaaAndSsaoCrackedShaders()
         {

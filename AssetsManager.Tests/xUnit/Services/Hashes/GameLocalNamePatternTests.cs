@@ -115,4 +115,39 @@ public sealed class GameLocalNamePatternTests
         Assert.Equal(3L, reported);
         Assert.Throws<OperationCanceledException>(() => GameHashGuesser.SubstituteLocalNameWords(engine, paths, new CancellationToken(true)));
     }
+
+    [Theory]
+    [InlineData("spell4a.anm", "spell4f.anm")]
+    [InlineData("level7_arena_bencha_tx.tex", "level7_arena_benchb_tx.tex")]
+    [InlineData("level7_arena_bencha_tx.tex", "level7_arena_benchz_tx.tex")]
+    public void DiscoversLetterVariantsOnlyInTheSeedDirectory(string seed, string filename)
+    {
+        const string directory = "assets/characters/example/particles/";
+        var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong>
+        {
+            XxHash64Ext.Hash(directory + filename), XxHash64Ext.Hash("assets/characters/other/particles/" + filename)
+        });
+        long count = GameHashGuesser.SubstituteLocalNameWords(engine, new[] { directory + seed }, CancellationToken.None);
+        Assert.Equal(directory + filename, Assert.Single(engine.Matches).Value.Path);
+        Assert.Equal(count, engine.CheckedCandidates);
+        Assert.Equal(1, engine.RemainingUnknownCount);
+    }
+
+    [Theory]
+    [InlineData("greenblue2.tex", "greenblue.tex")]
+    [InlineData("greenblue12.dds", "greenblue.dds")]
+    [InlineData("cast02.anm", "cast.anm")]
+    public void BasicRemovalAlsoChecksTheUnnumberedFilenameWithoutChangingDirectoryCounters(string seed, string filename)
+    {
+        const string directory = "assets/characters/example/skins/skin301/";
+        var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong>
+        {
+            XxHash64Ext.Hash(directory + filename), XxHash64Ext.Hash(directory.Replace("skin301", "skin") + filename)
+        });
+        var guesser = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[] { directory + seed }));
+        int count = guesser.RemoveBasenameTokens(engine, CancellationToken.None);
+        Assert.Equal(directory + filename, Assert.Single(engine.Matches).Value.Path);
+        Assert.Equal(count, engine.CheckedCandidates);
+        Assert.Equal(1, engine.RemainingUnknownCount);
+    }
 }
