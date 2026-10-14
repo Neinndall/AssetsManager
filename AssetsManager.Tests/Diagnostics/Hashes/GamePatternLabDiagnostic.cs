@@ -36,6 +36,20 @@ internal static class GamePatternLabDiagnostic
             m => Console.WriteLine($"MATCH {m.Hash:x16} {m.Path} [{m.SourceWadPath}]"));
         var timer = Stopwatch.StartNew();
         Console.WriteLine($"Pattern lab: {unknown.Count} unknowns, persistence disabled");
+        if (args.Contains("--bin-animations", StringComparer.Ordinal))
+        {
+            var guesser = new GameHashGuesser(new HashFile(HashGuessDomain.Game, known.Values));
+            try
+            {
+                long count = guesser.GuessBinReferencedAnimations(engine, root, cancellation.Token);
+                Console.WriteLine($"BIN-directed animations: {count:N0} checks; {engine.Matches.Count} matches; {timer.Elapsed.TotalSeconds:F1}s; complete; no persistence");
+            }
+            catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+            {
+                Console.WriteLine($"BIN-directed animations: {engine.CheckedCandidates:N0} checks; {engine.Matches.Count} matches; time limit reached; coverage is partial; no persistence");
+            }
+            return;
+        }
         if (args.Contains("--custom-local", StringComparer.Ordinal))
         {
             var guesser = new GameHashGuesser(new HashFile(HashGuessDomain.Game, known.Values));

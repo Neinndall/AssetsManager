@@ -199,6 +199,11 @@ internal sealed partial class GameHashGuesser
                     }
                     foreach (string number in numbers)
                         if (!Check(path.AsSpan(0, end), number, ".anm")) return Finish();
+                    // A numbered clip can use the action stem without its learned trailing qualifier.
+                    int qualifier = path.LastIndexOf('_', end - 1);
+                    if (qualifier > start)
+                        foreach (string number in numbers)
+                            if (!Check(path.AsSpan(0, qualifier), number, ".anm")) return Finish();
                 }
             }
         }

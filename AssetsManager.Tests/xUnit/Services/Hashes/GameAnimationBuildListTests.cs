@@ -90,6 +90,31 @@ public sealed class GameAnimationBuildListTests
     }
 
     [Theory]
+    [InlineData("cast2", "cast_damage")]
+    [InlineData("cast02", "cast_damage")]
+    [InlineData("cast_02", "cast_damage")]
+    [InlineData("passive01", "passive_loop")]
+    public void NumberedActionCanReplaceItsTrailingQualifierInTheReferencedContainer(string action, string seed)
+    {
+        const string directory = "assets/characters/petexample/themes/base/animations/";
+        string target = directory + "petexample_base_" + action + ".anm";
+        string outside = target.Replace("/base/", "/other/").Replace("_base_", "_other_");
+        var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong>
+        {
+            XxHash64Ext.Hash(target), XxHash64Ext.Hash(outside)
+        });
+        var guesser = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
+        {
+            directory + "petexample_base_" + seed + ".anm"
+        }));
+        long count = guesser.SubstituteReferencedAnimationNames(engine,
+            new HashSet<(string, string)> { ("petexample", "base") }, CancellationToken.None);
+        Assert.Equal(target, Assert.Single(engine.Matches).Value.Path);
+        Assert.Contains(XxHash64Ext.Hash(outside), engine.UnknownHashes);
+        Assert.Equal(count, engine.CheckedCandidates);
+    }
+
+    [Theory]
     [InlineData(false, false)]
     [InlineData(true, false)]
     [InlineData(false, true)]
