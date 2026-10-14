@@ -16,7 +16,7 @@ internal sealed class VfxStencilScene
         var state = emitter.RenderState ?? VfxEmitterRenderState.Default;
         if (emitter.IsSimpleEmitter || emitter.HasResolvedCustomMaterial || state.StencilMode == 0 ||
             !VfxStencilSemantics.TryGetDescriptor(state.StencilMode, out var descriptor)) return;
-        if (!emitter.IsMeshPrimitive && !emitter.DrawsAsQuad && !emitter.DrawsAsTrail &&
+        if (!emitter.DrawsAsMesh && !emitter.DrawsAsQuad && !emitter.DrawsAsTrail &&
             !emitter.DrawsAsBeam && !emitter.DrawsAsProjection) return;
 
         if (state.StencilReferenceId != 0 && !_names.ContainsKey(state.StencilReferenceId))

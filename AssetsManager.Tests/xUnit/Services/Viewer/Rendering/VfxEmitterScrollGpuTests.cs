@@ -79,11 +79,13 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
                     TextureMultFlipU: mult && (flips & 1) != 0,
                     TextureMultFlipV: mult && (flips & 2) != 0,
                     TextureMultEmitterUvScrollRate: mult ? scroll : Vector2.Zero,
-                    Beam: new VfxBeamDefinition(0, 0, 1, VfxCurve3.Const(Vector3.One),
+                    Beam: new VfxBeamDefinition(0, 0, 2, VfxCurve3.Const(Vector3.One),
                         VfxCurve4.Const(Vector4.One), false, Vector3.Zero, Vector3.Zero),
                     Trail: new VfxTrailDefinition(VfxCurve3.Const(Vector3.One), 0, 0, 0, 0));
 
-                int count = trail ? 2 : 1;
+                if (primitive == VfxPrimitiveKind.CameraSegmentBeam)
+                    definition = definition with { ColorLookUpScales = new Vector2(0.5f), ColorLookUpTypeX = 0, ColorLookUpTypeY = 0 };
+                int count = trail || primitive == VfxPrimitiveKind.CameraSegmentBeam ? 2 : 1;
                 var instances = new float[count * VfxPlaybackRuntime.InstanceStride];
                 var emitter = new VfxPlaybackRuntime.EmitterState
                 {
@@ -109,9 +111,16 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
                         instances[at + 41] = -1;
                         instances[at + 43] = 1;
                     }
+                    if (emitter.Def.PrimitiveKind == VfxPrimitiveKind.CameraSegmentBeam)
+                    {
+                        instances[at + 20] = 0.5f;
+                        instances[at] = emitter.SystemOrigin.X;
+                        instances[at + 1] = emitter.SystemOrigin.Y;
+                        instances[at + 2] = emitter.SystemOrigin.Z;
+                    }
                     emitter.Particles.Add(new VfxPlaybackRuntime.Particle
                     {
-                        Serial = (uint)index, Life = 1, BirthFrame = Matrix4x4.Identity,
+                        Serial = (uint)index, Ordinal = (ushort)index, Life = 1, BirthFrame = Matrix4x4.Identity,
                         TrailTiling = trail ? new Vector3(2, 1, 0) : Vector3.Zero,
                         BirthRotation = primitive == VfxPrimitiveKind.ArbitraryTrail
                             ? new Vector3(0, 0, MathF.PI / 2) : Vector3.Zero
@@ -143,9 +152,11 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
                     renderer.GameParticleFallback(emitter, mesh));
                 // An interior linear texture encodes UV directly. A positive pan must add the
                 // same channel increments under every flip; beam packing transposes both axes.
-                bool transpose = primitive is VfxPrimitiveKind.Beam or VfxPrimitiveKind.CameraSegmentBeam;
-                int deltaR = mesh ? 0 : transpose ? 48 : 32;
-                int deltaG = mesh ? 0 : transpose ? 32 : 48;
+                bool transpose = primitive == VfxPrimitiveKind.Beam;
+                // Segment beams route colour lookup to the multiplier instead of scrolling it.
+                bool fixedLookup = primitive == VfxPrimitiveKind.CameraSegmentBeam && mult;
+                int deltaR = mesh || fixedLookup ? 0 : transpose ? 48 : 32;
+                int deltaG = mesh || fixedLookup ? 0 : transpose ? 32 : 48;
                 int[] interior = Enumerable.Range(0, 64 * 64).Where(at =>
                     before[at * 4] is > 32 and < 190 && before[at * 4 + 1] is > 32 and < 190 &&
                     before[at * 4 + 3] > 240).ToArray();

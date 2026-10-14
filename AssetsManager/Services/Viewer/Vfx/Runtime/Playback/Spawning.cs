@@ -127,6 +127,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 Age = age,
                 Life = life,
                 Serial = _particleSerial++,
+                Ordinal = s.Spawned,
                 TrailTiling = BirthVector(d.Trail?.BirthTilingSize ?? d.Beam?.BirthTilingSize, emitterT),
                 TrailBirthDistance = s.TrailDistance,
                 BirthSize = finalBirthSize,
@@ -151,6 +152,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             particle.Placed = MatrixTranslation(particle, s);
             particle.Pos = (d.ParticleIsLocalOrientation ? particle.Placed : Vector3.TransformNormal(particle.Placed, birthFrame)) + anchor;
             s.Particles.Add(particle);
+            s.Spawned = unchecked((ushort)(s.Spawned + 1));
             ParticleLifecycle?.Invoke(this, d, LifecycleInfo(s, s.Particles[^1], died: false));
         }
     }

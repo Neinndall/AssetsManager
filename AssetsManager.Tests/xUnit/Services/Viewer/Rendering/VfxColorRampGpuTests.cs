@@ -25,7 +25,10 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
             {
                 for (int driver = 0; driver <= 3; driver++)
                     yield return new object[] { primitive, driver, false, false };
-                if (primitive is not (VfxPrimitiveKind.Mesh or VfxPrimitiveKind.AttachedMesh))
+                if (primitive == VfxPrimitiveKind.CameraSegmentBeam)
+                    for (int driver = 0; driver <= 3; driver++)
+                        yield return new object[] { primitive, driver, true, false };
+                else if (primitive is not (VfxPrimitiveKind.Mesh or VfxPrimitiveKind.AttachedMesh))
                     yield return new object[] { primitive, 1, true, false };
                 else
                     for (int driver = 0; driver <= 3; driver++)
@@ -74,10 +77,10 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
                     ColorLookUpTypeY: vertical ? driver : 0,
                     ColorLookUpScales: vertical ? new Vector2(0.5f, 1) : new Vector2(1, 0.5f),
                     ColorLookUpOffsets: vertical ? new Vector2(0.35f, 0.15f) : new Vector2(0.15f, 0.35f),
-                    Beam: new VfxBeamDefinition(0, 0, 1, VfxCurve3.Const(Vector3.One),
+                    Beam: new VfxBeamDefinition(0, 0, 2, VfxCurve3.Const(Vector3.One),
                         VfxCurve4.Const(Vector4.One), false, Vector3.Zero, Vector3.Zero),
                     Trail: new VfxTrailDefinition(VfxCurve3.Const(Vector3.One), 0, 0, 0, 0));
-                int count = trail ? 2 : 1;
+                int count = trail || primitive == VfxPrimitiveKind.CameraSegmentBeam ? 2 : 1;
                 var instances = new float[count * VfxPlaybackRuntime.InstanceStride];
                 var emitter = new VfxPlaybackRuntime.EmitterState
                 {
@@ -99,9 +102,15 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
                     instances[at + 21] = instances[at + 22] = instances[at + 31] = instances[at + 32] = 1;
                     instances[at + 34] = 1;
                     instances[at + 36] = instances[at + 40] = instances[at + 44] = 1;
+                    if (emitter.Def.PrimitiveKind == VfxPrimitiveKind.CameraSegmentBeam)
+                    {
+                        instances[at] = emitter.SystemOrigin.X;
+                        instances[at + 1] = emitter.SystemOrigin.Y;
+                        instances[at + 2] = emitter.SystemOrigin.Z;
+                    }
                     emitter.Particles.Add(new VfxPlaybackRuntime.Particle
                     {
-                        Serial = (uint)index, Life = 1, BirthFrame = Matrix4x4.Identity,
+                        Serial = (uint)index, Ordinal = (ushort)index, Life = 1, BirthFrame = Matrix4x4.Identity,
                         TrailTiling = trail ? new Vector3(2, vertical && mult ? 0 : 1, 0) : Vector3.Zero,
                         BirthRotation = primitive == VfxPrimitiveKind.ArbitraryTrail
                             ? new Vector3(0, 0, MathF.PI / 2) : Vector3.Zero
@@ -124,7 +133,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
                 int[] lit = Enumerable.Range(0, 64 * 64)
                     .Where(at => pixels[at * 4] > 32 || pixels[at * 4 + 2] > 32).ToArray();
                 Assert.NotEmpty(lit);
-                if (mult)
+                if (mult && primitive != VfxPrimitiveKind.CameraSegmentBeam)
                 {
                     // MULT_PASS routes the quad/ribbon ramp through the varying mult UV, not particle age.
                     Assert.Contains(lit, at => pixels[at * 4] > 240 && pixels[at * 4 + 2] < 8);
@@ -132,7 +141,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
                 }
                 else
                 {
-                    // Fallback controls reverse age/speed to exercise non-default drivers; random is one in both paths.
+                    // Segment mult UV carries the lookup pair, so its ramp follows the same driver.
+                    // Fallback controls reverse age/speed; random is one in both paths.
                     int channel = (driver == 2 && !fallback) || (driver == 1 && fallback) ? 0 : 2;
                     int wrong = lit.Count(at => pixels[at * 4 + channel] < 240 || pixels[at * 4 + (2 - channel)] > 8);
                     int first = lit[0] * 4;

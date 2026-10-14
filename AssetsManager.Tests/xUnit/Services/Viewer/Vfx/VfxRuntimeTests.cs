@@ -5775,6 +5775,25 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.Equal(0.25f, geometry.Vertices[10], precision: 5);
         }
 
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void SegmentBeamCapsTotalBirthsEvenAfterItsRibsExpire(bool single)
+        {
+            var emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                IsMeshPrimitive = false, PrimitiveKind = VfxPrimitiveKind.CameraSegmentBeam,
+                IsSingleParticle = single, Rate = VfxCurveF.Const(1000), ParticleLifetime = VfxCurveF.Const(0.025f),
+                Beam = new VfxBeamDefinition(0, 0, 3, VfxCurve3.Const(Vector3.One), VfxCurve4.Const(Vector4.One), false, Vector3.Zero, Vector3.Zero)
+            };
+            var runtime = new VfxPlaybackRuntime(7);
+            runtime.SetSystem(new VfxSystemDefinition(1, "segments", "segments", new[] { emitter }), Vector3.Zero);
+            runtime.Update(0.01f);
+            Assert.Equal(3, runtime.LiveParticleCount);
+            for (int step = 0; step < 6; step++) runtime.Update(0.01f);
+            Assert.Equal(0, runtime.LiveParticleCount);
+        }
+
         [Fact]
         public void BeamLockedAlphaUsesIndexedCornersWithoutColorUvTransforms()
         {

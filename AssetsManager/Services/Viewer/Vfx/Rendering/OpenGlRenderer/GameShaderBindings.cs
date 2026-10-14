@@ -25,7 +25,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             if (emitter.DrawsAsProjection) return (false, false);
             bool depth = ShouldUseSoftParticles(emitter, true);
             if (!emitter.HasResolvedCustomMaterial || _gameShaders == null) return (depth, false);
-            var inputs = _gameShaders.ParticleSceneInputs(emitter, emitter.IsMeshPrimitive);
+            var inputs = _gameShaders.ParticleSceneInputs(emitter, emitter.DrawsAsMesh);
             return (depth || inputs.Depth, inputs.Color);
         }
 
@@ -51,7 +51,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         }
 
         private static bool HasParticleDraw(VfxPlaybackRuntime.EmitterState emitter) =>
-            emitter.InstanceCount > 0 && emitter.IsVisible && (!emitter.Def.IsMeshPrimitive || emitter.MeshVao != 0);
+            emitter.InstanceCount > 0 && emitter.IsVisible && (!emitter.Def.DrawsAsMesh || emitter.MeshVao != 0);
 
         private int ParticlePassCount(VfxPlaybackRuntime.EmitterState emitter, bool mesh, bool wireframe) =>
             wireframe || emitter.Def.DrawsAsProjection || !HasParticleDraw(emitter) || !HasGameParticleResources(emitter)
@@ -59,7 +59,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
 
         private bool ParticlePassTransparent(VfxPlaybackRuntime.EmitterState emitter, int pass, bool wireframe) =>
             HasParticleDraw(emitter) && IsParticlePassTransparent(emitter.Def, wireframe, !emitter.Def.DrawsAsProjection && emitter.Def.HasResolvedCustomMaterial
-                ? _gameShaders?.GetParticlePassState(emitter.Def, emitter.Def.IsMeshPrimitive, pass)?.BlendEnabled
+                ? _gameShaders?.GetParticlePassState(emitter.Def, emitter.Def.DrawsAsMesh, pass)?.BlendEnabled
                 : null);
 
         internal static bool IsParticlePassTransparent(VfxEmitterDefinition emitter, bool wireframe, bool? customBlend = null)

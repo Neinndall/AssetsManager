@@ -1,5 +1,6 @@
 using System.Numerics;
 using AssetsManager.Services.Viewer.Vfx.Runtime;
+using AssetsManager.Services.Viewer.Vfx.Semantics;
 using AssetsManager.Views.Models.Viewer;
 
 namespace AssetsManager.Services.Viewer.Vfx.Session
@@ -11,7 +12,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             if (_graphs.Count == 0 || _graphAttachments.Count > 0 || _spellSteps.Count > 0 || _activeSystem == null) return;
 
             var step = VfxRigMotion.Evaluate(
-                _rigSettings,
+                EffectiveRigSettings(),
                 _activeSystem.CurrentTime,
                 RigDuration,
                 _lastRigOrigin);
@@ -28,6 +29,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                 graph.IsStopped = step.IsStopped;
             }
         }
+
+        private VfxRigSettings EffectiveRigSettings()
+            => _rigSettings.Target == null && _rigSettings.MotionKind == VfxRigMotionKind.Still &&
+                VfxSystemRigResolver.BeamReach(_activeSystem?.Definition) is { } reach
+                    ? _rigSettings with { Target = new Vector3(0, 0, reach) } : _rigSettings;
 
         private void ApplySpellTransforms(double time)
         {

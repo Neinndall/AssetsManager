@@ -450,7 +450,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                     continue;
                 }
 
-                if (!emitter.Def.IsMeshPrimitive || string.IsNullOrWhiteSpace(emitter.Def.MeshPath))
+                if (!emitter.Def.DrawsAsMesh || string.IsNullOrWhiteSpace(emitter.Def.MeshPath))
                     continue;
 
                 VfxMeshData? mesh = _resources.ResolveMesh(

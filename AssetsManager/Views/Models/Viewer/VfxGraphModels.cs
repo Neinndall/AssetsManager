@@ -244,6 +244,11 @@ namespace AssetsManager.Views.Models.Viewer
         /// <summary>LTK drawKind.ts: a beam ribbon is suppressed when the same primitive names a mesh.</summary>
         public bool DrawsAsBeam => Beam is not null && string.IsNullOrWhiteSpace(MeshPath);
 
+        public bool DrawsAsBeamMesh => PrimitiveKind == VfxPrimitiveKind.Beam && Beam is not null &&
+            !string.IsNullOrWhiteSpace(MeshPath);
+
+        public bool DrawsAsMesh => IsMeshPrimitive || DrawsAsBeamMesh;
+
         public bool HasResolvedCustomMaterial =>
             CustomMaterial is not null && CustomMaterial.BindingKind != ModelMaterialBindingKind.Missing;
 
@@ -254,8 +259,7 @@ namespace AssetsManager.Views.Models.Viewer
         public bool DrawsAsDistortion => AssetsManager.Services.Viewer.Vfx.Semantics.VfxRenderPhaseSemantics.Resolve(this).Distorts;
 
         /// <summary>
-        /// Riot suppresses a beam's ribbon when its primitive also names a mesh. Because a beam
-        /// does not enter the mesh draw path either, that authored combination draws nothing.
+        /// A named mesh replaces a beam's ribbon; segment beams do not use that mesh path.
         /// </summary>
         public bool SuppressesBeamRibbon => Beam is not null && !DrawsAsBeam;
 

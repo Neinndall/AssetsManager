@@ -126,13 +126,13 @@ namespace AssetsManager.Views.Controls.Viewer
                 string meshPath = emitter.MeshPath;
 
                 BitmapSource tex = string.IsNullOrEmpty(texPath) ? null : VfxLoadingService.ResolveTexture(texPath, searchDir);
-                var mesh = emitter.IsMeshPrimitive
+                var mesh = emitter.DrawsAsMesh
                     ? VfxLoadingService.ResolveMesh(meshPath, searchDir)
                     : null;
 
                 (string textureStatus, Brush textureStatusBrush) = DescribeTextureStatus(emitter, tex);
 
-                string primKind = emitter.IsMeshPrimitive
+                string primKind = emitter.DrawsAsMesh
                     ? "MESH"
                     : (emitter.IsGroundLayer ? "GROUND" : (emitter.Trail != null ? "TRAIL" : "QUAD"));
 
@@ -150,12 +150,12 @@ namespace AssetsManager.Views.Controls.Viewer
                     TextureSources = DescribeTextureSources(emitter),
                     TextureStatus = textureStatus,
                     TextureStatusBrush = textureStatusBrush,
-                    MeshPath = emitter.IsMeshPrimitive ? (meshPath ?? "N/A") : "N/A",
-                    MeshStatus = emitter.IsMeshPrimitive ? (mesh != null ? "Resolved" : "MISSING") : "N/A",
-                    MeshStatusBrush = emitter.IsMeshPrimitive ? (mesh != null ? Brushes.LightGreen : Brushes.OrangeRed) : Brushes.Gray,
+                    MeshPath = emitter.DrawsAsMesh ? (meshPath ?? "N/A") : "N/A",
+                    MeshStatus = emitter.DrawsAsMesh ? (mesh != null ? "Resolved" : "MISSING") : "N/A",
+                    MeshStatusBrush = emitter.DrawsAsMesh ? (mesh != null ? Brushes.LightGreen : Brushes.OrangeRed) : Brushes.Gray,
                     BlendMode = GetBlendModeName(emitter.BlendMode),
                     TexDiv = $"{emitter.TexDiv.X} x {emitter.TexDiv.Y}",
-                    IsMeshPrimitive = emitter.IsMeshPrimitive,
+                    IsMeshPrimitive = emitter.DrawsAsMesh,
                     DisableBackfaceCull = emitter.RenderState?.DisableBackfaceCull ?? false
                 };
 

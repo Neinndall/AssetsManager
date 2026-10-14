@@ -236,7 +236,7 @@ namespace AssetsManager.Views.Controls.Viewer
                             !string.IsNullOrWhiteSpace(e.TextureMultPath) ||
                             !string.IsNullOrWhiteSpace(e.ParticleColorTexturePath) ||
                             !string.IsNullOrWhiteSpace(e.PaletteDefinition?.PaletteTexturePath)),
-                        MeshCount = playableEmitters.Count(e => e.IsMeshPrimitive)
+                        MeshCount = playableEmitters.Count(e => e.DrawsAsMesh)
                     };
                     _model.Systems.Add(item);
                 }

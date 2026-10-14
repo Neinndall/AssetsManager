@@ -63,6 +63,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                     child.IsStopped = true;
                 }
 
+                if (parent.Emitters.Count > 0) child.SetTarget(parent.Emitters[0].SystemTarget);
                 child.UpdateAtTime(deltaTime, _sourceTime);
                 StepChildrenOf(child, deltaTime);
             }

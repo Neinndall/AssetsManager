@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Numerics;
 using AssetsManager.Services.Viewer.Vfx.Composition;
 using AssetsManager.Services.Viewer.Vfx.Loading;
 using AssetsManager.Services.Viewer.Vfx.Session;
@@ -10,6 +11,21 @@ namespace AssetsManager.Services.Viewer.Vfx.Semantics;
 /// <summary>Chooses an isolated system's preview rig from authored usage and emission geometry.</summary>
 internal static class VfxSystemRigResolver
 {
+    internal static float? BeamReach(VfxSystemDefinition system)
+    {
+        var shown = system?.Emitters;
+        if (shown == null || !shown.Any(emitter => !emitter.Disabled && emitter.Beam != null)) return null;
+        float? reach = null;
+        foreach (var emitter in shown)
+        {
+            if (emitter.Disabled || emitter.Beam != null || emitter.EmitterPosition.Times?.Length > 0) continue;
+            Vector3 position = emitter.EmitterPosition.Constant;
+            if (position.Z < VfxRigMotion.ChampionHeight || new Vector2(position.X, position.Y).Length() > position.Z * 0.01f) continue;
+            reach = MathF.Max(reach ?? 0, position.Z);
+        }
+        return reach;
+    }
+
     internal static (VfxRigPreset Preset, string Reason) Resolve(
         VfxSystemDefinition system,
         VfxLoadingService.Bundle bundle,

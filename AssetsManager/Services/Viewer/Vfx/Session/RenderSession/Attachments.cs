@@ -7,6 +7,14 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
 {
     public sealed partial class VfxRenderSession
     {
+        internal static Vector3 AheadOf(Matrix4x4 anchor)
+        {
+            Vector3 forward = Vector3.TransformNormal(Vector3.UnitZ, anchor);
+            forward.Y = 0;
+            forward = VectorMathUtils.NormalizeOr(forward, Vector3.UnitZ);
+            return anchor.Translation + forward * VfxRigMotion.TargetReach;
+        }
+
         public void UpdateBoneTransforms(Func<string, uint, Matrix4x4?> boneTransformProvider)
         {
             bool sourceChanged = _boneTransformSampler is null && !Equals(_boneTransformProvider, boneTransformProvider);
@@ -73,7 +81,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                         Vector3 target = targetBoneMatrix.HasValue
                             ? Vector3.Transform(PrepareBoneTransform(targetBoneMatrix.Value).Translation, authoredWorld)
                             : Vector3.Transform(
-                                boneTransform.Translation + new Vector3(VfxRigMotion.TargetReach, 0f, 0f),
+                                AheadOf(boneTransform),
                                 authoredWorld);
                         graph.SetTarget(target);
                         continue;
@@ -93,7 +101,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                     Vector3 fallbackTarget = targetBoneMatrix.HasValue
                         ? Vector3.Transform(PrepareBoneTransform(targetBoneMatrix.Value).Translation, fallbackWorld)
                         : Vector3.Transform(
-                            fallbackPlacement.Translation + new Vector3(VfxRigMotion.TargetReach, 0f, 0f),
+                            AheadOf(fallbackPlacement),
                             fallbackWorld);
                     graph.SetTarget(fallbackTarget);
                     continue;

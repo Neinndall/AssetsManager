@@ -216,6 +216,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 particleCapacity);
             RegisterChildCapacity(runtime, particleCapacity);
             RegisterParent(runtime, parentRuntime);
+            if (parentRuntime.Emitters.Count > 0)
+                runtime.SetTarget(parentRuntime.Emitters[0].SystemTarget);
             _pendingChildren.Add(runtime);
 
             if (!carried)

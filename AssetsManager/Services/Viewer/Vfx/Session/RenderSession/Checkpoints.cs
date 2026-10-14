@@ -64,7 +64,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
 
         private void ReplayRigLoopAtStart()
         {
-            VfxRigStep start = VfxRigMotion.Evaluate(_rigSettings, 0d, RigDuration);
+            VfxRigStep start = VfxRigMotion.Evaluate(EffectiveRigSettings(), 0d, RigDuration);
             _lastRigOrigin = start.Origin;
 
             foreach (VfxPlaybackGraphRuntime graph in _graphs)

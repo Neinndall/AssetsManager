@@ -546,7 +546,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
 
             VfxPlaybackRuntime root = Assert.Single(session.Graphs).Root;
             Assert.Equal(Vector3.Zero, root.WorldTransform.Translation);
-            Assert.Equal(new Vector3(600f, 0f, 0f), Assert.Single(root.Emitters).SystemTarget);
+            Assert.Equal(new Vector3(0f, 0f, 600f), Assert.Single(root.Emitters).SystemTarget);
         }
 
         [Fact]

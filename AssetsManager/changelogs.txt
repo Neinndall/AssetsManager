@@ -3,6 +3,7 @@
 AssetsManager - League of Legends | v4.1.0.1
 
 New Features
+  - 3D Studio / VFX preview now draws stretched beam meshes and particle-driven segment beams.
   - 3D Studio / Use Open/Add to load multiple project folders with separate trees and shared search; Remove from project preserves files and open scenes.
 
 Improvements
