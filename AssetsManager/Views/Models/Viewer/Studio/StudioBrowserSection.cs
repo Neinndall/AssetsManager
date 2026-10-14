@@ -29,6 +29,8 @@ namespace AssetsManager.Views.Models.Viewer
         public string Title { get; }
         public string Subtitle { get; }
         public StudioBrowserFolderKind Kind { get; }
+        public string ProjectFolderPath { get; init; }
+        public bool IsProjectFolder => ProjectFolderPath != null;
         public ObservableCollection<object> Children { get; } = new();
 
         private bool _isExpanded;

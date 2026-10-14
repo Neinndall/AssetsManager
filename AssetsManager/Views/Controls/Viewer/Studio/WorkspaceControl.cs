@@ -124,7 +124,7 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             string logical = InstallationMapCatalog.BackdropKey(source);
             if (!string.IsNullOrWhiteSpace(logical))
-                return $"map:{logical}";
+                return $"map:{source?.ProjectRoot}:{logical}";
             return $"map:{source?.SelectedMapFilePath ?? string.Empty}";
         }
 
@@ -184,7 +184,10 @@ namespace AssetsManager.Views.Controls.Viewer
                 return null;
 
             string wantedKey = variant.Map.Value?.Trim().ToLowerInvariant();
+            string resourceRoot = _mapSceneRuntime?.Scene?.Source?.ProjectRoot ??
+                _model.SelectedCharacterBackdrop?.Source?.ProjectRoot ?? _model.RootPath;
             CharacterBackdropOption option = _model.CharacterBackdrops.FirstOrDefault(candidate =>
+                string.Equals(candidate?.Source?.ProjectRoot, resourceRoot, StringComparison.OrdinalIgnoreCase) &&
                 string.Equals(
                     InstallationMapCatalog.BackdropKey(candidate?.Source),
                     wantedKey,
@@ -192,8 +195,8 @@ namespace AssetsManager.Views.Controls.Viewer
             if (option?.Source != null)
                 return option.Source;
 
-            string selectedFile = SelectedMapFileFor(variant.Map, _model.RootPath);
-            return new MapSceneSource(variant.Map, selectedFile, _model.RootPath);
+            string selectedFile = SelectedMapFileFor(variant.Map, resourceRoot);
+            return new MapSceneSource(variant.Map, selectedFile, resourceRoot);
         }
 
         private void RetargetMapWorkspaceTab(StudioWorkspaceTab tab, MapSceneSource source)

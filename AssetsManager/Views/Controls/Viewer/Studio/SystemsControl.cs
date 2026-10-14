@@ -74,7 +74,7 @@ namespace AssetsManager.Views.Controls.Viewer
             _model.Textures.Clear();
             _model.LogMessages.Add($"[INSPECT] Selected VFX: {systemItem.Name} (Hash: 0x{systemItem.PathHash:X8})");
 
-            string searchDir = _model.RootPath;
+            string searchDir = _model.SelectedSkin?.ResourceRoot ?? _model.RootPath;
             if (!string.IsNullOrEmpty(searchDir) && File.Exists(searchDir))
             {
                 searchDir = Path.GetDirectoryName(searchDir) ?? searchDir;

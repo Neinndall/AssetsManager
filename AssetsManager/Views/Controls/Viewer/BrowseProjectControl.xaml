@@ -13,6 +13,11 @@
         </Style>
         <HierarchicalDataTemplate DataType="{x:Type models:ProjectBrowserFolder}" ItemsSource="{Binding Children}" ItemContainerStyle="{StaticResource ProjectFolderStyle}">
             <StackPanel Orientation="Horizontal" ToolTip="{Binding FullPath}">
+                <StackPanel.ContextMenu>
+                    <ContextMenu>
+                        <MenuItem Header="Remove from project" Click="RemoveFolder_Click" Visibility="{Binding IsRoot, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                    </ContextMenu>
+                </StackPanel.ContextMenu>
                 <icons:MaterialIcon Kind="FolderOutline" Width="14" Height="14" Foreground="{StaticResource AccentOrange}" Margin="0,0,7,0"/>
                 <TextBlock Text="{Binding Name}" FontSize="10.5" TextTrimming="CharacterEllipsis"/>
             </StackPanel>

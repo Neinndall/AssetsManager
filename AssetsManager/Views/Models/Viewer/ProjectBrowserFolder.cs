@@ -1,20 +1,22 @@
 using System.Collections;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
-using System.Threading.Tasks;
 using System.Threading;
+using System.Threading.Tasks;
 using AssetsManager.Utils.Framework;
 using AssetsManager.Views.Helpers;
 
 namespace AssetsManager.Views.Models.Viewer
 {
-    public sealed class ProjectBrowserFolder(string fullPath) : INotifyPropertyChanged, ISelectableTreeNode
+    public sealed class ProjectBrowserFolder(string fullPath, string rootPath = null) : INotifyPropertyChanged, ISelectableTreeNode
     {
         public string FullPath { get; } = fullPath;
+        public string RootPath { get; } = rootPath ?? fullPath;
         public string Name => FullPath == null ? "Loading..." : System.IO.Path.GetFileName(System.IO.Path.TrimEndingDirectorySeparator(FullPath));
         public ObservableRangeCollection<ProjectBrowserFolder> Children { get; } = new();
         public IEnumerable SelectionChildren => Children;
         public bool IsSelectionVisible => FullPath != null;
+        public bool IsRoot => FullPath != null && string.Equals(FullPath, RootPath, System.StringComparison.OrdinalIgnoreCase);
         internal bool IsLoaded { get; set; }
         internal Task LoadingTask { get; set; }
         internal CancellationToken LoadingToken { get; set; }
@@ -34,10 +36,10 @@ namespace AssetsManager.Views.Models.Viewer
             get => _isMultiSelected;
             set { if (_isMultiSelected == value) return; _isMultiSelected = value; OnPropertyChanged(); }
         }
-        internal static ProjectBrowserFolder Create(string path)
+        internal static ProjectBrowserFolder Create(string path, string rootPath = null)
         {
-            var folder = new ProjectBrowserFolder(path);
-            folder.Children.Add(new ProjectBrowserFolder(null));
+            var folder = new ProjectBrowserFolder(path, rootPath);
+            folder.Children.Add(new ProjectBrowserFolder(null, folder.RootPath));
             return folder;
         }
         public event PropertyChangedEventHandler PropertyChanged;

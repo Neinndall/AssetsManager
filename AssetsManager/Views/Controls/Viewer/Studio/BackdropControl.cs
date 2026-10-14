@@ -56,6 +56,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 StudioWorkspaceTab tab = _model.SelectedWorkspaceTab;
                 string key = InstallationMapCatalog.BackdropKey(source);
                 CharacterBackdropOption option = _model.CharacterBackdrops.FirstOrDefault(candidate =>
+                    string.Equals(candidate?.Source?.ProjectRoot, source.ProjectRoot, StringComparison.OrdinalIgnoreCase) &&
                     string.Equals(
                         InstallationMapCatalog.BackdropKey(candidate?.Source),
                         key,

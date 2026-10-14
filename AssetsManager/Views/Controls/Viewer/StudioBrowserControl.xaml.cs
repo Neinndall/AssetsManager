@@ -14,6 +14,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void AddSkinToScene_Click(object sender, RoutedEventArgs e) => Owner?.AddSkinToScene_Click(sender, e);
         private void BrowseRoot_Click(object sender, RoutedEventArgs e) => Owner?.BrowseRoot_Click(sender, e);
+        private void RemoveFolder_Click(object sender, RoutedEventArgs e) => Owner?.RemoveFolder_Click(sender, e);
         private void BrowserItem_Expanded(object sender, RoutedEventArgs e) => Owner?.BrowserItem_Expanded(sender, e);
         private void CloseProject_Click(object sender, RoutedEventArgs e) => Owner?.CloseProject_Click(sender, e);
         private void ExitStudio_Click(object sender, RoutedEventArgs e) => Owner?.ExitStudio_Click(sender, e);

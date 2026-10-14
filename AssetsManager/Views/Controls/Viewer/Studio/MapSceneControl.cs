@@ -61,6 +61,13 @@ namespace AssetsManager.Views.Controls.Viewer
                 MapSceneRuntime previous = _mapSceneRuntime;
                 _mapSceneRuntime = staged;
                 _mapSceneIsCharacterBackdrop = asCharacterBackdrop;
+                if (source.ProjectRoot != null && _projectFolders.TryGetValue(source.ProjectRoot, out ProjectFolderCatalog folder) &&
+                    !string.Equals(previous?.Scene?.Source?.ProjectRoot, source.ProjectRoot, StringComparison.OrdinalIgnoreCase))
+                {
+                    _suppressMapVariantReload = true;
+                    try { _model.SetMapVariants(folder.Catalog.MapVariants); }
+                    finally { _suppressMapVariantReload = false; }
+                }
                 SyncSelectedMapVariant(source);
                 _mapSkyCube = null;
                 _skyCubeDirty = true;
@@ -500,6 +507,7 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 _model.BrowserRoots.Insert(0, root);
                 RefreshMapBrowserVisibility(root);
+                RefreshProjectBrowserSearch();
             }
         }
 

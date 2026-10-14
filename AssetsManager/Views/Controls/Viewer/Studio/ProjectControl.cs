@@ -14,6 +14,31 @@ namespace AssetsManager.Views.Controls.Viewer
 {
     public partial class StudioControl
     {
+        private sealed record ProjectFolderCatalog(
+            StudioProjectCatalog.BrowserCatalog Catalog,
+            StudioBrowserFolder BrowserRoot,
+            IReadOnlyList<MapSceneSource> InstallationMaps);
+
+        private readonly Dictionary<string, ProjectFolderCatalog> _projectFolders = new(StringComparer.OrdinalIgnoreCase);
+
+        internal void RemoveFolder_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is FrameworkElement { DataContext: StudioBrowserFolder { ProjectFolderPath: not null } folder })
+                RemoveProjectFolder(folder.ProjectFolderPath);
+        }
+
+        private void RemoveProjectFolder(string path)
+        {
+            if (!_projectFolders.Remove(path, out ProjectFolderCatalog folder)) return;
+            _scanCancellation?.Cancel();
+            _model.BrowserRoots.Remove(folder.BrowserRoot);
+            foreach (StudioSkinItem skin in folder.Catalog.Entries) _model.DetectedSkins.Remove(skin);
+            _model.SetProjectFolders(_projectFolders.Keys);
+            RebuildProjectBackdrops();
+            RefreshProjectBrowserSearch();
+            _model.StatusText = "Folder removed from project. Open scenes remain available.";
+        }
+
         internal void OpenChromaLibrary_Click(object sender, RoutedEventArgs e)
             => OpenChromaLibrary();
 
@@ -126,6 +151,8 @@ namespace AssetsManager.Views.Controls.Viewer
             _model.SelectedSkin = null;
             _model.DetectedSkins.Clear();
             _model.BrowserRoots.Clear();
+            _projectFolders.Clear();
+            _model.SetProjectFolders(Array.Empty<string>());
             _suppressMapVariantReload = true;
             try
             {
@@ -148,7 +175,6 @@ namespace AssetsManager.Views.Controls.Viewer
                 _isApplyingCharacterViewportState = false;
             }
             _model.NotifyCharacterCollectionsChanged();
-            _model.RootPath = string.Empty;
             _model.SearchQuery = string.Empty;
             _model.EmitterFilterText = string.Empty;
             _model.CurrentTime = 0;
@@ -163,15 +189,23 @@ namespace AssetsManager.Views.Controls.Viewer
             ResetCameraToConfiguredPreset();
         }
 
-        internal void BrowseRoot_Click(object sender, RoutedEventArgs e)
+        internal async void BrowseRoot_Click(object sender, RoutedEventArgs e)
         {
+            if (_isCleanedUp || _model.IsProjectLoading) return;
+            bool adding = _model.HasProject;
+            var owner = Window.GetWindow(this);
             var dialog = new OpenFolderDialog
             {
-                Title = "Open 3D Studio project folder"
+                Title = adding ? "Add folder to 3D Studio project" : "Open 3D Studio project folder",
+                InitialDirectory = _model.RootPath ?? string.Empty
             };
-
-            if (dialog.ShowDialog() == true)
-                LoadExtractedContainer(dialog.FolderName);
+            bool? accepted = dialog.ShowDialog(owner);
+            owner?.Activate();
+            if (accepted != true) return;
+            string path = Path.TrimEndingDirectorySeparator(Path.GetFullPath(dialog.FolderName));
+            if (!adding) LoadExtractedContainer(path);
+            else if (_projectFolders.ContainsKey(path)) _model.StatusText = "This folder is already in the project.";
+            else await ScanRootDirectoryAsync(path);
         }
 
         private void RootPathTextBox_KeyDown(object sender, KeyEventArgs e)
@@ -185,7 +219,7 @@ namespace AssetsManager.Views.Controls.Viewer
             if (string.IsNullOrWhiteSpace(rootFolder) || !Directory.Exists(rootFolder) || _isCleanedUp)
                 return;
 
-            string fullRoot = Path.GetFullPath(rootFolder);
+            string fullRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(rootFolder));
             ReleaseCurrentProject();
             _model.RootPath = fullRoot;
             if (AppSettings != null)
@@ -207,7 +241,8 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private async Task<bool> ScanRootDirectoryAsync(string rootFolder)
         {
-            if (!Directory.Exists(rootFolder)) return false;
+            rootFolder = Path.TrimEndingDirectorySeparator(Path.GetFullPath(rootFolder));
+            if (!Directory.Exists(rootFolder) || _projectFolders.ContainsKey(rootFolder)) return false;
             _scanCancellation?.Cancel();
             _scanCancellation = new System.Threading.CancellationTokenSource();
             var operation = _scanCancellation;
@@ -240,56 +275,28 @@ namespace AssetsManager.Views.Controls.Viewer
                         LogService),
                     operation.Token);
                 if (operation.IsCancellationRequested || _isCleanedUp || !ReferenceEquals(_scanCancellation, operation)) return false;
-                _model.DetectedSkins.Clear();
-                _model.BrowserRoots.Clear();
-                _model.CharacterBackdrops.Clear();
-
-                // Project geometry is listed first and wins for the same logical MapPath. Installation
-                // choices then fill the rest so a Character-only project can still use Map11/other maps.
-                var backdropKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                foreach (MapSceneSource mapSource in catalog.MapSources)
+                var projectRoot = new StudioBrowserFolder(
+                    Path.GetFileName(Path.TrimEndingDirectorySeparator(rootFolder)) is { Length: > 0 } name ? name : rootFolder,
+                    StudioBrowserFolderKind.Root)
                 {
-                    string key = InstallationMapCatalog.BackdropKey(mapSource);
-                    if (string.IsNullOrWhiteSpace(key) || !backdropKeys.Add(key)) continue;
-                    _model.CharacterBackdrops.Add(new CharacterBackdropOption(
-                        InstallationMapCatalog.Label(mapSource, projectSource: true),
-                        mapSource));
-                }
-                foreach (MapSceneSource mapSource in installationMaps)
+                    ProjectFolderPath = rootFolder,
+                    IsExpanded = true
+                };
+                foreach (StudioBrowserFolder semanticRoot in catalog.Roots) projectRoot.Children.Add(semanticRoot);
+                _projectFolders.Add(rootFolder, new(catalog, projectRoot, installationMaps));
+                foreach (StudioSkinItem entry in catalog.Entries) _model.DetectedSkins.Add(entry);
+                _model.BrowserRoots.Add(projectRoot);
+                _model.SetProjectFolders(_projectFolders.Keys);
+                RebuildProjectBackdrops();
+                if (!_model.HasMapPreview)
                 {
-                    string key = InstallationMapCatalog.BackdropKey(mapSource);
-                    if (string.IsNullOrWhiteSpace(key) || !backdropKeys.Add(key)) continue;
-                    _model.CharacterBackdrops.Add(new CharacterBackdropOption(
-                        InstallationMapCatalog.Label(mapSource, projectSource: false),
-                        mapSource));
+                    _suppressMapVariantReload = true;
+                    try { _model.SetMapVariants(_projectFolders.Values.SelectMany(folder => folder.Catalog.MapVariants)); }
+                    finally { _suppressMapVariantReload = false; }
                 }
-                _model.NotifyCharacterCollectionsChanged();
-                foreach (StudioSkinItem entry in catalog.Entries)
-                {
-                    // Never carry expansion state into a freshly discovered project tree.
-                    entry.IsExpanded = false;
-                    _model.DetectedSkins.Add(entry);
-                }
-                foreach (StudioBrowserFolder rootNode in catalog.Roots)
-                    _model.BrowserRoots.Add(rootNode);
-
-                _suppressMapVariantReload = true;
-                try
-                {
-                    _model.SetMapVariants(catalog.MapVariants);
-                }
-                finally
-                {
-                    _suppressMapVariantReload = false;
-                }
-
-                _model.ProjectBrowserMessage = "No previewable assets were found in this folder.";
-                StudioBrowserFolder charactersRoot = catalog.Roots.FirstOrDefault(root =>
-                    string.Equals(root.Title, "Characters", StringComparison.Ordinal));
-                int characterCount = charactersRoot?.Children.OfType<StudioBrowserFolder>().Count() ?? 0;
-                _model.StatusText = catalog.MapSources.Count > 0
-                    ? $"Found {catalog.MapSources.Count} map assets and {catalog.Entries.Count} BIN entries across {characterCount} characters. Select a map asset to load it."
-                    : $"Found {catalog.Entries.Count} BIN entries across {characterCount} characters.";
+                RefreshProjectBrowserSearch();
+                _model.ProjectBrowserMessage = "No previewable assets were found in the project folders.";
+                _model.StatusText = $"Added {projectRoot.Title}: {catalog.Entries.Count} BIN entries and {catalog.MapSources.Count} map assets.";
                 return true;
             }
             catch (OperationCanceledException)
@@ -315,6 +322,40 @@ namespace AssetsManager.Views.Controls.Viewer
                 }
                 operation.Dispose();
             }
+        }
+
+        private void RebuildProjectBackdrops()
+        {
+            var choices = new List<CharacterBackdropOption>();
+            var projectKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (ProjectFolderCatalog folder in _projectFolders.Values)
+                foreach (MapSceneSource source in folder.Catalog.MapSources)
+                {
+                    string key = InstallationMapCatalog.BackdropKey(source);
+                    projectKeys.Add(key);
+                    choices.Add(new CharacterBackdropOption(
+                        $"{folder.BrowserRoot.Title} - {InstallationMapCatalog.Label(source, projectSource: true)}", source));
+                }
+            foreach (MapSceneSource source in _projectFolders.Values.SelectMany(folder => folder.InstallationMaps))
+            {
+                string key = InstallationMapCatalog.BackdropKey(source);
+                if (string.IsNullOrWhiteSpace(key) || !projectKeys.Add(key)) continue;
+                choices.Add(new CharacterBackdropOption(InstallationMapCatalog.Label(source, projectSource: false), source));
+            }
+            CharacterBackdropOption selected = _model.SelectedCharacterBackdrop;
+            // Running tabs retain their resource source even when its folder leaves the browser.
+            if (selected != null && !choices.Any(choice => choice.Source == selected.Source)) choices.Insert(0, selected);
+            for (int index = 0; index < choices.Count; index++)
+                choices[index] = _model.CharacterBackdrops.FirstOrDefault(option => option.Source == choices[index].Source) ?? choices[index];
+            foreach (CharacterBackdropOption obsolete in _model.CharacterBackdrops.Where(option => !choices.Contains(option)).ToArray())
+                _model.CharacterBackdrops.Remove(obsolete);
+            for (int index = 0; index < choices.Count; index++)
+            {
+                int current = _model.CharacterBackdrops.IndexOf(choices[index]);
+                if (current < 0) _model.CharacterBackdrops.Insert(index, choices[index]);
+                else if (current != index) _model.CharacterBackdrops.Move(current, index);
+            }
+            _model.NotifyCharacterCollectionsChanged();
         }
 
         private static string SelectedMapFileFor(MapPath map, string rootFolder)

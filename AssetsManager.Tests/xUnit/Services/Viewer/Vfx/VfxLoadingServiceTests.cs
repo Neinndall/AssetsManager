@@ -1030,6 +1030,25 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void FolderCatalogPreservesEachExtractionResourceRootForIdenticalSkinPaths()
+        {
+            string root = Directory.CreateTempSubdirectory("am-project-roots-").FullName;
+            try
+            {
+                string first = Directory.CreateDirectory(Path.Combine(root, "first")).FullName;
+                string second = Directory.CreateDirectory(Path.Combine(root, "second")).FullName;
+                WriteSkinBin(Path.Combine(first, "skin0.bin"));
+                WriteSkinBin(Path.Combine(second, "skin0.bin"));
+                StudioSkinItem firstSkin = Assert.Single(StudioProjectCatalog.Scan(first, System.Threading.CancellationToken.None));
+                StudioSkinItem secondSkin = Assert.Single(StudioProjectCatalog.Scan(second, System.Threading.CancellationToken.None));
+                Assert.Equal(first, firstSkin.ResourceRoot);
+                Assert.Equal(second, secondSkin.ResourceRoot);
+                Assert.NotEqual(firstSkin.BinPath, secondSkin.BinPath);
+            }
+            finally { Directory.Delete(root, recursive: true); }
+        }
+
+        [Fact]
         public void FolderCatalogLabelsSkinsAndChromasFromTheirOwnAssetFolders()
         {
             string root = Path.Combine(Path.GetTempPath(), $"AssetsManagerSkinKinds_{Guid.NewGuid():N}");

@@ -79,6 +79,38 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer
             Assert.Equal(1, recent.Count(path => path.Equals(paths[3], StringComparison.OrdinalIgnoreCase)));
         }
 
+        [Fact]
+        public void MultiRootSearchKeepsIdenticallyNamedFilesAndDeduplicatesOverlappingRoots()
+        {
+            string first = Directory.CreateDirectory(Path.Combine(_root, "first")).FullName;
+            string second = Directory.CreateDirectory(Path.Combine(_root, "second")).FullName;
+            string nested = Directory.CreateDirectory(Path.Combine(first, "nested")).FullName;
+            string firstFile = Path.Combine(nested, "match.dds"), secondFile = Path.Combine(second, "match.dds");
+            File.WriteAllText(firstFile, "");
+            File.WriteAllText(secondFile, "");
+            var result = ProjectBrowserService.Search(new[] { first, second, nested }, "MATCH", CancellationToken.None);
+            Assert.Equal(2, result.Files.Count);
+            Assert.Contains(result.Files, file => file.FullPath == firstFile);
+            Assert.Contains(result.Files, file => file.FullPath == secondFile);
+            Assert.False(result.IsTruncated);
+            Assert.Equal(nested, ProjectBrowserService.FindRoot(new[] { first, second, nested }, firstFile));
+            Assert.Null(ProjectBrowserService.FindRoot(new[] { first, second }, _root));
+        }
+
+        [Fact]
+        public void MultiRootSearchSharesOneResultLimitAndHonorsCancellation()
+        {
+            string first = Directory.CreateDirectory(Path.Combine(_root, "first")).FullName;
+            string second = Directory.CreateDirectory(Path.Combine(_root, "second")).FullName;
+            for (int i = 0; i <= ProjectBrowserService.SearchLimit; i++)
+                File.WriteAllText(Path.Combine(i < 500 ? first : second, $"match{i}.txt"), "");
+            var result = ProjectBrowserService.Search(new[] { first, second }, "match", CancellationToken.None);
+            Assert.Equal(ProjectBrowserService.SearchLimit, result.Files.Count);
+            Assert.True(result.IsTruncated);
+            Assert.Throws<OperationCanceledException>(() => ProjectBrowserService.Search(
+                new[] { first, second }, "match", new CancellationToken(true)));
+        }
+
         public void Dispose() => Directory.Delete(_root, recursive: true);
     }
 }

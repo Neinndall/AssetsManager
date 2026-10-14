@@ -28,7 +28,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
             if (_championModel == null || !ReferenceEquals(_championBundle, _activeBundle))
             {
-                TryLoadChampionModelAsync(_model.RootPath);
+                TryLoadChampionModelAsync(_model.SelectedSkin?.ResourceRoot ?? _model.RootPath);
                 return;
             }
 
