@@ -5,7 +5,6 @@ using AssetsManager.Views.Models.Shared;
 using AssetsManager.Views.Settings;
 using AssetsManager.Views.Helpers;
 using AssetsManager.Utils;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace AssetsManager.Views
 {
@@ -16,7 +15,6 @@ namespace AssetsManager.Views
 
     public partial class SettingsWindow : HudWindow
     {
-        private readonly IServiceProvider _serviceProvider;
         private readonly AppSettings _appSettings;
         private readonly CustomMessageBoxService _customMessageBoxService;
         private readonly GeneralSettingsView _generalSettingsView;
@@ -28,20 +26,21 @@ namespace AssetsManager.Views
 
         public SettingsWindow(
             AppSettings appSettings,
-            IServiceProvider serviceProvider,
+            GeneralSettingsView generalSettingsView,
+            DefaultPathsSettingsView defaultPathsSettingsView,
+            AdvancedSettingsView advancedSettingsView,
             CustomMessageBoxService customMessageBoxService)
         {
             InitializeComponent();
 
             _appSettings = appSettings;
-            _serviceProvider = serviceProvider;
             _customMessageBoxService = customMessageBoxService;
 
             _settingsModel = new SettingsModel { Settings = _appSettings };
 
-            _generalSettingsView = _serviceProvider.GetRequiredService<GeneralSettingsView>();
-            _defaultPathsSettingsView = _serviceProvider.GetRequiredService<DefaultPathsSettingsView>();
-            _advancedSettingsView = _serviceProvider.GetRequiredService<AdvancedSettingsView>();
+            _generalSettingsView = generalSettingsView;
+            _defaultPathsSettingsView = defaultPathsSettingsView;
+            _advancedSettingsView = advancedSettingsView;
 
             // Inject DataContext (Consumidores de datos)
             _generalSettingsView.DataContext = _settingsModel;

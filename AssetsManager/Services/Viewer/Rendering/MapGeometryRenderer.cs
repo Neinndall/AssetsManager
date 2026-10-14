@@ -1,0 +1,1559 @@
+using AssetsManager.Services.Viewer.Resources;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Numerics;
+using System.Runtime.InteropServices;
+using System.Text.RegularExpressions;
+using System.Windows.Media.Imaging;
+using AssetsManager.Services.Viewer.Rendering.Core;
+using AssetsManager.Services.Viewer.Semantics;
+using AssetsManager.Services.Viewer.Vfx.Resources;
+using AssetsManager.Utils;
+using AssetsManager.Utils.Rendering;
+using AssetsManager.Services.Viewer.Rendering.GameShaders;
+using AssetsManager.Views.Models.Viewer;
+using Silk.NET.OpenGL;
+
+namespace AssetsManager.Services.Viewer.Rendering
+{
+    /// <summary>
+    /// Dedicated MAPGEO backdrop renderer aligned with the current LTK Manager MAIN viewport.
+    /// One set of vertex/index buffers owns the whole map; submeshes are draw groups rather
+    /// than SceneModel/ModelPart instances.
+    /// </summary>
+    internal sealed class MapGeometryRenderer : IDisposable
+    {
+        private const string IndicatorPattern = "indicator";
+        internal const long RetainedResourceLifetimeMs = 15_000;
+        private const long RetainedResourceSweepIntervalMs = 1_000;
+
+        private static readonly Vector3 StoneSrgb = new(154f / 255f, 149f / 255f, 140f / 255f);
+        private static readonly Vector3 StoneLinear = VectorMathUtils.SrgbToLinear(StoneSrgb);
+        private static readonly Vector3 PreviewWireColor = new(92f / 255f, 133f / 255f, 1f);
+        private static readonly Vector3 DefaultSunDirection = Vector3.Normalize(new Vector3(0.25f, 0.75f, -0.05f));
+        private static readonly Regex IndicatorShader = new(IndicatorPattern, RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly MapMaterialRenderState UnboundState = new(
+            MapMaterialBlendMode.Opaque,
+            MapBlendFactor.One,
+            MapBlendFactor.Zero,
+            false,
+            false,
+            true,
+            false,
+            true,
+            true);
+
+        internal sealed record BoundMaterial(
+            int MaterialIndex,
+            string MaterialPath,
+            MapMaterialDefinition Material,
+            MapMaterialRenderState RenderState,
+            bool Lit,
+            bool Transparent,
+            bool MeshDoubleSided,
+            Vector2 UvRepeat,
+            MapTextureWrap WrapU,
+            MapTextureWrap WrapV);
+
+        internal readonly record struct DrawGroup(
+            int StartIndex,
+            int IndexCount,
+            int BoundMaterialIndex,
+            int MeshIndex,
+            int Order);
+
+        internal sealed record DrawPlan(
+            IReadOnlyList<BoundMaterial> Materials,
+            IReadOnlyList<DrawGroup> OpaqueGroups,
+            IReadOnlyList<DrawGroup> TransparentGroups);
+
+        internal readonly record struct LightState(
+            Vector3 Direction,
+            Vector3 SunColor,
+            float SunStrength,
+            Vector3 SkyColor,
+            Vector3 GroundColor,
+            Vector3 HorizonColor,
+            float AmbientStrength,
+            float LightMapColorScale);
+
+        private sealed class SharedTexture
+        {
+            internal uint Id;
+            internal int References;
+            internal long ReleasedAtMs = -1;
+        }
+
+        private sealed class GeometryResources
+        {
+            internal uint Vao;
+            internal uint PositionVbo;
+            internal uint NormalVbo;
+            internal uint Uv0Vbo;
+            internal uint Uv1Vbo;
+            internal uint ColorVbo;
+            internal uint PivotVbo;
+            internal uint Ebo;
+            internal int References;
+            internal long ReleasedAtMs = -1;
+        }
+
+        private sealed record MaterialTexture(MapTextureImage Image, uint TextureId);
+
+        internal enum TextureSamplingSpace
+        {
+            SrgbColor,
+            LinearRaw
+        }
+
+        // League textures already arrive in DirectX row order: the first decoded row is v=0.
+        // Preserve those rows verbatim, matching LTK's texture.flipY = false.
+        internal const bool PreservesDirectXRowOrder = true;
+
+        private readonly AppSettings _appSettings;
+        private readonly Dictionary<MapTextureImage, SharedTexture> _sharedTextures =
+            new(ReferenceEqualityComparer.Instance);
+        private readonly Dictionary<MapTextureImage, SharedTexture> _sharedRawTextures =
+            new(ReferenceEqualityComparer.Instance);
+        private readonly Dictionary<MapResolvedAssetCacheKey, GeometryResources> _retainedGeometry = new();
+        private readonly Dictionary<string, MaterialTexture> _materialTextures =
+            new(StringComparer.Ordinal);
+        private readonly Dictionary<string, MaterialTexture> _programTextures =
+            new(StringComparer.Ordinal);
+        private readonly Dictionary<string, MaterialTexture> _lightmapTextures =
+            new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<(MapTextureWrap U, MapTextureWrap V), uint> _samplers = new();
+
+        private readonly Func<string, uint?> _programTextureLookup;
+        private readonly Func<string, uint?> _lightmapTextureLookup;
+        private GL _gl;
+        private GameShaderRuntime.DrawElementsDelegate _drawElements;
+        private MapSceneData _scene;
+        private MapSunData _previewSun;
+        private DrawPlan _plan;
+        private readonly MapGeometryDrawQueue _visibleDrawQueue = new();
+        private int _visibilityFlags;
+        private string _mapSkin;
+        private readonly Dictionary<MapTextureReference, uint> _environmentCubes = new();
+        private MapTextureImage _terrainPaintImage;
+        private uint _terrainPaint;
+        // Meshes a state change brought in, drawn with ENV_TRANSITION until the flag's TransitionTime runs out.
+        private readonly HashSet<int> _enteringMeshes = new();
+        private long _transitionStartMs;
+        private long _transitionDurationMs;
+        private readonly Dictionary<MapMaterialDefinition, MapMaterialDefinition> _transitionMaterials =
+            new(ReferenceEqualityComparer.Instance);
+        private DrawPlan _programPlan;
+        private DrawPlan _programPlanSource;
+        private DrawPlan _screenPlanSource;
+        private bool _screenPlanReads;
+        private GlSceneCapture _sceneCapture;
+        private uint _program;
+        private uint _vao;
+        private uint _positionVbo;
+        private uint _normalVbo;
+        private uint _uv0Vbo;
+        private uint _uv1Vbo;
+        private uint _colorVbo;
+        private uint _pivotVbo;
+        private uint _ebo;
+        private GeometryResources _activeGeometryResources;
+        private uint _whiteTexture;
+        private int _uViewProjection;
+        private int _uBaseTexture;
+        private int _uColor;
+        private int _uOpacity;
+        private int _uAlphaTest;
+        private int _uUvRepeat;
+        private int _uLit;
+        private int _uPremultipliedAlpha;
+        private int _uLightDirection;
+        private int _uSunColor;
+        private int _uSunStrength;
+        private int _uSkyColor;
+        private int _uGroundColor;
+        private int _uAmbientStrength;
+        private int _uWireframePass;
+        private int _uWireframeColor;
+        private LightState _light = ResolveLight(null);
+        private GameShaderRuntime _gameShaderRuntime;
+        private bool _gles;
+        private bool _ready;
+        private long _nextRetentionSweepMs;
+
+        internal bool HasScene => _scene != null && _plan != null && _vao != 0;
+
+        internal MapGeometryRenderer(AppSettings appSettings = null)
+        {
+            _appSettings = appSettings;
+            _programTextureLookup = ResolveProgramTexture;
+            _lightmapTextureLookup = ResolveLightmapTexture;
+        }
+
+        internal void Initialize(GL gl)
+        {
+            ArgumentNullException.ThrowIfNull(gl);
+            if (_ready)
+                return;
+
+            _gl = gl;
+            IntPtr drawElements = gl.Context.GetProcAddress("glDrawElements");
+            if (drawElements == IntPtr.Zero)
+                throw new InvalidOperationException("OpenGL glDrawElements is unavailable for MAPGEO rendering.");
+            _drawElements = Marshal.GetDelegateForFunctionPointer<GameShaderRuntime.DrawElementsDelegate>(drawElements);
+
+            bool embedded = GlShaderCompiler.UsesEmbeddedProfile(gl);
+            _gles = embedded;
+            _program = GlShaderCompiler.CreateProgram(
+                gl,
+                embedded,
+                MapGeometryShaderSource.Vertex,
+                MapGeometryShaderSource.Fragment);
+            _uViewProjection = gl.GetUniformLocation(_program, "uViewProjection");
+            _uBaseTexture = gl.GetUniformLocation(_program, "uBaseTexture");
+            _uColor = gl.GetUniformLocation(_program, "uColor");
+            _uOpacity = gl.GetUniformLocation(_program, "uOpacity");
+            _uAlphaTest = gl.GetUniformLocation(_program, "uAlphaTest");
+            _uUvRepeat = gl.GetUniformLocation(_program, "uUvRepeat");
+            _uLit = gl.GetUniformLocation(_program, "uLit");
+            _uPremultipliedAlpha = gl.GetUniformLocation(_program, "uPremultipliedAlpha");
+            _uLightDirection = gl.GetUniformLocation(_program, "uLightDirection");
+            _uSunColor = gl.GetUniformLocation(_program, "uSunColor");
+            _uSunStrength = gl.GetUniformLocation(_program, "uSunStrength");
+            _uSkyColor = gl.GetUniformLocation(_program, "uSkyColor");
+            _uGroundColor = gl.GetUniformLocation(_program, "uGroundColor");
+            _uAmbientStrength = gl.GetUniformLocation(_program, "uAmbientStrength");
+            _uWireframePass = gl.GetUniformLocation(_program, "uWireframePass");
+            _uWireframeColor = gl.GetUniformLocation(_program, "uWireframeColor");
+
+            gl.UseProgram(_program);
+            gl.Uniform1(_uBaseTexture, 0);
+            gl.UseProgram(0);
+            _whiteTexture = CreateWhiteTexture();
+            // Keep the large ShaderCache WAD and translated/linked game programs alive for the
+            // renderer lifetime. Map variants commonly reuse the same 14-ish permutations.
+            _gameShaderRuntime = _appSettings != null
+                ? new GameShaderRuntime(_gl, _gles, _appSettings)
+                : null;
+            _sceneCapture = new GlSceneCapture(gl);
+            _ready = true;
+        }
+
+        internal void LoadScene(MapSceneData scene)
+        {
+            if (!_ready)
+                throw new InvalidOperationException("MapGeometryRenderer must be initialized before loading a scene.");
+            ArgumentNullException.ThrowIfNull(scene);
+
+            CollectRetainedResources(forceSweep: true, purgeReleased: false);
+            ReleaseSceneResources();
+            _scene = scene;
+            _previewSun = scene.Sun;
+            _plan = BuildDrawPlan(scene, scene.OpeningVisibility);
+            _visibilityFlags = scene.OpeningVisibilityFlags;
+            _enteringMeshes.Clear();
+            _transitionMaterials.Clear();
+            _light = ResolveLight(scene.Sun);
+            AcquireGeometry(scene);
+            UpdateTextures(scene.Textures);
+            UpdateProgramTextures(scene.ProgramTextures);
+            UpdateLightmaps(scene.Lightmaps);
+            UploadEnvironmentCubes(scene.EnvironmentCubes);
+        }
+
+        /// <summary>
+        /// Selects the MapSkin (Variant) whose environment assets the shaders read. Skins sharing the
+        /// loaded container switch instantly, without reloading geometry.
+        /// </summary>
+        internal void SetMapSkin(string skin) => _mapSkin = skin;
+
+        private MapSkinEnvironmentData SelectedSkin() => _scene?.Terrain?.SkinFor(_mapSkin);
+
+        /// <summary>Uploads the terrain paint as the one-layer array TERRAIN_BLEND samples, replacing a sharper wave's predecessor.</summary>
+        private void UpdateTerrainPaint(MapTextureImage image)
+        {
+            if (ReferenceEquals(_terrainPaintImage, image))
+                return;
+            ReleaseTerrainPaint();
+            _terrainPaint = GlTextureArrayUploader.UploadSingleLayer(_gl, image);
+            _terrainPaintImage = image;
+        }
+
+        private void ReleaseTerrainPaint()
+        {
+            if (_terrainPaint != 0)
+                _gl.DeleteTexture(_terrainPaint);
+            _terrainPaint = 0;
+            _terrainPaintImage = null;
+        }
+
+        private void UploadEnvironmentCubes(IReadOnlyDictionary<MapTextureReference, CubeMapData> cubes)
+        {
+            foreach ((MapTextureReference reference, CubeMapData cube) in cubes ?? new Dictionary<MapTextureReference, CubeMapData>())
+            {
+                uint texture = GlCubeMapUploader.Upload(_gl, cube, srgb: false, mipmaps: true);
+                if (texture != 0)
+                    _environmentCubes[reference] = texture;
+            }
+        }
+
+        internal void SetPreviewSun(MapSunData effectiveSun, MapSunPreviewOverride? previewOverride)
+        {
+            if (!_ready || _scene == null)
+                return;
+
+            _previewSun = effectiveSun;
+            _light = previewOverride.HasValue
+                ? ResolveLight(effectiveSun, previewOverride.Value)
+                : ResolveLight(effectiveSun);
+        }
+
+        /// <summary>
+        /// Rebinds only texture images. Geometry, material classification and draw groups stay intact,
+        /// allowing the 64px preview wave to sharpen to the 1024px wave without rebuilding the map.
+        /// </summary>
+        internal void UpdateTextures(IReadOnlyDictionary<string, MapTextureImage> textures)
+        {
+            if (!_ready || _scene == null || textures == null)
+                return;
+
+            foreach ((string materialPath, MapTextureImage image) in textures)
+            {
+                if (string.IsNullOrWhiteSpace(materialPath) || image == null)
+                    continue;
+                if (!_scene.Geometry.Materials.Contains(materialPath, StringComparer.Ordinal))
+                    continue;
+
+                if (_materialTextures.TryGetValue(materialPath, out MaterialTexture current) &&
+                    ReferenceEquals(current.Image, image))
+                {
+                    continue;
+                }
+
+                uint textureId = AcquireTexture(image);
+                if (_materialTextures.TryGetValue(materialPath, out current))
+                    ReleaseTexture(current.Image);
+                _materialTextures[materialPath] = new MaterialTexture(image, textureId);
+            }
+        }
+
+        internal void UpdateProgramTextures(IReadOnlyDictionary<string, MapTextureImage> textures)
+        {
+            if (!_ready || _scene == null || textures == null)
+                return;
+
+            foreach ((string key, MapTextureImage image) in textures)
+            {
+                if (string.IsNullOrWhiteSpace(key) || image == null)
+                    continue;
+                if (key == MapTerrainData.TerrainPaintKey)
+                {
+                    UpdateTerrainPaint(image);
+                    continue;
+                }
+                if (_programTextures.TryGetValue(key, out MaterialTexture current) &&
+                    ReferenceEquals(current.Image, image))
+                {
+                    continue;
+                }
+
+                // The translated game shader performs its own colour decode; LTK loads these
+                // with NoColorSpace, so keep the texels raw rather than using an sRGB texture.
+                uint textureId = AcquireRawTexture(image);
+                if (_programTextures.TryGetValue(key, out current))
+                    ReleaseRawTexture(current.Image);
+                _programTextures[key] = new MaterialTexture(image, textureId);
+            }
+        }
+
+        internal void UpdateLightmaps(IReadOnlyDictionary<string, MapTextureImage> lightmaps)
+        {
+            if (!_ready || _scene == null || lightmaps == null)
+                return;
+
+            foreach ((string path, MapTextureImage image) in lightmaps)
+            {
+                if (string.IsNullOrWhiteSpace(path) || image == null)
+                    continue;
+                if (!_scene.Geometry.Lightmaps.Contains(path, StringComparer.OrdinalIgnoreCase))
+                    continue;
+                if (_lightmapTextures.TryGetValue(path, out MaterialTexture current) &&
+                    ReferenceEquals(current.Image, image))
+                {
+                    continue;
+                }
+
+                // Light maps encode lighting data, not display colour. LTK loads them with
+                // NoColorSpace, therefore they must remain linear/raw in the GPU texture.
+                uint textureId = AcquireRawTexture(image);
+                if (_lightmapTextures.TryGetValue(path, out current))
+                    ReleaseRawTexture(current.Image);
+                _lightmapTextures[path] = new MaterialTexture(image, textureId);
+            }
+        }
+
+        internal void ProcessRetainedResources()
+        {
+            if (_ready)
+                CollectRetainedResources(forceSweep: false, purgeReleased: false);
+        }
+
+        /// <summary>
+        /// Drops only grace-period resources that no longer have an active owner. This is used by
+        /// an explicit 3D Studio project exit while the OpenGL context is current; active resources
+        /// are never touched.
+        /// </summary>
+        internal void PurgeReleasedResources()
+        {
+            if (_ready)
+                CollectRetainedResources(forceSweep: true, purgeReleased: true);
+        }
+
+        internal void Render(
+            Matrix4x4 viewProjection,
+            Matrix4x4 view,
+            Matrix4x4 projection,
+            Vector3 eye,
+            float timeSeconds,
+            StudioViewMode viewMode = StudioViewMode.Lit,
+            bool wireOverlay = false,
+            bool shadersEnabled = true,
+            bool? transparentPass = null)
+        {
+            if (!_ready || !HasScene)
+                return;
+
+            (bool solids, bool wireframe, float wireOpacity) =
+                ResolveViewPasses(viewMode, wireOverlay, supportsWireframe: !_gles);
+            StudioViewMode solidMode = viewMode == StudioViewMode.Wireframe
+                ? StudioViewMode.Lit
+                : viewMode;
+            var gameFrame = new GameShaderRuntime.Frame(
+                view,
+                projection,
+                eye,
+                timeSeconds,
+                _previewSun,
+                Environment: ResolveEnvironmentFrame());
+
+            DrawPlan solidPlan = _plan;
+            if (shadersEnabled && solidMode == StudioViewMode.Lit && _gameShaderRuntime != null)
+            {
+                if (!ReferenceEquals(_programPlanSource, _plan))
+                {
+                    _programPlan = ResolveProgramDrawPlan(_plan, _gameShaderRuntime.GetStaticPassState);
+                    _programPlanSource = _plan;
+                }
+                solidPlan = _programPlan;
+            }
+
+            _visibleDrawQueue.Prepare(_scene.Geometry, solidPlan, viewProjection, eye);
+            PrepareStockFrame(viewProjection);
+            _gl.ActiveTexture(TextureUnit.Texture0);
+            _gl.BindVertexArray(_vao);
+            _gl.DepthFunc(DepthFunction.Lequal);
+
+            // LTK mirrors the entire backdrop across X and lets Three.js flip the front face
+            // from the negative world determinant. The stock shader mirrors X directly while
+            // the translated game path carries the same mirror in PerFrameVertexCB.
+            _gl.FrontFace(FrontFaceDirection.CW);
+            try
+            {
+                if (solids)
+                {
+                    _gl.UseProgram(_program);
+                    _gl.Uniform1(_uWireframePass, 0);
+                    if (transparentPass != true)
+                        DrawGroups(_visibleDrawQueue.Opaque, solidMode, shadersEnabled, in gameFrame);
+                    if (transparentPass != false)
+                    {
+                        GameShaderRuntime.Frame transparentFrame = WithScreenCapture(
+                            gameFrame,
+                            solidPlan,
+                            shadersEnabled && solidMode == StudioViewMode.Lit);
+                        DrawGroups(_visibleDrawQueue.Transparent, solidMode, shadersEnabled, in transparentFrame);
+                    }
+                }
+
+                if (wireframe && transparentPass != false)
+                {
+                    _gl.UseProgram(_program);
+                    _gl.PolygonMode(TriangleFace.FrontAndBack, PolygonMode.Line);
+                    _gl.Uniform1(_uWireframePass, 1);
+                    _gl.Uniform4(
+                        _uWireframeColor,
+                        PreviewWireColor.X,
+                        PreviewWireColor.Y,
+                        PreviewWireColor.Z,
+                        wireOpacity);
+                    ApplyWireframeState(wireOpacity);
+                    DrawWireGroups(_visibleDrawQueue.Opaque);
+                    DrawWireGroups(_visibleDrawQueue.Transparent);
+                }
+            }
+            finally
+            {
+                if (!_gles)
+                    _gl.PolygonMode(TriangleFace.FrontAndBack, PolygonMode.Fill);
+                _gameShaderRuntime?.ResetBindings();
+                _gl.UseProgram(_program);
+                _gl.Uniform1(_uWireframePass, 0);
+                _gl.ColorMask(true, true, true, true);
+                _gl.FrontFace(FrontFaceDirection.Ccw);
+                _gl.Disable(EnableCap.Blend);
+                _gl.Disable(EnableCap.CullFace);
+                _gl.Enable(EnableCap.DepthTest);
+                _gl.DepthMask(true);
+                _gl.BindSampler(0, 0);
+                _gl.ActiveTexture(TextureUnit.Texture1);
+                _gl.BindSampler(1, 0);
+                _gl.BindTexture(TextureTarget.Texture2D, 0);
+                _gl.ActiveTexture(TextureUnit.Texture2);
+                _gl.BindSampler(2, 0);
+                _gl.BindTexture(TextureTarget.Texture2D, 0);
+                _gl.ActiveTexture(TextureUnit.Texture0);
+                _gl.BindTexture(TextureTarget.Texture2D, 0);
+                _gl.BindVertexArray(0);
+                _gl.UseProgram(0);
+            }
+        }
+
+        /// <summary>
+        /// Captures the opaque frame (colour and depth) for transparent game materials that refract or
+        /// fade against it, like LTK's water; the copy is taken only when such a material is drawn.
+        /// </summary>
+        private GameShaderRuntime.Frame WithScreenCapture(
+            in GameShaderRuntime.Frame frame,
+            DrawPlan plan,
+            bool gameShaders)
+        {
+            if (!gameShaders || _gameShaderRuntime == null || _sceneCapture == null)
+                return frame;
+
+            if (!ReferenceEquals(_screenPlanSource, plan))
+            {
+                _screenPlanReads = plan.TransparentGroups
+                    .Select(group => group.BoundMaterialIndex)
+                    .Distinct()
+                    .Where(index => index >= 0 && index < plan.Materials.Count)
+                    .Any(index => _gameShaderRuntime.ReadsScreenTextures(plan.Materials[index].Material));
+                _screenPlanSource = plan;
+            }
+            if (!_screenPlanReads)
+                return frame;
+
+            Span<int> viewport = stackalloc int[4];
+            _gl.GetInteger(GetPName.Viewport, viewport);
+            if (viewport[2] <= 0 || viewport[3] <= 0)
+                return frame;
+
+            _sceneCapture.Capture((uint)viewport[2], (uint)viewport[3], captureColor: true, captureDepth: true);
+            return frame with
+            {
+                SceneColor = _sceneCapture.ColorTexture,
+                SceneDepth = _sceneCapture.DepthTexture
+            };
+        }
+
+        internal static DrawPlan ResolveProgramDrawPlan(
+            DrawPlan preview, Func<MapMaterialDefinition, GameMaterialPassState> stateOf)
+        {
+            var transparent = preview.Materials
+                .Select(bound => stateOf(bound.Material)?.BlendEnabled ?? bound.Transparent)
+                .ToArray();
+            var groups = preview.OpaqueGroups.Concat(preview.TransparentGroups).ToArray();
+            return preview with
+            {
+                OpaqueGroups = groups.Where(group => !transparent[group.BoundMaterialIndex])
+                    .OrderBy(group => group.BoundMaterialIndex).ThenBy(group => group.Order).ToArray(),
+                TransparentGroups = groups.Where(group => transparent[group.BoundMaterialIndex])
+                    .OrderBy(group => group.Order).ToArray()
+            };
+        }
+
+        private void PrepareStockFrame(Matrix4x4 viewProjection)
+        {
+            _gl.UseProgram(_program);
+            _gl.UniformMatrix4(_uViewProjection, 1, false, in viewProjection.M11);
+            _gl.Uniform3(_uLightDirection, _light.Direction.X, _light.Direction.Y, _light.Direction.Z);
+            _gl.Uniform3(_uSunColor, _light.SunColor.X, _light.SunColor.Y, _light.SunColor.Z);
+            _gl.Uniform1(_uSunStrength, _light.SunStrength);
+            _gl.Uniform3(_uSkyColor, _light.SkyColor.X, _light.SkyColor.Y, _light.SkyColor.Z);
+            _gl.Uniform3(_uGroundColor, _light.GroundColor.X, _light.GroundColor.Y, _light.GroundColor.Z);
+            _gl.Uniform1(_uAmbientStrength, _light.AmbientStrength);
+        }
+
+        internal static (bool Solids, bool Wireframe, float WireOpacity) ResolveViewPasses(
+            StudioViewMode viewMode,
+            bool wireOverlay,
+            bool supportsWireframe)
+        {
+            bool wireframeOnly = viewMode == StudioViewMode.Wireframe;
+            bool overlayAllowed = viewMode == StudioViewMode.Lit || viewMode == StudioViewMode.Untextured;
+            bool solids = !wireframeOnly || !supportsWireframe;
+            bool wireframe = supportsWireframe && (wireframeOnly || (wireOverlay && overlayAllowed));
+            return (solids, wireframe, wireframeOnly ? 1f : 0.35f);
+        }
+
+        private void DrawGroups(
+            IReadOnlyList<DrawGroup> groups,
+            StudioViewMode viewMode,
+            bool shadersEnabled,
+            in GameShaderRuntime.Frame gameFrame)
+        {
+            _gl.UseProgram(_program);
+            int activeStockMaterial = -1;
+            bool stockActive = true;
+            foreach (DrawGroup group in groups)
+            {
+                if (group.IndexCount <= 0 || group.BoundMaterialIndex < 0 ||
+                    group.BoundMaterialIndex >= _plan.Materials.Count)
+                {
+                    continue;
+                }
+
+                BoundMaterial bound = _plan.Materials[group.BoundMaterialIndex];
+                MapGeometryMeshData mesh = group.MeshIndex >= 0 && group.MeshIndex < _scene.Geometry.Meshes.Count
+                    ? _scene.Geometry.Meshes[group.MeshIndex]
+                    : null;
+                MapMaterialDefinition material = _enteringMeshes.Count > 0 && _enteringMeshes.Contains(group.MeshIndex)
+                    ? TransitionMaterial(bound.Material)
+                    : bound.Material;
+                int passCount = shadersEnabled &&
+                                viewMode == StudioViewMode.Lit &&
+                                _gameShaderRuntime != null &&
+                                material?.Program != null
+                    ? _gameShaderRuntime.GetStaticPassCount(material)
+                    : 0;
+
+                if (passCount > 0)
+                {
+                    bool boundAny = false;
+                    for (int passIndex = 0; passIndex < passCount; passIndex++)
+                    {
+                        if (_gameShaderRuntime.TryBind(
+                                material,
+                                passIndex,
+                                mesh,
+                                bound.MeshDoubleSided,
+                                in gameFrame,
+                                _programTextureLookup,
+                                _lightmapTextureLookup,
+                                _scene.Geometry.HasColors,
+                                _scene.Geometry.HasPivots))
+                        {
+                            boundAny = true;
+                            _gameShaderRuntime.DrawBoundPass(
+                                _drawElements,
+                                group.IndexCount,
+                                new IntPtr(checked(group.StartIndex * sizeof(uint))));
+                        }
+                    }
+
+                    if (boundAny)
+                    {
+                        stockActive = false;
+                        activeStockMaterial = -1;
+                        continue;
+                    }
+                }
+
+                if (!stockActive)
+                {
+                    _gameShaderRuntime?.ResetBindings();
+                    _gl.UseProgram(_program);
+                    stockActive = true;
+                }
+                if (activeStockMaterial != group.BoundMaterialIndex)
+                {
+                    activeStockMaterial = group.BoundMaterialIndex;
+                    ApplyMaterial(bound, viewMode);
+                }
+
+                if (_gameShaderRuntime != null)
+                    _gameShaderRuntime.DrawIndexedPass(
+                        _drawElements, group.IndexCount, new IntPtr(checked(group.StartIndex * sizeof(uint))),
+                        bound.Transparent && bound.RenderState.DoubleSided && viewMode != StudioViewMode.Untextured);
+                else
+                    _drawElements(
+                        (uint)PrimitiveType.Triangles,
+                        group.IndexCount,
+                        (uint)DrawElementsType.UnsignedInt,
+                        new IntPtr(checked(group.StartIndex * sizeof(uint))));
+            }
+        }
+
+        private uint? ResolveProgramTexture(string key) =>
+            !string.IsNullOrWhiteSpace(key) && _programTextures.TryGetValue(key, out MaterialTexture texture)
+                ? texture.TextureId
+                : null;
+
+        /// <summary>
+        /// MapSkin inputs for the current state: the selected skin's grass tint for the active flags, at
+        /// full weight in the alternate sampler, and its environment cube. The tint switches with the
+        /// state, like the geometry of the preview's Layers.
+        /// </summary>
+        private GameShaderRuntime.EnvironmentFrame ResolveEnvironmentFrame()
+        {
+            MapTerrainData terrain = _scene?.Terrain;
+            if (terrain == null)
+                return default;
+
+            MapSkinEnvironmentData skin = SelectedSkin();
+            uint grassTint = ResolveProgramTexture(MapTerrainData.GrassTintKey(skin?.GrassTintFor(_visibilityFlags))) ?? 0;
+            MapTextureReference cube = skin?.EnvironmentCube;
+            return new GameShaderRuntime.EnvironmentFrame(
+                terrain.TerrainTransform,
+                grassTint,
+                grassTint,
+                1f,
+                cube != null && _environmentCubes.TryGetValue(cube, out uint texture) ? texture : 0,
+                _terrainPaint,
+                SampleEnvironmentTransition());
+        }
+
+        private uint? ResolveLightmapTexture(string path) =>
+            !string.IsNullOrWhiteSpace(path) && _lightmapTextures.TryGetValue(path, out MaterialTexture texture)
+                ? texture.TextureId
+                : null;
+
+        private void DrawWireGroups(IReadOnlyList<DrawGroup> groups)
+        {
+            foreach (DrawGroup group in groups)
+            {
+                if (group.IndexCount <= 0)
+                    continue;
+
+                _drawElements(
+                    (uint)PrimitiveType.Triangles,
+                    group.IndexCount,
+                    (uint)DrawElementsType.UnsignedInt,
+                    new IntPtr(checked(group.StartIndex * sizeof(uint))));
+            }
+        }
+
+        private void ApplyWireframeState(float opacity)
+        {
+            _gl.Disable(EnableCap.CullFace);
+            _gl.Enable(EnableCap.DepthTest);
+            _gl.DepthFunc(DepthFunction.Lequal);
+            bool overlay = opacity < 1f;
+            _gl.DepthMask(!overlay);
+            if (overlay)
+            {
+                _gl.Enable(EnableCap.Blend);
+                _gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
+            }
+            else
+            {
+                _gl.Disable(EnableCap.Blend);
+            }
+        }
+
+        private void ApplyMaterial(BoundMaterial bound, StudioViewMode viewMode)
+        {
+            MapMaterialDefinition material = bound.Material;
+            bool untextured = viewMode == StudioViewMode.Untextured;
+            bool unshaded = viewMode == StudioViewMode.Unshaded;
+            MaterialTexture texture = null;
+            bool hasTexture = !untextured &&
+                              !string.IsNullOrWhiteSpace(bound.MaterialPath) &&
+                              _materialTextures.TryGetValue(bound.MaterialPath, out texture);
+            uint textureId = hasTexture ? texture.TextureId : _whiteTexture;
+            Vector3 color = untextured ? StoneLinear : ResolveColor(material, hasTexture);
+            float opacity = untextured ? 1f : material?.Missing == false ? material.Opacity ?? 1f : 1f;
+            float alphaTest = untextured ? 0f : material?.Missing == false ? material.AlphaTest ?? 0f : 0f;
+            bool lit = untextured || (!unshaded && bound.Lit);
+            MapMaterialRenderState renderState = untextured
+                ? MapMaterialRenderState.Default with { DoubleSided = bound.RenderState.DoubleSided }
+                : bound.RenderState;
+            bool transparent = !untextured && bound.Transparent;
+
+            _gl.ActiveTexture(TextureUnit.Texture0);
+            _gl.BindTexture(TextureTarget.Texture2D, textureId);
+            _gl.BindSampler(0, ResolveSampler(bound.WrapU, bound.WrapV));
+            _gl.Uniform3(_uColor, color.X, color.Y, color.Z);
+            _gl.Uniform1(_uOpacity, opacity);
+            _gl.Uniform1(_uAlphaTest, alphaTest);
+            _gl.Uniform2(_uUvRepeat, bound.UvRepeat.X, bound.UvRepeat.Y);
+            _gl.Uniform1(_uLit, lit ? 1 : 0);
+            _gl.Uniform1(_uPremultipliedAlpha, renderState.PremultipliedAlpha ? 1 : 0);
+            ApplyRenderState(renderState, transparent);
+        }
+
+        private void ApplyRenderState(MapMaterialRenderState state, bool transparent)
+        {
+            // A previous game pass may have changed these states; the stock preview path
+            // always writes colour and uses the normal LEQUAL depth comparison.
+            _gl.ColorMask(true, true, true, true);
+            _gl.DepthFunc(DepthFunction.Lequal);
+            if (transparent)
+            {
+                _gl.Enable(EnableCap.Blend);
+                _gl.BlendEquation(GLEnum.FuncAdd);
+                switch (state.Blending)
+                {
+                    case MapMaterialBlendMode.Additive:
+                        // Three.js AdditiveBlending uses the same factors for RGB and alpha.
+                        _gl.BlendFunc(
+                            state.PremultipliedAlpha ? BlendingFactor.One : BlendingFactor.SrcAlpha,
+                            BlendingFactor.One);
+                        break;
+                    case MapMaterialBlendMode.Modulate:
+                        _gl.BlendFunc(BlendingFactor.OneMinusSrcColor, BlendingFactor.Zero);
+                        break;
+                    default:
+                        _gl.BlendFuncSeparate(
+                            state.PremultipliedAlpha ? BlendingFactor.One : BlendingFactor.SrcAlpha,
+                            BlendingFactor.OneMinusSrcAlpha,
+                            BlendingFactor.One,
+                            BlendingFactor.OneMinusSrcAlpha);
+                        break;
+                }
+            }
+            else
+            {
+                _gl.Disable(EnableCap.Blend);
+            }
+
+            if (state.DepthTest)
+                _gl.Enable(EnableCap.DepthTest);
+            else
+                _gl.Disable(EnableCap.DepthTest);
+            _gl.DepthMask(state.DepthWrite);
+
+            if (state.DoubleSided)
+            {
+                _gl.Disable(EnableCap.CullFace);
+            }
+            else
+            {
+                _gl.Enable(EnableCap.CullFace);
+                _gl.CullFace(state.Inverted ? TriangleFace.Front : TriangleFace.Back);
+            }
+        }
+
+        private void AcquireGeometry(MapSceneData scene)
+        {
+            MapResolvedAsset asset = scene.Assets?.Geometry;
+            MapResolvedAssetCacheKey? key = asset == null ? null : MapResolvedAssetCacheKey.From(asset);
+            if (key.HasValue && _retainedGeometry.TryGetValue(key.Value, out GeometryResources retained))
+            {
+                retained.References++;
+                retained.ReleasedAtMs = -1;
+                _activeGeometryResources = retained;
+                BindGeometryResources(retained);
+                return;
+            }
+
+            UploadGeometry(scene.Geometry);
+            if (!key.HasValue)
+                return;
+
+            var resources = new GeometryResources
+            {
+                Vao = _vao,
+                PositionVbo = _positionVbo,
+                NormalVbo = _normalVbo,
+                Uv0Vbo = _uv0Vbo,
+                Uv1Vbo = _uv1Vbo,
+                ColorVbo = _colorVbo,
+                PivotVbo = _pivotVbo,
+                Ebo = _ebo,
+                References = 1
+            };
+            _retainedGeometry[key.Value] = resources;
+            _activeGeometryResources = resources;
+        }
+
+        private void BindGeometryResources(GeometryResources resources)
+        {
+            _vao = resources.Vao;
+            _positionVbo = resources.PositionVbo;
+            _normalVbo = resources.NormalVbo;
+            _uv0Vbo = resources.Uv0Vbo;
+            _uv1Vbo = resources.Uv1Vbo;
+            _colorVbo = resources.ColorVbo;
+            _pivotVbo = resources.PivotVbo;
+            _ebo = resources.Ebo;
+        }
+
+        private void UploadGeometry(MapGeometryData geometry)
+        {
+            _vao = _gl.GenVertexArray();
+            _gl.BindVertexArray(_vao);
+
+            _positionVbo = UploadAttribute(0, geometry.Positions, 3);
+            _normalVbo = UploadAttribute(1, geometry.Normals, 3);
+            _uv0Vbo = UploadAttribute(2, geometry.Uv0, 2);
+            if (geometry.Uv1 != null)
+                _uv1Vbo = UploadAttribute(3, geometry.Uv1, 2);
+            // Streams only game shaders read (the stock program stops at location 3).
+            if (geometry.Colors != null)
+                _colorVbo = UploadAttribute(GameShaderRuntime.StaticColorLocation, geometry.Colors);
+            if (geometry.Pivots != null)
+                _pivotVbo = UploadAttribute(GameShaderRuntime.StaticPivotLocation, geometry.Pivots, 3);
+
+            _ebo = _gl.GenBuffer();
+            _gl.BindBuffer(BufferTargetARB.ElementArrayBuffer, _ebo);
+            _gl.BufferData(
+                BufferTargetARB.ElementArrayBuffer,
+                new ReadOnlySpan<uint>(geometry.Indices),
+                BufferUsageARB.StaticDraw);
+
+            _gl.BindVertexArray(0);
+            _gl.BindBuffer(BufferTargetARB.ArrayBuffer, 0);
+        }
+
+        private uint UploadAttribute(uint location, Vector3[] values, int components)
+        {
+            uint buffer = _gl.GenBuffer();
+            _gl.BindBuffer(BufferTargetARB.ArrayBuffer, buffer);
+            _gl.BufferData(
+                BufferTargetARB.ArrayBuffer,
+                new ReadOnlySpan<Vector3>(values),
+                BufferUsageARB.StaticDraw);
+            _gl.EnableVertexAttribArray(location);
+            _gl.VertexAttribPointer(
+                location,
+                components,
+                VertexAttribPointerType.Float,
+                false,
+                (uint)Marshal.SizeOf<Vector3>(),
+                IntPtr.Zero);
+            return buffer;
+        }
+
+        private uint UploadAttribute(uint location, Vector4[] values)
+        {
+            uint buffer = _gl.GenBuffer();
+            _gl.BindBuffer(BufferTargetARB.ArrayBuffer, buffer);
+            _gl.BufferData(
+                BufferTargetARB.ArrayBuffer,
+                new ReadOnlySpan<Vector4>(values),
+                BufferUsageARB.StaticDraw);
+            _gl.EnableVertexAttribArray(location);
+            _gl.VertexAttribPointer(
+                location,
+                4,
+                VertexAttribPointerType.Float,
+                false,
+                (uint)Marshal.SizeOf<Vector4>(),
+                IntPtr.Zero);
+            return buffer;
+        }
+
+        private uint UploadAttribute(uint location, Vector2[] values, int components)
+        {
+            uint buffer = _gl.GenBuffer();
+            _gl.BindBuffer(BufferTargetARB.ArrayBuffer, buffer);
+            _gl.BufferData(
+                BufferTargetARB.ArrayBuffer,
+                new ReadOnlySpan<Vector2>(values),
+                BufferUsageARB.StaticDraw);
+            _gl.EnableVertexAttribArray(location);
+            _gl.VertexAttribPointer(
+                location,
+                components,
+                VertexAttribPointerType.Float,
+                false,
+                (uint)Marshal.SizeOf<Vector2>(),
+                IntPtr.Zero);
+            return buffer;
+        }
+
+        private uint AcquireTexture(MapTextureImage image)
+        {
+            if (_sharedTextures.TryGetValue(image, out SharedTexture shared))
+            {
+                shared.References++;
+                shared.ReleasedAtMs = -1;
+                return shared.Id;
+            }
+
+            // Stock/base material textures use the stage's sRGB colour space. OpenGL's sRGB
+            // internal format gives the shader the same linear sample Three.js produces.
+            uint id = UploadTexture(image, TextureSamplingSpace.SrgbColor);
+            _sharedTextures[image] = new SharedTexture { Id = id, References = 1, ReleasedAtMs = -1 };
+            return id;
+        }
+
+        private void ReleaseTexture(MapTextureImage image) =>
+            ReleaseSharedTexture(_sharedTextures, image);
+
+        private uint AcquireRawTexture(MapTextureImage image) =>
+            AcquireSharedTexture(_sharedRawTextures, image, TextureSamplingSpace.LinearRaw);
+
+        private void ReleaseRawTexture(MapTextureImage image) =>
+            ReleaseSharedTexture(_sharedRawTextures, image);
+
+        private uint AcquireSharedTexture(
+            Dictionary<MapTextureImage, SharedTexture> cache,
+            MapTextureImage image,
+            TextureSamplingSpace samplingSpace)
+        {
+            if (cache.TryGetValue(image, out SharedTexture shared))
+            {
+                shared.References++;
+                shared.ReleasedAtMs = -1;
+                return shared.Id;
+            }
+
+            uint id = UploadTexture(image, samplingSpace);
+            cache[image] = new SharedTexture { Id = id, References = 1, ReleasedAtMs = -1 };
+            return id;
+        }
+
+        private void ReleaseSharedTexture(
+            Dictionary<MapTextureImage, SharedTexture> cache,
+            MapTextureImage image)
+        {
+            if (image == null || !cache.TryGetValue(image, out SharedTexture shared))
+                return;
+
+            shared.References = Math.Max(0, shared.References - 1);
+            if (shared.References == 0)
+                shared.ReleasedAtMs = Environment.TickCount64;
+        }
+
+        private void CollectRetainedResources(bool forceSweep, bool purgeReleased)
+        {
+            long now = Environment.TickCount64;
+            if (!forceSweep && now < _nextRetentionSweepMs)
+                return;
+            _nextRetentionSweepMs = now + RetainedResourceSweepIntervalMs;
+
+            CollectRetainedTextures(_sharedTextures, now, purgeReleased);
+            CollectRetainedTextures(_sharedRawTextures, now, purgeReleased);
+
+            MapResolvedAssetCacheKey[] expiredGeometry = _retainedGeometry
+                .Where(pair => ShouldCollectRetainedResource(
+                    pair.Value.References,
+                    pair.Value.ReleasedAtMs,
+                    now,
+                    purgeReleased))
+                .Select(pair => pair.Key)
+                .ToArray();
+            foreach (MapResolvedAssetCacheKey key in expiredGeometry)
+            {
+                if (!_retainedGeometry.Remove(key, out GeometryResources resources))
+                    continue;
+                DeleteGeometryResources(resources);
+            }
+        }
+
+        private void CollectRetainedTextures(
+            Dictionary<MapTextureImage, SharedTexture> cache,
+            long now,
+            bool purgeReleased)
+        {
+            MapTextureImage[] expired = cache
+                .Where(pair => ShouldCollectRetainedResource(
+                    pair.Value.References,
+                    pair.Value.ReleasedAtMs,
+                    now,
+                    purgeReleased))
+                .Select(pair => pair.Key)
+                .ToArray();
+            foreach (MapTextureImage image in expired)
+            {
+                if (!cache.Remove(image, out SharedTexture texture))
+                    continue;
+                if (texture.Id != 0)
+                    _gl.DeleteTexture(texture.Id);
+            }
+        }
+
+        internal static bool ShouldCollectRetainedResource(
+            int references,
+            long releasedAtMs,
+            long nowMs,
+            bool purgeReleased) =>
+            references == 0 && (purgeReleased || RetentionExpired(releasedAtMs, nowMs));
+
+        internal static bool RetentionExpired(long releasedAtMs, long nowMs) =>
+            releasedAtMs >= 0 && nowMs - releasedAtMs >= RetainedResourceLifetimeMs;
+
+        private void DeleteAllRetainedResources()
+        {
+            foreach (SharedTexture texture in _sharedTextures.Values)
+                if (texture.Id != 0) _gl.DeleteTexture(texture.Id);
+            _sharedTextures.Clear();
+
+            foreach (SharedTexture texture in _sharedRawTextures.Values)
+                if (texture.Id != 0) _gl.DeleteTexture(texture.Id);
+            _sharedRawTextures.Clear();
+
+            foreach (GeometryResources resources in _retainedGeometry.Values)
+                DeleteGeometryResources(resources);
+            _retainedGeometry.Clear();
+        }
+
+        private uint UploadTexture(MapTextureImage image, TextureSamplingSpace samplingSpace)
+        {
+            uint texture = _gl.GenTexture();
+            _gl.BindTexture(TextureTarget.Texture2D, texture);
+
+            for (int level = 0; level < image.MipLevels.Count; level++)
+                UploadTextureLevel(image.MipLevels[level], level, samplingSpace);
+
+            // Current LTK MAIN preserves every authored level. Only a one-level source lets the
+            // GPU synthesize the missing chain, which also covers PNG/TGA fallback textures.
+            if (!image.HasAuthoredMipChain)
+                _gl.GenerateMipmap(TextureTarget.Texture2D);
+
+            _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.LinearMipmapLinear);
+            _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
+            _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.Repeat);
+            _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.Repeat);
+            _gl.BindTexture(TextureTarget.Texture2D, 0);
+            return texture;
+        }
+
+        private void UploadTextureLevel(BitmapSource source, int level, TextureSamplingSpace samplingSpace)
+        {
+            (int width, int height, byte[] pixels) = GlBitmapPixels.ToBgra32(source);
+            _gl.TexImage2D(
+                TextureTarget.Texture2D,
+                level,
+                TextureInternalFormat(samplingSpace),
+                (uint)width,
+                (uint)height,
+                0,
+                Silk.NET.OpenGL.PixelFormat.Bgra,
+                PixelType.UnsignedByte,
+                new ReadOnlySpan<byte>(pixels));
+        }
+
+        internal static InternalFormat TextureInternalFormat(TextureSamplingSpace samplingSpace) =>
+            samplingSpace == TextureSamplingSpace.SrgbColor
+                ? InternalFormat.Srgb8Alpha8
+                : InternalFormat.Rgba8;
+
+        private uint CreateWhiteTexture()
+        {
+            uint texture = _gl.GenTexture();
+            _gl.BindTexture(TextureTarget.Texture2D, texture);
+            byte[] white = { 255, 255, 255, 255 };
+            _gl.TexImage2D(
+                TextureTarget.Texture2D,
+                0,
+                InternalFormat.Srgb8Alpha8,
+                1,
+                1,
+                0,
+                Silk.NET.OpenGL.PixelFormat.Rgba,
+                PixelType.UnsignedByte,
+                new ReadOnlySpan<byte>(white));
+            _gl.GenerateMipmap(TextureTarget.Texture2D);
+            _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.LinearMipmapLinear);
+            _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
+            _gl.BindTexture(TextureTarget.Texture2D, 0);
+            return texture;
+        }
+
+        private uint ResolveSampler(MapTextureWrap wrapU, MapTextureWrap wrapV)
+        {
+            var key = (wrapU, wrapV);
+            if (_samplers.TryGetValue(key, out uint sampler))
+                return sampler;
+
+            sampler = _gl.GenSampler();
+            _gl.SamplerParameter(sampler, SamplerParameterI.MinFilter, (int)TextureMinFilter.LinearMipmapLinear);
+            _gl.SamplerParameter(sampler, SamplerParameterI.MagFilter, (int)TextureMagFilter.Linear);
+            _gl.SamplerParameter(sampler, SamplerParameterI.WrapS, (int)GlTextureWrap.Of(wrapU));
+            _gl.SamplerParameter(sampler, SamplerParameterI.WrapT, (int)GlTextureWrap.Of(wrapV));
+            _samplers[key] = sampler;
+            return sampler;
+        }
+
+        internal void SetVisibility(MapVisibilityState state)
+        {
+            if (!_ready || _scene == null || state == null)
+                return;
+            DrawPlan previous = _plan;
+            int previousFlags = _visibilityFlags;
+            _plan = BuildDrawPlan(_scene, state);
+            _visibilityFlags = state.Flags;
+            StartEnvironmentTransition(
+                previous,
+                _plan,
+                _scene.Terrain?.TransitionSecondsFor(previousFlags, state.Flags) ?? 0f);
+        }
+
+        /// <summary>
+        /// Marks the meshes the new state adds whose material has the transition permutation, so they rise
+        /// into place as the game draws an entered state. Everything else switches immediately.
+        /// </summary>
+        private void StartEnvironmentTransition(DrawPlan previous, DrawPlan next, float seconds)
+        {
+            _enteringMeshes.Clear();
+            if (previous == null || next == null || seconds <= 0f)
+                return;
+
+            var before = previous.OpaqueGroups.Concat(previous.TransparentGroups)
+                .Select(group => group.MeshIndex)
+                .ToHashSet();
+            foreach (DrawGroup group in next.OpaqueGroups.Concat(next.TransparentGroups))
+            {
+                if (before.Contains(group.MeshIndex) ||
+                    group.BoundMaterialIndex < 0 ||
+                    group.BoundMaterialIndex >= next.Materials.Count ||
+                    !MapEnvironmentTransition.Supports(next.Materials[group.BoundMaterialIndex].Material?.Program))
+                {
+                    continue;
+                }
+                _enteringMeshes.Add(group.MeshIndex);
+            }
+
+            _transitionStartMs = Environment.TickCount64;
+            _transitionDurationMs = (long)(seconds * 1000f);
+        }
+
+        /// <summary>The transition factor this frame; the transition ends once it reaches 1.</summary>
+        private float SampleEnvironmentTransition()
+        {
+            if (_enteringMeshes.Count == 0)
+                return 1f;
+            float factor = MapEnvironmentTransition.Progress(_transitionStartMs, _transitionDurationMs, Environment.TickCount64);
+            if (factor >= 1f)
+                _enteringMeshes.Clear();
+            return factor;
+        }
+
+        private MapMaterialDefinition TransitionMaterial(MapMaterialDefinition material)
+        {
+            if (!_transitionMaterials.TryGetValue(material, out MapMaterialDefinition transitioning))
+            {
+                transitioning = material with { Program = MapEnvironmentTransition.Transitioning(material.Program) };
+                _transitionMaterials[material] = transitioning;
+            }
+            return transitioning;
+        }
+
+        internal static DrawPlan BuildDrawPlan(MapSceneData scene)
+            => BuildDrawPlan(scene, scene?.OpeningVisibility);
+
+        internal static DrawPlan BuildDrawPlan(MapSceneData scene, int visibilityFlags)
+            => BuildDrawPlan(scene, scene?.OpeningVisibility.WithFlags(visibilityFlags));
+
+        internal static DrawPlan BuildDrawPlan(MapSceneData scene, MapVisibilityState visibility)
+        {
+            ArgumentNullException.ThrowIfNull(scene);
+            ArgumentNullException.ThrowIfNull(visibility);
+            MapGeometryData geometry = scene.Geometry;
+            IReadOnlyList<MapMaterialDefinition> materials = scene.Materials;
+            var bound = new List<BoundMaterial>();
+            var byKey = new Dictionary<(int Material, bool MeshDoubleSided), int>();
+            var opaque = new List<DrawGroup>();
+            var transparent = new List<DrawGroup>();
+            int order = 0;
+
+            for (int meshIndex = 0; meshIndex < geometry.Meshes.Count; meshIndex++)
+            {
+                MapGeometryMeshData mesh = geometry.Meshes[meshIndex];
+                if (mesh.SubmeshCount <= 0 ||
+                    !MapGeometrySemantics.IsDrawn(mesh, scene.Visibility, visibility))
+                    continue;
+
+                bool meshDoubleSided = (mesh.Flags & MapGeometryMeshFlags.CullDisabled) != 0;
+                int end = Math.Min(mesh.FirstSubmesh + mesh.SubmeshCount, geometry.Submeshes.Count);
+                for (int at = Math.Max(mesh.FirstSubmesh, 0); at < end; at++)
+                {
+                    MapGeometrySubmeshData submesh = geometry.Submeshes[at];
+                    int materialIndex = submesh.MaterialIndex;
+                    MapMaterialDefinition material = materialIndex >= 0 && materialIndex < materials.Count
+                        ? materials[materialIndex]
+                        : null;
+                    if (!Covers(material))
+                        continue;
+
+                    var key = (materialIndex, meshDoubleSided);
+                    if (!byKey.TryGetValue(key, out int boundIndex))
+                    {
+                        MapMaterialRenderState authored = material?.Missing == false
+                            ? material.RenderState
+                            : UnboundState;
+                        MapMaterialRenderState effective = authored with
+                        {
+                            DoubleSided = authored.DoubleSided || meshDoubleSided
+                        };
+                        bool transparentMaterial = effective.Blending != MapMaterialBlendMode.Opaque &&
+                                                   !effective.Cutout;
+                        bool lit = material == null ||
+                                   (!material.Missing && effective.Blending != MapMaterialBlendMode.Additive);
+                        Vector2 repeat = material?.Missing == false && material.UvRepeat.HasValue
+                            ? material.UvRepeat.Value
+                            : Vector2.One;
+                        bool forceRepeat = material?.Missing == false && material.UvRepeat.HasValue;
+                        MapTextureWrap wrapU = forceRepeat
+                            ? MapTextureWrap.Repeat
+                            : material?.BaseTexture?.WrapU ?? MapTextureWrap.Repeat;
+                        MapTextureWrap wrapV = forceRepeat
+                            ? MapTextureWrap.Repeat
+                            : material?.BaseTexture?.WrapV ?? MapTextureWrap.Repeat;
+                        string materialPath = materialIndex >= 0 && materialIndex < geometry.Materials.Count
+                            ? geometry.Materials[materialIndex]
+                            : null;
+
+                        boundIndex = bound.Count;
+                        byKey[key] = boundIndex;
+                        bound.Add(new BoundMaterial(
+                            materialIndex,
+                            materialPath,
+                            material,
+                            effective,
+                            lit,
+                            transparentMaterial,
+                            meshDoubleSided,
+                            repeat,
+                            wrapU,
+                            wrapV));
+                    }
+
+                    var group = new DrawGroup(
+                        submesh.StartIndex,
+                        submesh.IndexCount,
+                        boundIndex,
+                        meshIndex,
+                        order++);
+                    if (bound[boundIndex].Transparent)
+                        transparent.Add(group);
+                    else
+                        opaque.Add(group);
+                }
+            }
+
+            // Three.js sorts opaque render items by material identity. Bound materials are created
+            // in first-use order, so sorting by their index reproduces that batching while keeping
+            // the original order inside each material. Transparent groups keep authored order.
+            DrawGroup[] opaqueOrdered = opaque
+                .OrderBy(group => group.BoundMaterialIndex)
+                .ThenBy(group => group.Order)
+                .ToArray();
+            return new DrawPlan(bound, opaqueOrdered, transparent);
+        }
+
+        internal static bool Covers(MapMaterialDefinition material) =>
+            material == null ||
+            material.BaseTexture != null ||
+            string.IsNullOrWhiteSpace(material.ShaderPath) ||
+            !IndicatorShader.IsMatch(material.ShaderPath);
+
+        internal static LightState ResolveLight(MapSunData sun)
+        {
+            if (sun == null)
+            {
+                return new LightState(
+                    DefaultSunDirection,
+                    Vector3.One,
+                    0.4f,
+                    Vector3.One,
+                    Vector3.One,
+                    Vector3.One,
+                    0.6f,
+                    1f);
+            }
+
+            Vector3 direction = sun.Direction;
+            if (!VectorMathUtils.IsFinite(direction) || direction.LengthSquared() <= 1e-12f)
+                direction = new Vector3(-0.25f, 0.75f, -0.05f);
+            direction = Vector3.Normalize(direction);
+            direction.X = -direction.X;
+
+            float sunStrength = MathF.Max(sun.Intensity, 0f);
+            float ambientStrength = MathF.Max(sun.SkyScale, 0f);
+            float total = sunStrength + ambientStrength;
+            if (total > 0f)
+            {
+                sunStrength /= total;
+                ambientStrength /= total;
+            }
+            else
+            {
+                sunStrength = 0.5f;
+                ambientStrength = 0.5f;
+            }
+
+            return new LightState(
+                direction,
+                VectorMathUtils.SrgbToLinear(new Vector3(sun.Color.X, sun.Color.Y, sun.Color.Z)),
+                sunStrength,
+                VectorMathUtils.SrgbToLinear(new Vector3(sun.SkyColor.X, sun.SkyColor.Y, sun.SkyColor.Z)),
+                VectorMathUtils.SrgbToLinear(new Vector3(sun.GroundColor.X, sun.GroundColor.Y, sun.GroundColor.Z)),
+                VectorMathUtils.SrgbToLinear(new Vector3(sun.HorizonColor.X, sun.HorizonColor.Y, sun.HorizonColor.Z)),
+                ambientStrength,
+                MathF.Max(sun.LightMapColorScale, 0f));
+        }
+
+        internal static LightState ResolveLight(MapSunData sun, MapSunPreviewOverride previewOverride)
+        {
+            LightState own = ResolveLight(sun);
+            Vector3 direction = previewOverride.Direction;
+            if (!VectorMathUtils.IsFinite(direction) || direction.LengthSquared() <= 1e-12f)
+                direction = MapPreviewSemantics.DefaultSun.Direction;
+            direction = Vector3.Normalize(direction);
+            direction.X = -direction.X;
+
+            return own with
+            {
+                Direction = direction,
+                SunColor = VectorMathUtils.SrgbToLinear(new Vector3(previewOverride.Color.X, previewOverride.Color.Y, previewOverride.Color.Z)),
+                SunStrength = MathF.Max(previewOverride.Strength, 0f),
+                SkyColor = VectorMathUtils.SrgbToLinear(new Vector3(previewOverride.SkyColor.X, previewOverride.SkyColor.Y, previewOverride.SkyColor.Z)),
+                GroundColor = VectorMathUtils.SrgbToLinear(new Vector3(previewOverride.GroundColor.X, previewOverride.GroundColor.Y, previewOverride.GroundColor.Z)),
+                AmbientStrength = MathF.Max(previewOverride.Ambient, 0f)
+            };
+        }
+
+        private static Vector3 ResolveColor(MapMaterialDefinition material, bool hasTexture)
+        {
+            if (material?.Missing == false && material.Tint.HasValue)
+                return VectorMathUtils.SrgbToLinear(material.Tint.Value);
+            return hasTexture ? Vector3.One : StoneLinear;
+        }
+
+        internal void ClearScene()
+        {
+            if (!_ready || _scene == null)
+                return;
+            ReleaseSceneResources();
+        }
+
+        private void ReleaseSceneResources()
+        {
+            foreach (MaterialTexture texture in _materialTextures.Values)
+                ReleaseTexture(texture.Image);
+            _materialTextures.Clear();
+            foreach (MaterialTexture texture in _programTextures.Values)
+                ReleaseRawTexture(texture.Image);
+            _programTextures.Clear();
+            foreach (MaterialTexture texture in _lightmapTextures.Values)
+                ReleaseRawTexture(texture.Image);
+            _lightmapTextures.Clear();
+            foreach (uint cube in _environmentCubes.Values)
+                _gl.DeleteTexture(cube);
+            _environmentCubes.Clear();
+            ReleaseTerrainPaint();
+
+            ReleaseGeometry();
+
+            _scene = null;
+            _previewSun = null;
+            _plan = null;
+            _programPlan = null;
+            _programPlanSource = null;
+        }
+
+        private void ReleaseGeometry()
+        {
+            if (_activeGeometryResources != null)
+            {
+                GeometryResources resources = _activeGeometryResources;
+                _activeGeometryResources = null;
+                resources.References = Math.Max(0, resources.References - 1);
+                if (resources.References == 0)
+                    resources.ReleasedAtMs = Environment.TickCount64;
+
+                _vao = 0;
+                _positionVbo = 0;
+                _normalVbo = 0;
+                _uv0Vbo = 0;
+                _uv1Vbo = 0;
+                _colorVbo = 0;
+                _pivotVbo = 0;
+                _ebo = 0;
+                return;
+            }
+
+            DeleteBuffer(ref _positionVbo);
+            DeleteBuffer(ref _normalVbo);
+            DeleteBuffer(ref _uv0Vbo);
+            DeleteBuffer(ref _uv1Vbo);
+            DeleteBuffer(ref _colorVbo);
+            DeleteBuffer(ref _pivotVbo);
+            DeleteBuffer(ref _ebo);
+            if (_vao != 0)
+            {
+                _gl.DeleteVertexArray(_vao);
+                _vao = 0;
+            }
+        }
+
+        private void DeleteGeometryResources(GeometryResources resources)
+        {
+            if (resources == null)
+                return;
+
+            DeleteBuffer(ref resources.PositionVbo);
+            DeleteBuffer(ref resources.NormalVbo);
+            DeleteBuffer(ref resources.Uv0Vbo);
+            DeleteBuffer(ref resources.Uv1Vbo);
+            DeleteBuffer(ref resources.ColorVbo);
+            DeleteBuffer(ref resources.PivotVbo);
+            DeleteBuffer(ref resources.Ebo);
+            if (resources.Vao != 0)
+            {
+                _gl.DeleteVertexArray(resources.Vao);
+                resources.Vao = 0;
+            }
+        }
+
+        private void DeleteBuffer(ref uint buffer)
+        {
+            if (buffer == 0)
+                return;
+            _gl.DeleteBuffer(buffer);
+            buffer = 0;
+        }
+
+        public void Dispose()
+        {
+            if (!_ready)
+                return;
+
+            try
+            {
+                ReleaseSceneResources();
+                DeleteAllRetainedResources();
+                _gameShaderRuntime?.Dispose();
+                _gameShaderRuntime = null;
+                _sceneCapture?.Dispose();
+                _sceneCapture = null;
+                foreach (uint sampler in _samplers.Values)
+                    if (sampler != 0)
+                        _gl.DeleteSampler(sampler);
+                _samplers.Clear();
+                if (_whiteTexture != 0)
+                    _gl.DeleteTexture(_whiteTexture);
+                if (_program != 0)
+                    _gl.DeleteProgram(_program);
+            }
+            catch (Silk.NET.Core.Loader.SymbolLoadingException)
+            {
+                // The OpenGL context owns remaining handles and reclaims them on teardown.
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+            finally
+            {
+                _sharedTextures.Clear();
+                _sharedRawTextures.Clear();
+                _retainedGeometry.Clear();
+                _activeGeometryResources = null;
+                _materialTextures.Clear();
+                _programTextures.Clear();
+                _lightmapTextures.Clear();
+                _samplers.Clear();
+                _whiteTexture = 0;
+                _program = 0;
+                _nextRetentionSweepMs = 0;
+                _ready = false;
+                _gl = null;
+                _drawElements = null;
+            }
+        }
+    }
+}

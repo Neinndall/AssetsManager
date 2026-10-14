@@ -1,9 +1,10 @@
 using System;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using Microsoft.WindowsAPICodePack.Dialogs;
+using Microsoft.Win32;
 using AssetsManager.Views.Models.Comparator;
 using AssetsManager.Services.Comparator;
 using AssetsManager.Services.Core;
@@ -26,6 +27,10 @@ namespace AssetsManager.Views.Controls.Comparator
 
         public WadComparisonModel ViewModel => DataContext as WadComparisonModel;
 
+        private string _lastPreferredClientKey;
+        private bool _isUpdatingSources;
+        private readonly SemaphoreSlim _refreshGate = new(1, 1);
+
         public WadComparisonControl()
         {
             InitializeComponent();
@@ -41,8 +46,8 @@ namespace AssetsManager.Views.Controls.Comparator
                 AppSettings.ConfigurationSaved -= OnConfigurationSaved;
                 AppSettings.ConfigurationSaved += OnConfigurationSaved;
             }
-            await LoadBackupsAsync();
-            await InitializeDefaultPathsAsync();
+
+            await RefreshSourcesAsync();
         }
 
         private void WadComparisonControl_Unloaded(object sender, RoutedEventArgs e)
@@ -51,75 +56,153 @@ namespace AssetsManager.Views.Controls.Comparator
             {
                 AppSettings.ConfigurationSaved -= OnConfigurationSaved;
             }
+        }
 
-            // Clear heavy data from memory when not in use
-            if (ViewModel != null)
+        private async Task RefreshSourcesAsync()
+        {
+            await _refreshGate.WaitAsync();
+            try
             {
-                ViewModel.AvailableBackups.Clear();
+                if (ViewModel == null || AppSettings == null || BackupManager == null || VersionService == null) return;
+
+                string preferredClientKey = GetPreferredClientKey();
+                bool resetSources = _lastPreferredClientKey != null
+                    && !string.Equals(_lastPreferredClientKey, preferredClientKey, StringComparison.OrdinalIgnoreCase);
+                _lastPreferredClientKey = preferredClientKey;
+
+                _isUpdatingSources = true;
+                try
+                {
+                    if (resetSources)
+                    {
+                        ViewModel.SelectedTargetBackup = null;
+                        ViewModel.SelectedBaseBackup = null;
+                        ViewModel.NewDirectoryPath = null;
+                        ViewModel.OldDirectoryPath = null;
+                        ViewModel.NewWadFilePath = null;
+                        ViewModel.OldWadFilePath = null;
+                    }
+
+                    // Publish the initial target before the first asynchronous inventory scan.
+                    if (ViewModel.IsDirectoryMode && string.IsNullOrEmpty(ViewModel.NewDirectoryPath))
+                    {
+                        string defaultPath = GetPreferredInitialDirectory();
+                        ViewModel.DirectorySyncSuffix = GetRelativeSubDirectory(defaultPath);
+                        SetPathWithSync(false, defaultPath);
+                    }
+                }
+                finally
+                {
+                    _isUpdatingSources = false;
+                }
+
+                await LoadBackupsAsync();
+
+                await ViewModel.UpdateMetadataFromPathAsync(
+                    false, ViewModel.TargetSourcePath, VersionService, BackupManager);
+                if (ViewModel.IsDirectoryMode && string.IsNullOrEmpty(ViewModel.OldDirectoryPath))
+                {
+                    await SyncDirectoryBaseAsync(ViewModel.NewDirectoryPath);
+                }
+                else
+                {
+                    await ViewModel.UpdateMetadataFromPathAsync(
+                        true, ViewModel.BaseSourcePath, VersionService, BackupManager);
+                }
+            }
+            catch (Exception ex)
+            {
+                LogService.LogError(ex, "Error refreshing comparison sources.");
+            }
+            finally
+            {
+                _refreshGate.Release();
             }
         }
 
         private async void OnConfigurationSaved(object sender, EventArgs e)
         {
-            await Dispatcher.InvokeAsync(async () =>
-            {
-                await LoadBackupsAsync();
-                await InitializeDefaultPathsAsync();
-            });
+            await Dispatcher.InvokeAsync(RefreshSourcesAsync).Task.Unwrap();
         }
+
+
+        private string GetPreferredClientKey() =>
+            $"{AppSettings?.PreferredClient}:{GetPreferredInitialDirectory()}";
 
         private void SetPathWithSync(bool isBase, string path)
         {
             if (ViewModel == null) return;
 
-            var match = ViewModel.AvailableBackups.FirstOrDefault(b => string.Equals(b.Path, path, StringComparison.OrdinalIgnoreCase));
-            if (isBase)
+            var match = ViewModel.AvailableBackups.FirstOrDefault(b =>
+                string.Equals(ViewModel.IsDirectoryMode ? ViewModel.ApplySyncSuffix(b.Path) : b.Path,
+                    path, StringComparison.OrdinalIgnoreCase));
+            bool wasUpdatingSources = _isUpdatingSources;
+            _isUpdatingSources = true;
+            try
             {
-                if (match != null) ViewModel.SelectedBaseBackup = match;
-                else ViewModel.OldDirectoryPath = path;
+                if (isBase)
+                {
+                    ViewModel.SelectedBaseBackup = match;
+                    if (match == null && ViewModel.IsDirectoryMode) ViewModel.OldDirectoryPath = path;
+                }
+                else
+                {
+                    ViewModel.SelectedTargetBackup = match;
+                    if (match == null && ViewModel.IsDirectoryMode) ViewModel.NewDirectoryPath = path;
+                }
             }
-            else
+            finally
             {
-                if (match != null) ViewModel.SelectedTargetBackup = match;
-                else ViewModel.NewDirectoryPath = path;
+                _isUpdatingSources = wasUpdatingSources;
             }
         }
 
-        private async Task InitializeDefaultPathsAsync()
+
+        private string GetRelativeSubDirectory(string path)
         {
-            if (ViewModel == null || AppSettings == null || VersionService == null) return;
-            string defaultPath = GetPreferredInitialDirectory();
-            if (!string.IsNullOrEmpty(defaultPath))
+            if (string.IsNullOrEmpty(path) || BackupManager == null) return null;
+            string root = BackupManager.GetGameRoot(path);
+            if (string.IsNullOrEmpty(root) || string.Equals(root, path, StringComparison.OrdinalIgnoreCase)) return null;
+            string relative = System.IO.Path.GetRelativePath(root, path);
+            if (relative == "." || relative.StartsWith("..", StringComparison.Ordinal)) return null;
+            return relative;
+        }
+
+        private async Task SyncDirectoryBaseAsync(string targetPath)
+        {
+            if (ViewModel == null || !ViewModel.IsDirectoryMode || string.IsNullOrEmpty(targetPath)
+                || !string.IsNullOrEmpty(ViewModel.OldDirectoryPath)) return;
+
+            var (isPbe, _) = BackupManager.GetPathIdentification(targetPath);
+            var suggestedBackup = ViewModel.AvailableBackups
+                .Where(b => !b.IsMainClient && b.IsPbe == isPbe)
+                .OrderByDescending(b => b.CreationDate)
+                .FirstOrDefault();
+
+            if (suggestedBackup == null) return;
+
+            _isUpdatingSources = true;
+            try
             {
-                SetPathWithSync(false, defaultPath);
-                await ViewModel.UpdateMetadataFromPathAsync(false, defaultPath, VersionService, BackupManager);
-
-                // --- DIRECTORY AUTO-SYNC ---
-                if (ViewModel.IsDirectoryMode && string.IsNullOrEmpty(ViewModel.OldDirectoryPath))
-                {
-                    var (isPbe, _) = BackupManager.GetPathIdentification(defaultPath);
-                    var suggestedBackup = ViewModel.AvailableBackups
-                        .Where(b => !b.IsMainClient && b.IsPbe == isPbe)
-                        .OrderByDescending(b => b.CreationDate)
-                        .FirstOrDefault();
-
-                    if (suggestedBackup != null)
-                    {
-                        ViewModel.SelectedBaseBackup = suggestedBackup;
-                        await ViewModel.UpdateMetadataFromPathAsync(true, suggestedBackup.Path, VersionService, BackupManager);
-                    }
-                }
+                ViewModel.SelectedBaseBackup = suggestedBackup;
             }
+            finally
+            {
+                _isUpdatingSources = false;
+            }
+            await ViewModel.UpdateMetadataFromPathAsync(
+                true,
+                ViewModel.ApplySyncSuffix(suggestedBackup.Path),
+                VersionService,
+                BackupManager);
         }
 
         private string GetPreferredInitialDirectory()
         {
             if (AppSettings == null) return null;
-            if (AppSettings.PreferredClient == PreferredClient.PBE && !string.IsNullOrEmpty(AppSettings.LolPbeDirectory))
-                return AppSettings.LolPbeDirectory;
-            else if (AppSettings.PreferredClient == PreferredClient.LIVE && !string.IsNullOrEmpty(AppSettings.LolLiveDirectory))
-                return AppSettings.LolLiveDirectory;
-            return !string.IsNullOrEmpty(AppSettings.LolPbeDirectory) ? AppSettings.LolPbeDirectory : AppSettings.LolLiveDirectory;
+            return AppSettings.PreferredClient == PreferredClient.PBE
+                ? AppSettings.LolPbeDirectory
+                : AppSettings.LolLiveDirectory;
         }
 
         private async Task LoadBackupsAsync()
@@ -127,22 +210,48 @@ namespace AssetsManager.Views.Controls.Comparator
             if (BackupManager == null || ViewModel == null) return;
             try
             {
-                var backups = await BackupManager.GetBackupsAsync();
-                ViewModel.AvailableBackups.Clear();
-                foreach (var backup in backups) { ViewModel.AvailableBackups.Add(backup); }
+                PreferredClient client = AppSettings?.PreferredClient ?? PreferredClient.PBE;
+                var backups = await BackupManager.GetBackupsAsync(
+                    includeStorageMetrics: false,
+                    client: client);
+                string targetPath = ViewModel.TargetSourceRoot;
+                string basePath = ViewModel.BaseSourceRoot;
+                var previousBaseBackup = ViewModel.SelectedBaseBackup
+                    ?? ViewModel.AvailableBackups.FirstOrDefault(b =>
+                        string.Equals(ViewModel.ApplySyncSuffix(b.Path), basePath, StringComparison.OrdinalIgnoreCase));
+                bool baseBackupRemoved = ViewModel.IsDirectoryMode
+                    && previousBaseBackup != null
+                    && !previousBaseBackup.IsMainClient
+                    && !backups.Any(b => string.Equals(b.Path, previousBaseBackup.Path, StringComparison.OrdinalIgnoreCase));
 
-                // Re-sync selections after collection update to ensure reference matching
-                if (!string.IsNullOrEmpty(ViewModel.NewDirectoryPath)) SetPathWithSync(false, ViewModel.NewDirectoryPath);
-                if (!string.IsNullOrEmpty(ViewModel.OldDirectoryPath)) SetPathWithSync(true, ViewModel.OldDirectoryPath);
+                // Collection resets clear ComboBox selections; preserve paths until rebinding completes.
+                _isUpdatingSources = true;
+                try
+                {
+                    ViewModel.AvailableBackups.Clear();
+                    foreach (var backup in backups) { ViewModel.AvailableBackups.Add(backup); }
+
+                    if (!string.IsNullOrEmpty(targetPath)) SetPathWithSync(false, targetPath);
+                    if (baseBackupRemoved) ViewModel.OldDirectoryPath = null;
+                    else if (!string.IsNullOrEmpty(basePath)) SetPathWithSync(true, basePath);
+                }
+                finally
+                {
+                    _isUpdatingSources = false;
+                }
+
             }
             catch (Exception ex) { LogService.LogError(ex, "Error loading backups."); }
         }
 
         private async void BaseQuickSelect_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (sender is ComboBox comboBox && comboBox.SelectedItem is BackupModel backup)
+            if (!_isUpdatingSources && sender is ComboBox comboBox && comboBox.SelectedItem is BackupModel backup)
             {
-                await ViewModel.UpdateMetadataFromPathAsync(true, backup.Path, VersionService, BackupManager);
+                string effectivePath = ViewModel.IsDirectoryMode
+                    ? ViewModel.ApplySyncSuffix(backup.Path)
+                    : backup.Path;
+                await ViewModel.UpdateMetadataFromPathAsync(true, effectivePath, VersionService, BackupManager);
                 if (ViewModel.IsFileMode)
                 {
                     await SyncWadFilePathsAsync(backup.Path);
@@ -152,23 +261,17 @@ namespace AssetsManager.Views.Controls.Comparator
 
         private async void TargetQuickSelect_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (sender is ComboBox comboBox && comboBox.SelectedItem is BackupModel backup)
+            if (!_isUpdatingSources && sender is ComboBox comboBox && comboBox.SelectedItem is BackupModel backup)
             {
-                await ViewModel.UpdateMetadataFromPathAsync(false, backup.Path, VersionService, BackupManager);
+                string effectivePath = ViewModel.IsDirectoryMode
+                    ? ViewModel.ApplySyncSuffix(backup.Path)
+                    : backup.Path;
+                await ViewModel.UpdateMetadataFromPathAsync(false, effectivePath, VersionService, BackupManager);
 
                 // --- DIRECTORY AUTO-SYNC ---
                 if (ViewModel.IsDirectoryMode && string.IsNullOrEmpty(ViewModel.OldDirectoryPath))
                 {
-                    var suggestedBackup = ViewModel.AvailableBackups
-                        .Where(b => !b.IsMainClient && b.IsPbe == backup.IsPbe)
-                        .OrderByDescending(b => b.CreationDate)
-                        .FirstOrDefault();
-
-                    if (suggestedBackup != null)
-                    {
-                        ViewModel.SelectedBaseBackup = suggestedBackup;
-                        await ViewModel.UpdateMetadataFromPathAsync(true, suggestedBackup.Path, VersionService, BackupManager);
-                    }
+                    await SyncDirectoryBaseAsync(effectivePath);
                 }
             }
         }
@@ -176,43 +279,30 @@ namespace AssetsManager.Views.Controls.Comparator
         private async void btnSelectOldLolPbeDirectory_Click(object sender, RoutedEventArgs e)
         {
             if (ViewModel == null) return;
-            using (var folderBrowserDialog = new CommonOpenFileDialog { IsFolderPicker = true, Title = "Select old directory", InitialDirectory = GetPreferredInitialDirectory() })
+            var folderBrowserDialog = new OpenFolderDialog { Title = "Select old directory", InitialDirectory = GetPreferredInitialDirectory() };
+            if (folderBrowserDialog.ShowDialog() == true)
             {
-                if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
-                {
-                    string oldPath = folderBrowserDialog.FileName;
-                    SetPathWithSync(true, oldPath);
-                    await ViewModel.UpdateMetadataFromPathAsync(true, oldPath, VersionService, BackupManager);
-                }
+                string oldPath = folderBrowserDialog.FolderName;
+                SetPathWithSync(true, oldPath);
+                await ViewModel.UpdateMetadataFromPathAsync(true, oldPath, VersionService, BackupManager);
             }
         }
 
         private async void btnSelectNewLolPbeDirectory_Click(object sender, RoutedEventArgs e)
         {
             if (ViewModel == null) return;
-            using (var folderBrowserDialog = new CommonOpenFileDialog { IsFolderPicker = true, Title = "Select new directory", InitialDirectory = GetPreferredInitialDirectory() })
+            var folderBrowserDialog = new OpenFolderDialog { Title = "Select new directory", InitialDirectory = GetPreferredInitialDirectory() };
+            if (folderBrowserDialog.ShowDialog() == true)
             {
-                if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
+                string newPath = folderBrowserDialog.FolderName;
+                ViewModel.DirectorySyncSuffix = GetRelativeSubDirectory(newPath);
+                SetPathWithSync(false, newPath);
+                await ViewModel.UpdateMetadataFromPathAsync(false, newPath, VersionService, BackupManager);
+
+                // --- DIRECTORY AUTO-SYNC ---
+                if (string.IsNullOrEmpty(ViewModel.OldDirectoryPath))
                 {
-                    string newPath = folderBrowserDialog.FileName;
-                    SetPathWithSync(false, newPath);
-                    await ViewModel.UpdateMetadataFromPathAsync(false, newPath, VersionService, BackupManager);
-
-                    // --- DIRECTORY AUTO-SYNC ---
-                    if (string.IsNullOrEmpty(ViewModel.OldDirectoryPath))
-                    {
-                        var (isPbe, _) = BackupManager.GetPathIdentification(newPath);
-                        var suggestedBackup = ViewModel.AvailableBackups
-                            .Where(b => !b.IsMainClient && b.IsPbe == isPbe)
-                            .OrderByDescending(b => b.CreationDate)
-                            .FirstOrDefault();
-
-                        if (suggestedBackup != null)
-                        {
-                            ViewModel.SelectedBaseBackup = suggestedBackup;
-                            await ViewModel.UpdateMetadataFromPathAsync(true, suggestedBackup.Path, VersionService, BackupManager);
-                        }
-                    }
+                    await SyncDirectoryBaseAsync(newPath);
                 }
             }
         }
@@ -220,8 +310,8 @@ namespace AssetsManager.Views.Controls.Comparator
         private async void btnSelectOldWadFile_Click(object sender, RoutedEventArgs e)
         {
             if (ViewModel == null) return;
-            var openFileDialog = new CommonOpenFileDialog { Filters = { new CommonFileDialogFilter("WAD files", "*.wad;*.wad.client"), new CommonFileDialogFilter("All files", "*.*") }, Title = "Select old wad file", InitialDirectory = GetPreferredInitialDirectory() };
-            if (openFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
+            var openFileDialog = new OpenFileDialog { Filter = "WAD files (*.wad;*.wad.client)|*.wad;*.wad.client|All files (*.*)|*.*", Title = "Select old wad file", InitialDirectory = GetPreferredInitialDirectory() };
+            if (openFileDialog.ShowDialog() == true)
             {
                 ViewModel.OldWadFilePath = openFileDialog.FileName;
                 await ViewModel.UpdateMetadataFromPathAsync(true, ViewModel.OldWadFilePath, VersionService, BackupManager);
@@ -231,9 +321,9 @@ namespace AssetsManager.Views.Controls.Comparator
         private async void btnSelectNewWadFile_Click(object sender, RoutedEventArgs e)
         {
             if (ViewModel == null) return;
-            var openFileDialog = new CommonOpenFileDialog { Filters = { new CommonFileDialogFilter("WAD files", "*.wad;*.wad.client"), new CommonFileDialogFilter("All files", "*.*") }, Title = "Select new wad file", InitialDirectory = GetPreferredInitialDirectory() };
+            var openFileDialog = new OpenFileDialog { Filter = "WAD files (*.wad;*.wad.client)|*.wad;*.wad.client|All files (*.*)|*.*", Title = "Select new wad file", InitialDirectory = GetPreferredInitialDirectory() };
             
-            if (openFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
+            if (openFileDialog.ShowDialog() == true)
             {
                 string newPath = openFileDialog.FileName;
                 ViewModel.NewWadFilePath = newPath;
@@ -339,7 +429,7 @@ namespace AssetsManager.Views.Controls.Comparator
                 else await WadComparatorService.CompareSingleWadAsync(ViewModel.BaseSourcePath, ViewModel.TargetSourcePath, ViewModel.TargetVersion, cancellationToken);
             }
             catch (OperationCanceledException) { LogService.LogWarning("WAD comparison cancelled."); }
-            catch (Exception ex) { LogService.LogError(ex, "Comparison error."); CustomMessageBoxService.ShowError("Error", ex.Message, Window.GetWindow(this)); }
+            catch (Exception ex) { LogService.LogError(ex, "Comparison error."); CustomMessageBoxService.ShowError("Error", "Comparison error:\n" + ex.Message, Window.GetWindow(this)); }
             finally { ViewModel.IsComparing = false; }
         }
     }

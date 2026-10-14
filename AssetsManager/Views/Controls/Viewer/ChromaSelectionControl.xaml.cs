@@ -1,98 +1,316 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Input;
-using AssetsManager.Services.Viewer;
+using AssetsManager.Services.Viewer.Loading;
+using AssetsManager.Services.Core;
 using AssetsManager.Views.Models.Viewer;
+using Microsoft.Win32;
 
 namespace AssetsManager.Views.Controls.Viewer
 {
-    /// <summary>
-    /// ChromaSelectionControl: A specialized container for skin selection.
-    /// Following the "Contenedores (Dueños)" pattern from PBE.md.
-    /// </summary>
     public partial class ChromaSelectionControl : UserControl
     {
         private readonly ChromaSelectionModel _viewModel;
+        private List<ChromaFamilyModel> _currentFamilies = new();
+        private List<ChromaFamilyModel> _referenceFamilies = new();
+        private string _currentSkinsPath;
 
-        // The control owns its ViewModel
         public ChromaSelectionModel ViewModel => _viewModel;
 
-        // Dependency Injection via Property
-        public ChromaScannerService ScannerService { get; set; }
+        public ChromaLoadingService ChromaLoadingService { get; set; }
 
-        // Peer Reference to the Parent Panel (Needed for model loading)
-        public ViewerPanelControl ParentPanel { get; set; }
+        public CustomMessageBoxService CustomMessageBoxService { get; set; }
+        public event Action<IReadOnlyList<ChromaSkinModel>, bool> SelectionRequested;
+        public event EventHandler CloseRequested;
+        public event EventHandler SourceChangeRequested;
+        private int _loadGeneration;
 
         public ChromaSelectionControl()
         {
             InitializeComponent();
-            
-            // Pattern: Instancian su ViewModel en el constructor y lo asignan al DataContext
+
             _viewModel = new ChromaSelectionModel();
             DataContext = _viewModel;
         }
 
-        /// <summary>
-        /// Starts the scanning process for a specific skins directory.
-        /// </summary>
         public async Task InitializeAsync(string skinsPath)
         {
-            if (ScannerService == null || _viewModel == null) return;
+            if (ChromaLoadingService == null) return;
+            int generation = ++_loadGeneration;
 
-            _viewModel.SetScanningState(System.IO.Path.GetFileName(skinsPath));
+            _currentSkinsPath = NormalizePath(skinsPath);
+            _currentFamilies = new List<ChromaFamilyModel>();
+            _referenceFamilies = new List<ChromaFamilyModel>();
+            _viewModel.SetScanningState(Path.GetFileName(_currentSkinsPath), _currentSkinsPath);
 
             try
             {
-                var skins = await ScannerService.ScanSkinsAsync(skinsPath);
-                _viewModel.AvailableSkins.ReplaceRange(skins);
-                _viewModel.ModelPath = ScannerService.FindAssociatedModel(skinsPath);
+                var families = await ChromaLoadingService.LoadFamiliesAsync(skinsPath);
+                if (generation != _loadGeneration) return;
+                TagSource(families, ChromaSourceKind.Current, _currentSkinsPath);
+                _currentFamilies = families;
+                ApplyCombinedFamilies();
 
-                if (skins.Count == 0)
-                {
+                if (families.Count == 0)
                     _viewModel.SetEmptyState();
-                }
                 else
-                {
-                    _viewModel.SetSuccessState(skins.Count);
-                }
+                    _viewModel.SetSuccessState();
             }
             catch (Exception ex)
             {
+                if (generation != _loadGeneration) return;
                 _viewModel.SetErrorState(ex.Message);
             }
         }
 
-        private void ChromaCard_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        private void FamilyListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (sender is FrameworkElement element && element.DataContext is ChromaSkinModel skin)
+            if (FamilyListBox.SelectedItem is ChromaFamilyModel family)
+                _viewModel.SelectedFamily = family;
+        }
+
+        private async void AddReferenceButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (ChromaLoadingService == null || string.IsNullOrWhiteSpace(_currentSkinsPath))
+                return;
+
+            int generation = _loadGeneration;
+            var dialog = new OpenFolderDialog
             {
-                // Toggle selection
-                skin.IsSelected = !skin.IsSelected;
-                _viewModel.SelectedSkin = skin;
+                Title = "Select reference skins folder",
+                InitialDirectory = _currentSkinsPath
+            };
+
+            if (dialog.ShowDialog() != true)
+                return;
+
+            string referencePath = NormalizePath(dialog.FolderName);
+            if (PathsEqual(_currentSkinsPath, referencePath))
+            {
+                CustomMessageBoxService?.ShowWarning(
+                    "Same Chroma Source",
+                    "Choose a different skins folder to use as the reference source.",
+                    Window.GetWindow(this));
+                return;
+            }
+
+            _viewModel.SetReferenceScanningState();
+            try
+            {
+                var families = await ChromaLoadingService.LoadFamiliesAsync(referencePath);
+                if (generation != _loadGeneration) return;
+                if (families.Count == 0)
+                {
+                    _viewModel.SetSuccessState();
+                    CustomMessageBoxService?.ShowWarning(
+                        "Reference Not Found",
+                        "No chroma families were found in the selected reference folder.",
+                        Window.GetWindow(this));
+                    return;
+                }
+
+                TagSource(families, ChromaSourceKind.Reference, referencePath);
+                _referenceFamilies = families;
+                _viewModel.SetReferenceSource(referencePath);
+                ApplyCombinedFamilies();
+                _viewModel.SetSuccessState();
+            }
+            catch (Exception ex)
+            {
+                if (generation != _loadGeneration) return;
+                _viewModel.SetSuccessState();
+                CustomMessageBoxService?.ShowWarning(
+                    "Reference Load Failed",
+                    $"Could not load the reference chromas: {ex.Message}",
+                    Window.GetWindow(this));
             }
         }
 
-        private void LoadSelectedButton_Click(object sender, RoutedEventArgs e)
+        private void RemoveReferenceButton_Click(object sender, RoutedEventArgs e)
         {
-            var selectedSkins = _viewModel.AvailableSkins.Where(s => s.IsSelected).ToList();
-            if (selectedSkins.Count > 0)
+            _referenceFamilies = new List<ChromaFamilyModel>();
+            _viewModel.ClearReferenceSource();
+            ApplyCombinedFamilies();
+            _viewModel.SetSuccessState();
+        }
+
+        private void SelectFamilyButton_Click(object sender, RoutedEventArgs e)
+        {
+            SetCurrentFamilySelection(true);
+        }
+
+        private void ClearFamilyButton_Click(object sender, RoutedEventArgs e)
+        {
+            SetCurrentFamilySelection(false);
+        }
+
+        private void SetCurrentFamilySelection(bool isSelected)
+        {
+            if (_viewModel.SelectedFamily == null) return;
+            foreach (ChromaSkinModel chroma in _viewModel.SelectedFamily.Chromas)
+                chroma.IsSelected = isSelected;
+        }
+
+        private void LoadSelectedButton_Click(object sender, RoutedEventArgs e) => RequestSelection(false);
+
+        private void AddToSceneButton_Click(object sender, RoutedEventArgs e) => RequestSelection(true);
+
+        private void RequestSelection(bool addToScene)
+        {
+            var selected = _viewModel.SelectedChromas.ToList();
+            if (selected.Count > 0 && !_viewModel.IsLoading)
+                SelectionRequested?.Invoke(selected, addToScene);
+        }
+
+        private void ChangeSourceButton_Click(object sender, RoutedEventArgs e) =>
+            SourceChangeRequested?.Invoke(this, EventArgs.Empty);
+
+        private void CloseButton_Click(object sender, RoutedEventArgs e) =>
+            CloseRequested?.Invoke(this, EventArgs.Empty);
+
+        public void Reset()
+        {
+            _loadGeneration++;
+            _currentFamilies.Clear();
+            _referenceFamilies.Clear();
+            _currentSkinsPath = null;
+            _viewModel.Reset();
+        }
+
+        private void ApplyCombinedFamilies()
+        {
+            string selectedFamilyKey = _viewModel.SelectedFamily == null
+                ? null
+                : GetFamilyKey(_viewModel.SelectedFamily);
+            List<ChromaFamilyModel> mergedFamilies = MergeFamilies(_currentFamilies, _referenceFamilies);
+            _viewModel.SetFamilies(mergedFamilies);
+
+            if (!string.IsNullOrWhiteSpace(selectedFamilyKey))
             {
-                ParentPanel?.HandleMultipleChromasSelected(selectedSkins);
+                ChromaFamilyModel selectedFamily = mergedFamilies.FirstOrDefault(
+                    family => string.Equals(GetFamilyKey(family), selectedFamilyKey, StringComparison.OrdinalIgnoreCase));
+                if (selectedFamily != null)
+                    _viewModel.SelectedFamily = selectedFamily;
             }
         }
 
-        private void CloseButton_Click(object sender, RoutedEventArgs e)
+        private static List<ChromaFamilyModel> MergeFamilies(
+            IReadOnlyList<ChromaFamilyModel> currentFamilies,
+            IReadOnlyList<ChromaFamilyModel> referenceFamilies)
         {
-            // We use the Peer Reference to notify the parent to hide the gallery
-            if (ParentPanel?.ViewModel != null)
+            // A family name such as SKIN01 is only meaningful inside a champion/model set.
+            // Matching the model identity as well prevents unrelated champions from being
+            // folded together when a reference folder is added for comparison.
+            var referenceByKey = referenceFamilies.ToDictionary(
+                GetFamilyKey,
+                StringComparer.OrdinalIgnoreCase);
+            var merged = new List<ChromaFamilyModel>();
+            var consumedKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (ChromaFamilyModel currentFamily in currentFamilies)
             {
-                ParentPanel.ViewModel.IsChromaGalleryVisible = false;
+                string familyKey = GetFamilyKey(currentFamily);
+                referenceByKey.TryGetValue(familyKey, out ChromaFamilyModel referenceFamily);
+                merged.Add(MergeFamily(currentFamily, referenceFamily));
+                consumedKeys.Add(familyKey);
             }
-            _viewModel?.Reset();
+
+            foreach (ChromaFamilyModel referenceFamily in referenceFamilies)
+            {
+                string familyKey = GetFamilyKey(referenceFamily);
+                if (!consumedKeys.Contains(familyKey))
+                    merged.Add(MergeFamily(null, referenceFamily));
+            }
+
+            return merged;
+        }
+
+        private static string GetFamilyKey(ChromaFamilyModel family)
+        {
+            if (family == null)
+                return string.Empty;
+
+            string modelIdentity = string.IsNullOrWhiteSpace(family.ModelName)
+                ? Path.GetFileNameWithoutExtension(family.ModelPath) ?? string.Empty
+                : family.ModelName;
+
+            // Keep the champion/model identity, but ignore skin-number formatting differences
+            // such as lillia_skin1 vs lillia_skin01 between extracted versions.
+            int skinMarker = modelIdentity.IndexOf("_skin", StringComparison.OrdinalIgnoreCase);
+            if (skinMarker > 0)
+                modelIdentity = modelIdentity[..skinMarker];
+
+            return $"{family.Name}\u001F{modelIdentity}";
+        }
+
+        private static ChromaFamilyModel MergeFamily(
+            ChromaFamilyModel currentFamily,
+            ChromaFamilyModel referenceFamily)
+        {
+            ChromaFamilyModel preferredFamily = currentFamily ?? referenceFamily;
+            var mergedFamily = new ChromaFamilyModel
+            {
+                Name = preferredFamily.Name,
+                ModelName = preferredFamily.ModelName,
+                ModelPath = preferredFamily.ModelPath,
+                PreviewImage = preferredFamily.PreviewImage,
+                SwatchColor = preferredFamily.SwatchColor
+            };
+
+            IEnumerable<ChromaSkinModel> chromas =
+                (currentFamily == null ? Enumerable.Empty<ChromaSkinModel>() : currentFamily.Chromas)
+                .Concat(referenceFamily == null ? Enumerable.Empty<ChromaSkinModel>() : referenceFamily.Chromas)
+                .OrderBy(chroma => GetChromaOrder(chroma.Name))
+                .ThenBy(chroma => chroma.Name, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(chroma => chroma.SourceKind);
+
+            mergedFamily.Chromas.ReplaceRange(chromas);
+            return mergedFamily;
+        }
+
+        private static void TagSource(
+            IEnumerable<ChromaFamilyModel> families,
+            ChromaSourceKind sourceKind,
+            string sourceRoot)
+        {
+            foreach (ChromaSkinModel chroma in families.SelectMany(family => family.Chromas))
+            {
+                chroma.SourceKind = sourceKind;
+                chroma.SourceRoot = sourceRoot;
+            }
+        }
+
+        private static int GetChromaOrder(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+                return int.MaxValue;
+
+            int start = name.Length;
+            while (start > 0 && char.IsDigit(name[start - 1]))
+                start--;
+
+            return start < name.Length && int.TryParse(name[start..], out int value)
+                ? value
+                : int.MaxValue;
+        }
+
+        private static string NormalizePath(string path)
+        {
+            return string.IsNullOrWhiteSpace(path)
+                ? string.Empty
+                : Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        }
+
+        private static bool PathsEqual(string firstPath, string secondPath)
+        {
+            return string.Equals(
+                NormalizePath(firstPath),
+                NormalizePath(secondPath),
+                StringComparison.OrdinalIgnoreCase);
         }
     }
 }

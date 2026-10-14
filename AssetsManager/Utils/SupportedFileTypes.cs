@@ -9,9 +9,9 @@ namespace AssetsManager.Utils
         public static readonly HashSet<string> Images = new(StringComparer.OrdinalIgnoreCase) { ".png", ".jpg", ".jpeg", ".gif", ".ico", ".tga" };
         public static readonly HashSet<string> Textures = new(StringComparer.OrdinalIgnoreCase) { ".dds", ".tex" };
         public static readonly HashSet<string> VectorImages = new(StringComparer.OrdinalIgnoreCase) { ".svg" };
-        public static readonly HashSet<string> Media = new(StringComparer.OrdinalIgnoreCase) { ".ogg", ".wem", ".webm", ".mp3" };
+        public static readonly HashSet<string> Media = new(StringComparer.OrdinalIgnoreCase) { ".ogg", ".wem", ".webm", ".mp3", ".wav", ".flac" };
         public static readonly HashSet<string> AudioBank = new(StringComparer.OrdinalIgnoreCase) { ".wpk", ".bnk" };
-        public static readonly HashSet<string> Viewer3D = new(StringComparer.OrdinalIgnoreCase) { ".skn", ".sco", ".scb", ".skl", ".anm", ".mapgeo" };
+        public static readonly HashSet<string> Viewer3D = new(StringComparer.OrdinalIgnoreCase) { ".skn", ".sco", ".scb", ".skl", ".anm" };
         public static readonly HashSet<string> Json = new(StringComparer.OrdinalIgnoreCase) { ".json" };
         public static readonly HashSet<string> JavaScript = new(StringComparer.OrdinalIgnoreCase) { ".js" };
         public static readonly HashSet<string> Css = new(StringComparer.OrdinalIgnoreCase) { ".css" };
@@ -65,6 +65,13 @@ namespace AssetsManager.Utils
             return AudioBank.Contains(extension);
         }
 
+        public static bool IsWadFile(string fileName)
+        {
+            return !string.IsNullOrEmpty(fileName)
+                && (fileName.EndsWith(".wad", StringComparison.OrdinalIgnoreCase)
+                    || fileName.EndsWith(".wad.client", StringComparison.OrdinalIgnoreCase));
+        }
+
         public static bool IsText(string fileName)
         {
             if (string.IsNullOrEmpty(fileName)) return false;
@@ -79,6 +86,24 @@ namespace AssetsManager.Utils
                    PlainText.Contains(extension) ||
                    Lua.Contains(extension) ||
                    Html.Contains(extension);
+        }
+
+        /// <summary>
+        /// Shared predicate used by the segmented "FILTER BY" control: "All", "Images",
+        /// "Audio", "3D" or "Data". Accepts a file name or extension.
+        /// </summary>
+        public static bool MatchesFilter(string filterType, string fileName)
+        {
+            if (string.IsNullOrEmpty(filterType) || filterType == "All") return true;
+
+            return filterType switch
+            {
+                "Images" => IsImage(fileName),
+                "Audio" => IsAudio(fileName),
+                "3D" => Is3D(fileName),
+                "Data" => IsText(fileName),
+                _ => true
+            };
         }
 
         public static bool IsDiffSupported(string fileName)

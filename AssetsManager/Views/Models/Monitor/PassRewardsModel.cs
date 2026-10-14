@@ -95,6 +95,12 @@ namespace AssetsManager.Views.Models.Monitor
         private bool _isFree;
         public bool IsFree { get => _isFree; set => SetProperty(ref _isFree, value); }
 
+        private string _originalTitle;
+        public string OriginalTitle { get => _originalTitle; set => SetProperty(ref _originalTitle, value); }
+
+        private string _originalIconUrl;
+        public string OriginalIconUrl { get => _originalIconUrl; set => SetProperty(ref _originalIconUrl, value); }
+
         public event PropertyChangedEventHandler PropertyChanged;
         protected void OnPropertyChanged([CallerMemberName] string propertyName = null)
         {

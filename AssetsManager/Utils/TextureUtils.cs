@@ -1,180 +1,35 @@
 using System;
+using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
+using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using System.Windows.Media.Media3D;
+using AssetRipper.TextureDecoder.Etc;
+using AssetRipper.TextureDecoder.Rgb.Formats;
+using BCnEncoder.Shared;
 using LeagueToolkit.Core.Renderer;
 using LeagueToolkit.Toolkit;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
 using AssetsManager.Services.Core;
-using AssetsManager.Views.Models.Viewer;
 using AssetsManager.Views.Models.Settings;
 
 namespace AssetsManager.Utils
 {
     public static class TextureUtils
     {
-        private static readonly HashSet<string> GenericMaterialKeywords =
-            new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-            { "body", "face", "head", "hair", "mask", "eyes", "leg" };
-
-        public static IReadOnlyList<string> GetColorTextureCandidates(IEnumerable<string> textureKeys)
+        public static BitmapSource ResolveTexture(Dictionary<string, BitmapSource> allTextures, string selectedTextureName)
         {
-            var keys = textureKeys?.ToList() ?? new List<string>();
-            var colorKeys = keys
-                .Where(IsColorTextureCandidate)
-                .OrderByDescending(key => key.Contains("_tx_cm", StringComparison.OrdinalIgnoreCase))
-                .ThenBy(key => key.Length)
-                .ToList();
-
-            return colorKeys.Count > 0 ? colorKeys : keys;
-        }
-
-        private static bool IsColorTextureCandidate(string textureKey)
-        {
-            if (string.IsNullOrWhiteSpace(textureKey)) return false;
-
-            string key = textureKey.ToLowerInvariant();
-            string padded = "_" + key.Replace('-', '_').Replace(' ', '_').Replace('.', '_') + "_";
-
-            if (padded.Contains("_normal_") ||
-                padded.Contains("_norm_") ||
-                padded.Contains("_mask_") ||
-                padded.Contains("_masks_") ||
-                padded.Contains("_spec_") ||
-                padded.Contains("_specular_") ||
-                padded.Contains("_rough_") ||
-                padded.Contains("_roughness_") ||
-                padded.Contains("_metal_") ||
-                padded.Contains("_metallic_") ||
-                padded.Contains("_orm_") ||
-                padded.Contains("_ao_") ||
-                padded.Contains("_emissive_") ||
-                padded.Contains("_glow_"))
-            {
-                return false;
-            }
-
-            return padded.Contains("_tx_cm_") ||
-                   padded.Contains("_cm_") ||
-                   padded.Contains("_diffuse_") ||
-                   padded.Contains("_color_") ||
-                   padded.Contains("_albedo_") ||
-                   padded.Contains("_basecolor_") ||
-                   padded.Contains("_base_color_");
-        }
-
-        public static string FindBestTextureMatch(string materialName, string skinName, IEnumerable<string> availableTextureKeys, string defaultTextureKey, LogService logService)
-        {
-            var textureKeys = availableTextureKeys?.ToList() ?? new List<string>();
-            if (textureKeys.Count == 0)
-            {
-                logService?.LogDebug($"No textures available for material: '{materialName}'");
+            if (allTextures == null || string.IsNullOrEmpty(selectedTextureName))
                 return null;
-            }
 
-            string exactMatch = textureKeys.FirstOrDefault(key => key.Equals(materialName, StringComparison.OrdinalIgnoreCase));
-            if (exactMatch != null)
-            {
-                logService?.LogDebug($"Found texture '{exactMatch}' via exact name match.");
-                return exactMatch;
-            }
-
-            string lowerMaterialName = materialName.ToLowerInvariant();
-            bool isGeneric = GenericMaterialKeywords.Contains(lowerMaterialName);
-            if (!isGeneric && lowerMaterialName.EndsWith("_mat") && lowerMaterialName.Length > 4)
-            {
-                string baseWord = lowerMaterialName.Substring(0, lowerMaterialName.Length - 4);
-                isGeneric = GenericMaterialKeywords.Contains(baseWord);
-            }
-
-            if (isGeneric)
-            {
-                string skinTxCm = $"{skinName}_tx_cm";
-                string genericMatch = textureKeys
-                    .FirstOrDefault(key => key.IndexOf(skinTxCm, StringComparison.OrdinalIgnoreCase) >= 0);
-                if (genericMatch != null)
-                {
-                    logService?.LogDebug($"Found main texture '{genericMatch}' for generic material '{materialName}'.");
-                    return genericMatch;
-                }
-            }
-
-            string propTexture = textureKeys.FirstOrDefault(key => key.Contains("_prop_tx_cm", StringComparison.OrdinalIgnoreCase));
-            if (propTexture != null)
-            {
-                logService?.LogDebug($"Falling back to generic prop texture '{propTexture}' for material '{materialName}'.");
-                return propTexture;
-            }
-
-            logService?.LogDebug($"No specific match found. Falling back to default: '{defaultTextureKey}'");
-            return defaultTextureKey;
+            allTextures.TryGetValue(selectedTextureName, out BitmapSource texture);
+            return texture;
         }
-
-        public static void UpdateMaterial(ModelPart modelPart)
-        {
-            if (modelPart.Geometry == null || string.IsNullOrEmpty(modelPart.SelectedTextureName))
-                return;
-
-            if (!modelPart.AllTextures.TryGetValue(modelPart.SelectedTextureName, out BitmapSource texture))
-            {
-                string fullKey = modelPart.AllTextures.Keys
-                    .FirstOrDefault(k => string.Equals(PathUtils.TruncateAtDot(k), modelPart.SelectedTextureName, StringComparison.OrdinalIgnoreCase));
-                if (fullKey != null)
-                    modelPart.AllTextures.TryGetValue(fullKey, out texture);
-            }
-
-            if (texture != null)
-            {
-                var materialGroup = new MaterialGroup();
-
-                // Force Bgr32 format for opaque parts to prevent WPF from placing them in the transparent rendering pass
-                BitmapSource textureToUse = texture;
-                if (!modelPart.IsTransparent && texture.Format != PixelFormats.Bgr32)
-                {
-                    try
-                    {
-                        textureToUse = new FormatConvertedBitmap(texture, PixelFormats.Bgr32, null, 0);
-                    }
-                    catch
-                    {
-                        textureToUse = texture;
-                    }
-                }
-
-                var imageBrush = CreateViewerTextureBrush(textureToUse);
-                if (modelPart.IsTransparent)
-                {
-                    imageBrush.Opacity = 0.99; // Force WPF to place this in the transparent pass
-                }
-                materialGroup.Children.Add(new DiffuseMaterial(imageBrush));
-
-                modelPart.Geometry.Material = materialGroup;
-                modelPart.Geometry.BackMaterial = materialGroup;
-            }
-        }
-
-        private static ImageBrush CreateViewerTextureBrush(BitmapSource texture)
-        {
-            var imageBrush = new ImageBrush(texture)
-            {
-                Viewport = new System.Windows.Rect(0, 0, 1, 1),
-                ViewportUnits = BrushMappingMode.Absolute,
-                TileMode = TileMode.Tile,
-                Stretch = Stretch.Fill
-            };
-
-            RenderOptions.SetBitmapScalingMode(imageBrush, BitmapScalingMode.HighQuality);
-            RenderOptions.SetCachingHint(imageBrush, CachingHint.Cache);
-            RenderOptions.SetEdgeMode(imageBrush, EdgeMode.Unspecified);
-
-            return imageBrush;
-        }
-
 
         public static BitmapSource LoadTexture(byte[] data, string extension, int? maxWidth = null, int? maxHeight = null)
         {
@@ -187,33 +42,90 @@ namespace AssetsManager.Utils
 
         public static BitmapSource LoadViewerTexture(Stream textureStream, string extension, int? maxWidth = null, int? maxHeight = null)
         {
-            return LoadTexture(textureStream, extension, maxWidth, maxHeight);
+            return LoadTextureCore(textureStream, extension, maxWidth, maxHeight, null, null);
+        }
+
+        public static BitmapSource LoadViewerTexture(Stream textureStream, string extension, LogService logService, string source)
+        {
+            return LoadTextureCore(textureStream, extension, null, null, logService, source);
+        }
+
+        /// <summary>
+        /// Decodes the texture's authored mip chain from the smallest level at least
+        /// <paramref name="minWidth"/> pixels wide down to the file's last level.
+        /// This mirrors the current LTK MAIN map viewport path and preserves alpha-test coverage.
+        /// </summary>
+        public static IReadOnlyList<BitmapSource> LoadViewerTextureMipChain(
+            Stream textureStream,
+            string extension,
+            int minWidth)
+        {
+            if (textureStream == null)
+                return Array.Empty<BitmapSource>();
+            if (minWidth <= 0)
+                throw new ArgumentOutOfRangeException(nameof(minWidth));
+
+            try
+            {
+                if (extension.Equals(".tex", StringComparison.OrdinalIgnoreCase))
+                    return LoadTexMipChain(textureStream, minWidth);
+
+                if (extension.Equals(".dds", StringComparison.OrdinalIgnoreCase))
+                {
+                    Texture texture = Texture.LoadDds(textureStream);
+                    return ConvertTextureMipChain(texture, minWidth);
+                }
+
+                BitmapSource image = LoadTextureCore(
+                    textureStream,
+                    extension,
+                    minWidth,
+                    minWidth,
+                    null,
+                    null);
+                return image == null ? Array.Empty<BitmapSource>() : new[] { image };
+            }
+            catch
+            {
+                return Array.Empty<BitmapSource>();
+            }
         }
 
         public static BitmapSource LoadTexture(Stream textureStream, string extension, int? maxWidth = null, int? maxHeight = null)
+        {
+            return LoadTextureCore(textureStream, extension, maxWidth, maxHeight, null, null);
+        }
+
+        private static BitmapSource LoadTextureCore(
+            Stream textureStream,
+            string extension,
+            int? maxWidth,
+            int? maxHeight,
+            LogService logService,
+            string source)
         {
             try
             {
                 if (textureStream == null) { return null; }
 
-                if (extension.Equals(".tex", StringComparison.OrdinalIgnoreCase) || extension.Equals(".dds", StringComparison.OrdinalIgnoreCase))
+                if (extension.Equals(".tex", StringComparison.OrdinalIgnoreCase))
                 {
-                    Texture tex = Texture.Load(textureStream);
-                    if (tex.Mips.Length > 0)
+                    return LoadTexBitmapSource(textureStream, maxWidth, maxHeight);
+                }
+                else if (extension.Equals(".dds", StringComparison.OrdinalIgnoreCase))
+                {
+                    Texture texture = Texture.LoadDds(textureStream);
+                    if (texture.Mips.Length > 0)
                     {
-                        using (Image<Rgba32> imageSharp = tex.Mips[0].ToImage())
-                        {
-                            return ConvertToBgra32BitmapSource(imageSharp, maxWidth, maxHeight);
-                        }
+                        using Image<Rgba32> image = texture.Mips[0].ToImage();
+                        return ConvertImageToBitmapSource(image, maxWidth, maxHeight);
                     }
                     return null;
                 }
                 else if (extension.Equals(".tga", StringComparison.OrdinalIgnoreCase))
                 {
-                    using (Image<Rgba32> imageSharp = Image.Load<Rgba32>(textureStream))
-                    {
-                        return ConvertToBgra32BitmapSource(imageSharp, maxWidth, maxHeight);
-                    }
+                    using Image<Rgba32> image = Image.Load<Rgba32>(textureStream);
+                    return ConvertImageToBitmapSource(image, maxWidth, maxHeight);
                 }
                 else
                 {
@@ -234,48 +146,376 @@ namespace AssetsManager.Utils
                     return bitmapImage;
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                logService?.LogError(ex, $"Failed to decode viewer texture: {source ?? extension ?? "unknown source"}");
                 return null;
             }
         }
 
-        private static BitmapSource ConvertToBgra32BitmapSource(Image<Rgba32> imageSharp, int? maxWidth, int? maxHeight)
+        private static BitmapSource LoadTexBitmapSource(Stream textureStream, int? maxWidth, int? maxHeight)
         {
-            if ((maxWidth.HasValue && imageSharp.Width > maxWidth.Value) ||
-                (maxHeight.HasValue && imageSharp.Height > maxHeight.Value))
+            MemoryStream copy = null;
+            Stream stream = textureStream;
+            if (!stream.CanSeek)
             {
-                int resizeWidth = maxWidth ?? imageSharp.Width;
-                int resizeHeight = maxHeight ?? imageSharp.Height;
-                imageSharp.Mutate(x => x.Resize(new ResizeOptions
+                copy = new MemoryStream();
+                stream.CopyTo(copy);
+                copy.Position = 0;
+                stream = copy;
+            }
+
+            try
+            {
+                long start = stream.Position;
+                TexHeader header = ReadTexHeader(stream);
+                stream.Position = start;
+
+                if (RequiresCompatibleTexDecode(header.Format))
+                    return DecodeCompatibleTex(stream, start, header, maxWidth, maxHeight);
+
+                Texture texture = maxWidth.HasValue && maxHeight.HasValue
+                    ? Texture.LoadTex(stream, maxWidth.Value, maxHeight.Value)
+                    : Texture.LoadTex(stream);
+                return texture.Mips.Length > 0 ? ConvertTextureMipToBitmapSource(texture) : null;
+            }
+            finally
+            {
+                copy?.Dispose();
+            }
+        }
+
+        private static bool RequiresCompatibleTexDecode(byte format) =>
+            format is 1 or 2 or 3 or 14 or 21 or 22;
+
+        private static TexHeader ReadTexHeader(Stream stream)
+        {
+            using var reader = new BinaryReader(stream, System.Text.Encoding.UTF8, leaveOpen: true);
+            uint magic = reader.ReadUInt32();
+            if (magic != 0x00584554)
+                throw new InvalidDataException($"Invalid TEX magic: {magic:x8}");
+
+            ushort width = reader.ReadUInt16();
+            ushort height = reader.ReadUInt16();
+            byte depth = reader.ReadByte();
+            byte format = reader.ReadByte();
+            byte resourceType = reader.ReadByte();
+            byte flags = reader.ReadByte();
+            return new TexHeader(width, height, depth, format, resourceType, flags);
+        }
+
+        private static BitmapSource DecodeCompatibleTex(
+            Stream stream,
+            long start,
+            TexHeader header,
+            int? maxWidth,
+            int? maxHeight)
+        {
+            int mipCount = GetTexMipCount(header);
+            int level = 0;
+            if (maxWidth.HasValue && maxHeight.HasValue)
+            {
+                for (int i = 0; i < mipCount; i++)
                 {
-                    Size = new Size(resizeWidth, resizeHeight),
+                    int width = Math.Max(header.Width >> i, 1);
+                    int height = Math.Max(header.Height >> i, 1);
+                    if ((width <= maxWidth.Value && height <= maxHeight.Value) || i == mipCount - 1)
+                    {
+                        level = i;
+                        break;
+                    }
+                }
+            }
+
+            return DecodeCompatibleTexLevel(stream, start, header, mipCount, level);
+        }
+
+        private static IReadOnlyList<BitmapSource> LoadTexMipChain(Stream textureStream, int minWidth)
+        {
+            MemoryStream copy = null;
+            Stream stream = textureStream;
+            if (!stream.CanSeek)
+            {
+                copy = new MemoryStream();
+                stream.CopyTo(copy);
+                copy.Position = 0;
+                stream = copy;
+            }
+
+            try
+            {
+                long start = stream.Position;
+                TexHeader header = ReadTexHeader(stream);
+                int mipCount = GetTexMipCount(header);
+                int firstLevel = SelectFirstMipLevel(header.Width, mipCount, minWidth);
+                var levels = new List<BitmapSource>(mipCount - firstLevel);
+
+                if (RequiresCompatibleTexDecode(header.Format))
+                {
+                    for (int level = firstLevel; level < mipCount; level++)
+                        levels.Add(DecodeCompatibleTexLevel(stream, start, header, mipCount, level));
+                    return levels;
+                }
+
+                stream.Position = start;
+                Texture texture = Texture.LoadTex(stream);
+                return ConvertTextureMipChain(texture, minWidth);
+            }
+            finally
+            {
+                copy?.Dispose();
+            }
+        }
+
+        private static IReadOnlyList<BitmapSource> ConvertTextureMipChain(Texture texture, int minWidth)
+        {
+            if (texture?.Mips is not { Length: > 0 })
+                return Array.Empty<BitmapSource>();
+
+            int firstLevel = SelectFirstMipLevel(texture.Mips[0].Width, texture.Mips.Length, minWidth);
+            var levels = new List<BitmapSource>(texture.Mips.Length - firstLevel);
+            for (int level = firstLevel; level < texture.Mips.Length; level++)
+                levels.Add(ConvertTextureMipToBitmapSource(texture, level));
+            return levels;
+        }
+
+        private static int GetTexMipCount(TexHeader header) =>
+            (header.Flags & 1) != 0
+                ? (int)Math.Floor(Math.Log2(Math.Max(Math.Max(header.Width, header.Height), Math.Max(header.Depth, (byte)1)))) + 1
+                : 1;
+
+        private static int SelectFirstMipLevel(int width, int mipCount, int minWidth)
+        {
+            for (int level = mipCount - 1; level >= 0; level--)
+            {
+                int mipWidth = level >= 31 ? 1 : Math.Max(width >> level, 1);
+                if (mipWidth >= minWidth)
+                    return level;
+            }
+            return 0;
+        }
+
+        private static BitmapSource DecodeCompatibleTexLevel(
+            Stream stream,
+            long start,
+            TexHeader header,
+            int mipCount,
+            int level)
+        {
+            int mipWidth = Math.Max(header.Width >> level, 1);
+            int mipHeight = Math.Max(header.Height >> level, 1);
+            long offset = 0;
+            for (int i = mipCount - 1; i > level; i--)
+                offset = checked(offset + GetTexMipByteCount(header, i));
+
+            int sliceBytes = GetTexSliceByteCount(header.Format, mipWidth, mipHeight);
+            long dataOffset = checked(start + 12 + offset);
+            if (dataOffset < 0 || sliceBytes < 0 || dataOffset + sliceBytes > stream.Length)
+                throw new EndOfStreamException("TEX mip data is truncated.");
+
+            stream.Position = dataOffset;
+            byte[] encoded = new byte[sliceBytes];
+            stream.ReadExactly(encoded);
+            byte[] rgba = DecodeCompatibleTexPixels(header.Format, encoded, mipWidth, mipHeight);
+            return CreateBgra32BitmapSource(rgba, mipWidth, mipHeight);
+        }
+
+        private static long GetTexMipByteCount(TexHeader header, int level)
+        {
+            int width = Math.Max(header.Width >> level, 1);
+            int height = Math.Max(header.Height >> level, 1);
+            int depth = Math.Max(header.Depth >> level, 1);
+            return checked((long)GetTexSliceByteCount(header.Format, width, height) * depth);
+        }
+
+        private static int GetTexSliceByteCount(byte format, int width, int height)
+        {
+            (int blockWidth, int blockHeight, int bytesPerBlock) = format switch
+            {
+                1 => (4, 4, 8),
+                2 or 3 or 14 => (4, 4, 16),
+                21 => (1, 1, 8),
+                22 => (1, 1, 16),
+                _ => throw new NotSupportedException($"Unsupported compatible TEX format: {format}")
+            };
+            int blocksX = checked((width + blockWidth - 1) / blockWidth);
+            int blocksY = checked((height + blockHeight - 1) / blockHeight);
+            return checked(blocksX * blocksY * bytesPerBlock);
+        }
+
+        private static byte[] DecodeCompatibleTexPixels(byte format, byte[] encoded, int width, int height)
+        {
+            return format switch
+            {
+                1 => DecodeEtc(encoded, width, height, etc2: false),
+                2 or 3 => DecodeEtc(encoded, width, height, etc2: true),
+                14 => DecodeBc5Snorm(encoded, width, height),
+                21 => DecodeFloatTexture(encoded, width, height, halfPrecision: true),
+                22 => DecodeFloatTexture(encoded, width, height, halfPrecision: false),
+                _ => throw new NotSupportedException($"Unsupported compatible TEX format: {format}")
+            };
+        }
+
+        private static byte[] DecodeEtc(byte[] encoded, int width, int height, bool etc2)
+        {
+            byte[] rgba = new byte[checked(width * height * 4)];
+            if (etc2)
+                EtcDecoder.DecompressETC2A8<ColorRGBA<byte>, byte>(encoded, width, height, rgba);
+            else
+                EtcDecoder.DecompressETC<ColorRGBA<byte>, byte>(encoded, width, height, rgba);
+            return rgba;
+        }
+
+        private static byte[] DecodeBc5Snorm(byte[] encoded, int width, int height)
+        {
+            int blocksX = (width + 3) / 4;
+            int blocksY = (height + 3) / 4;
+            if (encoded.Length != checked(blocksX * blocksY * 16))
+                throw new InvalidDataException("BC5_SNORM TEX payload has an invalid size.");
+
+            byte[] rgba = new byte[checked(width * height * 4)];
+            Span<sbyte> red = stackalloc sbyte[16];
+            Span<sbyte> green = stackalloc sbyte[16];
+            for (int blockIndex = 0; blockIndex < blocksX * blocksY; blockIndex++)
+            {
+                ReadOnlySpan<byte> block = encoded.AsSpan(blockIndex * 16, 16);
+                DecodeBc4SnormBlock(block[..8], red);
+                DecodeBc4SnormBlock(block[8..], green);
+                int baseX = (blockIndex % blocksX) * 4;
+                int baseY = (blockIndex / blocksX) * 4;
+                for (int y = 0; y < 4; y++)
+                {
+                    for (int x = 0; x < 4; x++)
+                    {
+                        int pixelX = baseX + x;
+                        int pixelY = baseY + y;
+                        if (pixelX >= width || pixelY >= height)
+                            continue;
+
+                        int source = y * 4 + x;
+                        int target = (pixelY * width + pixelX) * 4;
+                        rgba[target] = SnormToUnorm(red[source]);
+                        rgba[target + 1] = SnormToUnorm(green[source]);
+                        rgba[target + 2] = 0;
+                        rgba[target + 3] = 255;
+                    }
+                }
+            }
+            return rgba;
+        }
+
+        private static void DecodeBc4SnormBlock(ReadOnlySpan<byte> block, Span<sbyte> output)
+        {
+            sbyte endpoint0 = unchecked((sbyte)block[0]);
+            sbyte endpoint1 = unchecked((sbyte)block[1]);
+            float value0 = Math.Max(endpoint0, (sbyte)-127);
+            float value1 = Math.Max(endpoint1, (sbyte)-127);
+            Span<float> palette = stackalloc float[8];
+            palette[0] = value0;
+            palette[1] = value1;
+            if (endpoint0 > endpoint1)
+            {
+                for (int i = 2; i < 8; i++)
+                    palette[i] = (value0 * (8 - i) + value1 * (i - 1)) / 7f;
+            }
+            else
+            {
+                for (int i = 2; i < 6; i++)
+                    palette[i] = (value0 * (6 - i) + value1 * (i - 1)) / 5f;
+                palette[6] = -127f;
+                palette[7] = 127f;
+            }
+
+            ulong indices = BinaryPrimitives.ReadUInt64LittleEndian(block) >> 16;
+            for (int i = 0; i < 16; i++)
+            {
+                int paletteIndex = (int)((indices >> (i * 3)) & 7);
+                output[i] = (sbyte)MathF.Round(palette[paletteIndex], MidpointRounding.AwayFromZero);
+            }
+        }
+
+        private static byte SnormToUnorm(sbyte value)
+        {
+            float normalized = Math.Max(value, (sbyte)-127) / 127f;
+            return ToUnorm8(normalized * 0.5f + 0.5f);
+        }
+
+        private static byte[] DecodeFloatTexture(byte[] encoded, int width, int height, bool halfPrecision)
+        {
+            int bytesPerChannel = halfPrecision ? 2 : 4;
+            int expected = checked(width * height * 4 * bytesPerChannel);
+            if (encoded.Length != expected)
+                throw new InvalidDataException("Floating-point TEX payload has an invalid size.");
+
+            byte[] rgba = new byte[checked(width * height * 4)];
+            for (int channel = 0; channel < rgba.Length; channel++)
+            {
+                int offset = channel * bytesPerChannel;
+                float value = halfPrecision
+                    ? (float)BitConverter.UInt16BitsToHalf(BinaryPrimitives.ReadUInt16LittleEndian(encoded.AsSpan(offset, 2)))
+                    : BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32LittleEndian(encoded.AsSpan(offset, 4)));
+                rgba[channel] = ToUnorm8(value);
+            }
+            return rgba;
+        }
+
+        private static byte ToUnorm8(float value)
+        {
+            if (float.IsNaN(value))
+                return 0;
+            float clamped = Math.Clamp(value, 0f, 1f);
+            return (byte)MathF.Round(clamped * 255f, MidpointRounding.AwayFromZero);
+        }
+
+        private readonly record struct TexHeader(
+            ushort Width,
+            ushort Height,
+            byte Depth,
+            byte Format,
+            byte ResourceType,
+            byte Flags);
+
+        private static BitmapSource ConvertTextureMipToBitmapSource(Texture texture) =>
+            ConvertTextureMipToBitmapSource(texture, 0);
+
+        private static BitmapSource ConvertTextureMipToBitmapSource(Texture texture, int level)
+        {
+            var mip = texture.Mips[level];
+            if (!mip.TryGetMemory(out Memory<ColorRgba32> colorMemory))
+                throw new InvalidOperationException("Texture mip memory must be contiguous.");
+
+            return CreateBgra32BitmapSource(
+                MemoryMarshal.AsBytes(colorMemory.Span).ToArray(),
+                mip.Width,
+                mip.Height);
+        }
+
+        private static BitmapSource ConvertImageToBitmapSource(Image<Rgba32> image, int? maxWidth, int? maxHeight)
+        {
+            if ((maxWidth.HasValue && image.Width > maxWidth.Value) ||
+                (maxHeight.HasValue && image.Height > maxHeight.Value))
+            {
+                image.Mutate(x => x.Resize(new ResizeOptions
+                {
+                    Size = new Size(maxWidth ?? image.Width, maxHeight ?? image.Height),
                     Mode = ResizeMode.Max
                 }));
             }
 
-            // Mantener el buffer estable evita que WPF renderice pixeles de un array reutilizado.
-            using (Image<Bgra32> bgraImage = imageSharp.CloneAs<Bgra32>())
-            {
-                int bufferSize = bgraImage.Width * bgraImage.Height * 4;
-                byte[] pixelBuffer = new byte[bufferSize];
+            byte[] pixels = new byte[checked(image.Width * image.Height * 4)];
+            image.CopyPixelDataTo(pixels);
+            return CreateBgra32BitmapSource(pixels, image.Width, image.Height);
+        }
 
-                bgraImage.CopyPixelDataTo(pixelBuffer);
+        private static BitmapSource CreateBgra32BitmapSource(byte[] pixels, int width, int height)
+        {
+            for (int i = 0; i < pixels.Length; i += 4)
+                (pixels[i], pixels[i + 2]) = (pixels[i + 2], pixels[i]);
 
-                int stride = bgraImage.Width * 4;
-
-                var bitmapSource = BitmapSource.Create(
-                    bgraImage.Width,
-                    bgraImage.Height,
-                    96, 96,
-                    PixelFormats.Bgra32,
-                    null,
-                    pixelBuffer,
-                    stride);
-
-                bitmapSource.Freeze();
-                return bitmapSource;
-            }
+            BitmapSource bitmap = BitmapSource.Create(
+                width, height, 96, 96, PixelFormats.Bgra32, null, pixels, checked(width * 4));
+            bitmap.Freeze();
+            return bitmap;
         }
 
         public static BitmapSource LoadTexture(Stream textureStream, string extension)
@@ -283,34 +523,36 @@ namespace AssetsManager.Utils
             return LoadTexture(textureStream, extension, null, null);
         }
 
-        public static void SaveBitmapSourceAsImage(BitmapSource bitmapSource, string originalFileName, string destinationPath, ImageExportFormat format, Action<string> onFileSavedCallback)
+        public static BitmapSource LoadTextureFromFile(string filePath, int? maxWidth = null, int? maxHeight = null)
         {
-            BitmapEncoder encoder;
-            string extension;
+            if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath)) return null;
 
-            switch (format)
+            using var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+            string extension = Path.GetExtension(filePath);
+            if (extension.Equals(".png", StringComparison.OrdinalIgnoreCase) ||
+                extension.Equals(".webp", StringComparison.OrdinalIgnoreCase))
             {
-                case ImageExportFormat.Jpeg:
-                    encoder = new JpegBitmapEncoder { QualityLevel = 90 };
-                    extension = ".jpg";
-                    break;
-                case ImageExportFormat.Png:
-                default:
-                    encoder = new PngBitmapEncoder();
-                    extension = ".png";
-                    break;
+                using Image<Rgba32> image = Image.Load<Rgba32>(fileStream);
+                return ConvertImageToBitmapSource(image, maxWidth, maxHeight);
             }
 
-            encoder.Frames.Add(BitmapFrame.Create(bitmapSource));
+            return LoadTexture(fileStream, extension, maxWidth, maxHeight);
+        }
 
+        public static async Task SaveBitmapSourceAsImageAsync(
+            BitmapSource bitmapSource,
+            string originalFileName,
+            string destinationPath,
+            ImageExportFormat format,
+            Action<string> onFileSavedCallback,
+            CancellationToken cancellationToken = default)
+        {
+            string extension = format == ImageExportFormat.Jpeg ? ".jpg" : ".png";
             string fileName = Path.ChangeExtension(originalFileName, extension);
             string filePath = PathUtils.GetUniqueFilePath(destinationPath, fileName);
-
-            using (var fileStream = new FileStream(filePath, FileMode.Create))
-            {
-                encoder.Save(fileStream);
-            }
+            await ImageExportUtils.SaveBitmapAsImageAsync(bitmapSource, filePath, format, cancellationToken);
             onFileSavedCallback?.Invoke(filePath);
         }
+
     }
 }

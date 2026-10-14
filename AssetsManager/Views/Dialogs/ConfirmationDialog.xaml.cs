@@ -36,11 +36,15 @@ namespace AssetsManager.Views.Dialogs
             {
                 YesNoButtons.Visibility = Visibility.Collapsed;
                 btnOk.Visibility = Visibility.Visible;
+                btnOk.IsDefault = true;
+                btnOk.IsCancel = true;
             }
             else
             {
                 YesNoButtons.Visibility = Visibility.Visible;
                 btnOk.Visibility = Visibility.Collapsed;
+                btnYes.IsDefault = true;
+                btnNoBottom.IsCancel = true;
             }
 
             switch (icon)

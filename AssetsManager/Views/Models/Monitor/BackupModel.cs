@@ -1,5 +1,5 @@
 using System;
-using System.Collections.ObjectModel;
+using AssetsManager.Utils.Framework;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
@@ -9,22 +9,12 @@ namespace AssetsManager.Views.Models.Monitor
     {
         public event PropertyChangedEventHandler PropertyChanged;
 
-        private ObservableCollection<BackupModel> _allBackups;
         private bool _isBusy;
         private int _totalBackupsCount;
         private string _totalStorageSize;
         private string _activeClientEnvironment;
 
-        public BackupsControlModel()
-        {
-            AllBackups = new ObservableCollection<BackupModel>();
-        }
-
-        public ObservableCollection<BackupModel> AllBackups
-        {
-            get => _allBackups;
-            set { _allBackups = value; OnPropertyChanged(); }
-        }
+        public ObservableRangeCollection<BackupModel> AllBackups { get; } = new();
 
         public bool IsBusy
         {
@@ -68,6 +58,7 @@ namespace AssetsManager.Views.Models.Monitor
         public long Size { get; set; }
         public string SizeDisplay { get; set; }
         public bool IsCurrentSessionBackup { get; set; }
+        public bool CanModify => !IsMainClient;
 
         private bool _isSelected;
         public bool IsSelected
@@ -82,4 +73,5 @@ namespace AssetsManager.Views.Models.Monitor
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
     }
+
 }

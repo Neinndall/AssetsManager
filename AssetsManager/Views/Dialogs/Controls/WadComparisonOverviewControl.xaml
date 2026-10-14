@@ -5,97 +5,271 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:icons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              mc:Ignorable="d" 
-             d:DesignHeight="600" d:DesignWidth="1000">
-    
-    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="32">
+             d:DesignHeight="750" d:DesignWidth="1100">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="28,20,28,28">
         <StackPanel>
-            <!-- 1. HERO SUMMARY CARD -->
-            <Border Background="{StaticResource CardBackground}" CornerRadius="16" Padding="32" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="0,0,0,32">
+            <!-- 1. HERO SUMMARY BANNER -->
+            <Border Style="{StaticResource SettingsCard}" Margin="0,0,0,20" Padding="24,18">
                 <Grid>
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/> <!-- Hero Icon -->
+                        <ColumnDefinition Width="*"/>    <!-- Text & Summary -->
                     </Grid.ColumnDefinitions>
-                    
-                    <Border Background="{StaticResource SidebarBackground}" Width="64" Height="64" CornerRadius="12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-                        <icons:MaterialIcon Kind="AutoFix" Width="32" Height="32" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+
+                    <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="10" Width="52" Height="52" VerticalAlignment="Center">
+                        <icons:MaterialIcon Kind="AutoFix" Width="28" Height="28" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <icons:MaterialIcon.Effect>
+                                <DropShadowEffect Color="#FF5C85FF" BlurRadius="12" ShadowDepth="0" Opacity="0.4"/>
+                            </icons:MaterialIcon.Effect>
+                        </icons:MaterialIcon>
                     </Border>
-                    
-                    <StackPanel Grid.Column="1" Margin="24,0,0,0" VerticalAlignment="Center">
-                        <TextBlock Text="PATCH INTELLIGENCE SUMMARY" Style="{StaticResource ToolSectionLabel}" Margin="0,0,0,4"/>
-                        <TextBlock Text="{Binding SummaryText}" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" TextWrapping="Wrap"/>
+
+                    <StackPanel Grid.Column="1" Margin="20,0,0,0" VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,3">
+                            <TextBlock Text="PATCH INTELLIGENCE DASHBOARD" FontWeight="Bold" FontSize="16" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                            <Border Background="{StaticResource SidebarBackground}" CornerRadius="6" Padding="8,2" Margin="10,0,0,0" VerticalAlignment="Center">
+                                <TextBlock Text="Analysis Overview" FontSize="10" FontWeight="Bold" Foreground="{StaticResource AccentBrush}"/>
+                            </Border>
+                        </StackPanel>
+                        <TextBlock Text="{Binding SummaryText}" FontSize="12" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" Opacity="0.9"/>
                     </StackPanel>
                 </Grid>
             </Border>
 
-            <Grid>
+            <!-- 2. KPI METRICS ROW -->
+            <Grid Margin="0,0,0,24">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="32"/>
+                    <ColumnDefinition Width="16"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="16"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
-                <!-- 2. CATEGORY DISTRIBUTION -->
-                <StackPanel Grid.Column="0">
-                    <TextBlock Text="ASSET DISTRIBUTION" Style="{StaticResource ToolSectionLabel}" Margin="0,0,0,16"/>
-                    <ItemsControl ItemsSource="{Binding TreeModel.CategoryDistribution}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <Border Background="{StaticResource CardBackground}" CornerRadius="12" Padding="20" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="0,0,0,12">
-                                    <Grid>
-                                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-                                        <Grid Margin="0,0,0,8">
-                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
-                                                <TextBlock Text="{Binding Name}" FontSize="13" Foreground="{StaticResource TextPrimary}" FontWeight="Black"/>
-                                                <TextBlock Text="{Binding SizeChangeText}" FontSize="11" Foreground="{StaticResource AccentBrush}" Margin="10,0,0,0" VerticalAlignment="Bottom" Opacity="0.8"/>
+                <!-- KPI 1: Net Payload Impact -->
+                <Border Grid.Column="0" Style="{StaticResource OverviewKpiCard}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,8">
+                            <icons:MaterialIcon Kind="ScaleBalance" Width="16" Height="16" Foreground="{StaticResource AccentBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="NET PAYLOAD IMPACT" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                        </StackPanel>
+                        <TextBlock Grid.Row="1" Text="{Binding TreeModel.NetSizeChangeText}" FontSize="22" FontWeight="Black" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,4"/>
+                        <StackPanel Grid.Row="2" Orientation="Horizontal">
+                            <TextBlock Text="{Binding TreeModel.AddedPayloadText, StringFormat='{}{0} added'}" FontSize="11" Foreground="{StaticResource AccentGreen}" FontWeight="SemiBold" Margin="0,0,8,0"/>
+                            <TextBlock Text="·" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,0,8,0"/>
+                            <TextBlock Text="{Binding TreeModel.RemovedPayloadText, StringFormat='{}{0} removed'}" FontSize="11" Foreground="{StaticResource AccentRed}" FontWeight="SemiBold"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- KPI 2: Operations Breakdown -->
+                <Border Grid.Column="2" Style="{StaticResource OverviewKpiCard}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,8">
+                            <icons:MaterialIcon Kind="LayersOutline" Width="16" Height="16" Foreground="{StaticResource AccentTeal}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="DIFFERENCES BREAKDOWN" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                        </StackPanel>
+                        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,4">
+                            <TextBlock Text="{Binding CountNew}" FontSize="22" FontWeight="Black" Foreground="{StaticResource AccentGreen}"/>
+                            <TextBlock Text=" new" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Bottom" Margin="2,0,12,3"/>
+                            <TextBlock Text="{Binding CountModified}" FontSize="22" FontWeight="Black" Foreground="{StaticResource AccentBlue}"/>
+                            <TextBlock Text=" modified" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Bottom" Margin="2,0,0,3"/>
+                        </StackPanel>
+                        <StackPanel Grid.Row="2" Orientation="Horizontal">
+                            <TextBlock Text="{Binding CountRemoved, StringFormat='{}{0} removed'}" FontSize="11" Foreground="{StaticResource AccentRed}" FontWeight="SemiBold" Margin="0,0,8,0"/>
+                            <TextBlock Text="·" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,0,8,0"/>
+                            <TextBlock Text="{Binding CountRenamed, StringFormat='{}{0} renamed'}" FontSize="11" Foreground="{StaticResource AccentOrange}" FontWeight="SemiBold"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- KPI 3: Unknown Hashes Status -->
+                <Border Grid.Column="4" Style="{StaticResource OverviewKpiCard}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,8">
+                            <icons:MaterialIcon Kind="HelpCircleOutline" Width="16" Height="16" Foreground="{StaticResource AccentPurple}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="HASH RESOLUTION STATUS" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                        </StackPanel>
+                        <TextBlock Grid.Row="1" Text="{Binding TreeModel.UnknownHashesCount, StringFormat='{}{0:N0} Unknowns'}" FontSize="22" FontWeight="Black" Foreground="{StaticResource AccentPurple}" Margin="0,0,0,4"/>
+                        <TextBlock Grid.Row="2" Text="Unresolved hex-based hash paths in this patch" FontSize="11" Foreground="{StaticResource TextSecondary}" TextTrimming="CharacterEllipsis" Opacity="0.8"/>
+                    </Grid>
+                </Border>
+            </Grid>
+
+            <!-- 3. MAIN CONTENT: 2x2 BALANCED GRID DASHBOARD -->
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="20"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="20"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- ROW 0, COL 0: GAME SYSTEMS & CONTENT DOMAINS -->
+                <Border Grid.Row="0" Grid.Column="0" VerticalAlignment="Stretch" Background="{StaticResource CardBackground}" CornerRadius="12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="20">
+                    <StackPanel>
+                        <Grid Margin="0,0,0,14">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <icons:MaterialIcon Kind="ViewGridOutline" Width="16" Height="16" Foreground="{StaticResource AccentTeal}" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                <TextBlock Text="GAME SYSTEMS &amp; CONTENT DOMAINS" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <ItemsControl ItemsSource="{Binding TreeModel.FeatureAreas}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Style="{StaticResource OverviewDisplayCard}" Margin="0,0,0,8">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <icons:MaterialIcon Kind="{Binding IconKind}" Width="18" Height="18" Foreground="{StaticResource AccentTeal}" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
+                                                <TextBlock Text="{Binding SizeChangeText}" FontSize="10" Foreground="{StaticResource TextMuted}"/>
                                             </StackPanel>
-                                            <TextBlock Text="{Binding Count, StringFormat='{}{0} files'}" FontSize="11" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Right" VerticalAlignment="Bottom"/>
+                                            <Border Grid.Column="2" Background="{StaticResource SidebarBackground}" CornerRadius="6" Padding="8,3" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Count, StringFormat='{}{0} files'}" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                                            </Border>
                                         </Grid>
-                                        <ProgressBar Grid.Row="1" Height="6" Value="{Binding Percentage}" Foreground="{StaticResource AccentBrush}" Background="{StaticResource SidebarBackground}" BorderThickness="0"/>
-                                    </Grid>
-                                </Border>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
 
-                <!-- 3. TOP IMPACT & AREAS -->
-                <StackPanel Grid.Column="2">
-                    <TextBlock Text="CRITICAL SIZE IMPACT" Style="{StaticResource ToolSectionLabel}" Margin="0,0,0,16"/>
-                    <ItemsControl ItemsSource="{Binding TreeModel.TopImpactFiles}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <Border Background="{StaticResource CardBackground}" CornerRadius="12" Padding="16" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="0,0,0,12">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                        <StackPanel>
-                                            <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="Black" Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis"/>
-                                            <TextBlock Text="{Binding Path}" FontSize="10" Foreground="{StaticResource TextMuted}" TextTrimming="CharacterEllipsis" Opacity="0.7"/>
-                                        </StackPanel>
-                                        <TextBlock Grid.Column="1" Text="{Binding SizeDiffText}" FontSize="12" FontWeight="Black" Foreground="{StaticResource AccentOrange}" VerticalAlignment="Center" Margin="16,0,0,0"/>
-                                    </Grid>
-                                </Border>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
+                <!-- ROW 0, COL 2: ASSET CATEGORY DISTRIBUTION -->
+                <Border Grid.Row="0" Grid.Column="2" VerticalAlignment="Stretch" Background="{StaticResource CardBackground}" CornerRadius="12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="20">
+                    <StackPanel>
+                        <Grid Margin="0,0,0,14">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <icons:MaterialIcon Kind="ChartDonut" Width="16" Height="16" Foreground="{StaticResource AccentOrange}" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                <TextBlock Text="ASSET TYPE DISTRIBUTION" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Grid>
 
-                    <TextBlock Text="AFFECTED GAME AREAS" Style="{StaticResource ToolSectionLabel}" Margin="0,20,0,16"/>
-                    <ItemsControl ItemsSource="{Binding TreeModel.AffectedAreas}">
-                        <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <Border Background="{StaticResource CardBackground}" CornerRadius="8" Padding="12,8" Margin="0,0,8,8" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-                                    <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="{Binding Name}" FontSize="11" FontWeight="Black" Foreground="{StaticResource TextSecondary}"/>
-                                        <Border Background="{StaticResource SidebarBackground}" CornerRadius="6" Margin="10,0,0,0" Padding="6,2">
-                                            <TextBlock Text="{Binding Count}" FontSize="10" Foreground="{StaticResource AccentBrush}" FontWeight="Black"/>
-                                        </Border>
-                                    </StackPanel>
-                                </Border>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </StackPanel>
+                        <ItemsControl ItemsSource="{Binding TreeModel.CategoryDistribution}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Style="{StaticResource OverviewDisplayCard}" Margin="0,0,0,8">
+                                        <Grid>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="6"/>
+                                                <RowDefinition Height="Auto"/>
+                                            </Grid.RowDefinitions>
+                                            <Grid Grid.Row="0">
+                                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
+                                                    <icons:MaterialIcon Kind="{Binding IconKind}" Width="14" Height="14" Foreground="{StaticResource AccentOrange}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                                    <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                                                    <TextBlock Text="{Binding SizeChangeText}" FontSize="10" Foreground="{StaticResource AccentOrange}" Margin="8,0,0,0" VerticalAlignment="Center" Opacity="0.85"/>
+                                                </StackPanel>
+                                                <TextBlock Text="{Binding Count, StringFormat='{}{0} files'}" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                                            </Grid>
+                                            <ProgressBar Grid.Row="2" Height="4" Value="{Binding Percentage}" Foreground="{StaticResource AccentOrange}" Background="{StaticResource SidebarBackground}" BorderThickness="0"/>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+
+                <!-- ROW 2, COL 0: CRITICAL SIZE IMPACT FILES -->
+                <Border Grid.Row="2" Grid.Column="0" VerticalAlignment="Stretch" Background="{StaticResource CardBackground}" CornerRadius="12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="20">
+                    <StackPanel>
+                        <Grid Margin="0,0,0,14">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <icons:MaterialIcon Kind="Flame" Width="16" Height="16" Foreground="{StaticResource AccentRed}" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                <TextBlock Text="CRITICAL SIZE IMPACT (LARGEST DELTAS)" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <ItemsControl ItemsSource="{Binding TreeModel.TopImpactFiles}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Style="{StaticResource OverviewDisplayCard}" Margin="0,0,0,8">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <icons:MaterialIcon Kind="{Binding IconKind}" Width="18" Height="18" Foreground="{StaticResource AccentBrush}" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis"/>
+                                                <TextBlock Text="{Binding Path}" FontSize="10" Foreground="{StaticResource TextMuted}" TextTrimming="CharacterEllipsis" Opacity="0.75"/>
+                                            </StackPanel>
+                                            <Border Grid.Column="2" Background="{StaticResource SidebarBackground}" CornerRadius="6" Padding="8,3" VerticalAlignment="Center" Margin="8,0,0,0">
+                                                <TextBlock Text="{Binding SizeDiffText}" FontSize="11" FontWeight="Bold" Foreground="{Binding Type, Converter={StaticResource ChunkDiffTypeToBrushConverter}}"/>
+                                            </Border>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+
+                <!-- ROW 2, COL 2: TOP ALTERED WAD PACKAGES -->
+                <Border Grid.Row="2" Grid.Column="2" VerticalAlignment="Stretch" Background="{StaticResource CardBackground}" CornerRadius="12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="20">
+                    <StackPanel>
+                        <Grid Margin="0,0,0,14">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <icons:MaterialIcon Kind="PackageVariantClosed" Width="16" Height="16" Foreground="{StaticResource AccentPurple}" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                <TextBlock Text="TOP ALTERED WAD PACKAGES" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <ItemsControl ItemsSource="{Binding TreeModel.TopWadPackages}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Style="{StaticResource OverviewDisplayCard}" Margin="0,0,0,8">
+                                        <Grid>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="6"/>
+                                                <RowDefinition Height="Auto"/>
+                                            </Grid.RowDefinitions>
+                                            <Grid Grid.Row="0">
+                                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
+                                                    <icons:MaterialIcon Kind="PackageVariantClosed" Width="14" Height="14" Foreground="{StaticResource AccentPurple}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                                    <TextBlock Text="{Binding WadName}" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                                                    <TextBlock Text="{Binding SizeChangeText}" FontSize="10" Foreground="{StaticResource AccentPurple}" Margin="8,0,0,0" VerticalAlignment="Center" Opacity="0.85"/>
+                                                </StackPanel>
+                                                <TextBlock Text="{Binding Count, StringFormat='{}{0} files'}" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                                            </Grid>
+                                            <ProgressBar Grid.Row="2" Height="4" Value="{Binding Percentage}" Foreground="{StaticResource AccentPurple}" Background="{StaticResource SidebarBackground}" BorderThickness="0"/>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
             </Grid>
         </StackPanel>
     </ScrollViewer>

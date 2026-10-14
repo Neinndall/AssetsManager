@@ -1,7 +1,9 @@
 using System;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using AssetsManager.Services.Core;
+using AssetsManager.Services.News;
 using AssetsManager.Views.Models.Notifications;
 using AssetsManager.Views.Helpers;
 
@@ -9,12 +11,20 @@ namespace AssetsManager.Views.Dialogs
 {
     public partial class NotificationHubWindow : HudWindow
     {
+        private readonly NotificationService _notificationService;
+        private readonly NewsService _newsService;
+
         public NotificationHubModel ViewModel => DataContext as NotificationHubModel;
 
-        public NotificationHubWindow(NotificationService notificationService)
+        public NotificationHubWindow(NotificationService notificationService, NewsService newsService)
         {
+            _notificationService = notificationService;
+            _newsService = newsService;
+
             InitializeComponent();
             this.DataContext = new NotificationHubModel(notificationService);
+
+            _notificationService.NotificationsMarkedAsRead += OnNotificationMarkedAsRead;
         }
 
         private void MarkAllRead_Click(object sender, RoutedEventArgs e)
@@ -22,9 +32,9 @@ namespace AssetsManager.Views.Dialogs
             ViewModel?.MarkAllRead();
         }
 
-        private void ClearAll_Click(object sender, RoutedEventArgs e)
+        private void Clear_Click(object sender, RoutedEventArgs e)
         {
-            ViewModel?.ClearAll();
+            ViewModel?.ClearSelectedCategory();
         }
 
         private void RemoveNotification_Click(object sender, RoutedEventArgs e)
@@ -35,10 +45,66 @@ namespace AssetsManager.Views.Dialogs
             }
         }
 
+        private void NotificationCard_Click(object sender, MouseButtonEventArgs e)
+        {
+            if (sender is FrameworkElement element && element.DataContext is NotificationModel note)
+            {
+                ViewModel?.ExecuteNotificationAction(note);
+            }
+        }
+
+        private void NotificationAction_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is FrameworkElement element && element.DataContext is NotificationModel note)
+            {
+                ViewModel?.ExecuteNotificationAction(note);
+                e.Handled = true;
+            }
+        }
+
+        private void FilterAll_Click(object sender, RoutedEventArgs e)
+        {
+            ViewModel?.SetCategoryFilter(null);
+        }
+
+        private void FilterSystem_Click(object sender, RoutedEventArgs e)
+        {
+            ViewModel?.SetCategoryFilter(NotificationCategory.System);
+        }
+
+        private void FilterWatcher_Click(object sender, RoutedEventArgs e)
+        {
+            ViewModel?.SetCategoryFilter(NotificationCategory.Watcher);
+        }
+
+        private void FilterTracker_Click(object sender, RoutedEventArgs e)
+        {
+            ViewModel?.SetCategoryFilter(NotificationCategory.Tracker);
+        }
+
+        private void FilterUpdates_Click(object sender, RoutedEventArgs e)
+        {
+            ViewModel?.SetCategoryFilter(NotificationCategory.Updates);
+        }
+
+        private void FilterNews_Click(object sender, RoutedEventArgs e)
+        {
+            ViewModel?.SetCategoryFilter(NotificationCategory.News);
+        }
+
         protected override void OnClosed(EventArgs e)
         {
+            _notificationService.NotificationsMarkedAsRead -= OnNotificationMarkedAsRead;
             base.OnClosed(e);
             ViewModel?.Dispose();
+        }
+
+        private void OnNotificationMarkedAsRead(NotificationModel notification)
+        {
+            if (notification?.Category != NotificationCategory.News) return;
+            if (string.IsNullOrEmpty(notification.NewsArticleUrl)) return;
+
+            _ = _newsService.MarkAsSeenAsync(notification.NewsArticleUrl, notification.NewsPublishedAt ?? DateTime.MinValue);
         }
     }
 }

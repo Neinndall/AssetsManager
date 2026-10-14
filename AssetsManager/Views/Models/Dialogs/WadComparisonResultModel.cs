@@ -1,21 +1,20 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using AssetsManager.Views.Models.Wad;
 using AssetsManager.Views.Models.Dialogs.Controls;
 using AssetsManager.Utils;
-using AssetsManager.Utils.Framework;
+using Material.Icons;
 
 namespace AssetsManager.Views.Models.Dialogs
 {
     public enum ComparisonViewMode
     {
         Overview,
-        Discovery,
-        Advanced
+        Hierarchy,
+        Results
     }
 
     public enum ComparisonLoadingState
@@ -33,13 +32,14 @@ namespace AssetsManager.Views.Models.Dialogs
     {
         private bool _isLoading;
         private string _summaryText = "Analyzing differences...";
+        private string _resultsSummaryText = string.Empty;
         private string _countNew = "0";
         private string _countModified = "0";
         private string _countRemoved = "0";
         private string _countRenamed = "0";
         private string _filterText = string.Empty;
         private int _totalDiffsCount = -1;
-        private ComparisonViewMode _activeView = ComparisonViewMode.Advanced;
+        private ComparisonViewMode _activeView = ComparisonViewMode.Hierarchy;
 
         private SerializableChunkDiff _selectedItem;
         private List<SerializableChunkDiff> _selectedNodes = new();
@@ -47,12 +47,11 @@ namespace AssetsManager.Views.Models.Dialogs
         public ComparisonViewMode ActiveView
         {
             get => _activeView;
-            set { if (_activeView != value) { _activeView = value; OnPropertyChanged(); } }
+            set { if (_activeView != value) { _activeView = value; OnPropertyChanged(); OnPropertyChanged(nameof(FooterSummaryText)); } }
         }
 
         // Sub-Models (Encapsulated responsibilities)
         public WadResultsTreeModel TreeModel { get; } = new WadResultsTreeModel();
-        public ObservableRangeCollection<SerializableChunkDiff> DiscoveryItems { get; } = new();
 
         public SerializableChunkDiff SelectedItem
         {
@@ -108,29 +107,10 @@ namespace AssetsManager.Views.Models.Dialogs
             set { _detailsModel = value; OnPropertyChanged(); }
         }
 
-        private bool _isDashboardVisible;
-        public bool IsDashboardVisible
-        {
-            get => _isDashboardVisible;
-            set { _isDashboardVisible = value; OnPropertyChanged(); }
-        }
-
         public string FilterText
         {
             get => _filterText;
             set { if (_filterText != value) { _filterText = value; OnPropertyChanged(); } }
-        }
-
-        public WadComparisonResultModel()
-        {
-            TreeModel.PropertyChanged += (sender, e) =>
-            {
-                if (e.PropertyName == nameof(TreeModel.DashboardToggleChecked))
-                {
-                    IsDashboardVisible = TreeModel.DashboardToggleChecked;
-                }
-            };
-            IsDashboardVisible = TreeModel.DashboardToggleChecked; // Set initial state
         }
 
         // Window Global State
@@ -143,14 +123,16 @@ namespace AssetsManager.Views.Models.Dialogs
         public string SummaryText
         {
             get => _summaryText;
-            set { if (_summaryText != value) { _summaryText = value; OnPropertyChanged(); } }
+            set { if (_summaryText != value) { _summaryText = value; OnPropertyChanged(); OnPropertyChanged(nameof(FooterSummaryText)); } }
         }
 
-        public string ComparisonSummary
+        public string ResultsSummaryText
         {
-            get => _summaryText; // They are the same for now, but let's keep the alias for future expansion
-            set { if (_summaryText != value) { _summaryText = value; OnPropertyChanged(); OnPropertyChanged(nameof(SummaryText)); } }
+            get => _resultsSummaryText;
+            set { if (_resultsSummaryText != value) { _resultsSummaryText = value; OnPropertyChanged(); OnPropertyChanged(nameof(FooterSummaryText)); } }
         }
+
+        public string FooterSummaryText => ActiveView == ComparisonViewMode.Results ? ResultsSummaryText : SummaryText;
 
         public string CountNew
         {
@@ -208,13 +190,7 @@ namespace AssetsManager.Views.Models.Dialogs
             // 1. Update Technical Tree
             TreeModel.WadGroups.ReplaceRange(groups);
             
-            // 2. Populate Discovery Grid (Visual Assets)
-            var visualAssets = diffs
-                .Where(d => SupportedFileTypes.IsImage(d.Path))
-                .ToList();
-            DiscoveryItems.ReplaceRange(visualAssets);
-
-            // 3. Update Summary & Stats
+            // 2. Update Summary & Stats
             if (diffs.Count == _totalDiffsCount)
             {
                 SummaryText = $"Found {diffs.Count} differences across {groups.Count} WAD files.";
@@ -233,91 +209,193 @@ namespace AssetsManager.Views.Models.Dialogs
             }
 
             // 4. Perform Analysis
-            CalculateInsights(diffs);
+            CalculateInsights(diffs, groups);
         }
 
-        private void CalculateInsights(List<SerializableChunkDiff> diffs)
+        private void CalculateInsights(List<SerializableChunkDiff> diffs, List<WadGroupViewModel> groups = null)
         {
-            // Category Analysis
-            TreeModel.CategoryDistribution.Clear();
-            var categories = new Dictionary<string, (int Count, long Size)>
+            if (diffs == null || diffs.Count == 0)
             {
-                { "Audio", (0, 0) },
-                { "Images", (0, 0) },
-                { "Models/3D", (0, 0) },
-                { "Data/Bin", (0, 0) },
-                { "Other", (0, 0) }
+                TreeModel.CategoryDistribution.Clear();
+                TreeModel.TopImpactFiles.Clear();
+                TreeModel.TopWadPackages.Clear();
+                TreeModel.FeatureAreas.Clear();
+                TreeModel.AddedPayloadText = "+0 B";
+                TreeModel.RemovedPayloadText = "-0 B";
+                TreeModel.NetSizeChangeText = "0 B";
+                TreeModel.UnknownHashesCount = 0;
+                return;
+            }
+
+            long addedBytes = 0, removedBytes = 0;
+            int unknownHashes = 0;
+
+            var areas = new (string Key, string Name, MaterialIconKind Icon, string Brush, int Count, long Size, string Filter)[]
+            {
+                ("characters/", "Champions & Entities", MaterialIconKind.AccountCircleOutline, "AccentBrush", 0, 0, "characters"),
+                ("ux/", "Loot, Store & UI", MaterialIconKind.StorefrontOutline, "AccentTeal", 0, 0, "ux"),
+                ("data/", "Game Data & Balance", MaterialIconKind.CodeJson, "AccentBlue", 0, 0, "data"),
+                ("tft", "Teamfight Tactics", MaterialIconKind.ChessKnight, "AccentOrange", 0, 0, "tft"),
+                ("audio/", "Audio & Voicebanks", MaterialIconKind.VolumeHigh, "AccentPurple", 0, 0, "audio"),
+                ("maps/", "Maps & Environments", MaterialIconKind.MapOutline, "AccentGreen", 0, 0, "maps")
             };
+            var categories = new (Func<string, bool> Match, string Name, MaterialIconKind Icon, string Ext, int Count, long Size)[]
+            {
+                (SupportedFileTypes.IsImage, "Image", MaterialIconKind.ImageOutline, ".dds", 0, 0),
+                (SupportedFileTypes.IsAudio, "Audio", MaterialIconKind.MusicNoteOutline, ".bnk", 0, 0),
+                (SupportedFileTypes.Is3D, "3D Models", MaterialIconKind.CubeOutline, ".skn", 0, 0),
+                (p => SupportedFileTypes.IsText(p) || p.EndsWith(".bin", StringComparison.OrdinalIgnoreCase), "Data", MaterialIconKind.FileDocumentOutline, ".bin", 0, 0),
+                (p => p.EndsWith(".hlsl", StringComparison.OrdinalIgnoreCase), "Shaders", MaterialIconKind.CodeBraces, ".hlsl", 0, 0),
+                (_ => true, "Miscellaneous", MaterialIconKind.FileOutline, "", 0, 0)
+            };
+            var topFiles = new List<TopImpactFile>(Math.Min(diffs.Count, 32));
 
             foreach (var diff in diffs)
             {
-                string cat = "Other";
-                
-                if (SupportedFileTypes.IsAudio(diff.Path)) cat = "Audio";
-                else if (SupportedFileTypes.IsImage(diff.Path)) cat = "Images";
-                else if (SupportedFileTypes.Is3D(diff.Path)) cat = "Models/3D";
-                else if (SupportedFileTypes.IsText(diff.Path)) cat = "Data/Bin";
+                string path = diff.Path ?? string.Empty;
+                string normalizedPath = PathUtils.NormalizeSeparators(path);
 
-                long sizeChange = (long)(diff.NewUncompressedSize ?? 0) - (long)(diff.OldUncompressedSize ?? 0);
-                if (diff.Type == ChunkDiffType.New) sizeChange = (long)(diff.NewUncompressedSize ?? 0);
-                if (diff.Type == ChunkDiffType.Removed) sizeChange = -(long)(diff.OldUncompressedSize ?? 0);
+                // 1. Unknown Hashes & Payload
+                if (IsHexHash(path) || path.StartsWith("[unknown_", StringComparison.OrdinalIgnoreCase)) unknownHashes++;
 
-                var current = categories[cat];
-                categories[cat] = (current.Count + 1, current.Size + sizeChange);
-            }
-
-            int total = diffs.Count;
-            if (total > 0)
-            {
-                var statsToAdd = categories
-                    .Where(c => c.Value.Count > 0)
-                    .OrderByDescending(c => c.Value.Count)
-                    .Select(cat => new AssetCategoryStats 
-                    { 
-                        Name = cat.Key, 
-                        Count = cat.Value.Count,
-                        Percentage = (double)cat.Value.Count / total * 100,
-                        TotalSizeChange = cat.Value.Size
-                    });
-                
-                TreeModel.CategoryDistribution.ReplaceRange(statsToAdd);
-            }
-            else
-            {
-                TreeModel.CategoryDistribution.Clear();
-            }
-
-            // Top Impact Analysis
-            var topFiles = diffs
-                .Where(d => d.OldUncompressedSize != null || d.NewUncompressedSize != null)
-                .Select(d => new TopImpactFile
+                long oldSz = (long)(diff.OldUncompressedSize ?? 0);
+                long newSz = (long)(diff.NewUncompressedSize ?? 0);
+                long delta = diff.Type switch
                 {
-                    Name = d.FileName,
-                    Path = d.Path,
-                    Type = d.Type,
-                    OldSize = d.OldUncompressedSize ?? 0,
-                    NewSize = d.NewUncompressedSize ?? 0,
-                    SizeDiff = (long)(d.NewUncompressedSize ?? 0) - (long)(d.OldUncompressedSize ?? 0)
-                })
-                .OrderByDescending(f => Math.Abs(f.SizeDiff))
-                .Take(5)
-                .ToList();
+                    ChunkDiffType.New => newSz,
+                    ChunkDiffType.Removed => -oldSz,
+                    _ => newSz - oldSz
+                };
 
-            TreeModel.TopImpactFiles.ReplaceRange(topFiles);
+                if (delta > 0) addedBytes += delta;
+                else if (delta < 0) removedBytes += Math.Abs(delta);
 
-            // Area Analysis
-            var areas = diffs
-                .Select(d => {
-                    var parts = d.Path.Split(new[] { '/', '\\' }, StringSplitOptions.RemoveEmptyEntries);
-                    return parts.Length > 0 ? parts[0].ToUpper() : "ROOT";
-                })
-                .GroupBy(a => a)
-                .Select(g => new AffectedArea { Name = g.Key, Count = g.Count() })
-                .OrderByDescending(a => a.Count)
-                .Take(6)
-                .ToList();
+                // 2. Feature Areas
+                for (int i = 0; i < areas.Length; i++)
+                {
+                    bool match = i switch
+                    {
+                        0 => normalizedPath.Contains("characters/", StringComparison.OrdinalIgnoreCase),
+                        1 => normalizedPath.Contains("ux/", StringComparison.OrdinalIgnoreCase) || normalizedPath.Contains("loot", StringComparison.OrdinalIgnoreCase) || normalizedPath.Contains("emotes", StringComparison.OrdinalIgnoreCase) || normalizedPath.Contains("lol-game-data", StringComparison.OrdinalIgnoreCase),
+                        2 => normalizedPath.EndsWith(".bin", StringComparison.OrdinalIgnoreCase) || normalizedPath.EndsWith(".inibin", StringComparison.OrdinalIgnoreCase) || normalizedPath.Contains("data/", StringComparison.OrdinalIgnoreCase),
+                        3 => normalizedPath.Contains("tft", StringComparison.OrdinalIgnoreCase) || normalizedPath.Contains("sets/set", StringComparison.OrdinalIgnoreCase),
+                        4 => SupportedFileTypes.IsAudio(path) || normalizedPath.Contains("audio/", StringComparison.OrdinalIgnoreCase) || normalizedPath.Contains("sound/", StringComparison.OrdinalIgnoreCase),
+                        5 => normalizedPath.Contains("maps/", StringComparison.OrdinalIgnoreCase) || normalizedPath.Contains("map11", StringComparison.OrdinalIgnoreCase) || normalizedPath.Contains("map12", StringComparison.OrdinalIgnoreCase) || normalizedPath.Contains("map22", StringComparison.OrdinalIgnoreCase),
+                        _ => false
+                    };
 
-            TreeModel.AffectedAreas.ReplaceRange(areas);
+                    if (match)
+                    {
+                        areas[i].Count++;
+                        areas[i].Size += delta;
+                        break;
+                    }
+                }
+
+                // 3. Asset Categories
+                for (int i = 0; i < categories.Length; i++)
+                {
+                    if (categories[i].Match(normalizedPath))
+                    {
+                        categories[i].Count++;
+                        categories[i].Size += delta;
+                        break;
+                    }
+                }
+
+                // 4. Impact Files
+                if (oldSz > 0 || newSz > 0)
+                {
+                    var icon = SupportedFileTypes.IsImage(path) ? Material.Icons.MaterialIconKind.ImageOutline
+                        : SupportedFileTypes.IsAudio(path) ? Material.Icons.MaterialIconKind.VolumeHigh
+                        : SupportedFileTypes.Is3D(path) ? Material.Icons.MaterialIconKind.CubeOutline
+                        : Material.Icons.MaterialIconKind.FileDocumentOutline;
+
+                    topFiles.Add(new TopImpactFile
+                    {
+                        Name = diff.FileName,
+                        Path = diff.Path,
+                        Type = diff.Type,
+                        OldSize = (ulong)oldSz,
+                        NewSize = (ulong)newSz,
+                        SizeDiff = delta,
+                        Diff = diff,
+                        IconKind = icon
+                    });
+                }
+            }
+
+            // Update ViewModel
+            long net = addedBytes - removedBytes;
+            TreeModel.AddedPayloadText = "+" + FormatUtils.FormatSize(addedBytes);
+            TreeModel.RemovedPayloadText = "-" + FormatUtils.FormatSize(removedBytes);
+            TreeModel.NetSizeChangeText = (net >= 0 ? "+" : "-") + FormatUtils.FormatSize(Math.Abs(net));
+            TreeModel.UnknownHashesCount = unknownHashes;
+
+            if (groups != null && groups.Count > 0)
+            {
+                var topWads = groups
+                    .Select(g =>
+                    {
+                        long wadSize = 0;
+                        foreach (var typeGroup in g.Types)
+                        {
+                            foreach (var d in typeGroup.Diffs)
+                            {
+                                long oldSz = (long)(d.OldUncompressedSize ?? 0);
+                                long newSz = (long)(d.NewUncompressedSize ?? 0);
+                                wadSize += d.Type switch
+                                {
+                                    ChunkDiffType.New => newSz,
+                                    ChunkDiffType.Removed => -oldSz,
+                                    _ => newSz - oldSz
+                                };
+                            }
+                        }
+
+                        return new TopWadImpact
+                        {
+                            WadName = g.WadName,
+                            Count = g.DiffCount,
+                            Percentage = diffs.Count > 0 ? (double)g.DiffCount / diffs.Count * 100 : 0,
+                            TotalSizeChange = wadSize
+                        };
+                    })
+                    .OrderByDescending(w => w.Count)
+                    .Take(5)
+                    .ToList();
+
+                TreeModel.TopWadPackages.ReplaceRange(topWads);
+            }
+
+            TreeModel.FeatureAreas.ReplaceRange(areas.Where(a => a.Count > 0).OrderByDescending(a => a.Count).Select(a => new PatchAreaStats
+            {
+                Name = a.Name,
+                IconKind = a.Icon,
+                ColorBrushKey = a.Brush,
+                Count = a.Count,
+                TotalSizeChange = a.Size,
+                FilterQuery = a.Filter
+            }));
+
+            TreeModel.CategoryDistribution.ReplaceRange(categories.Where(c => c.Count > 0).OrderByDescending(c => c.Count).Select(c => new AssetCategoryStats
+            {
+                Name = c.Name,
+                IconKind = c.Icon,
+                ExtensionFilter = c.Ext,
+                Count = c.Count,
+                Percentage = (double)c.Count / diffs.Count * 100,
+                TotalSizeChange = c.Size
+            }));
+
+            TreeModel.TopImpactFiles.ReplaceRange(topFiles.OrderByDescending(f => Math.Abs(f.SizeDiff)).Take(5));
+        }
+
+        private static bool IsHexHash(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return false;
+            string name = System.IO.Path.GetFileNameWithoutExtension(path);
+            return name.Length == 16 && name.All(Uri.IsHexDigit);
         }
 
         public event PropertyChangedEventHandler PropertyChanged;

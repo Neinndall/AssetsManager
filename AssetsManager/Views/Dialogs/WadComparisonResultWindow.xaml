@@ -26,9 +26,9 @@
         <!-- 1. NAVIGATION SIDEBAR -->
         <Border Grid.Column="0" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,1,0" Width="64">
             <StackPanel Margin="0,20">
-                <!-- Advanced (Technical Tree) -->
+                <!-- Hierarchy (Technical Tree) -->
                 <RadioButton Style="{StaticResource ModernSidebarNavigationStyle}" 
-                             IsChecked="{Binding ActiveView, Converter={StaticResource EqualityConverter}, ConverterParameter={x:Static viewModels:ComparisonViewMode.Advanced}, Mode=TwoWay}"
+                             IsChecked="{Binding ActiveView, Converter={StaticResource EqualityConverter}, ConverterParameter={x:Static viewModels:ComparisonViewMode.Hierarchy}, Mode=TwoWay}"
                              ToolTip="Hierarchy"
                              GroupName="ExplorerNavigation">
                     <Grid Width="64">
@@ -36,13 +36,13 @@
                     </Grid>
                 </RadioButton>
 
-                <!-- Discovery (Gallery) -->
+                <!-- Results -->
                 <RadioButton Style="{StaticResource ModernSidebarNavigationStyle}" 
-                             IsChecked="{Binding ActiveView, Converter={StaticResource EqualityConverter}, ConverterParameter={x:Static viewModels:ComparisonViewMode.Discovery}, Mode=TwoWay}"
-                             Margin="0,4,0,0" ToolTip="Gallery"
+                             IsChecked="{Binding ActiveView, Converter={StaticResource EqualityConverter}, ConverterParameter={x:Static viewModels:ComparisonViewMode.Results}, Mode=TwoWay}"
+                             Margin="0,4,0,0" ToolTip="Results"
                              GroupName="ExplorerNavigation">
                     <Grid Width="64">
-                        <icons:MaterialIcon Kind="ImageMultipleOutline" Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <icons:MaterialIcon Kind="FolderPlusOutline" Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Grid>
                 </RadioButton>
 
@@ -93,6 +93,7 @@
                             <TextBox x:Name="globalSearchBox" 
                                      Style="{StaticResource StandardSearchBoxStyle}" 
                                      Width="280" 
+                                     Padding="12,10"
                                      Background="Transparent"
                                      BorderThickness="0"
                                      TextChanged="GlobalSearchBox_TextChanged"
@@ -154,11 +155,12 @@
                 <!-- Overview View -->
                 <controls:WadComparisonOverviewControl Visibility="{Binding ActiveView, Converter={StaticResource EqualityConverter}, ConverterParameter={x:Static viewModels:ComparisonViewMode.Overview}}"/>
                 
-                <!-- Discovery View -->
-                <controls:WadComparisonGalleryControl Visibility="{Binding ActiveView, Converter={StaticResource EqualityConverter}, ConverterParameter={x:Static viewModels:ComparisonViewMode.Discovery}}"/>
+                <!-- Results View -->
+                <controls:WadResultsControl x:Name="ResultsControl"
+                                            Visibility="{Binding ActiveView, Converter={StaticResource EqualityConverter}, ConverterParameter={x:Static viewModels:ComparisonViewMode.Results}}"/>
                 
-                <!-- Advanced View (Hierarchy + Details) -->
-                <Grid Visibility="{Binding ActiveView, Converter={StaticResource EqualityConverter}, ConverterParameter={x:Static viewModels:ComparisonViewMode.Advanced}}">
+                <!-- Hierarchy View (Hierarchy Tree + Details) -->
+                <Grid Visibility="{Binding ActiveView, Converter={StaticResource EqualityConverter}, ConverterParameter={x:Static viewModels:ComparisonViewMode.Hierarchy}}">
                     <Grid Margin="24">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="45*" MinWidth="300"/>
@@ -178,7 +180,7 @@
                 <Grid>
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
                         <icons:MaterialIcon Kind="InformationOutline" Width="16" Height="16" Foreground="{StaticResource AccentBrush}" Margin="0,0,10,0" VerticalAlignment="Center"/>
-                        <TextBlock Text="{Binding SummaryText}" FontSize="11" Foreground="{StaticResource TextSecondary}" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding FooterSummaryText}" FontSize="11" Foreground="{StaticResource TextSecondary}" FontWeight="SemiBold" VerticalAlignment="Center"/>
                     </StackPanel>
 
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">

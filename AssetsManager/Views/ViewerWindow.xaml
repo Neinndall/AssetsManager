@@ -1,181 +1,159 @@
 <UserControl x:Class="AssetsManager.Views.ViewerWindow"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-             xmlns:viewer="clr-namespace:AssetsManager.Views.Controls.Viewer"
-             xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
-             mc:Ignorable="d" FontFamily="{StaticResource AppFontFamily}">
+             xmlns:icons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
+             FontFamily="{StaticResource AppFontFamily}">
+    <UserControl.Resources>
+        <Style x:Key="HomeSectionTitle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+        </Style>
+        <Style x:Key="HomeSectionDescription" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+            <Setter Property="Opacity" Value="0.8"/>
+            <Setter Property="Margin" Value="0,2,0,0"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <Style x:Key="RecentProjectButton" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Surface" Background="{TemplateBinding Background}" CornerRadius="10"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Surface" Property="Background" Value="{StaticResource HoverColor}"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Surface" Property="Background" Value="{StaticResource HoverColor}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Surface" Property="Opacity" Value="0.75"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
     <Grid>
-        <!-- CUERPO -->
-        <Grid>
-            <!-- LANDING PAGE / EMPTY STATE -->
-            <Grid x:Name="EmptyStatePanel" Visibility="{Binding ViewModel.IsMainContentVisible, ElementName=PanelControl, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
-                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                    
-                    <!-- Default Content (Buttons) -->
-                    <StackPanel x:Name="DefaultEmptyStateContent" Visibility="{Binding IsLoadingVisible, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
-                        <!-- HERO HEADER: Centered Model -->
-                        <StackPanel Margin="0,0,0,32" HorizontalAlignment="Center">
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,8">
-                                <Border Background="#1A00E676" CornerRadius="4" Padding="8,3" VerticalAlignment="Center" Margin="0,0,10,0">
-                                    <TextBlock Text="3D WORKSPACE" FontSize="11" FontWeight="Bold" Foreground="{StaticResource AccentGreen}"/>
-                                </Border>
-                                <TextBlock Text="INTERACTIVE STUDIO" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Opacity="0.7"/>
-                            </StackPanel>
-                            <TextBlock Text="Model Viewer" FontSize="42" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center" Margin="-2,0,0,0"/>
-                            <TextBlock Text="Visualize characters, animations, and map geometry in real-time." FontSize="14" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center" Margin="0,8,0,0" Opacity="0.8"/>
-                        </StackPanel>
-
-                        <!-- Action Cards -->
-                        <UniformGrid Columns="3" HorizontalAlignment="Center">
-                            <!-- Load Model Card -->
-                            <Button Style="{StaticResource SelectionCardButtonStyle}"
-                                    Click="OpenFile_Click"
-                                    Width="180" Height="160">
-                                <StackPanel>
-                                    <Border Background="{StaticResource SidebarBackground}" CornerRadius="25" Width="50" Height="50" Margin="0,0,0,16">
-                                        <materialIcons:MaterialIcon Kind="CubeOutline" Width="24" Height="24" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                                    </Border>
-                                    <TextBlock Text="Load Model"
-                                               FontWeight="SemiBold"
-                                               FontSize="14"
-                                               Foreground="{StaticResource TextPrimary}"
-                                               HorizontalAlignment="Center"/>
-                                    <TextBlock Text="Import skn, sco and scb"
-                                               FontSize="12"
-                                               Foreground="{StaticResource TextMuted}"
-                                               HorizontalAlignment="Center"
-                                               TextAlignment="Center"
-                                               TextWrapping="Wrap"
-                                               Margin="0,4,0,0"/>
-                                </StackPanel>
-                            </Button>
-
-                            <!-- Load Chroma Card -->
-                            <Button Style="{StaticResource SelectionCardButtonStyle}"
-                                    Click="OpenChromaFile_Click"
-                                    Width="180" Height="160">
-                                <StackPanel>
-                                    <Border Background="{StaticResource SidebarBackground}" CornerRadius="25" Width="50" Height="50" Margin="0,0,0,16">
-                                        <materialIcons:MaterialIcon Kind="Palette" Width="24" Height="24" Foreground="{StaticResource AccentPurple}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                                    </Border>
-                                    <TextBlock Text="Load Chroma"
-                                               FontWeight="SemiBold"
-                                               FontSize="14"
-                                               Foreground="{StaticResource TextPrimary}"
-                                               HorizontalAlignment="Center"/>
-                                    <TextBlock Text="Import skn with textures"
-                                               FontSize="12"
-                                               Foreground="{StaticResource TextMuted}"
-                                               HorizontalAlignment="Center"
-                                               TextAlignment="Center"
-                                               TextWrapping="Wrap"
-                                               Margin="0,4,0,0"/>
-                                </StackPanel>
-                            </Button>
-
-                            <!-- Load Map Card -->
-                            <Button Style="{StaticResource SelectionCardButtonStyle}"
-                                    Click="OpenGeometryFile_Click"
-                                    Width="180" Height="160">
-                                <StackPanel>
-                                    <Border Background="{StaticResource SidebarBackground}" CornerRadius="25" Width="50" Height="50" Margin="0,0,0,16">
-                                        <materialIcons:MaterialIcon Kind="Map" Width="24" Height="24" Foreground="{StaticResource AccentOrange}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                                    </Border>
-                                    <TextBlock Text="Load Map"
-                                               FontWeight="SemiBold"
-                                               FontSize="14"
-                                               Foreground="{StaticResource TextPrimary}"
-                                               HorizontalAlignment="Center"/>
-                                    <TextBlock Text="Import mapgeo"
-                                               FontSize="12"
-                                               Foreground="{StaticResource TextMuted}"
-                                               HorizontalAlignment="Center"
-                                               TextAlignment="Center"
-                                               TextWrapping="Wrap"
-                                               Margin="0,4,0,0"/>
-                                </StackPanel>
-                            </Button>
-                        </UniformGrid>
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                      HorizontalContentAlignment="Stretch" VerticalContentAlignment="Center"
+                      Visibility="{Binding HasActiveContent, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
+            <StackPanel MaxWidth="720" Margin="28,40" HorizontalAlignment="Stretch" VerticalAlignment="Center">
+                <Border Background="#1A00E676" CornerRadius="6" Padding="10,4" HorizontalAlignment="Center" Margin="0,0,0,12">
+                    <StackPanel Orientation="Horizontal">
+                        <icons:MaterialIcon Kind="CubeOutline" Width="14" Height="14" Foreground="{StaticResource AccentGreen}" Margin="0,0,8,0"/>
+                        <TextBlock Text="INTERACTIVE STUDIO" FontSize="10" FontWeight="Bold" Foreground="{StaticResource AccentGreen}" VerticalAlignment="Center"/>
                     </StackPanel>
-                    
-                    <!-- Loading Indicator (Enhanced) -->
-                    <Grid x:Name="LoadingStateContent" Visibility="{Binding IsLoadingVisible, Converter={StaticResource BooleanToVisibilityConverter}}" Margin="0">
-                        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                            <!-- Animated Spinner (Explorer Style) -->
-                            <materialIcons:MaterialIcon Kind="Sync" 
-                                                        Width="38" 
-                                                        Height="38" 
-                                                        Foreground="{StaticResource AccentBrush}"
-                                                        Style="{StaticResource SpinningIconStyle}"/>
-
-                            <!-- Title -->
-                            <TextBlock x:Name="LoadingTitleText"
-                                       Text="{Binding LoadingTitle}"
-                                       FontSize="24"
-                                       FontWeight="Bold"
-                                       Foreground="{StaticResource TextPrimary}"
-                                       HorizontalAlignment="Center" 
-                                       Margin="0,18,0,8"/>
-
-                            <!-- Description -->
-                            <TextBlock x:Name="LoadingDescriptionText"
-                                       Text="{Binding LoadingDescription}"
-                                       FontSize="14"
-                                       Foreground="{StaticResource TextSecondary}"
-                                       HorizontalAlignment="Center"
-                                       TextAlignment="Center"/>
+                </Border>
+                <TextBlock Text="Model Viewer" FontSize="42" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" TextAlignment="Center"/>
+                <TextBlock Text="Characters, maps and effects. Build your next scene." FontSize="14" MaxWidth="600" HorizontalAlignment="Center"
+                           Foreground="{StaticResource TextSecondary}" Margin="0,8,0,28" TextWrapping="Wrap" TextAlignment="Center"/>
+                <WrapPanel HorizontalAlignment="Center" Margin="0,0,0,40">
+                    <Button Click="OpenProject_Click" Style="{StaticResource SelectionCardButtonStyle}" Width="260" Height="86" Padding="16" Margin="6,0,6,8">
+                        <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                            <Border Width="44" Height="44" CornerRadius="10" Background="{StaticResource SidebarBackground}" Margin="0,0,14,0">
+                                <icons:MaterialIcon Kind="FolderOpenOutline" Width="24" Height="24" Foreground="{StaticResource AccentBrush}"/>
+                            </Border>
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="Open Project" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                                <TextBlock Text="Choose a project folder" FontSize="10" Foreground="{StaticResource TextSecondary}" Margin="0,2,0,0"/>
+                            </StackPanel>
+                        </Grid>
+                    </Button>
+                    <Button Click="OpenStudio_Click" Style="{StaticResource SelectionCardButtonStyle}" Width="260" Height="86" Padding="16" Margin="6,0,6,8">
+                        <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                            <Border Width="44" Height="44" CornerRadius="10" Background="{StaticResource SidebarBackground}" Margin="0,0,14,0">
+                                <icons:MaterialIcon Kind="CubeOutline" Width="24" Height="24" Foreground="{StaticResource AccentGreen}"/>
+                            </Border>
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="Enter Studio" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                                <TextBlock Text="Start an empty workspace" FontSize="10" Foreground="{StaticResource TextSecondary}" Margin="0,2,0,0"/>
+                            </StackPanel>
+                        </Grid>
+                    </Button>
+                </WrapPanel>
+                <Grid Margin="0,0,0,40">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                    <Border Width="48" Height="48" CornerRadius="10" Background="#14BB86FC" Margin="0,0,16,0" VerticalAlignment="Center">
+                        <icons:MaterialIcon Kind="PaletteOutline" Width="26" Height="26" Foreground="{StaticResource AccentPurple}"/>
+                    </Border>
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                        <TextBlock Text="Chroma Library" Style="{StaticResource HomeSectionTitle}"/>
+                        <TextBlock Text="Browse skin variants and reference collections." Style="{StaticResource HomeSectionDescription}"/>
+                    </StackPanel>
+                    <Button Grid.Column="2" Click="OpenChromas_Click" Style="{StaticResource SecondaryButton}" Content="Browse Chromas" Height="36" Padding="14,0" VerticalAlignment="Center"/>
+                </Grid>
+                <StackPanel HorizontalAlignment="Stretch">
+                    <Grid Margin="0,0,0,16">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                        <Border Width="48" Height="48" CornerRadius="10" Background="#145C85FF" Margin="0,0,16,0" VerticalAlignment="Center">
+                            <icons:MaterialIcon Kind="History" Width="26" Height="26" Foreground="{StaticResource AccentBrush}"/>
+                        </Border>
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                            <TextBlock Text="Recent Projects" Style="{StaticResource HomeSectionTitle}"/>
+                            <TextBlock Text="Pick up where you left off." Style="{StaticResource HomeSectionDescription}"/>
                         </StackPanel>
+                        <Border Grid.Column="2" CornerRadius="6" Background="{StaticResource CardBackground}" Padding="8,4" VerticalAlignment="Center"
+                                Margin="12,0,0,0" Visibility="{Binding HasRecentProjects, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <TextBlock Text="{Binding RecentProjects.Count, StringFormat='{}{0} recent'}" FontSize="10" Foreground="{StaticResource TextSecondary}"/>
+                        </Border>
                     </Grid>
-
+                    <ScrollViewer MaxHeight="192" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" PanningMode="VerticalOnly">
+                        <ItemsControl ItemsSource="{Binding RecentProjects}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Background="{StaticResource CardBackground}" CornerRadius="10" Margin="0,0,0,6">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="40"/></Grid.ColumnDefinitions>
+                                            <Button Style="{StaticResource RecentProjectButton}" Click="OpenRecent_Click" Padding="12,8" ToolTip="{Binding Path}">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions><ColumnDefinition Width="42"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                                    <Border Width="42" Height="42" CornerRadius="10" Background="#145C85FF" VerticalAlignment="Center">
+                                                        <icons:MaterialIcon Kind="FolderOpenOutline" Width="22" Height="22" Foreground="{StaticResource AccentBrush}"/>
+                                                    </Border>
+                                                    <StackPanel Grid.Column="1" Margin="12,0,12,0" VerticalAlignment="Center">
+                                                        <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis"/>
+                                                        <TextBlock Text="{Binding Path}" FontSize="10" Foreground="{StaticResource TextMuted}" TextTrimming="CharacterEllipsis" Margin="0,2,0,0"/>
+                                                    </StackPanel>
+                                                    <icons:MaterialIcon Grid.Column="2" Kind="ArrowTopRight" Width="18" Height="18" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                                                </Grid>
+                                            </Button>
+                                            <Button Grid.Column="1" Click="RemoveRecent_Click" Style="{StaticResource TransparentIconButton}" Width="28" Height="28" Padding="0"
+                                                    HorizontalAlignment="Center" VerticalAlignment="Center" ToolTip="Remove from recent projects">
+                                                <icons:MaterialIcon Kind="Close" Width="14" Height="14"/>
+                                            </Button>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                    <Grid Margin="0,10,0,0" Visibility="{Binding HasRecentProjects, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                        <icons:MaterialIcon Kind="FolderOutline" Width="24" Height="24" Foreground="{StaticResource TextMuted}" Margin="0,0,12,0"/>
+                        <TextBlock Grid.Column="1" Text="Your projects will appear here after opening a folder." FontSize="11" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                    </Grid>
                 </StackPanel>
-            </Grid>
-
-            <!-- MAIN CONTENT (Viewport + Panel) -->
-            <Grid x:Name="MainContentGrid" Visibility="{Binding ViewModel.IsMainContentVisible, ElementName=PanelControl, Converter={StaticResource BooleanToVisibilityConverter}}">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="360" MinWidth="280" MaxWidth="450"/>
-                </Grid.ColumnDefinitions>
-
-                <!-- Column 0: Viewport -->
-                <viewer:ViewerViewportControl Grid.Column="0" x:Name="ViewportControl">
-                    <viewer:ViewerViewportControl.Style>
-                        <Style TargetType="viewer:ViewerViewportControl">
-                            <Setter Property="Margin" Value="0"/>
-                            <Setter Property="Grid.ColumnSpan" Value="1"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding ViewModel.IsMaximized, ElementName=ViewportControl}" Value="True">
-                                    <Setter Property="Grid.ColumnSpan" Value="3"/>
-                                    <Setter Property="Margin" Value="0,0,4,0"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </viewer:ViewerViewportControl.Style>
-                </viewer:ViewerViewportControl>
-
-                <!-- Column 1: Splitter -->
-                <GridSplitter Grid.Column="1"
-                              x:Name="MainGridSplitter"
-                              HorizontalAlignment="Center"
-                              VerticalAlignment="Stretch"
-                              Width="4"
-                              Background="Transparent"
-                              ResizeBehavior="PreviousAndNext"
-                              ResizeDirection="Columns"
-                              Visibility="{Binding ViewModel.IsMaximized, ElementName=ViewportControl, Converter={StaticResource InverseBooleanToVisibilityConverter}}"/>
-                
-                <!-- Column 2: Controls Panel -->
-                <viewer:ViewerPanelControl Grid.Column="2" x:Name="PanelControl"
-                                           Visibility="{Binding ViewModel.IsMaximized, ElementName=ViewportControl, Converter={StaticResource InverseBooleanToVisibilityConverter}}"/>
-            </Grid>
-
-
-            <!-- CHROMA SELECTION OVERLAY -->
-            <viewer:ChromaSelectionControl x:Name="ChromaSelectionOverlay" 
-                                           Visibility="{Binding ViewModel.IsChromaGalleryVisible, ElementName=PanelControl, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-        </Grid>
+            </StackPanel>
+        </ScrollViewer>
+        <ContentControl x:Name="StudioHost" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                        Visibility="{Binding IsStudioVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+        <ContentControl x:Name="ChromaHost" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                        Visibility="{Binding IsChromaLibraryVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
     </Grid>
 </UserControl>

@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Reflection;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media;
@@ -26,8 +25,6 @@ namespace AssetsManager.Services.Monitor
         private readonly WadContentProvider _wadContentProvider;
         private readonly VersionService _versionService;
         private readonly BackupManager _backupManager;
-
-        private static readonly FieldInfo _checksumField = typeof(WadChunk).GetField("_checksum", BindingFlags.NonPublic | BindingFlags.Instance);
 
         public event Action<MonitoredAsset> AssetUpdated;
 
@@ -171,7 +168,7 @@ namespace AssetsManager.Services.Monitor
 
                     checkPerformed = true;
                     using var wadFile = new WadFile(fullWadPath);
-                    ulong pathHash = XxHash64Ext.Hash(asset.InternalPath.ToLower());
+                    ulong pathHash = XxHash64Ext.Hash(PathUtils.NormalizePath(asset.InternalPath));
                     
                     if (!wadFile.Chunks.TryGetValue(pathHash, out var chunk))
                     {
@@ -184,8 +181,7 @@ namespace AssetsManager.Services.Monitor
                         continue;
                     }
 
-                    // En WAD v3+, el checksum es XXHash64 del contenido (private field _checksum)
-                    ulong currentChecksum = _checksumField != null ? (ulong)_checksumField.GetValue(chunk) : 0;
+                    ulong currentChecksum = chunk.Checksum;
 
                     if (asset.LastKnownHash == 0)
                     {

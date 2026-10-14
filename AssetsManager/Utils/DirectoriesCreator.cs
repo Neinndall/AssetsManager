@@ -9,6 +9,7 @@ namespace AssetsManager.Utils
         // Fixed root paths
         public string AppDirectory { get; }
         public string HashesPath { get; }
+        public string HashLabPath { get; }
         public string JsonCacheHistoryPath { get; }
         public string WatcherCacheOldPath { get; }
         public string WatcherCacheNewPath { get; }
@@ -22,15 +23,26 @@ namespace AssetsManager.Utils
         public string ApiCacheSalesPath { get; }
         public string ApiCacheMythicPath { get; }
         public string ApiCacheRewardsPath { get; }
+        public string NotificationsPath { get; }
+        public string NotificationsHistoryPath { get; }
+        public string NewsSeenPath { get; }
+        public string AudioRuntimePath { get; }
 
-        public DirectoriesCreator()
+        public DirectoriesCreator(string customAppFolderPath = null)
         {
             AppDirectory = AppDomain.CurrentDomain.BaseDirectory;
 
-            string appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-            string appFolderPath = Path.Combine(appDataPath, "AssetsManager");
+            string appFolderPath = customAppFolderPath;
+            if (string.IsNullOrEmpty(appFolderPath))
+            {
+                string appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+                appFolderPath = Path.Combine(appDataPath, "AssetsManager");
+            }
+
+            AudioRuntimePath = Path.Combine(appFolderPath, "audio_runtime");
 
             HashesPath = Path.Combine(appFolderPath, "hashes");
+            HashLabPath = Path.Combine(appFolderPath, "hash_lab");
 
             AssetsDownloadedPath = Path.Combine(AppDirectory, "AssetsDownloaded");
             
@@ -51,6 +63,13 @@ namespace AssetsManager.Utils
 
             WadComparisonSavePath = Path.Combine(appFolderPath, "wadcomparison");
             VersionsPath = Path.Combine(appFolderPath, "versions");
+
+            NotificationsPath = Path.Combine(appFolderPath, "notifications");
+            NotificationsHistoryPath = Path.Combine(NotificationsPath, "notifications_history.json");
+            CreateDirectory(NotificationsPath);
+
+            NewsSeenPath = Path.Combine(appFolderPath, "news_cache", "seen_news.json");
+            CreateDirectory(Path.Combine(appFolderPath, "news_cache"));
         }
 
         // Dynamic naming logic (Stateless & Safe)
@@ -100,6 +119,7 @@ namespace AssetsManager.Utils
         public void CreateHashesDirectories()
         {
             CreateDirectory(HashesPath);
+            CreateDirectory(HashLabPath);
         }
 
         public void CreateDirectory(string path)

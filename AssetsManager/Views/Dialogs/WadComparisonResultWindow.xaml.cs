@@ -2,14 +2,16 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using Microsoft.Extensions.DependencyInjection;
+using System.Windows.Threading;
 using AssetsManager.Services.Comparator;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Downloads;
 using AssetsManager.Services.Explorer;
+using AssetsManager.Services.Formatting;
 using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Monitor;
 using AssetsManager.Utils;
@@ -25,9 +27,7 @@ namespace AssetsManager.Views.Dialogs
     public partial class WadComparisonResultWindow : HudWindow
     {
         private List<SerializableChunkDiff> _serializableDiffs;
-        private readonly IServiceProvider _serviceProvider;
         private readonly CustomMessageBoxService _customMessageBoxService;
-        private readonly AssetDownloader _assetDownloaderService;
         private readonly LogService _logService;
         private readonly ComparisonHistoryService _comparisonHistoryService;
         private readonly DiffViewService _diffViewService;
@@ -36,6 +36,12 @@ namespace AssetsManager.Views.Dialogs
         private readonly WadContentProvider _wadContentProvider;
         private readonly VersionService _versionService;
         private readonly BackupManager _backupManager;
+        private readonly ExtractionService _extractionService;
+        private readonly DirectoriesCreator _directoriesCreator;
+        private readonly SemaphoreSlim _thumbnailLoadLimiter = new(2, 2);
+        private readonly Dictionary<SerializableChunkDiff, CancellationTokenSource> _thumbnailLoads = new();
+        private readonly Dictionary<SerializableChunkDiff, WadResultItemModel> _resultItems = new();
+        private readonly DispatcherTimer _searchDebounceTimer;
 
         private string _oldPbePath;
         private string _newPbePath;
@@ -45,9 +51,7 @@ namespace AssetsManager.Views.Dialogs
         private readonly WadComparisonResultModel _viewModel;
 
         public WadComparisonResultWindow(
-            IServiceProvider serviceProvider,
             CustomMessageBoxService customMessageBoxService,
-            AssetDownloader assetDownloaderService,
             LogService logService,
             ComparisonHistoryService comparisonHistoryService,
             DiffViewService diffViewService,
@@ -55,15 +59,15 @@ namespace AssetsManager.Views.Dialogs
             AppSettings appSettings,
             WadContentProvider wadContentProvider,
             VersionService versionService,
-            BackupManager backupManager)
+            BackupManager backupManager,
+            ExtractionService extractionService,
+            DirectoriesCreator directoriesCreator)
         {
             InitializeComponent();
             _viewModel = new WadComparisonResultModel();
             DataContext = _viewModel;
 
-            _serviceProvider = serviceProvider;
             _customMessageBoxService = customMessageBoxService;
-            _assetDownloaderService = assetDownloaderService;
             _logService = logService;
             _comparisonHistoryService = comparisonHistoryService;
             _diffViewService = diffViewService;
@@ -72,12 +76,24 @@ namespace AssetsManager.Views.Dialogs
             _wadContentProvider = wadContentProvider;
             _versionService = versionService;
             _backupManager = backupManager;
+            _extractionService = extractionService;
+            _directoriesCreator = directoriesCreator;
+
+            // Debounce only this window's expensive result projection so typing stays responsive.
+            _searchDebounceTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(150)
+            };
+            _searchDebounceTimer.Tick += SearchDebounceTimer_Tick;
 
             // Peer Injection
             ResultsTree.ParentWindow = this;
+            ResultsControl.ParentWindow = this;
 
             _viewModel.TreeModel.FilterChanged += OnTreeFilterChanged;
             _viewModel.PropertyChanged += OnViewModelPropertyChanged;
+            ResultsControl.ItemVisibilityChanged += OnResultsItemVisibilityChanged;
+            ResultsControl.FilterApplied += OnResultsFilterApplied;
 
             Loaded += WadComparisonResultWindow_Loaded;
             Closed += OnWindowClosed;
@@ -87,71 +103,158 @@ namespace AssetsManager.Views.Dialogs
         {
             if (e.PropertyName == nameof(WadComparisonResultModel.ActiveView))
             {
-                if (_viewModel.ActiveView == ComparisonViewMode.Discovery)
+                UpdateFooterSummary();
+                if (_viewModel.ActiveView == ComparisonViewMode.Results)
                 {
-                    _ = LoadGalleryThumbnailsAsync();
+                    QueueResultsThumbnailLoading();
+                }
+                else
+                {
+                    ResetThumbnailLoading();
                 }
             }
         }
 
-        private async Task LoadGalleryThumbnailsAsync()
+        private void OnResultsFilterApplied()
         {
-            var itemsToLoad = _viewModel.DiscoveryItems.Where(i => i.ImagePreview == null).ToList();
-            if (!itemsToLoad.Any()) return;
+            UpdateFooterSummary();
+        }
 
-            foreach (var item in itemsToLoad)
+        private void UpdateFooterSummary()
+        {
+            if (_viewModel == null || _viewModel.ActiveView != ComparisonViewMode.Results)
             {
-                try
-                {
-                    // Delegamos todo al servicio: extracción + procesado (TextureUtils)
-                    // Mantenemos el límite de 256px para optimizar memoria
-                    item.ImagePreview = await _wadContentProvider.GetDiffThumbnailAsync(item, _oldPbePath, _newPbePath, 256);
-                }
-                catch (Exception ex)
-                {
-                    _logService.LogError(ex, $"Failed to load gallery thumbnail for {item.Path}");
-                }
+                return;
             }
+
+            int total = ResultsControl.TotalCount;
+            int visible = ResultsControl.VisibleCount;
+            if (total == 0)
+            {
+                _viewModel.ResultsSummaryText = "No results to show.";
+            }
+            else if (visible == total)
+            {
+                _viewModel.ResultsSummaryText = $"Showing {visible} results.";
+            }
+            else
+            {
+                _viewModel.ResultsSummaryText = $"Showing {visible} of {total} results.";
+            }
+        }
+
+        private void OnResultsItemVisibilityChanged(SerializableChunkDiff item, bool isVisible)
+        {
+            if (!isVisible || _viewModel.ActiveView != ComparisonViewMode.Results)
+            {
+                CancelThumbnail(item);
+                return;
+            }
+
+            LoadThumbnail(item);
+        }
+
+        private void QueueResultsThumbnailLoading()
+        {
+            Dispatcher.InvokeAsync(() =>
+            {
+                if (_viewModel.ActiveView == ComparisonViewMode.Results)
+                {
+                    ResultsControl.LoadRealizedItems();
+                }
+            }, DispatcherPriority.Loaded);
         }
 
         private void OnTreeFilterChanged(object sender, EventArgs e)
         {
+            // A type-filter change already applies the latest search text, so discard any pending duplicate refresh.
+            _searchDebounceTimer.Stop();
             Dispatcher.InvokeAsync(() => ApplyFilters());
         }
 
-        public void ApplyFilters()
+        private void ResetThumbnailLoading()
+        {
+            foreach (var cancellation in _thumbnailLoads.Values) cancellation.Cancel();
+            _thumbnailLoads.Clear();
+            foreach (var item in _serializableDiffs ?? Enumerable.Empty<SerializableChunkDiff>())
+            {
+                item.ImagePreview = null;
+            }
+        }
+
+        private async void LoadThumbnail(SerializableChunkDiff item)
+        {
+            if (item.ImagePreview != null || _thumbnailLoads.ContainsKey(item)) return;
+
+            var cancellation = new CancellationTokenSource();
+            _thumbnailLoads.Add(item, cancellation);
+            bool acquiredSlot = false;
+            try
+            {
+                await _thumbnailLoadLimiter.WaitAsync(cancellation.Token);
+                acquiredSlot = true;
+                var preview = await _wadContentProvider.GetDiffThumbnailAsync(
+                    item, _oldPbePath, _newPbePath, 256, cancellation.Token);
+
+                if (_thumbnailLoads.TryGetValue(item, out var active) && ReferenceEquals(active, cancellation))
+                    item.ImagePreview = preview;
+            }
+            catch (OperationCanceledException)
+            {
+                // Recycling and filtering cancel thumbnails by design.
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, $"Failed to load thumbnail. WAD='{item.SourceWadFile}', Path='{item.Path}'");
+            }
+            finally
+            {
+                if (acquiredSlot) _thumbnailLoadLimiter.Release();
+                if (_thumbnailLoads.TryGetValue(item, out var active) && ReferenceEquals(active, cancellation))
+                    _thumbnailLoads.Remove(item);
+                cancellation.Dispose();
+            }
+        }
+
+        private void CancelThumbnail(SerializableChunkDiff item)
+        {
+            if (_thumbnailLoads.Remove(item, out var cancellation)) cancellation.Cancel();
+        }
+
+        public void ApplyFilters(bool refreshResultItems = true)
         {
             if (_serializableDiffs == null) return;
 
-            var filtered = _serializableDiffs.Where(d => 
+            var typeFiltered = _serializableDiffs.Where(d => IsDiffTypeVisible(d.Type)).ToList();
+            string filterText = _viewModel.FilterText;
+            var filtered = string.IsNullOrWhiteSpace(filterText)
+                ? typeFiltered
+                : typeFiltered.Where(d => d.FileName.IndexOf(filterText, StringComparison.OrdinalIgnoreCase) >= 0).ToList();
+
+            _viewModel.SetResults(filtered, PrepareGroupedResults(filtered));
+
+            // Text-only searches keep the same result item pool; rebuilding it would trigger a redundant grid filter.
+            if (refreshResultItems)
             {
-                bool stateMatch = false;
-                if (d.Type == ChunkDiffType.New && _viewModel.TreeModel.ShowNew) stateMatch = true;
-                else if (d.Type == ChunkDiffType.Modified && _viewModel.TreeModel.ShowModified) stateMatch = true;
-                else if (d.Type == ChunkDiffType.Removed && _viewModel.TreeModel.ShowRemoved) stateMatch = true;
-                else if (d.Type == ChunkDiffType.Renamed && _viewModel.TreeModel.ShowRenamed) stateMatch = true;
-                
-                if (!stateMatch) return false;
-
-                if (string.IsNullOrWhiteSpace(_viewModel.FilterText)) return true;
-                return d.FileName.IndexOf(_viewModel.FilterText, StringComparison.OrdinalIgnoreCase) >= 0;
-            }).ToList();
-
-            var wadGroups = PrepareGroupedResults(filtered);
-            _viewModel.SetResults(filtered, wadGroups);
-
-            // If we are in Gallery mode, trigger thumbnail loading for newly visible filtered items
-            if (_viewModel.ActiveView == ComparisonViewMode.Discovery)
-            {
-                _ = LoadGalleryThumbnailsAsync();
+                SetFilteredResultItems(typeFiltered);
             }
         }
+
+        private bool IsDiffTypeVisible(ChunkDiffType type) => type switch
+        {
+            ChunkDiffType.New => _viewModel.TreeModel.ShowNew,
+            ChunkDiffType.Modified => _viewModel.TreeModel.ShowModified,
+            ChunkDiffType.Removed => _viewModel.TreeModel.ShowRemoved,
+            ChunkDiffType.Renamed => _viewModel.TreeModel.ShowRenamed,
+            _ => false
+        };
 
         public void Initialize(List<ChunkDiff> diffs, string oldPbePath, string newPbePath, string version = null)
         {
             _oldPbePath = oldPbePath;
             _newPbePath = newPbePath;
             _version = version;
+            _resultItems.Clear();
             _serializableDiffs = diffs.Select(d => new SerializableChunkDiff
             {
                 Type = d.Type,
@@ -167,19 +270,35 @@ namespace AssetsManager.Views.Dialogs
             }).ToList();
         }
 
-        public void Initialize(List<SerializableChunkDiff> serializableDiffs, string oldPbePath = null, string newPbePath = null, string sourceJsonPath = null, string version = null)
+        public void Initialize(List<SerializableChunkDiff> serializableDiffs, string oldPbePath = null, string newPbePath = null, string sourceJsonPath = null, string version = null, List<ExtractResultItem> extractionResults = null)
         {
+            _resultItems.Clear();
             _serializableDiffs = serializableDiffs;
             _oldPbePath = oldPbePath;
             _newPbePath = newPbePath;
             _sourceJsonPath = sourceJsonPath;
             _version = version;
+            foreach (var result in extractionResults ?? Enumerable.Empty<ExtractResultItem>())
+            {
+                _resultItems[result.Diff] = new WadResultItemModel(result);
+            }
+
+            // Default to the Results view when a batch extraction just finished.
+            if (extractionResults != null && extractionResults.Count > 0)
+            {
+                _viewModel.ActiveView = ComparisonViewMode.Results;
+            }
         }
 
         private void OnWindowClosed(object sender, System.EventArgs e)
         {
             Loaded -= WadComparisonResultWindow_Loaded;
             Closed -= OnWindowClosed;
+            _searchDebounceTimer.Stop();
+            _searchDebounceTimer.Tick -= SearchDebounceTimer_Tick;
+            ResultsControl.ItemVisibilityChanged -= OnResultsItemVisibilityChanged;
+            ResultsControl.FilterApplied -= OnResultsFilterApplied;
+            ResetThumbnailLoading();
 
             if (_viewModel != null)
             {
@@ -189,23 +308,26 @@ namespace AssetsManager.Views.Dialogs
                     _viewModel.TreeModel.FilterChanged -= OnTreeFilterChanged;
                 }
             }
-            _serializableDiffs?.Clear();
+            _serializableDiffs = null;
+            _resultItems.Clear();
             _viewModel.TreeModel.WadGroups?.Clear();
             ResultsTree.Cleanup();
+            DataContext = null;
         }
 
         private async void WadComparisonResultWindow_Loaded(object sender, RoutedEventArgs e)
         {
             Loaded -= WadComparisonResultWindow_Loaded;
             _viewModel.SetLoadingState(ComparisonLoadingState.ResolvingHashes);
-            
-            var wadGroups = await Task.Run(() =>
-            {
-                TryResolveHashes();
-                return PrepareGroupedResults(_serializableDiffs);
-            });
 
-            _viewModel.SetResults(_serializableDiffs, wadGroups);
+            var diffs = _serializableDiffs;
+            await Task.Run(() => TryResolveHashes(diffs));
+
+            if (_serializableDiffs != null)
+            {
+                ApplyFilters();
+                QueueResultsThumbnailLoading();
+            }
         }
 
         // --- Handle methods for direct peer communication ---
@@ -213,13 +335,29 @@ namespace AssetsManager.Views.Dialogs
         private void GlobalSearchBox_TextChanged(object sender, TextChangedEventArgs e)
         {
             _viewModel.FilterText = globalSearchBox.Text;
-            ApplyFilters();
+
+            // Let WPF paint the typed text first, then refresh the expensive projections once input settles.
+            _searchDebounceTimer.Stop();
+            _searchDebounceTimer.Start();
+        }
+
+        private void SearchDebounceTimer_Tick(object sender, EventArgs e)
+        {
+            _searchDebounceTimer.Stop();
+            ApplySearchText(_viewModel.FilterText);
+        }
+
+        private void ApplySearchText(string text)
+        {
+            _viewModel.FilterText = text ?? string.Empty;
+            ApplyFilters(refreshResultItems: false);
+            ResultsControl.SetSearchText(_viewModel.FilterText);
         }
 
         public void HandleSearchTextChanged(string text)
         {
-            _viewModel.FilterText = text;
-            ApplyFilters();
+            _searchDebounceTimer.Stop();
+            ApplySearchText(text);
         }
 
         public void HandleTreeSelectionChanged(object selectedItem)
@@ -275,36 +413,42 @@ namespace AssetsManager.Views.Dialogs
             }
         }
 
-        private void TryResolveHashes()
+        private void TryResolveHashes(IEnumerable<SerializableChunkDiff> diffs)
         {
             string backupRoot = !string.IsNullOrEmpty(_sourceJsonPath) ? Path.GetDirectoryName(_sourceJsonPath) : null;
             
-            foreach (var diff in _serializableDiffs)
+            foreach (var diff in diffs)
             {
                 if (backupRoot != null)
                 {
                     diff.BackupChunkPath = WadNodeLoaderService.GetBackupChunkPath(backupRoot, diff);
                 }
 
-                // Optimization: Skip if already has a readable name. Only attempt if empty or a raw hex hash.
-                if (diff.OldPathHash != 0 && (string.IsNullOrEmpty(diff.OldPath) || IsHexHash(diff.OldPath)))
-                {
-                    string resolved = _hashResolverService.ResolveHash(diff.OldPathHash);
-                    if (resolved != null) diff.OldPath = resolved;
-                }
-
-                if (diff.NewPathHash != 0 && (string.IsNullOrEmpty(diff.NewPath) || IsHexHash(diff.NewPath)))
-                {
-                    string resolved = _hashResolverService.ResolveHash(diff.NewPathHash);
-                    if (resolved != null) diff.NewPath = resolved;
-                }
+                ResolveStoredPath(diff.OldPathHash, diff.OldPath, value => diff.OldPath = value);
+                ResolveStoredPath(diff.NewPathHash, diff.NewPath, value => diff.NewPath = value);
             }
         }
 
-        private bool IsHexHash(string path)
+        // Re-attempts hash resolution for stored hex-based names (the shape produced by
+        // Smart Guessing when a hash was unknown at comparison time). Only applies the
+        // result when the catalog returns a real game path, preserving the stored name
+        // otherwise.
+        private void ResolveStoredPath(ulong pathHash, string currentPath, Action<string> assign)
+        {
+            if (pathHash == 0) return;
+            if (!string.IsNullOrEmpty(currentPath) && !IsHexHash(currentPath)) return;
+
+            string resolved = _hashResolverService.ResolveHash(pathHash);
+            if (resolved != pathHash.ToString("x16")) assign(resolved);
+        }
+
+        // Matches a raw 16-char hex hash with or without an extension, the shape
+        // produced by Smart Guessing when a hash was unknown at comparison time.
+        private static bool IsHexHash(string path)
         {
             if (string.IsNullOrEmpty(path)) return false;
-            return path.Length == 16 && System.Text.RegularExpressions.Regex.IsMatch(path, @"^[0-9a-fA-F]+$");
+            string name = Path.GetFileNameWithoutExtension(path);
+            return name.Length == 16 && name.All(Uri.IsHexDigit);
         }
 
         private List<WadGroupViewModel> PrepareGroupedResults(List<SerializableChunkDiff> diffs)
@@ -327,10 +471,18 @@ namespace AssetsManager.Views.Dialogs
             return groups;
         }
 
-        private void PopulateResults(List<SerializableChunkDiff> diffs)
+        private void SetFilteredResultItems(List<SerializableChunkDiff> diffs)
         {
-            var wadGroups = PrepareGroupedResults(diffs);
-            _viewModel.SetResults(diffs, wadGroups);
+            var items = diffs.Select(diff =>
+            {
+                if (_resultItems.TryGetValue(diff, out var existing)) return existing;
+
+                var item = new WadResultItemModel(diff, _extractionService != null ? _extractionService.GetModeFromSettings(diff) : WadExportMode.Original);
+                _resultItems[diff] = item;
+                return item;
+            }).ToList();
+
+            ResultsControl.SetItems(items, _viewModel.FilterText);
         }
 
         private async void SaveButton_Click(object sender, RoutedEventArgs e)
@@ -391,11 +543,11 @@ namespace AssetsManager.Views.Dialogs
                     await _hashResolverService.ForceReloadHashesAsync();
                     foreach (var diff in _serializableDiffs)
                     {
-                        if (diff.OldPathHash != 0) diff.OldPath = _hashResolverService.ResolveHash(diff.OldPathHash);
-                        if (diff.NewPathHash != 0) diff.NewPath = _hashResolverService.ResolveHash(diff.NewPathHash);
+                        ResolveStoredPath(diff.OldPathHash, diff.OldPath, value => diff.OldPath = value);
+                        ResolveStoredPath(diff.NewPathHash, diff.NewPath, value => diff.NewPath = value);
                     }
                 });
-                PopulateResults(_serializableDiffs);
+                ApplyFilters();
                 _customMessageBoxService.ShowSuccess("Success", "Hashes have been reloaded and the result tree has been refreshed.", this);
             }
             catch (Exception ex)
@@ -403,6 +555,118 @@ namespace AssetsManager.Views.Dialogs
                 _viewModel.SetLoadingState(ComparisonLoadingState.Ready);
                 _customMessageBoxService.ShowError("Error", $"Failed to reload hashes: {ex.Message}", this);
                 _logService.LogError(ex, "Failed to reload hashes.");
+            }
+        }
+
+        // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // Results View Actions
+        // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+        public async void HandleResultsAction(string action, List<WadResultItemModel> items)
+        {
+            if (items == null || items.Count == 0) return;
+
+            try
+            {
+                switch (action)
+                {
+                    case "Retry":
+                        await ReExportAsync(items);
+                        break;
+
+                    case "Extract":
+                        await ReExportAsync(items, WadExportMode.Original);
+                        break;
+
+                    case "Save":
+                        await ReExportAsync(items, WadExportMode.Smart);
+                        break;
+
+                    case "CopyPaths":
+                        Clipboard.SetText(string.Join(Environment.NewLine, items.Select(i => i.Diff.Path)));
+                        break;
+
+                    case "OpenFolder":
+                        OpenOutputFolder(items.FirstOrDefault(i => !string.IsNullOrEmpty(i.OutputPath)) ?? items.FirstOrDefault());
+                        break;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, "Failed to handle Results action.");
+                _customMessageBoxService.ShowError("Error", $"Action failed: {ex.Message}", this);
+            }
+        }
+
+        public void OpenOutputFolder(WadResultItemModel item)
+        {
+            string folder = item?.OutputPath;
+            if (string.IsNullOrEmpty(folder) || !Directory.Exists(folder))
+            {
+                _customMessageBoxService.ShowInfo("Folder not found", "This asset has not been extracted yet.", this);
+                return;
+            }
+
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = folder,
+                UseShellExecute = true
+            });
+        }
+
+        private async Task ReExportAsync(List<WadResultItemModel> items, WadExportMode? mode = null)
+        {
+            if (string.IsNullOrEmpty(_oldPbePath) &&
+                string.IsNullOrEmpty(_newPbePath) &&
+                items.All(item => string.IsNullOrEmpty(item.Diff.BackupChunkPath)))
+            {
+                return;
+            }
+
+            var diffs = items.Where(i => i.CanExport).Select(i => i.Diff).ToList();
+            if (diffs.Count == 0) return;
+
+            using var cancellation = new CancellationTokenSource();
+            var results = new List<ExtractResultItem>();
+
+            if (mode == WadExportMode.Smart)
+            {
+                results.AddRange(await _extractionService.ExtractSmartAsync(diffs, _oldPbePath, _newPbePath, cancellation.Token));
+            }
+            else if (mode == WadExportMode.Original)
+            {
+                results.AddRange(await _extractionService.ExtractRawAsync(diffs, _oldPbePath, _newPbePath, cancellation.Token));
+            }
+            else
+            {
+                // Retry: re-export each failed item with the mode it was attempted with.
+                var rawDiffs = items.Where(i => i.CanExport && i.Mode == WadExportMode.Original).Select(i => i.Diff).ToList();
+                var smartDiffs = items.Where(i => i.CanExport && i.Mode == WadExportMode.Smart).Select(i => i.Diff).ToList();
+                results.AddRange(await _extractionService.ExtractRawAsync(rawDiffs, _oldPbePath, _newPbePath, cancellation.Token));
+                results.AddRange(await _extractionService.ExtractSmartAsync(smartDiffs, _oldPbePath, _newPbePath, cancellation.Token));
+            }
+
+            if (results.Count == 0) return;
+
+            var resultMap = results.ToDictionary(r => r.Diff, r => r);
+            foreach (var item in ResultsControl.GetAllItems())
+            {
+                if (resultMap.TryGetValue(item.Diff, out var result))
+                {
+                    item.UpdateResult(result);
+                }
+            }
+
+            int failedCount = results.Count(r => !r.Success);
+            ResultsControl.UpdateRetryButton();
+            ResultsControl.RefreshOpenFolderButton();
+            if (failedCount == 0)
+            {
+                _customMessageBoxService.ShowSuccess("Extraction Complete", $"{results.Count} asset(s) exported successfully.", this);
+            }
+            else
+            {
+                _customMessageBoxService.ShowWarning("Extraction Finished", $"{results.Count - failedCount} exported, {failedCount} failed.", this);
             }
         }
     }

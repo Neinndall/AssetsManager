@@ -1,0 +1,42 @@
+using System;
+using System.Numerics;
+
+namespace AssetsManager.Services.Viewer.Vfx.Semantics
+{
+    /// <summary>
+    /// League's UV bookkeeping before the shader samples a texture cell. Birth ramps are
+    /// clamped only when authored to clamp; otherwise they retain their signed fraction. Long-running
+    /// wrap/mirror offsets are folded on the CPU so float attributes retain texel precision.
+    /// </summary>
+    internal static class VfxUvSemantics
+    {
+        internal static Vector2 BirthRamp(Vector2 value, bool clamped)
+            => clamped
+                ? Vector2.Clamp(value, new Vector2(-1f), Vector2.One)
+                // The engine uses modff: negative ramps must stay negative before addressing.
+                : new Vector2(value.X % 1f, value.Y % 1f);
+
+        // The emitter pan lands after the layer flips. Its pre-flip carrier must cancel their sign.
+        internal static Vector2 PreFlipEmitterScroll(Vector2 rate, float time, bool flipU, bool flipV)
+            => rate * time * new Vector2(flipU ? -1f : 1f, flipV ? -1f : 1f);
+
+        internal static Vector2 Periodic(Vector2 value, int addressMode)
+        {
+            float period = addressMode switch
+            {
+                0 => 1f, // wrap
+                1 => 2f, // mirror
+                _ => 0f  // clamp / border keep the authored displacement
+            };
+            return period > 0f
+                ? new Vector2(PositiveModulo(value.X, period), PositiveModulo(value.Y, period))
+                : value;
+        }
+
+        private static float PositiveModulo(float value, float period)
+        {
+            float wrapped = value % period;
+            return wrapped < 0f ? wrapped + period : wrapped;
+        }
+    }
+}

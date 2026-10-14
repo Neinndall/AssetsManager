@@ -1,6 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
-using Microsoft.WindowsAPICodePack.Dialogs;
+using Microsoft.Win32;
 using AssetsManager.Views.Models.Shared;
 
 namespace AssetsManager.Views.Settings
@@ -18,18 +18,16 @@ namespace AssetsManager.Views.Settings
         {
             if (ViewModel?.Settings == null) return;
 
-            using (var folderBrowserDialog = new CommonOpenFileDialog
+            var folderBrowserDialog = new OpenFolderDialog
             {
-                IsFolderPicker = true,
                 Title = "Select lol PBE directory",
                 InitialDirectory = ViewModel.Settings.LolPbeDirectory
-            })
+            };
+
+            if (folderBrowserDialog.ShowDialog() == true)
             {
-                if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
-                {
-                    ViewModel.Settings.LolPbeDirectory = folderBrowserDialog.FileName;
-                    ViewModel.NotifySettingsChanged();
-                }
+                ViewModel.Settings.LolPbeDirectory = folderBrowserDialog.FolderName;
+                ViewModel.NotifySettingsChanged();
             }
         }
 
@@ -37,18 +35,16 @@ namespace AssetsManager.Views.Settings
         {
             if (ViewModel?.Settings == null) return;
 
-            using (var folderBrowserDialog = new CommonOpenFileDialog
+            var folderBrowserDialog = new OpenFolderDialog
             {
-                IsFolderPicker = true,
                 Title = "Select lol Live directory",
                 InitialDirectory = ViewModel.Settings.LolLiveDirectory
-            })
+            };
+
+            if (folderBrowserDialog.ShowDialog() == true)
             {
-                if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
-                {
-                    ViewModel.Settings.LolLiveDirectory = folderBrowserDialog.FileName;
-                    ViewModel.NotifySettingsChanged();
-                }
+                ViewModel.Settings.LolLiveDirectory = folderBrowserDialog.FolderName;
+                ViewModel.NotifySettingsChanged();
             }
         }
 
@@ -56,42 +52,36 @@ namespace AssetsManager.Views.Settings
         {
             if (ViewModel?.Settings == null) return;
 
-            using (var folderBrowserDialog = new CommonOpenFileDialog
+            var folderBrowserDialog = new OpenFolderDialog
             {
-                IsFolderPicker = true,
                 Title = "Select default extraction directory",
                 InitialDirectory = ViewModel.Settings.DefaultExtractedSelectDirectory
-            })
+            };
+
+            if (folderBrowserDialog.ShowDialog() == true)
             {
-                if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
-                {
-                    ViewModel.Settings.DefaultExtractedSelectDirectory = folderBrowserDialog.FileName;
-                    ViewModel.NotifySettingsChanged();
-                }
+                ViewModel.Settings.DefaultExtractedSelectDirectory = folderBrowserDialog.FolderName;
+                ViewModel.NotifySettingsChanged();
             }
         }
 
-        private void btnBrowseCustomFloorTexture_Click(object sender, RoutedEventArgs e)
+        private void btnBrowseCustomGroundLogo_Click(object sender, RoutedEventArgs e)
         {
             if (ViewModel?.Settings == null) return;
 
-            using (var openFileDialog = new CommonOpenFileDialog
+            var openFileDialog = new OpenFileDialog
             {
-                IsFolderPicker = false,
-                Title = "Select custom floor texture file",
-                InitialDirectory = System.IO.Path.GetDirectoryName(ViewModel.Settings.CustomFloorTexturePath),
-                Filters = {
-                    new CommonFileDialogFilter("Image Files", "*.png;*.jpg;*.jpeg;*.dds;*.tga"),
-                    new CommonFileDialogFilter("All Files", "*.*")
-                }
-            })
+                Title = "Select viewport ground logo",
+                InitialDirectory = System.IO.Path.GetDirectoryName(ViewModel.Settings.CustomGroundLogoPath),
+                Filter = "Ground Logo Image (*.png;*.webp)|*.png;*.webp|All Files (*.*)|*.*"
+            };
+
+            if (openFileDialog.ShowDialog() == true)
             {
-                if (openFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
-                {
-                    ViewModel.Settings.CustomFloorTexturePath = openFileDialog.FileName;
-                    ViewModel.NotifySettingsChanged();
-                }
+                ViewModel.Settings.CustomGroundLogoPath = openFileDialog.FileName;
+                ViewModel.NotifySettingsChanged();
             }
         }
+
     }
 }

@@ -1,0 +1,207 @@
+using System.Linq;
+using System.Numerics;
+using AssetsManager.Shaders;
+using AssetsManager.Services.Viewer.Rendering;
+using AssetsManager.Services.Viewer.Rendering.GameShaders;
+using AssetsManager.Views.Models.Viewer;
+using Xunit;
+
+namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
+{
+    public sealed class GameShaderRuntimeSemanticsTests
+    {
+        [Fact]
+        public void BorderSamplingRetainsDerivativesAndOnlyRewritesTheNamedSamplerOnce()
+        {
+            const string source = "uniform highp sampler2D TEXTURE_TX;\n" +
+                "uniform highp sampler2D OTHER_TX;\n" +
+                "void main(){ vec4 a = texture(TEXTURE_TX, vec2(1.5)); vec4 b = texture(OTHER_TX, vec2(0.5)); }";
+            string patched = GameParticleShaderPrelude.WithBorder(source, "TEXTURE_TX");
+            Assert.Contains("vec4 a = particleBorder_TEXTURE_TX(vec2(1.5))", patched);
+            Assert.Contains("texture(OTHER_TX, vec2(0.5))", patched);
+            Assert.Contains("vec4 texel = texture(TEXTURE_TX, at);", patched);
+            Assert.Contains("return clamp(at, 0.0, 1.0) == at ? texel : vec4(0.0);", patched);
+            Assert.Equal(patched, GameParticleShaderPrelude.WithBorder(patched, "TEXTURE_TX"));
+            Assert.Equal(source, GameParticleShaderPrelude.WithBorder(source, "ABSENT"));
+            Assert.Equal("uniform highp samplerCube CUBE;", GameParticleShaderPrelude.WithBorder(
+                "uniform highp samplerCube CUBE;", "CUBE"));
+        }
+
+        [Fact]
+        public void CompactSkinPaletteIncludesAnimatedRigJointsAbove255()
+        {
+            Matrix4x4[] joints = Enumerable.Repeat(Matrix4x4.Identity, 361).ToArray();
+            joints[346] = Matrix4x4.CreateTranslation(8f, -2f, 0f);
+            var palette = new Matrix4x4[2];
+            GlMeshRenderer.WriteInfluenceSkinningPalette(joints, new short[] { 346, 0 }, palette);
+            Assert.Equal(joints[346], palette[0]);
+            Assert.Equal(Matrix4x4.Identity, palette[1]);
+            joints[346] = Matrix4x4.CreateRotationY(0.5f);
+            GlMeshRenderer.WriteInfluenceSkinningPalette(joints, new short[] { 346, 0 }, palette);
+            Assert.Equal(joints[346], palette[0]);
+        }
+
+        [Theory]
+        [InlineData(0.1f, 1000f, 0.2f)]
+        [InlineData(1f, 10000f, 50f)]
+        [InlineData(5f, 200f, 150f)]
+        public void DepthConversionReconstructsTheStoredStockOpenGlDepth(float near, float far, float distance)
+        {
+            var projection = Matrix4x4.CreatePerspectiveFieldOfView(1f, 1.5f, near, far);
+            Vector4 clip = Vector4.Transform(new Vector4(0f, 0f, -distance, 1f), projection);
+            float storedDepth = (clip.Z / clip.W + 1f) * 0.5f;
+            Vector2 conversion = GameShaderRuntime.DepthConversion(projection);
+            float reconstructed = 1f / (conversion.X + storedDepth * conversion.Y);
+            Assert.InRange(reconstructed, distance * 0.999f, distance * 1.001f);
+        }
+
+        [Fact]
+        public void OrthographicDepthConversionPreservesDistanceGaps()
+        {
+            var projection = Matrix4x4.CreateOrthographic(100f, 100f, 1f, 201f);
+            var conversion = GameShaderRuntime.DepthConversion(projection);
+            float Read(float distance)
+            {
+                var clip = Vector4.Transform(new Vector4(0f, 0f, -distance, 1f), projection);
+                float depth = (clip.Z + 1f) * 0.5f;
+                return 1f / (conversion.X + depth * conversion.Y);
+            }
+            Assert.InRange(Read(100f) - Read(50f), 49.8f, 50.2f);
+        }
+
+        [Fact]
+        public void BufferTexturesRequireIntegerNearestNeutralSampling()
+        {
+            Assert.True(GameShaderRuntime.RequiresIntegerNeutral(GameShaderTranslator.TextureDimension.Buffer));
+            Assert.False(GameShaderRuntime.RequiresIntegerNeutral(GameShaderTranslator.TextureDimension.Texture2D));
+            Assert.False(GameShaderRuntime.RequiresIntegerNeutral(GameShaderTranslator.TextureDimension.Cube));
+        }
+
+        [Theory]
+        [InlineData(0u, false)]
+        [InlineData(16u, false)]
+        [InlineData(1u, true)]
+        [InlineData(8u, true)]
+        [InlineData(15u, true)]
+        [InlineData(31u, true)]
+        public void ColorWriteMatchesViewportAllOrNothingMask(uint writeMask, bool expected)
+        {
+            Assert.Equal(expected, GameShaderRuntime.ColorWriteEnabled(writeMask));
+        }
+
+        [Fact]
+        public void ProgramTextureKeyIncludesPassIndexWhenSpecified()
+        {
+            Assert.Equal("program:materialA:0:Diffuse", AssetsManager.Services.Viewer.Loading.MapTextureLoadingService.ProgramTextureKey("materialA", 0, "Diffuse"));
+            Assert.Equal("program:materialA:1:Emissive", AssetsManager.Services.Viewer.Loading.MapTextureLoadingService.ProgramTextureKey("materialA", 1, "Emissive"));
+        }
+
+        [Fact]
+        public void TerrainTextureLookupKeepsAuthoredIndexAfterAnEarlierPassFails()
+        {
+            var textures = new System.Collections.Generic.Dictionary<string, uint>
+            {
+                ["program:terrain:0:Diffuse"] = 10,
+                ["program:terrain:1:Diffuse"] = 20,
+                ["program:terrain:Diffuse"] = 30
+            };
+            uint? Lookup(string key) => textures.TryGetValue(key, out uint value) ? value : null;
+            Assert.Equal(20u, GameShaderRuntime.ResolveStaticProgramTexture("terrain", 1, "Diffuse", Lookup));
+            Assert.Null(GameShaderRuntime.ResolveStaticProgramTexture("terrain", 2, "Diffuse", Lookup));
+        }
+
+        [Fact]
+        public void WritesSecondTarget_OnlyForPixelShadersThatDeclareOutputOne()
+        {
+            Assert.True(GameShaderRuntime.WritesSecondTarget("layout(location = 0) out vec4 SV_Target;\nlayout(location = 1) out vec4 SV_Target1;"));
+            Assert.False(GameShaderRuntime.WritesSecondTarget("layout(location = 0) out vec4 SV_Target;"));
+            Assert.False(GameShaderRuntime.WritesSecondTarget(null));
+        }
+
+        // Object-space shaders (HKG_MatCap_LuLu) subtract mWorld * point from the skinned, already placed position.
+        [Fact]
+        public void WriteCharacterPerDrawVertex_WritesTheCharacterPlacementAndItsInverse()
+        {
+            var frame = new GameShaderRuntime.Frame(Matrix4x4.Identity, Matrix4x4.Identity, Vector3.Zero, 0f, null);
+            Matrix4x4 world = Matrix4x4.CreateScale(2f) * Matrix4x4.CreateTranslation(100f, 0f, -50f);
+            float[] data = new float[64];
+
+            GameShaderRuntime.WriteCharacterPerDrawVertex(data, frame, world);
+
+            // Row r of the cbuffer is column r of the row-vector matrix: translation sits in each row's w.
+            Assert.Equal(new[] { 2f, 0f, 0f, 100f }, data[0..4]);
+            Assert.Equal(new[] { 0f, 0f, 2f, -50f }, data[8..12]);
+            Assert.Equal(new[] { 0.5f, 0f, 0f, -50f }, data[44..48]);
+        }
+
+        [Fact]
+        public void WriteCharacterPerDrawVertex_AmbientCubeAddsSunWhereItFalls()
+        {
+            var sun = new MapSunData(
+                Direction: new Vector3(0f, 1f, 0f),
+                Color: new Vector4(1f, 0.5f, 0f, 1f),
+                Intensity: 1f,
+                SkyColor: new Vector4(0.2f, 0.2f, 0.2f, 1f),
+                GroundColor: new Vector4(0.1f, 0.1f, 0.1f, 1f),
+                HorizonColor: new Vector4(0.4f, 0.4f, 0.4f, 1f),
+                SkyScale: 1f,
+                LightMapColorScale: 1f,
+                FogColor: Vector4.Zero,
+                FogAlternateColor: Vector4.Zero,
+                FogStartEnd: Vector2.Zero,
+                FogEmissiveRemap: 0f,
+                FogEnabled: false);
+
+            var frame = new GameShaderRuntime.Frame(
+                Matrix4x4.Identity,
+                Matrix4x4.Identity,
+                Vector3.Zero,
+                0f,
+                sun);
+
+            float[] data = new float[64];
+            GameShaderRuntime.WriteCharacterPerDrawVertex(data, frame, System.Numerics.Matrix4x4.Identity);
+
+            // Face 2 is +Y: index 16 + 2 * 4 = 24
+            // Lit = basis * skyScale + sun * facing
+            // Basis for +Y is sky = (0.2, 0.2, 0.2)
+            // Sun is (1.0, 0.5, 0.0) * 1.0 = (1.0, 0.5, 0.0)
+            // Facing for +Y and direction (0, 1, 0) is dot = 1.0
+            // Lit = (0.2, 0.2, 0.2) + (1.0, 0.5, 0.0) = (1.2, 0.7, 0.2)
+            Assert.Equal(1.2f, data[24], precision: 4);
+            Assert.Equal(0.7f, data[25], precision: 4);
+            Assert.Equal(0.2f, data[26], precision: 4);
+
+            // Face 3 is -Y: index 16 + 3 * 4 = 28
+            // Basis for -Y is ground = (0.1, 0.1, 0.1)
+            // Facing for -Y and direction (0, 1, 0) is dot = 0.0
+            // Lit = ground * skyScale = (0.1, 0.1, 0.1)
+            Assert.Equal(0.1f, data[28], precision: 4);
+            Assert.Equal(0.1f, data[29], precision: 4);
+            Assert.Equal(0.1f, data[30], precision: 4);
+
+            // Face 0 is +X: index 16 + 0 * 4 = 16
+            // Basis for +X is horizon = (0.4, 0.4, 0.4)
+            // Facing for +X and direction (0, 1, 0) is dot = 0.0
+            // Lit = horizon * skyScale = (0.4, 0.4, 0.4)
+            Assert.Equal(0.4f, data[16], precision: 4);
+            Assert.Equal(0.4f, data[17], precision: 4);
+            Assert.Equal(0.4f, data[18], precision: 4);
+        }
+
+        [Theory]
+        [InlineData(0u, Silk.NET.OpenGL.DepthFunction.Lequal)] // 0 reads as class default (Lequal) rather than Never
+        [InlineData(1u, Silk.NET.OpenGL.DepthFunction.Less)]
+        [InlineData(2u, Silk.NET.OpenGL.DepthFunction.Equal)]
+        [InlineData(3u, Silk.NET.OpenGL.DepthFunction.Lequal)]
+        [InlineData(4u, Silk.NET.OpenGL.DepthFunction.Greater)]
+        [InlineData(5u, Silk.NET.OpenGL.DepthFunction.Notequal)]
+        [InlineData(6u, Silk.NET.OpenGL.DepthFunction.Gequal)]
+        [InlineData(7u, Silk.NET.OpenGL.DepthFunction.Always)]
+        [InlineData(99u, Silk.NET.OpenGL.DepthFunction.Lequal)]
+        public void ToDepth_MapsZeroToDefaultLequal(uint value, Silk.NET.OpenGL.DepthFunction expected)
+        {
+            Assert.Equal(expected, GameShaderRuntime.ToDepth(value));
+        }
+    }
+}

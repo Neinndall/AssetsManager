@@ -1,208 +1,273 @@
+using AssetsManager.Services.Viewer.Resources;
 using System;
 using System.IO;
+using System.Linq;
+using System.Numerics;
 using System.Windows;
-using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using System.Windows.Media.Media3D;
 using AssetsManager.Services.Core;
 using AssetsManager.Utils;
-using Material3D = System.Windows.Media.Media3D.Material;
 
 namespace AssetsManager.Views.Helpers
 {
+    internal readonly record struct GroundAppearance(
+        BitmapSource Texture, BitmapSource Logo = null, double LogoScale = 1, double LogoOpacity = 1)
+    {
+        internal Vector2 LogoUvSize
+        {
+            get
+            {
+                if (Logo == null) return Vector2.One;
+                double scale = double.IsFinite(LogoScale) ? Math.Clamp(LogoScale, 0.25, 1.5) : 1;
+                double size = 850.0 / SceneElements.GroundSize * scale;
+                double aspect = (double)Logo.PixelWidth / Logo.PixelHeight;
+                return new Vector2((float)(size * Math.Min(1, aspect)), (float)(size / Math.Max(1, aspect)));
+            }
+        }
+
+        internal float Opacity => double.IsFinite(LogoOpacity) ? (float)Math.Clamp(LogoOpacity, 0, 1) : 1;
+    }
+
+    /// <summary>
+    /// Centralized provider for viewport environment elements:
+    /// shared ground appearance and studio skybox cubemap (dynamic WAD cubemap).
+    /// </summary>
     public static class SceneElements
     {
-        public const double GroundLevel = 2000;
-        public const int SceneTextureMaxSize = 2048;
+        public const double GroundLevel = 1000;
+        public const float GroundSize = 2000f;
+        public const string GroundTexturePath = "pack://application:,,,/AssetsManager;component/Resources/Scene/ground_rift.dds";
+        public const string SkyboxChunkVirtualPath = "assets/maps/skyboxes/riots_sru_skybox_cubemap.dds";
 
-        private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, BitmapSource> _textureCache = new();
+        #region Ground Cache & Loader
 
-        public static BitmapSource LoadSceneTexture(string path, LogService logService)
+        private static readonly object GroundLock = new();
+        private static BitmapSource _cachedGroundTexture;
+        private static bool _groundLoaded;
+        private static BitmapSource _cachedGroundLogo;
+        private static (string Path, long Modified, long Length)? _cachedGroundLogoFile;
+
+        internal static bool IsGroundLogoSetting(string propertyName) =>
+            string.IsNullOrEmpty(propertyName)
+            || propertyName is nameof(AppSettings.CustomGroundLogoPath)
+                or nameof(AppSettings.GroundLogoScale) or nameof(AppSettings.GroundLogoOpacity);
+
+        public static void ClearGroundCache()
         {
-            if (string.IsNullOrEmpty(path)) return null;
+            lock (GroundLock)
+            {
+                _groundLoaded = false;
+                _cachedGroundTexture = null;
+                _cachedGroundLogo = null;
+                _cachedGroundLogoFile = null;
+            }
+        }
 
-            return _textureCache.GetOrAdd(path, p =>
+        internal static GroundAppearance LoadGroundAppearance(AppSettings settings, LogService logService)
+        {
+            lock (GroundLock)
             {
                 try
                 {
-                    if (File.Exists(p))
+                    if (!_groundLoaded)
                     {
-                        using (FileStream fileStream = new FileStream(p, FileMode.Open, FileAccess.Read))
-                            return TextureUtils.LoadTexture(fileStream, Path.GetExtension(p), SceneTextureMaxSize);
+                        _cachedGroundTexture = LoadBundledGround(logService);
+                        _groundLoaded = true;
+                    }
+
+                    string path = settings?.CustomGroundLogoPath;
+                    var file = string.IsNullOrWhiteSpace(path) ? null : new FileInfo(path);
+                    if (file?.Exists == true)
+                    {
+                        var logoFile = (file.FullName, file.LastWriteTimeUtc.Ticks, file.Length);
+                        if (_cachedGroundLogoFile != logoFile)
+                        {
+                            _cachedGroundLogo = TextureUtils.LoadTextureFromFile(file.FullName);
+                            _cachedGroundLogoFile = logoFile;
+                        }
                     }
                     else
                     {
-                        using (Stream resourceStream = Application.GetResourceStream(new Uri(p)).Stream)
-                            return TextureUtils.LoadTexture(resourceStream, Path.GetExtension(p), SceneTextureMaxSize);
+                        _cachedGroundLogo = null;
+                        _cachedGroundLogoFile = null;
                     }
+                    return new GroundAppearance(_cachedGroundTexture, _cachedGroundLogo,
+                        settings?.GroundLogoScale ?? 1, settings?.GroundLogoOpacity ?? 1);
                 }
                 catch (Exception ex)
                 {
-                    logService.LogError(ex, $"Failed to load scene texture: {p}");
+                    logService?.LogError(ex, "Failed to load preview ground texture.");
+                    return new GroundAppearance(_cachedGroundTexture);
+                }
+            }
+        }
+
+        private static BitmapSource LoadBundledGround(LogService logService)
+        {
+            try
+            {
+                var uri = new Uri(GroundTexturePath, UriKind.RelativeOrAbsolute);
+                var streamInfo = Application.GetResourceStream(uri);
+                if (streamInfo?.Stream != null)
+                {
+                    using var stream = streamInfo.Stream;
+                    return TextureUtils.LoadTexture(stream, ".dds");
+                }
+            }
+            catch (Exception ex)
+            {
+                logService?.LogDebug($"Could not load ground from resource stream: {ex.Message}");
+            }
+
+            string diskPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources", "Scene", "ground_rift.dds");
+            if (File.Exists(diskPath))
+            {
+                try
+                {
+                    using var stream = File.OpenRead(diskPath);
+                    return TextureUtils.LoadTexture(stream, ".dds");
+                }
+                catch (Exception ex)
+                {
+                    logService?.LogError(ex, $"Failed to load ground from disk: {diskPath}");
+                }
+            }
+
+            return null;
+        }
+
+        #endregion
+
+        #region Studio Skybox Cubemap Cache & Loader
+
+        private static readonly object SkyLock = new();
+        private static CubeMapData _cachedGenericSky;
+        private static bool _skyAttempted;
+
+        public static void ClearSkyCache()
+        {
+            lock (SkyLock)
+            {
+                _skyAttempted = false;
+                _cachedGenericSky = null;
+            }
+        }
+
+        /// <summary>
+        /// Clears both ground texture and skybox cubemap caches.
+        /// </summary>
+        public static void ClearSceneCache()
+        {
+            ClearGroundCache();
+            ClearSkyCache();
+        }
+
+        internal static CubeMapData LoadGenericSkyCube(LogService logService) =>
+            LoadGenericSkyCube(null, logService);
+
+        /// <summary>
+        /// Loads the official Summoner's Rift sky cubemap from Map11.wad.client matching LTK Manager.
+        /// </summary>
+        internal static CubeMapData LoadGenericSkyCube(AppSettings settings, LogService logService)
+        {
+            lock (SkyLock)
+            {
+                if (_skyAttempted)
+                    return _cachedGenericSky;
+
+                _skyAttempted = true;
+                try
+                {
+                    _cachedGenericSky = LoadSkyFromGame(settings, logService);
+                    return _cachedGenericSky;
+                }
+                catch (Exception ex)
+                {
+                    logService?.LogError(ex, "Failed to load studio skybox cubemap from League installation.");
+                    _cachedGenericSky = null;
                     return null;
                 }
-            });
+            }
         }
 
-        public static ModelVisual3D CreateSidePlanes(Func<string, BitmapSource> loadTextureFunc, Action<string> logErrorFunc)
+        private static CubeMapData LoadSkyFromGame(AppSettings settings, LogService logService)
         {
-            Model3DGroup finalGroup = new Model3DGroup();
-            double size = 2500; // Sides are 5000x5000
-
-            // 1. Load individual textures for each side and create their materials
-            string frontTexturePath = "pack://application:,,,/AssetsManager;component/Resources/Scene/Sky/sky_front.dds";
-            BitmapSource frontTexture = loadTextureFunc(frontTexturePath);
-            Material3D frontMaterial = (frontTexture != null) ? new DiffuseMaterial(new ImageBrush(frontTexture)) : new DiffuseMaterial(new SolidColorBrush(Colors.Gray));
-            if (frontTexture == null) logErrorFunc($"Failed to load sky_front texture from {frontTexturePath}. Using solid color fallback.");
-
-            string rightTexturePath = "pack://application:,,,/AssetsManager;component/Resources/Scene/Sky/sky_right.dds";
-            BitmapSource rightTexture = loadTextureFunc(rightTexturePath);
-            Material3D rightMaterial = (rightTexture != null) ? new DiffuseMaterial(new ImageBrush(rightTexture)) : new DiffuseMaterial(new SolidColorBrush(Colors.Gray));
-            if (rightTexture == null) logErrorFunc($"Failed to load sky_right texture from {rightTexturePath}. Using solid color fallback.");
-
-            string backTexturePath = "pack://application:,,,/AssetsManager;component/Resources/Scene/Sky/sky_back.dds";
-            BitmapSource backTexture = loadTextureFunc(backTexturePath);
-            Material3D backMaterial = (backTexture != null) ? new DiffuseMaterial(new ImageBrush(backTexture)) : new DiffuseMaterial(new SolidColorBrush(Colors.Gray));
-            if (backTexture == null) logErrorFunc($"Failed to load sky_back texture from {backTexturePath}. Using solid color fallback.");
-
-            string leftTexturePath = "pack://application:,,,/AssetsManager;component/Resources/Scene/Sky/sky_left.dds";
-            BitmapSource leftTexture = loadTextureFunc(leftTexturePath);
-            Material3D leftMaterial = (leftTexture != null) ? new DiffuseMaterial(new ImageBrush(leftTexture)) : new DiffuseMaterial(new SolidColorBrush(Colors.Gray));
-            if (leftTexture == null) logErrorFunc($"Failed to load sky_left texture from {leftTexturePath}. Using solid color fallback.");
-
-            // Load sky_up texture
-            string skyUpTexturePath = "pack://application:,,,/AssetsManager;component/Resources/Scene/Sky/sky_up.dds";
-            BitmapSource skyUpTexture = loadTextureFunc(skyUpTexturePath);
-            Material3D skyUpMaterial = (skyUpTexture != null) ? new DiffuseMaterial(new ImageBrush(skyUpTexture)) : new DiffuseMaterial(new SolidColorBrush(Colors.LightBlue)); // Fallback color
-            if (skyUpTexture == null) logErrorFunc($"Failed to load sky_up texture from {skyUpTexturePath}. Using solid color fallback.");
-
-            // Load sky_down texture
-            string skyDownTexturePath = "pack://application:,,,/AssetsManager;component/Resources/Scene/Sky/sky_down.dds";
-            BitmapSource skyDownTexture = loadTextureFunc(skyDownTexturePath);
-            Material3D skyDownMaterial = (skyDownTexture != null) ? new DiffuseMaterial(new ImageBrush(skyDownTexture)) : new DiffuseMaterial(new SolidColorBrush(Colors.DarkGray)); // Fallback color
-            if (skyDownTexture == null) logErrorFunc($"Failed to load sky_down texture from {skyDownTexturePath}. Using solid color fallback.");
-
-            // 2. Create a single, canonical plane geometry. By default, its front face points towards +Z.
-            var planeMesh = new MeshGeometry3D
-            {
-                Positions = new Point3DCollection()
-                {
-                    new Point3D(-size, -size, 0), // Bottom-left
-                    new Point3D(size, -size, 0),  // Bottom-right
-                    new Point3D(size, size, 0),   // Top-right
-                    new Point3D(-size, size, 0)    // Top-left
-                },
-                TriangleIndices = new Int32Collection() { 0, 1, 2, 0, 2, 3 },
-                TextureCoordinates = new PointCollection()
-                {
-                    new System.Windows.Point(0, 1),
-                    new System.Windows.Point(1, 1),
-                    new System.Windows.Point(1, 0),
-                    new System.Windows.Point(0, 0)
-                }
-            };
-
-            // Back Plane (at z=size, needs to face origin at -Z)
-            var backTransform = new Transform3DGroup();
-            backTransform.Children.Add(new RotateTransform3D(new AxisAngleRotation3D(new Vector3D(0, 1, 0), 180)));
-            backTransform.Children.Add(new TranslateTransform3D(new Vector3D(0, 0, size)));
-            var backPlane = new GeometryModel3D(planeMesh, backMaterial);
-            backPlane.Transform = backTransform;
-            finalGroup.Children.Add(backPlane);
-
-            // Front Plane (at z=-size, needs to face origin at +Z)
-            var frontPlane = new GeometryModel3D(planeMesh, frontMaterial);
-            frontPlane.Transform = new TranslateTransform3D(0, 0, -size);
-            finalGroup.Children.Add(frontPlane);
-
-            // Left Plane (at x=-size, needs to face origin at +X)
-            var leftTransform = new Transform3DGroup();
-            leftTransform.Children.Add(new RotateTransform3D(new AxisAngleRotation3D(new Vector3D(0, 1, 0), 90)));
-            leftTransform.Children.Add(new TranslateTransform3D(new Vector3D(-size, 0, 0)));
-            var leftPlane = new GeometryModel3D(planeMesh, leftMaterial);
-            leftPlane.Transform = leftTransform;
-            finalGroup.Children.Add(leftPlane);
-
-            // Right Plane (at x=size, needs to face origin at -X)
-            var rightTransform = new Transform3DGroup();
-            rightTransform.Children.Add(new RotateTransform3D(new AxisAngleRotation3D(new Vector3D(0, 1, 0), -90)));
-            rightTransform.Children.Add(new TranslateTransform3D(new Vector3D(size, 0, 0)));
-            var rightPlane = new GeometryModel3D(planeMesh, rightMaterial);
-            rightPlane.Transform = rightTransform;
-            finalGroup.Children.Add(rightPlane);
-
-            // Top Plane (at y=size, needs to face origin at -Y)
-            var topTransform = new Transform3DGroup();
-            topTransform.Children.Add(new RotateTransform3D(new AxisAngleRotation3D(new Vector3D(1, 0, 0), 90))); // Rotate to face down
-            topTransform.Children.Add(new TranslateTransform3D(new Vector3D(0, size, 0))); // Move to top
-            var topPlane = new GeometryModel3D(planeMesh, skyUpMaterial);
-            topPlane.Transform = topTransform;
-            finalGroup.Children.Add(topPlane);
-
-            // Bottom Plane (at y=-size, needs to face origin at +Y)
-            var bottomTransform = new Transform3DGroup();
-            bottomTransform.Children.Add(new RotateTransform3D(new AxisAngleRotation3D(new Vector3D(1, 0, 0), -90))); // Rotate to face up
-            bottomTransform.Children.Add(new TranslateTransform3D(new Vector3D(0, -size, 0))); // Move to bottom
-            var bottomPlane = new GeometryModel3D(planeMesh, skyDownMaterial);
-            bottomPlane.Transform = bottomTransform;
-            finalGroup.Children.Add(bottomPlane);
-
-            finalGroup.Transform = new TranslateTransform3D(0, size, 0);
-
-            return new ModelVisual3D { Content = finalGroup };
+            using var stream = OpenMap11Chunk(settings, SkyboxChunkVirtualPath, logService);
+            return stream == null ? null : CubeMapDecoder.Decode(stream);
         }
 
-        public static ModelVisual3D CreateGroundPlane(Func<string, BitmapSource> loadTextureFunc, Action<string> logErrorFunc, string customTexturePath = null)
+        #endregion
+
+        #region Game WAD Chunk Resolution Helpers
+
+        private static MemoryStream OpenMap11Chunk(AppSettings settings, string virtualPath, LogService logService)
         {
-            MeshGeometry3D groundMesh = new MeshGeometry3D();
-
-            // Define vertices for a large square plane (e.g., 800x800 units)
-            // Y-coordinate is 0 to place it at the base of the model
-            groundMesh.Positions = new Point3DCollection()
+            string gameRoot = GetPreferredGameRoot(settings);
+            if (string.IsNullOrWhiteSpace(gameRoot) || !Directory.Exists(gameRoot))
             {
-                new Point3D(-1000, GroundLevel, -1000), // Bottom-left
-                new Point3D(1000, GroundLevel, -1000),  // Bottom-right
-                new Point3D(1000, GroundLevel, 1000),   // Top-right
-                new Point3D(-1000, GroundLevel, 1000)   // Top-left
-            };
-
-            // Define triangle indices (two triangles for a square)
-            groundMesh.TriangleIndices = new Int32Collection() { 0, 3, 2, 0, 2, 1 };
-
-            // Define texture coordinates (simple mapping for a solid color)
-            groundMesh.TextureCoordinates = new PointCollection()
-            {
-                new System.Windows.Point(0, 1),
-                new System.Windows.Point(1, 1),
-                new System.Windows.Point(1, 0),
-                new System.Windows.Point(0, 0)
-            };
-
-            // Load the ground texture
-            string finalGroundTexturePath = "pack://application:,,,/AssetsManager;component/Resources/Scene/Floor/ground_rift.dds"; // Default to resource path
-
-            if (!string.IsNullOrEmpty(customTexturePath) && File.Exists(customTexturePath))
-            {
-                finalGroundTexturePath = customTexturePath;
+                logService?.LogDebug($"No valid League of Legends installation directory configured for '{virtualPath}'.");
+                return null;
             }
 
-            BitmapSource groundTexture = loadTextureFunc(finalGroundTexturePath);
-
-            Material3D groundMaterial;
-            if (groundTexture != null)
+            string mapWadPath = FindMap11Wad(gameRoot);
+            if (string.IsNullOrWhiteSpace(mapWadPath) || !File.Exists(mapWadPath))
             {
-                groundMaterial = new DiffuseMaterial(new ImageBrush(groundTexture));
-            }
-            else
-            {
-                // Fallback to a solid color if texture loading fails
-                groundMaterial = new DiffuseMaterial(new SolidColorBrush(System.Windows.Media.Color.FromRgb(100, 120, 80))); // Earthy color
-                logErrorFunc($"Failed to load ground texture from {finalGroundTexturePath}. Using solid color fallback.");
+                logService?.LogWarning($"Map11.wad.client was not found under '{gameRoot}'.");
+                return null;
             }
 
-            // Create the GeometryModel3D and ModelVisual3D
-            GeometryModel3D groundModel = new GeometryModel3D(groundMesh, groundMaterial);
-            return new ModelVisual3D { Content = groundModel };
+            ulong chunkHash = LeagueToolkit.Hashing.XxHash64Ext.Hash(virtualPath);
+            using var wad = new LeagueToolkit.Core.Wad.WadFile(mapWadPath);
+            if (!wad.Chunks.TryGetValue(chunkHash, out var chunk))
+            {
+                logService?.LogWarning($"Chunk {chunkHash:x16} ({virtualPath}) not found in '{mapWadPath}'.");
+                return null;
+            }
+
+            using var decompressed = wad.LoadChunkDecompressed(chunk);
+            return new MemoryStream(decompressed.Span.ToArray(), writable: false);
         }
+
+        private static string GetPreferredGameRoot(AppSettings settings)
+        {
+            if (settings == null)
+                return null;
+
+            string preferred = settings.PreferredClient == AssetsManager.Views.Models.Settings.PreferredClient.PBE
+                ? settings.LolPbeDirectory
+                : settings.LolLiveDirectory;
+
+            if (!string.IsNullOrWhiteSpace(preferred) && Directory.Exists(preferred))
+                return preferred;
+
+            string fallback = settings.PreferredClient == AssetsManager.Views.Models.Settings.PreferredClient.PBE
+                ? settings.LolLiveDirectory
+                : settings.LolPbeDirectory;
+
+            if (!string.IsNullOrWhiteSpace(fallback) && Directory.Exists(fallback))
+                return fallback;
+
+            return null;
+        }
+
+        private static string FindMap11Wad(string gameRoot)
+        {
+            string candidate1 = Path.Combine(gameRoot, "Game", "DATA", "FINAL", "Maps", "Shipping", "Map11.wad.client");
+            if (File.Exists(candidate1)) return candidate1;
+
+            string candidate2 = Path.Combine(gameRoot, "DATA", "FINAL", "Maps", "Shipping", "Map11.wad.client");
+            if (File.Exists(candidate2)) return candidate2;
+
+            try
+            {
+                return Directory.EnumerateFiles(gameRoot, "Map11.wad.client", SearchOption.AllDirectories).FirstOrDefault();
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        #endregion
     }
 }

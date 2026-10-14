@@ -149,13 +149,40 @@ namespace AssetsManager.Services.Parsers
                                     break;
 
                                 case BnkObjectType.RandomOrSequenceContainer:
-                                    var randContainerData = new RandomOrSequenceContainerBnkObjectData();
-                                    (randContainerData.ParentId, _) = BnkParseHelper.SkipBaseParams(reader, bnk.Bkhd.Version);
-                                    reader.BaseStream.Seek(24, SeekOrigin.Current);
-                                    uint childCountRand = reader.ReadUInt32();
-                                    for (int j = 0; j < childCountRand; j++) randContainerData.Children.Add(reader.ReadUInt32());
-                                    bnkObject.Data = randContainerData;
-                                    break;
+                                     var randContainerData = new RandomOrSequenceContainerBnkObjectData();
+                                     (randContainerData.ParentId, _) = BnkParseHelper.SkipBaseParams(reader, bnk.Bkhd.Version);
+                                     reader.BaseStream.Seek(24, SeekOrigin.Current);
+                                     uint childCountRand = reader.ReadUInt32();
+                                     var rawChildren = new List<uint>();
+                                     for (int j = 0; j < childCountRand; j++) rawChildren.Add(reader.ReadUInt32());
+                                     
+                                     // Ensure we don't read beyond this HIRC object's boundary
+                                     long remainingBytes = objEnd - reader.BaseStream.Position;
+                                     bool playlistReadSuccess = false;
+                                     if (remainingBytes >= 2)
+                                     {
+                                         uint randPlaylistItemCount = reader.ReadUInt16();
+                                         if (randPlaylistItemCount > 0 && (objEnd - reader.BaseStream.Position) >= randPlaylistItemCount * 8)
+                                         {
+                                             for (int j = 0; j < randPlaylistItemCount; j++)
+                                             {
+                                                 uint playId = reader.ReadUInt32();
+                                                 reader.ReadUInt32(); // Weight
+                                                 randContainerData.Children.Add(playId);
+                                             }
+                                             playlistReadSuccess = true;
+                                         }
+                                     }
+                                     
+                                     if (!playlistReadSuccess)
+                                     {
+                                         randContainerData.Children.AddRange(rawChildren);
+                                     }
+                                     
+                                     // Force stream position to the exact end of the object to avoid corruption
+                                     reader.BaseStream.Seek(objEnd, SeekOrigin.Begin);
+                                     bnkObject.Data = randContainerData;
+                                     break;
 
                                 case BnkObjectType.SwitchContainer:
                                     var switchContainerData = new SwitchContainerBnkObjectData();

@@ -20,7 +20,7 @@ namespace AssetsManager.Views.Controls.Monitor
     public partial class AssetWatcherControl : UserControl
     {
         // Public properties for dependency injection
-        public MonitorService MonitorService { get; set; }
+        public MonitoredFilesService MonitoredFilesService { get; set; }
         public IServiceProvider ServiceProvider { get; set; }
         public DiffViewService DiffViewService { get; set; }
         public AssetWatcherService AssetWatcherService { get; set; }
@@ -70,14 +70,14 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private void RefreshList()
         {
-            if (MonitorService == null) return;
+            if (MonitoredFilesService == null) return;
 
-            string filter = txtSearch.Text.Trim().ToLower();
-            var filtered = MonitorService.MonitoredAssets
+            string filter = txtSearch.Text.Trim();
+            var filtered = MonitoredFilesService.MonitoredAssets
                 .Where(u => string.IsNullOrEmpty(filter) || 
-                            u.Alias.ToLower().Contains(filter) || 
-                            u.WadName.ToLower().Contains(filter) ||
-                            u.AssetPath.ToLower().Contains(filter))
+                            (u.Alias?.Contains(filter, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                            (u.WadName?.Contains(filter, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                            (u.AssetPath?.Contains(filter, StringComparison.OrdinalIgnoreCase) ?? false))
                 .ToList();
 
             ViewModel.Paginator.SetFullList(filtered);
@@ -94,7 +94,7 @@ namespace AssetsManager.Views.Controls.Monitor
             {
                 AppSettings.MonitoredAssets.Clear();
                 AppSettings.Save();
-                MonitorService.LoadMonitoredAssets();
+                MonitoredFilesService.LoadMonitoredAssets();
                 RefreshList();
             }
         }
@@ -139,7 +139,7 @@ namespace AssetsManager.Views.Controls.Monitor
                 if (AppSettings.MonitoredAssets.Remove(asset))
                 {
                     AppSettings.Save();
-                    MonitorService.LoadMonitoredAssets();
+                    MonitoredFilesService.LoadMonitoredAssets();
                     RefreshList();
                 }
             }

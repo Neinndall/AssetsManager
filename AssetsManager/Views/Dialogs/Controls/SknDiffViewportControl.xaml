@@ -1,0 +1,317 @@
+<UserControl x:Class="AssetsManager.Views.Dialogs.Controls.SknDiffViewportControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:viewerControls="clr-namespace:AssetsManager.Views.Controls.Viewer"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
+             xmlns:glWpfControl="clr-namespace:OpenTK.Wpf;assembly=GLWpfControl"
+             mc:Ignorable="d" 
+             d:DesignHeight="450" d:DesignWidth="800">
+
+    <Border Background="Transparent">
+        <!-- Clipping Border (Thickness 0 to avoid double borders) -->
+        <Border CornerRadius="0" ClipToBounds="True" BorderThickness="0">
+            <Grid>
+                <!-- 3D VIEWPORT (Silk.NET OpenGL) -->
+                <glWpfControl:GLWpfControl x:Name="OpenTkControl"
+                                           Opacity="0"
+                                           ClipToBounds="True"
+                                           Ready="OpenTkControl_Ready"
+                                           Render="OpenTkControl_Render"/>
+
+                <Border x:Name="CameraInputSurface"
+                        Background="Transparent"/>
+
+                <Border HorizontalAlignment="Right"
+                        VerticalAlignment="Top"
+                        Margin="0,24,24,0"
+                        Background="#CC18181B"
+                        CornerRadius="10"
+                        Padding="12,8"
+                        BorderBrush="{StaticResource BorderColor}"
+                        BorderThickness="1"
+                        IsHitTestVisible="False"
+                        Visibility="{Binding IsFpsVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <Border.Effect>
+                        <DropShadowEffect Color="Black" BlurRadius="15" ShadowDepth="2" Opacity="0.3"/>
+                    </Border.Effect>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Border Background="#1F22C55E" CornerRadius="6" Width="22" Height="22"
+                                Margin="0,0,8,0" VerticalAlignment="Center">
+                            <materialIcons:MaterialIcon Kind="Speedometer" Width="12" Height="12"
+                                                        Foreground="#FF6EE7A2"
+                                                        HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <StackPanel VerticalAlignment="Center" MinWidth="34">
+                            <TextBlock Text="FPS" FontSize="8" FontWeight="Black"
+                                       Foreground="{StaticResource TextMuted}"/>
+                            <TextBlock Text="{Binding DisplayFps}" FontFamily="Consolas"
+                                       FontSize="12" FontWeight="Bold" Foreground="#FF6EE7A2"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- ============================================ -->
+                <!-- TOP-LEFT: SCENE INFO BADGE                  -->
+                <!-- ============================================ -->
+                <Border HorizontalAlignment="Left" 
+                        VerticalAlignment="Top" 
+                        Margin="24,24,0,0"
+                        Background="#CC18181B" 
+                        CornerRadius="10"
+                        Padding="12,8"
+                        BorderBrush="{StaticResource BorderColor}"
+                        BorderThickness="1">
+                    <Border.Effect>
+                        <DropShadowEffect Color="Black" BlurRadius="15" ShadowDepth="2" Opacity="0.3"/>
+                    </Border.Effect>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Border Background="#1F5C85FF" CornerRadius="6" Width="22" Height="22" Margin="0,0,8,0" VerticalAlignment="Center">
+                            <materialIcons:MaterialIcon Kind="CubeOutline" Width="12" Height="12" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="SCENE" FontSize="8" FontWeight="Black" Foreground="{StaticResource TextMuted}"/>
+                            <TextBlock Text="{Binding SceneDisplayName}" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- ============================================ -->
+                <!-- TOP-RIGHT: REFINED CAMERA GIMBAL            -->
+                <!-- ============================================ -->
+                <Border HorizontalAlignment="Right" 
+                        VerticalAlignment="Top" 
+                        Margin="0,80,16,0"
+                        Background="#E618181B" 
+                        CornerRadius="11"
+                        Padding="4"
+                        BorderBrush="{StaticResource BorderColor}"
+                        BorderThickness="1"
+                        Visibility="{Binding IsToolbarVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <Border.Effect>
+                        <DropShadowEffect Color="Black" BlurRadius="18" ShadowDepth="3" Opacity="0.35"/>
+                    </Border.Effect>
+
+                    <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
+                        <!-- Section label -->
+                        <TextBlock Text="VIEW" FontSize="8" FontWeight="Black" Foreground="{StaticResource TextMuted}" 
+                                   HorizontalAlignment="Center" Margin="0,0,0,4"/>
+
+                        <!-- Z+ Frontal -->
+                        <Button Style="{StaticResource TransparentIconButton}"
+                                ToolTip="Front View (Z+)"
+                                Click="SetCameraView_Click" Tag="Front"
+                                Width="32" Height="32"
+                                HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Padding="0">
+                            <materialIcons:MaterialIcon Kind="AxisZArrow" Width="14" Height="14" Foreground="{StaticResource AccentBlue}"/>
+                        </Button>
+
+                        <!-- Z- Trasera -->
+                        <Button Style="{StaticResource TransparentIconButton}"
+                                ToolTip="Back View (Z-)"
+                                Click="SetCameraView_Click" Tag="Back"
+                                Width="32" Height="32"
+                                HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Padding="0">
+                            <materialIcons:MaterialIcon Kind="AxisZArrow" Width="14" Height="14" Foreground="{StaticResource AccentBlue}" Opacity="0.35" RenderTransformOrigin="0.5,0.5">
+                                <materialIcons:MaterialIcon.RenderTransform>
+                                    <ScaleTransform ScaleY="-1"/>
+                                </materialIcons:MaterialIcon.RenderTransform>
+                            </materialIcons:MaterialIcon>
+                        </Button>
+
+                        <!-- X+ Derecha -->
+                        <Button Style="{StaticResource TransparentIconButton}"
+                                ToolTip="Right View (X+)"
+                                Click="SetCameraView_Click" Tag="Right"
+                                Width="32" Height="32"
+                                HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Padding="0">
+                            <materialIcons:MaterialIcon Kind="AxisXArrow" Width="14" Height="14" Foreground="{StaticResource AccentRed}" Opacity="0.35" RenderTransformOrigin="0.5,0.5">
+                                <materialIcons:MaterialIcon.RenderTransform>
+                                    <ScaleTransform ScaleX="-1"/>
+                                </materialIcons:MaterialIcon.RenderTransform>
+                            </materialIcons:MaterialIcon>
+                        </Button>
+
+                        <!-- X- Izquierda -->
+                        <Button Style="{StaticResource TransparentIconButton}"
+                                ToolTip="Left View (X-)"
+                                Click="SetCameraView_Click" Tag="Left"
+                                Width="32" Height="32"
+                                HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Padding="0">
+                            <materialIcons:MaterialIcon Kind="AxisXArrow" Width="14" Height="14" Foreground="{StaticResource AccentRed}"/>
+                        </Button>
+
+                        <!-- Y+ Superior -->
+                        <Button Style="{StaticResource TransparentIconButton}"
+                                ToolTip="Top View (Y+)"
+                                Click="SetCameraView_Click" Tag="Top"
+                                Width="32" Height="32"
+                                HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Padding="0">
+                            <materialIcons:MaterialIcon Kind="AxisYArrow" Width="14" Height="14" Foreground="{StaticResource AccentGreen}"/>
+                        </Button>
+
+                        <!-- Y- Inferior -->
+                        <Button Style="{StaticResource TransparentIconButton}"
+                                ToolTip="Bottom View (Y-)"
+                                Click="SetCameraView_Click" Tag="Bottom"
+                                Width="32" Height="32"
+                                HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Padding="0">
+                            <materialIcons:MaterialIcon Kind="AxisYArrow" Width="14" Height="14" Foreground="{StaticResource AccentGreen}" Opacity="0.35" RenderTransformOrigin="0.5,0.5">
+                                <materialIcons:MaterialIcon.RenderTransform>
+                                    <ScaleTransform ScaleY="-1"/>
+                                </materialIcons:MaterialIcon.RenderTransform>
+                            </materialIcons:MaterialIcon>
+                        </Button>
+
+                        <Rectangle Height="1" Width="18" Fill="#22FFFFFF" Margin="0,4" HorizontalAlignment="Center"/>
+
+                        <!-- Reset Home -->
+                        <Button Style="{StaticResource TransparentIconButton}"
+                                ToolTip="Reset Camera"
+                                Click="ResetCameraButton_Click"
+                                Width="32" Height="32"
+                                HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Padding="0">
+                            <materialIcons:MaterialIcon Kind="HomeOutline" Width="14" Height="14" Foreground="{StaticResource AccentBrush}"/>
+                        </Button>
+                    </StackPanel>
+                </Border>
+
+                <!-- ============================================ -->
+                <!-- BOTTOM-CENTER: REFINED ACTION TOOLBAR       -->
+                <!-- ============================================ -->
+                <Border HorizontalAlignment="Center" 
+                        VerticalAlignment="Bottom" 
+                        Margin="0,0,0,16"
+                        Background="#E618181B" 
+                        CornerRadius="18"
+                        Padding="6,4"
+                        BorderBrush="{StaticResource BorderColor}"
+                        BorderThickness="1"
+                        Visibility="{Binding IsToolbarVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <Border.Effect>
+                        <DropShadowEffect Color="Black" BlurRadius="22" ShadowDepth="4" Opacity="0.4"/>
+                    </Border.Effect>
+                    
+                    <Grid x:Name="ToolbarContentGrid">
+                        <!-- Diff Toolbar Group (Collapsed by default) -->
+                        <StackPanel x:Name="DiffToolbarGroup" Orientation="Horizontal" VerticalAlignment="Center" >
+                            <!-- Group 1: Modes -->
+                            <Border Background="#1AFFFFFF" CornerRadius="11" Padding="2,1" Margin="0,0,2,0">
+                                <StackPanel Orientation="Horizontal">
+                                    <ToggleButton x:Name="CombinedModeToggle"
+                                                  Style="{StaticResource TransparentIconToggleButton}"
+                                                  IsChecked="False"
+                                                  Click="CombinedModeToggle_Click"
+                                                  ToolTip="Toggle Overlay / Side-by-Side View"
+                                                  Width="30" Height="30">
+                                        <materialIcons:MaterialIcon Kind="LayersOutline" Width="13" Height="13"/>
+                                    </ToggleButton>
+                                </StackPanel>
+                            </Border>
+
+                            <Rectangle Width="1" Fill="#22FFFFFF" Margin="2,7" VerticalAlignment="Stretch"/>
+
+                            <!-- Group 2: View / Rotations -->
+                            <Border Background="#1AFFFFFF" CornerRadius="11" Padding="2,1" Margin="2,0">
+                                <StackPanel Orientation="Horizontal">
+                                    <ToggleButton x:Name="AutoRotateToggle"
+                                                  Style="{StaticResource TransparentIconToggleButton}"
+                                                  IsChecked="False"
+                                                  Click="AutoRotateToggle_Click"
+                                                  ToolTip="Auto-Rotate Model"
+                                                  Width="30" Height="30">
+                                        <materialIcons:MaterialIcon Kind="Autorenew" Width="13" Height="13"/>
+                                    </ToggleButton>
+                                </StackPanel>
+                            </Border>
+
+                            <Rectangle Width="1" Fill="#22FFFFFF" Margin="2,7" VerticalAlignment="Stretch"/>
+
+                            <!-- Group 3: Submesh List Panel Toggle -->
+                            <Border Background="#1AFFFFFF" CornerRadius="11" Padding="2,1" Margin="2,0">
+                                <StackPanel Orientation="Horizontal">
+                                    <ToggleButton x:Name="MeshPartsToggle"
+                                                  Style="{StaticResource TransparentIconToggleButton}"
+                                                  IsChecked="False"
+                                                  Click="MeshPartsToggle_Click"
+                                                  ToolTip="Toggle Mesh Parts Visibility Panel"
+                                                  Width="30" Height="30">
+                                        <materialIcons:MaterialIcon Kind="FormatListBulleted" Width="13" Height="13"/>
+                                    </ToggleButton>
+                                </StackPanel>
+                            </Border>
+
+                            <Rectangle Width="1" Fill="#22FFFFFF" Margin="2,7" VerticalAlignment="Stretch"/>
+
+                            <!-- Group 4: Visual Modes (Ghost Mode) -->
+                            <Border Background="#1AFFFFFF" CornerRadius="11" Padding="2,1" Margin="2,0">
+                                <StackPanel Orientation="Horizontal">
+                                    <ToggleButton x:Name="GhostModeToggle"
+                                                  Style="{StaticResource TransparentIconToggleButton}"
+                                                  IsChecked="False"
+                                                  Click="GhostModeToggle_Click"
+                                                  ToolTip="Toggle Ghost / X-Ray Mode"
+                                                  Width="30" Height="30">
+                                        <materialIcons:MaterialIcon Kind="PaletteOutline" Width="13" Height="13"/>
+                                    </ToggleButton>
+                                </StackPanel>
+                            </Border>
+
+                            <Rectangle Width="1" Fill="#22FFFFFF" Margin="2,7" VerticalAlignment="Stretch"/>
+
+                            <!-- Group 5: Reset camera -->
+                            <Border Background="#1AFFFFFF" CornerRadius="11" Padding="2,1" Margin="2,0,0,0">
+                                <StackPanel Orientation="Horizontal">
+                                    <Button Style="{StaticResource TransparentIconButton}"
+                                            Click="ResetCameras_Click"
+                                            ToolTip="Reset Both Cameras"
+                                            Width="30" Height="30">
+                                        <materialIcons:MaterialIcon Kind="HomeOutline" Width="13" Height="13"/>
+                                    </Button>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- ============================================ -->
+                <!-- BOTTOM-RIGHT: REFINED TOOLBAR TOGGLE FAB    -->
+                <!-- ============================================ -->
+                <ToggleButton x:Name="ToolbarToggle"
+                              IsChecked="{Binding IsToolbarVisible}"
+                              HorizontalAlignment="Right"
+                              VerticalAlignment="Bottom"
+                              Margin="0,0,16,16"
+                              ToolTip="Show / Hide Viewport Toolbar"
+                              Cursor="Hand">
+                    <ToggleButton.Template>
+                        <ControlTemplate TargetType="ToggleButton">
+                            <Border x:Name="border"
+                                    Width="36" Height="36"
+                                    CornerRadius="18"
+                                    Background="#E618181B"
+                                    BorderBrush="{StaticResource AccentBrush}"
+                                    BorderThickness="1.5">
+                                <Border.Effect>
+                                    <DropShadowEffect Color="Black" BlurRadius="14" ShadowDepth="3" Opacity="0.4"/>
+                                </Border.Effect>
+                                <materialIcons:MaterialIcon x:Name="Icon" Kind="TuneVariant" Width="16" Height="16" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                     <Setter TargetName="border" Property="Background" Value="#FF1E2233"/>
+                                </Trigger>
+                                <Trigger Property="IsChecked" Value="False">
+                                    <Setter TargetName="border" Property="Opacity" Value="0.7"/>
+                                    <Setter TargetName="border" Property="BorderBrush" Value="{StaticResource BorderColor}"/>
+                                    <Setter TargetName="Icon" Property="Foreground" Value="{StaticResource TextSecondary}"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </ToggleButton.Template>
+                </ToggleButton>
+            </Grid>
+        </Border>
+    </Border>
+</UserControl>

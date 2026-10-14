@@ -68,11 +68,22 @@ namespace AssetsManager.Views.Dialogs
                     .ToList();
 
                 _viewModel.GroupedCommits.ReplaceRange(groups);
-                _viewModel.StatusMessage = _viewModel.Commits.Count > 0 ? "Commits synchronized" : "No commits found";
+                if (_viewModel.Commits.Count > 0)
+                {
+                    _viewModel.StatusMessage = _gitHubApi.IsRateLimited
+                        ? $"Commits loaded from cache (GitHub quota resets at {_gitHubApi.RateLimitResetTime:HH:mm})"
+                        : "Commits synchronized";
+                }
+                else
+                {
+                    _viewModel.StatusMessage = _gitHubApi.IsRateLimited
+                        ? $"GitHub rate limit in effect for this IP (Resets at {_gitHubApi.RateLimitResetTime:HH:mm})"
+                        : "No commits found";
+                }
             }
             catch (Exception ex)
             {
-                _logService.LogError(ex, "Failed to load commit history.");
+                _logService.LogWarning($"Failed to load commit history: {ex.Message}");
                 _viewModel.StatusMessage = "Synchronization failed";
             }
             finally

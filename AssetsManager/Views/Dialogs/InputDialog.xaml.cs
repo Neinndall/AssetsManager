@@ -16,7 +16,7 @@ namespace AssetsManager.Views.Dialogs
         {
             InitializeComponent();
             HeaderIcon = MaterialIconKind.TextBoxEdit;
-            textBoxInput.Focus();
+            Loaded += (_, _) => textBoxInput.Focus();
         }
 
         public void Initialize(string title, string question, string defaultAnswer = "", bool isMultiLine = false)

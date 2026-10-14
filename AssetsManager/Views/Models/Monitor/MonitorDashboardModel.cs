@@ -1,24 +1,27 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media;
 using System.Collections.Specialized;
-using AssetsManager.Info;
 using AssetsManager.Services;
 using AssetsManager.Services.Downloads;
 using AssetsManager.Services.Monitor;
 using AssetsManager.Services.Core;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.Monitor;
+using AssetsManager.Views.Models.News;
 using Material.Icons;
 
 namespace AssetsManager.Views.Models.Monitor
 {
     public class MonitorDashboardModel : INotifyPropertyChanged, IDisposable
     {
-        private readonly MonitorService _monitorService;
+        private readonly MonitoredFilesService _monitoredFilesService;
+        private readonly AssetCatalogService _assetCatalog;
         private readonly PbeStatusService _pbeStatusService;
         private readonly AppSettings _appSettings;
         private readonly VersionService _versionService;
@@ -161,10 +164,10 @@ namespace AssetsManager.Views.Models.Monitor
             set { _appVersionText = value; OnPropertyChanged(); }
         }
 
-        public string BuildType => ApplicationInfos.BuildType;
-        public string BuildChannel => ApplicationInfos.IsQA ? "QA / EXPERIMENTAL" : "PRODUCTION / STABLE";
+        public string BuildType => VersionInfo.IsQA ? "Experimental Build" : "Stable Build";
+        public string BuildChannel => VersionInfo.IsQA ? "QA / EXPERIMENTAL" : "PRODUCTION / STABLE";
         private static string _cachedBuildSha;
-        public string BuildSha => _cachedBuildSha ??= ApplicationInfos.IsQA ? ApplicationInfos.Version.Split('-').Last() : "N/A";
+        public string BuildSha => _cachedBuildSha ??= VersionInfo.QaCommitSha ?? "N/A";
 
         private Brush _appVersionColor;
         public Brush AppVersionColor
@@ -242,12 +245,13 @@ namespace AssetsManager.Views.Models.Monitor
         private void UpdateAppVersionFooter()
         {
             string shaPart = BuildSha != null && BuildSha != "N/A" ? $" · {BuildSha}" : string.Empty;
-            AppVersionFooterText = $"Channel: {ApplicationInfos.BuildType}{shaPart}";
+            AppVersionFooterText = $"Channel: {BuildType}{shaPart}";
         }
 
-        public MonitorDashboardModel(MonitorService monitorService, PbeStatusService pbeStatusService, AppSettings appSettings, VersionService versionService, Status statusService, UpdateCheckService updateCheckService)
+        public MonitorDashboardModel(MonitoredFilesService monitoredFilesService, AssetCatalogService assetCatalog, PbeStatusService pbeStatusService, AppSettings appSettings, VersionService versionService, Status statusService, UpdateCheckService updateCheckService)
         {
-            _monitorService = monitorService;
+            _monitoredFilesService = monitoredFilesService;
+            _assetCatalog = assetCatalog;
             _pbeStatusService = pbeStatusService;
             _appSettings = appSettings;
             _versionService = versionService;
@@ -255,11 +259,11 @@ namespace AssetsManager.Views.Models.Monitor
             _updateCheckService = updateCheckService;
 
             // Set Initial App Version State based on Build Type (Stable vs Experimental)
-            AppVersionText = ApplicationInfos.Version;
+            AppVersionText = VersionInfo.Version;
 
-            // Map ApplicationInfos color and icon dynamically
-            AppVersionColor = (Brush)Application.Current.FindResource(ApplicationInfos.BuildColorKey);
-            AppVersionIconKind = ApplicationInfos.BuildIcon;
+            // Map build color and icon dynamically.
+            AppVersionColor = (Brush)Application.Current.FindResource(VersionInfo.IsQA ? "AccentOrange" : "AccentGreen");
+            AppVersionIconKind = VersionInfo.IsQA ? MaterialIconKind.Flask : MaterialIconKind.CheckDecagram;
 
             // Check if an update was already found (Higher priority than Build Type)
             if (!string.IsNullOrEmpty(_updateCheckService.AvailableVersion))
@@ -290,16 +294,17 @@ namespace AssetsManager.Views.Models.Monitor
             }
 
             // Subscriptions
-            _monitorService.MonitoredAssets.CollectionChanged += MonitoredItems_CollectionChanged;
+            _monitoredFilesService.MonitoredAssets.CollectionChanged += MonitoredItems_CollectionChanged;
 
             // Subscribe to PropertyChanged for existing items
-            foreach (var item in _monitorService.MonitoredAssets)
+            foreach (var item in _monitoredFilesService.MonitoredAssets)
             {
                 item.PropertyChanged += MonitoredItem_PropertyChanged;
             }
 
-            _monitorService.CategoryCheckCompleted += OnCategoryCheckCompleted;
-            _monitorService.CategoryCheckStarted += OnCategoryCheckStarted;
+            _assetCatalog.CategoryCheckCompleted += OnCategoryCheckCompleted;
+            _assetCatalog.CategoryCheckStarted += OnCategoryCheckStarted;
+            _appSettings.ConfigurationSaved += OnConfigurationSaved;
             _pbeStatusService.StatusChecked += OnPbeStatusChecked;
             _statusService.HashSyncStarted += OnHashSyncStarted;
             _statusService.HashSyncCompleted += OnHashSyncCompleted;
@@ -318,6 +323,10 @@ namespace AssetsManager.Views.Models.Monitor
             {
                 HashesIndicatorColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#2ECC71")); // Green
             }
+            else if (HashesStatus == "Sync failed")
+            {
+                HashesIndicatorColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F39C12"));
+            }
             else
             {
                 HashesIndicatorColor = Brushes.Gray;
@@ -327,7 +336,7 @@ namespace AssetsManager.Views.Models.Monitor
         private void UpdateGlobalStatus()
         {
             // Priority 1: Critical (Maintenance started - RED)
-            if (PbeStatusText == "Under Maintenance")
+            if (PbeStatusText == "Maintenance")
             {
                 GlobalStatusText = "System Alert";
                 GlobalStatusColor = new SolidColorBrush(Color.FromRgb(231, 76, 60)); // Red
@@ -371,6 +380,14 @@ namespace AssetsManager.Views.Models.Monitor
                 SystemHealthFooterText = "Syncing Databases...";
                 SystemHealthFooterColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#3498DB")); // Blue
                 SystemHealthFooterIconKind = MaterialIconKind.Sync;
+                return;
+            }
+
+            if (HashesStatus == "Sync failed")
+            {
+                SystemHealthFooterText = "Hash sync incomplete";
+                SystemHealthFooterColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F39C12"));
+                SystemHealthFooterIconKind = MaterialIconKind.AlertCircleOutline;
                 return;
             }
 
@@ -422,7 +439,7 @@ namespace AssetsManager.Views.Models.Monitor
 
             else if (!string.IsNullOrEmpty(status))
             {
-                if (status.Contains("Maintenance started at"))
+                if (status.StartsWith("Maintenance ", StringComparison.OrdinalIgnoreCase))
                 {
                     PbeStatusText = "Maintenance";
                     PbeStatusSubtitle = status.Replace("Maintenance ", ""); // "Started at HH:mm"
@@ -451,15 +468,15 @@ namespace AssetsManager.Views.Models.Monitor
 
         public void RefreshFileWatcherData()
         {
-            if (_monitorService.MonitoredAssets == null) return;
+            if (_monitoredFilesService.MonitoredAssets == null) return;
 
-            MonitoredFilesCount = _monitorService.MonitoredAssets.Count;
-            MonitoredFilesChangedCount = _monitorService.MonitoredAssets.Count(x => x.HasChanges);
+            MonitoredFilesCount = _monitoredFilesService.MonitoredAssets.Count;
+            MonitoredFilesChangedCount = _monitoredFilesService.MonitoredAssets.Count(x => x.HasChanges);
 
-            var changedAssets = _monitorService.MonitoredAssets.Where(x => x.HasChanges).OrderByDescending(x => x.LastUpdated).ToList();
+            var changedAssets = _monitoredFilesService.MonitoredAssets.Where(x => x.HasChanges).OrderByDescending(x => x.LastUpdated).ToList();
             LastChangedFileName = changedAssets.FirstOrDefault()?.Alias ?? "None";
 
-            var lastItem = _monitorService.MonitoredAssets.OrderByDescending(x => x.LastUpdated).FirstOrDefault();
+            var lastItem = _monitoredFilesService.MonitoredAssets.OrderByDescending(x => x.LastUpdated).FirstOrDefault();
             WatcherLastUpdate = lastItem != null && lastItem.LastUpdated != DateTime.MinValue
                 ? (lastItem.LastUpdated.Date == DateTime.Today ? lastItem.LastUpdated.ToString("HH:mm") : lastItem.LastUpdated.ToString("dd/MM HH:mm"))
                 : "Never";
@@ -480,20 +497,20 @@ namespace AssetsManager.Views.Models.Monitor
 
         public void RefreshAssetTrackerData()
         {
-            if (!_monitorService.AssetCategories.Any()) _monitorService.LoadAssetCategories();
+            if (!_assetCatalog.Categories.Any()) _assetCatalog.RefreshCategories();
 
-            AssetTrackerCategoriesCount = _monitorService.AssetCategories.Count;
-            AssetTrackerTotalFound = _monitorService.AssetCategories.Sum(c => c.FoundUrls?.Count ?? 0);
+            AssetTrackerCategoriesCount = _assetCatalog.Categories.Count;
+            AssetTrackerTotalFound = _assetCatalog.Categories.Sum(category => CountFoundAssets(category));
 
-            var lastActiveCategory = _monitorService.AssetCategories
-                .Where(c => c.FoundUrls != null && c.FoundUrls.Any())
-                .OrderByDescending(c => c.FoundUrls.Max())
+            var lastActiveCategory = _assetCatalog.Categories
+                .Where(category => CountFoundAssets(category) > 0)
+                .OrderByDescending(category => MaxFoundAssetId(category))
                 .FirstOrDefault();
 
             if (lastActiveCategory != null)
             {
                 LastDiscoveredCategory = lastActiveCategory.Name;
-                LastDiscoveredAssetId = lastActiveCategory.FoundUrls.Max().ToString();
+                LastDiscoveredAssetId = MaxFoundAssetId(lastActiveCategory).ToString();
             }
             else
             {
@@ -501,18 +518,39 @@ namespace AssetsManager.Views.Models.Monitor
                 LastDiscoveredAssetId = "N/A";
             }
 
-            if (_monitorService.AssetCategories.All(c => c.Status == CategoryStatus.Idle || c.Status == CategoryStatus.CompletedSuccess))
+            if (_assetCatalog.Categories.All(c => c.Status == CategoryStatus.Idle || c.Status == CategoryStatus.CompletedSuccess))
             {
                 AssetTrackerStatus = "Idle";
             }
             UpdateDataStatus();
         }
 
+        private static int CountFoundAssets(AssetCategory category)
+        {
+            var removed = new HashSet<string>(category.UserRemovedAssetUrls, StringComparer.Ordinal);
+            return category.Entries.Values.Count(entry =>
+                entry.State == TrackedAssetState.Available && !removed.Contains(entry.Url));
+        }
+
+        private static long MaxFoundAssetId(AssetCategory category)
+        {
+            var removed = new HashSet<string>(category.UserRemovedAssetUrls, StringComparer.Ordinal);
+            return category.Entries.Values
+                .Where(entry => entry.State == TrackedAssetState.Available && !removed.Contains(entry.Url))
+                .Max(entry => entry.AssetId);
+        }
+
+        private void OnConfigurationSaved(object sender, EventArgs e)
+        {
+            Application.Current.Dispatcher.InvokeAsync(RefreshAssetTrackerData);
+        }
+
         private string FormatLastCheckTime(string timeStr)
         {
             if (string.IsNullOrEmpty(timeStr) || timeStr == "N/A") return "N/A";
 
-            if (DateTime.TryParseExact(timeStr, "yyyy-MM-dd HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out DateTime dt))
+            var dt = FormatUtils.ParseDate(timeStr, "yyyy-MM-dd HH:mm:ss");
+            if (dt != DateTime.MinValue)
             {
                 return dt.Date == DateTime.Today ? dt.ToString("HH:mm") : dt.ToString("yyyy-MM-dd HH:mm");
             }
@@ -525,7 +563,7 @@ namespace AssetsManager.Views.Models.Monitor
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
         }
 
-        private void OnUpdatesFound(string message, string latestVersion)
+        private void OnUpdatesFound(string message, string latestVersion, Notifications.NotificationCategory category, string title, NewsItemModel newsItem, Func<Window, Task> updateAction)
         {
             if (!string.IsNullOrEmpty(latestVersion))
             {
@@ -545,7 +583,7 @@ namespace AssetsManager.Views.Models.Monitor
         {
             Application.Current.Dispatcher.InvokeAsync(() =>
             {
-                bool anyOtherChecking = _monitorService.AssetCategories
+                bool anyOtherChecking = _assetCatalog.Categories
                     .Where(c => c != category)
                     .Any(c => c.Status == CategoryStatus.Checking);
 
@@ -584,11 +622,11 @@ namespace AssetsManager.Views.Models.Monitor
             });
         }
 
-        private void OnHashSyncCompleted()
+        private void OnHashSyncCompleted(bool succeeded)
         {
             Application.Current.Dispatcher.InvokeAsync(() =>
             {
-                HashesStatus = "Synced";
+                HashesStatus = succeeded ? "Synced" : "Sync failed";
                 UpdateSystemHealthFooter();
             });
         }
@@ -602,15 +640,16 @@ namespace AssetsManager.Views.Models.Monitor
                 _updateCheckService.UpdatesFound -= OnUpdatesFound;
             }
 
-            if (_monitorService != null)
+            if (_monitoredFilesService != null)
             {
-                _monitorService.MonitoredAssets.CollectionChanged -= MonitoredItems_CollectionChanged;
-                foreach (var item in _monitorService.MonitoredAssets)
+                _monitoredFilesService.MonitoredAssets.CollectionChanged -= MonitoredItems_CollectionChanged;
+                foreach (var item in _monitoredFilesService.MonitoredAssets)
                 {
                     item.PropertyChanged -= MonitoredItem_PropertyChanged;
                 }
-                _monitorService.CategoryCheckCompleted -= OnCategoryCheckCompleted;
-                _monitorService.CategoryCheckStarted -= OnCategoryCheckStarted;
+                _assetCatalog.CategoryCheckCompleted -= OnCategoryCheckCompleted;
+                _assetCatalog.CategoryCheckStarted -= OnCategoryCheckStarted;
+                _appSettings.ConfigurationSaved -= OnConfigurationSaved;
             }
 
             if (_pbeStatusService != null)

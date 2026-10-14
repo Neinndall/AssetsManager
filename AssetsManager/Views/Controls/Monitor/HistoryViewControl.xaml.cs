@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Windows;
@@ -73,13 +74,13 @@ namespace AssetsManager.Views.Controls.Monitor
         {
             if (AppSettings != null)
             {
-                string filter = txtSearch.Text.Trim().ToLower();
+                string filter = txtSearch.Text.Trim();
                 var entries = AppSettings.DiffHistory
                     .Where(e => string.IsNullOrEmpty(filter) || 
-                                (e.FileName != null && e.FileName.ToLower().Contains(filter)) ||
-                                (e.DisplayName != null && e.DisplayName.ToLower().Contains(filter)) ||
-                                (e.Version != null && e.Version.ToLower().Contains(filter)) ||
-                                (e.ReferenceId != null && e.ReferenceId.ToLower().Contains(filter)))
+                                (e.FileName?.Contains(filter, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                                (e.DisplayName?.Contains(filter, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                                (e.Version?.Contains(filter, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                                (e.ReferenceId?.Contains(filter, StringComparison.OrdinalIgnoreCase) ?? false))
                     .OrderByDescending(e => e.Timestamp);
 
                 _viewModel.LoadHistory(entries);
@@ -95,15 +96,20 @@ namespace AssetsManager.Views.Controls.Monitor
         {
             try
             {
-                int recoveredCount = await ComparisonHistoryService.SyncOrphanedArchivesAsync();
+                var (recoveredCount, removedCount) = await ComparisonHistoryService.SyncOrphanedArchivesAsync();
                 
-                if (recoveredCount > 0)
+                RefreshHistory();
+
+                if (recoveredCount > 0 || removedCount > 0)
                 {
-                    LogService.LogSuccess($"Successfully synchronized {recoveredCount} orphaned history entry(s).");
+                    var details = new List<string>();
+                    if (recoveredCount > 0) details.Add($"{recoveredCount} imported");
+                    if (removedCount > 0) details.Add($"{removedCount} removed");
+                    LogService.LogSuccess($"History synchronized with disk: {string.Join(", ", details)}.");
                 }
                 else
                 {
-                    LogService.Log("No orphaned history entries found to synchronize.");
+                    LogService.Log("History is already synchronized with local comparisons folder.");
                 }
             }
             catch (Exception ex)
@@ -166,6 +172,23 @@ namespace AssetsManager.Views.Controls.Monitor
             else
             {
                 CustomMessageBoxService.ShowWarning("Warning", "Please select a history entry to view.", Window.GetWindow(this));
+            }
+        }
+
+        private void btnOpenLocation_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as FrameworkElement)?.DataContext is not HistoryEntry entry) return;
+
+            string archivePath = ComparisonHistoryService.GetComparisonArchivePath(entry.ReferenceId);
+            if (string.IsNullOrEmpty(archivePath) || !Directory.Exists(archivePath)) return;
+
+            try
+            {
+                Process.Start(new ProcessStartInfo { FileName = archivePath, UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                LogService.LogError(ex, $"Failed to open comparison location: {archivePath}");
             }
         }
 

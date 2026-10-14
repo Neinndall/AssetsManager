@@ -10,11 +10,14 @@ using AssetsManager.Views.Models.Monitor;
 
 namespace AssetsManager.Views.Controls.Monitor
 {
-    public partial class MonitorDashboardControl : UserControl
+    public partial class MonitorDashboardControl : UserControl, IDisposable
     {
         // Public properties for Service Injection from Parent Window
-        private MonitorService _monitorService;
-        public MonitorService MonitorService { get => _monitorService; set { _monitorService = value; TryInitModel(); } }
+        private MonitoredFilesService _monitoredFilesService;
+        public MonitoredFilesService MonitoredFilesService { get => _monitoredFilesService; set { _monitoredFilesService = value; TryInitModel(); } }
+
+        private AssetCatalogService _assetCatalog;
+        public AssetCatalogService CatalogService { get => _assetCatalog; set { _assetCatalog = value; TryInitModel(); } }
 
         private PbeStatusService _pbeStatusService;
         public PbeStatusService PbeStatusService { get => _pbeStatusService; set { _pbeStatusService = value; TryInitModel(); } }
@@ -36,12 +39,10 @@ namespace AssetsManager.Views.Controls.Monitor
         public MonitorDashboardControl()
         {
             InitializeComponent();
-            Unloaded += MonitorDashboardControl_Unloaded;
         }
 
-        private void MonitorDashboardControl_Unloaded(object sender, RoutedEventArgs e)
+        public void Dispose()
         {
-            Unloaded -= MonitorDashboardControl_Unloaded;
             if (DataContext is IDisposable disposableModel)
             {
                 disposableModel.Dispose();
@@ -51,10 +52,10 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private void TryInitModel()
         {
-            // Solo creamos el modelo si no existe ya y si tenemos todos los servicios inyectados
-            if (DataContext == null && MonitorService != null && PbeStatusService != null && AppSettings != null && VersionService != null && StatusService != null && UpdateCheckService != null)
+            // Wait until all dashboard dependencies have been injected.
+            if (DataContext == null && MonitoredFilesService != null && CatalogService != null && PbeStatusService != null && AppSettings != null && VersionService != null && StatusService != null && UpdateCheckService != null)
             {
-                DataContext = new MonitorDashboardModel(MonitorService, PbeStatusService, AppSettings, VersionService, StatusService, UpdateCheckService);
+                DataContext = new MonitorDashboardModel(MonitoredFilesService, CatalogService, PbeStatusService, AppSettings, VersionService, StatusService, UpdateCheckService);
             }
         }
     }

@@ -3,7 +3,6 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
-             xmlns:info="clr-namespace:AssetsManager.Info"
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              mc:Ignorable="d" 
              d:DesignHeight="730" d:DesignWidth="64"
@@ -84,6 +83,28 @@
                         </Grid.ColumnDefinitions>
                         <materialIcons:MaterialIcon Grid.Column="0" Kind="CubeOutline" Width="20" Height="20" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                         <TextBlock Grid.Column="1" Text="Viewer" FontWeight="Normal" FontSize="12" VerticalAlignment="Center" Margin="0,0,16,0" Style="{StaticResource SidebarMenuTextStyle}"/>
+                    </Grid>
+                </RadioButton>
+
+                <RadioButton x:Name="HashLabButton" Style="{StaticResource ModernSidebarNavigationStyle}" Click="MenuButton_Click" Tag="HashLab" GroupName="SidebarNavigation">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="64"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <materialIcons:MaterialIcon Grid.Column="0" Kind="FlaskOutline" Width="20" Height="20" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                        <TextBlock Grid.Column="1" Text="Hash Lab" FontWeight="Normal" FontSize="12" VerticalAlignment="Center" Margin="0,0,16,0" Style="{StaticResource SidebarMenuTextStyle}"/>
+                    </Grid>
+                </RadioButton>
+
+                <RadioButton x:Name="NewsButton" Style="{StaticResource ModernSidebarNavigationStyle}" Click="MenuButton_Click" Tag="News" GroupName="SidebarNavigation">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="64"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <materialIcons:MaterialIcon Grid.Column="0" Kind="NewspaperVariantOutline" Width="20" Height="20" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                        <TextBlock Grid.Column="1" Text="News" FontWeight="Normal" FontSize="12" VerticalAlignment="Center" Margin="0,0,16,0" Style="{StaticResource SidebarMenuTextStyle}"/>
                     </Grid>
                 </RadioButton>
 

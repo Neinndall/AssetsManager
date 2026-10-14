@@ -6,13 +6,8 @@
              xmlns:local="clr-namespace:AssetsManager.Views.Controls.Monitor"
              xmlns:shared="clr-namespace:AssetsManager.Views.Controls.Shared"
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
-             xmlns:converters="clr-namespace:AssetsManager.Views.Converters"
              mc:Ignorable="d"
              d:DesignHeight="800" d:DesignWidth="800">
-
-    <UserControl.Resources>
-        <converters:EqualityConverter x:Key="EqualityConverter"/>
-    </UserControl.Resources>
 
     <Grid Margin="0,10,0,0">
         <Grid.RowDefinitions>
@@ -84,7 +79,7 @@
                 <StackPanel VerticalAlignment="Center">
                     <materialIcons:MaterialIcon Kind="Sync" Width="24" Height="24" Foreground="{StaticResource AccentBlue}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
                     <TextBlock Text="Sync History" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
-                    <TextBlock Text="Import missing folders" FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center" Margin="0,2,0,0"/>
+                    <TextBlock Text="Sync with disk" FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center" Margin="0,2,0,0"/>
                 </StackPanel>
             </Button>
 
@@ -298,10 +293,10 @@
                                             </Style.Triggers>
                                         </Style>
                                     </Button.Style>
-                                    <materialIcons:MaterialIcon Kind="Rename" Width="18" Height="18" Foreground="{StaticResource TextSecondary}"/>
+                                    <materialIcons:MaterialIcon Kind="Rename" Width="16" Height="16"/>
                                 </Button>
 
-                                <Button Click="btnViewDiff_Click" Width="34" Height="34" Margin="0,0,6,0" Background="{StaticResource SidebarBackground}">
+                                <Button Click="btnViewDiff_Click" Width="30" Height="30" Margin="0,0,6,0">
                                     <Button.Style>
                                         <Style TargetType="Button" BasedOn="{StaticResource TransparentIconButton}">
                                             <Setter Property="ToolTip" Value="View Historical Data"/>
@@ -312,13 +307,31 @@
                                             </Style.Triggers>
                                         </Style>
                                     </Button.Style>
-                                    <materialIcons:MaterialIcon Kind="FileCompare" Width="18" Height="18" Foreground="{StaticResource AccentBrush}"/>
+                                    <materialIcons:MaterialIcon Kind="FileCompare" Width="16" Height="16"/>
+                                </Button>
+
+                                <Button Click="btnOpenLocation_Click" Width="30" Height="30" Margin="0,0,6,0">
+                                    <Button.Style>
+                                        <Style TargetType="Button" BasedOn="{StaticResource TransparentIconButton}">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                            <Setter Property="ToolTip" Value="Open comparison location"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Type}" Value="WadArchive">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding Type}" Value="WadFile">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                    <materialIcons:MaterialIcon Kind="FolderOpenOutline" Width="16" Height="16"/>
                                 </Button>
 
                                 <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="4,0,10,0" Background="{StaticResource BorderColor}"/>
 
                                 <Button Click="btnRemoveSelected_Click" Style="{StaticResource TransparentIconButton}" Width="30" Height="30" ToolTip="Remove from History">
-                                    <materialIcons:MaterialIcon Kind="TrashCanOutline" Width="18" Height="18" Foreground="{StaticResource AccentRed}"/>
+                                    <materialIcons:MaterialIcon Kind="TrashCanOutline" Width="16" Height="16" Foreground="{StaticResource AccentRed}"/>
                                 </Button>
                             </StackPanel>
                         </Grid>

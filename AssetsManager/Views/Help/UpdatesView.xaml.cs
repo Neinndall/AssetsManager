@@ -1,10 +1,14 @@
+using System;
 using System.Windows;
 using System.Windows.Controls;
+using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
-using AssetsManager.Info;
 using AssetsManager.Services.Updater;
 using AssetsManager.Services.Core;
+using AssetsManager.Utils;
 using AssetsManager.Views.Models.Help;
+using AssetsManager.Views.Models.Notifications;
+using AssetsManager.Views.Models.News;
 
 namespace AssetsManager.Views.Help
 {
@@ -26,7 +30,7 @@ namespace AssetsManager.Views.Help
             _updateCheckService = updateCheckService;
 
             // Initialize Model Data
-            _viewModel.CurrentVersion = ApplicationInfos.Version;
+            _viewModel.CurrentVersion = VersionInfo.Version;
             UpdateModelState();
 
             Loaded += UpdatesView_Loaded;
@@ -43,7 +47,7 @@ namespace AssetsManager.Views.Help
             _updateCheckService.UpdatesFound -= OnUpdatesFound;
         }
 
-        private void OnUpdatesFound(string message, string latestVersion)
+        private void OnUpdatesFound(string message, string latestVersion, NotificationCategory category, string title, NewsItemModel newsItem, Func<Window, Task> updateAction)
         {
             UpdateModelState();
         }

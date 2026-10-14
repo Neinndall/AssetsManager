@@ -40,6 +40,13 @@ namespace AssetsManager.Services.Monitor
             _logService = logService;
         }
 
+        public string GetComparisonArchivePath(string referenceId)
+        {
+            return string.IsNullOrWhiteSpace(referenceId)
+                ? null
+                : Path.Combine(_directoriesCreator.WadComparisonSavePath, referenceId);
+        }
+
         /// <summary>
         /// Centralized entry point for archiving a comparison. Builds a stable
         /// identity key from (version + oldPath + newPath). If a previous entry
@@ -52,7 +59,8 @@ namespace AssetsManager.Services.Monitor
             string oldPbePath,
             string newPbePath,
             string version,
-            string displayName)
+            string displayName,
+            CancellationToken cancellationToken = default)
         {
             if (diffs == null || diffs.Count == 0)
             {
@@ -61,7 +69,8 @@ namespace AssetsManager.Services.Monitor
 
             string comparisonKey = PathUtils.BuildComparisonKey(version, oldPbePath, newPbePath);
 
-            await _archiveLock.WaitAsync();
+            await _archiveLock.WaitAsync(cancellationToken);
+            string pendingArchivePath = null;
             try
             {
                 // Re-check inside the lock: a background auto-archive and a
@@ -70,7 +79,7 @@ namespace AssetsManager.Services.Monitor
 
                 if (existingReferenceId != null)
                 {
-                    string archivePath = Path.Combine(_directoriesCreator.WadComparisonSavePath, existingReferenceId);
+                    string archivePath = GetComparisonArchivePath(existingReferenceId);
 
                     if (Directory.Exists(archivePath))
                     {
@@ -86,12 +95,31 @@ namespace AssetsManager.Services.Monitor
                 }
 
                 var folderInfo = _directoriesCreator.GetNewWadComparisonFolderInfo();
-                await _wadPackagingService.SaveBackupAsync(diffs, oldPbePath, newPbePath, folderInfo.PhysicalPath, version);
+                pendingArchivePath = folderInfo.PhysicalPath;
+                _logService.Log("Saving comparison history...");
+                await _wadPackagingService.SaveBackupAsync(diffs, oldPbePath, newPbePath, folderInfo.PhysicalPath, version, cancellationToken);
 
                 RegisterInHistory(folderInfo.FolderName, displayName, oldPbePath, newPbePath, version, comparisonKey);
+                pendingArchivePath = null;
                 _logService.LogSuccess("Comparison history saved successfully.");
 
                 return new ArchiveResult(false, folderInfo.FolderName);
+            }
+            catch
+            {
+                if (!string.IsNullOrEmpty(pendingArchivePath) && Directory.Exists(pendingArchivePath))
+                {
+                    try
+                    {
+                        Directory.Delete(pendingArchivePath, true);
+                    }
+                    catch (Exception cleanupException)
+                    {
+                        _logService.LogError(cleanupException, $"Failed to remove incomplete comparison archive '{pendingArchivePath}'.");
+                    }
+                }
+
+                throw;
             }
             finally
             {
@@ -181,7 +209,11 @@ namespace AssetsManager.Services.Monitor
         {
             try
             {
-                string historyDir = Path.Combine(_directoriesCreator.WadComparisonSavePath, referenceId);
+                string historyDir = GetComparisonArchivePath(referenceId);
+                if (historyDir == null)
+                {
+                    return (null, null);
+                }
                 string indexFilePath = Path.Combine(historyDir, "wadcomparison.json");
 
                 if (!File.Exists(indexFilePath))
@@ -206,15 +238,38 @@ namespace AssetsManager.Services.Monitor
             }
         }
 
-        public async Task<int> SyncOrphanedArchivesAsync()
+        public async Task<(int RecoveredCount, int RemovedCount)> SyncOrphanedArchivesAsync()
         {
             int recoveredCount = 0;
+            int removedCount = 0;
             
             try
             {
-                if (!Directory.Exists(_directoriesCreator.WadComparisonSavePath))
+                var archiveDirs = Directory.Exists(_directoriesCreator.WadComparisonSavePath)
+                    ? Directory.GetDirectories(_directoriesCreator.WadComparisonSavePath)
+                    : Array.Empty<string>();
+                var physicalFolderNames = new HashSet<string>(
+                    archiveDirs.Select(Path.GetFileName),
+                    StringComparer.OrdinalIgnoreCase
+                );
+
+                bool changesMade = false;
+
+                // 1. Remove history entries whose physical folder on disk was deleted
+                var deletedEntries = _appSettings.DiffHistory
+                    .Where(h => (h.Type == HistoryEntryType.WadArchive || h.Type == HistoryEntryType.WadFile) &&
+                                !string.IsNullOrEmpty(h.ReferenceId) &&
+                                !physicalFolderNames.Contains(h.ReferenceId))
+                    .ToList();
+
+                if (deletedEntries.Count > 0)
                 {
-                    return 0;
+                    foreach (var entry in deletedEntries)
+                    {
+                        _appSettings.DiffHistory.Remove(entry);
+                    }
+                    removedCount = deletedEntries.Count;
+                    changesMade = true;
                 }
 
                 var existingReferenceIds = new HashSet<string>(
@@ -224,10 +279,7 @@ namespace AssetsManager.Services.Monitor
                     StringComparer.OrdinalIgnoreCase
                 );
 
-                var archiveDirs = Directory.GetDirectories(_directoriesCreator.WadComparisonSavePath);
-
-                bool changesMade = false;
-
+                // 2. Import missing folders from disk
                 foreach (var dir in archiveDirs)
                 {
                     string folderName = Path.GetFileName(dir);
@@ -243,7 +295,8 @@ namespace AssetsManager.Services.Monitor
                             if (folderName.StartsWith("comparison_") && folderName.Length >= 26)
                             {
                                 string dateStr = folderName.Substring(11, 15);
-                                if (DateTime.TryParseExact(dateStr, "ddMMyyyy_HHmmss", null, System.Globalization.DateTimeStyles.None, out DateTime parsedDate))
+                                var parsedDate = FormatUtils.ParseDate(dateStr, "ddMMyyyy_HHmmss");
+                                if (parsedDate != DateTime.MinValue)
                                 {
                                     timestamp = parsedDate;
                                 }
@@ -316,7 +369,7 @@ namespace AssetsManager.Services.Monitor
                 _logService.LogError(ex, "Failed to synchronize orphaned archives.");
             }
 
-            return recoveredCount;
+            return (recoveredCount, removedCount);
         }
 
         public void DeleteComparison(HistoryEntry entry)
@@ -325,7 +378,7 @@ namespace AssetsManager.Services.Monitor
             {
                 if ((entry.Type == HistoryEntryType.WadArchive || entry.Type == HistoryEntryType.WadFile) && !string.IsNullOrEmpty(entry.ReferenceId))
                 {
-                    string historyDir = Path.Combine(_directoriesCreator.WadComparisonSavePath, entry.ReferenceId);
+                    string historyDir = GetComparisonArchivePath(entry.ReferenceId);
                     if (Directory.Exists(historyDir))
                     {
                         Directory.Delete(historyDir, true);

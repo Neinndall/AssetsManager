@@ -3,12 +3,14 @@
     
     <!-- BRAND ACCENTS (More vibrant & professional) -->
     <SolidColorBrush x:Key="AccentBrush" Color="#FF5C85FF"/> <!-- Blue-ish Indigo -->
+    <Color x:Key="AccentBrushColor">#FF5C85FF</Color>
     <SolidColorBrush x:Key="ModernButtonHoverBrush" Color="#FF7094FF"/>
     <SolidColorBrush x:Key="ModernButtonPressedBrush" Color="#FF4A6EDF"/>
 
     <!-- DARK THEME CORE (Refined deep tones) -->
     <SolidColorBrush x:Key="DarkBackground" Color="#FF0F111A"/>    <!-- Deeper Dark -->
     <SolidColorBrush x:Key="SidebarBackground" Color="#FF161925"/> <!-- Slightly lighter than bg -->
+    <SolidColorBrush x:Key="ViewportBackground" Color="#FF14171F"/>
     <SolidColorBrush x:Key="CardBackground" Color="#FF1E2233"/>    <!-- Elevated layer -->
     
     <!-- ACCENT PALETTE (Modern & Balanced) -->
@@ -47,7 +49,6 @@
     <Color x:Key="DiffNavigationAdded">#FF00E676</Color>
     <Color x:Key="DiffNavigationRemoved">#FFFF5252</Color>
     <Color x:Key="DiffNavigationModified">#FFFF9100</Color>
-    <Color x:Key="DiffNavigationImaginary">#FF2D314D</Color>
 
     <Color x:Key="BackgroundPanelNavigation">#FF161925</Color>
     <Color x:Key="DiffNavigationViewPort">#FF5C85FF</Color>

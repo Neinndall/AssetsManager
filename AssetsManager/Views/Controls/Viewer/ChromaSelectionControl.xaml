@@ -1,147 +1,404 @@
 <UserControl x:Class="AssetsManager.Views.Controls.Viewer.ChromaSelectionControl"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
-             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              xmlns:vwp="clr-namespace:WpfToolkit.Controls;assembly=VirtualizingWrapPanel"
-             mc:Ignorable="d" 
-             d:DesignHeight="600" d:DesignWidth="800">
-
-    <UserControl.Resources>
-        <!-- Chroma Card Template -->
-        <DataTemplate x:Key="ChromaCardTemplate">
-            <Border Margin="8" Width="140" Height="180" CornerRadius="12"
-                    Background="{StaticResource CardBackground}"
-                    BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
-                    Cursor="Hand" MouseLeftButtonDown="ChromaCard_MouseLeftButtonDown">
-                <Border.Style>
-                    <Style TargetType="Border">
-                        <Style.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
-                                <Setter Property="Background" Value="{StaticResource HoverColor}"/>
-                            </Trigger>
-                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
-                                <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
-                                <Setter Property="BorderThickness" Value="2"/>
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </Border.Style>
-
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="*"/>   <!-- Thumbnail -->
-                        <RowDefinition Height="Auto"/> <!-- Info -->
-                    </Grid.RowDefinitions>
-
-                    <!-- Preview Area -->
-                    <Border Grid.Row="0" Margin="10,10,10,5" CornerRadius="10" Background="{StaticResource SidebarBackground}">
-                        <Grid>
-                            <!-- Texture Preview -->
-                            <Border CornerRadius="10">
-                                <Border.Background>
-                                    <ImageBrush ImageSource="{Binding PreviewImage}" Stretch="UniformToFill"/>
-                                </Border.Background>
-                            </Border>
-
-                            <!-- Color Swatch Overlay (Bottom Right) -->
-                            <Border Width="24" Height="24" CornerRadius="12" 
-                                    HorizontalAlignment="Right" VerticalAlignment="Bottom" 
-                                    Margin="0,0,-5,-5" BorderBrush="{StaticResource BorderColor}" BorderThickness="2">
-                                <Border.Background>
-                                    <SolidColorBrush Color="{Binding SwatchColor}"/>
-                                </Border.Background>
-                                <Border.Effect>
-                                    <DropShadowEffect BlurRadius="8" ShadowDepth="0" Opacity="0.5"/>
-                                </Border.Effect>
-                            </Border>
-                        </Grid>
-                    </Border>
-
-                    <!-- Info Area -->
-                    <StackPanel Grid.Row="1" Margin="10,5,10,12" HorizontalAlignment="Center">
-                        <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="Bold" 
-                                   Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center"/>
-                        <TextBlock Text="{Binding PreviewTextureName}" FontSize="9" FontWeight="Black" 
-                                   Foreground="{StaticResource TextMuted}" Opacity="0.5" 
-                                   HorizontalAlignment="Center" Margin="0,2,0,0"
-                                   TextTrimming="CharacterEllipsis" MaxWidth="120"
-                                   ToolTip="{Binding PreviewTextureName}"/>
-                    </StackPanel>
-
-                    <!-- Selected Indicator -->
-                    <materialIcons:MaterialIcon Kind="CheckCircle" Foreground="{StaticResource AccentBrush}" 
-                                                Width="20" Height="20" HorizontalAlignment="Right" VerticalAlignment="Top" 
-                                                Margin="0,6,6,0" Visibility="{Binding IsSelected, Converter={StaticResource BooleanToVisibilityConverter}}">
-                        <materialIcons:MaterialIcon.Effect>
-                            <DropShadowEffect BlurRadius="10" ShadowDepth="0" Color="Black" Opacity="0.5"/>
-                        </materialIcons:MaterialIcon.Effect>
-                    </materialIcons:MaterialIcon>
-                </Grid>
-            </Border>
-        </DataTemplate>
-    </UserControl.Resources>
+             mc:Ignorable="d"
+             d:DesignHeight="650"
+             d:DesignWidth="1000">
 
     <Grid Background="{StaticResource SidebarBackground}">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/> <!-- Header -->
-            <RowDefinition Height="*"/>    <!-- Gallery -->
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- 1. Technical Header -->
-        <Border Grid.Row="0" Padding="24,20" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1">
+        <Border Grid.Row="0"
+                Padding="28,12"
+                Background="{StaticResource CardBackground}"
+                BorderBrush="{StaticResource BorderColor}"
+                BorderThickness="0,0,0,1">
             <Grid>
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <Border Width="4" Height="24" Background="{StaticResource AccentBrush}" CornerRadius="2" Margin="0,0,15,0"/>
-                    <StackPanel>
-                        <TextBlock Text="CHROMA SELECTION" FontSize="16" FontWeight="Black" Foreground="{StaticResource TextPrimary}"/>
-                        <TextBlock Text="{Binding StatusText}" FontSize="11" Foreground="{StaticResource TextSecondary}" Opacity="0.7" Margin="0,2,0,0"/>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <Grid VerticalAlignment="Center" Margin="0,0,24,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Border Width="42"
+                            Height="42"
+                            Margin="0,0,14,0"
+                            Background="{StaticResource SidebarBackground}"
+                            BorderBrush="{StaticResource BorderColor}"
+                            BorderThickness="1"
+                            CornerRadius="10">
+                        <materialIcons:MaterialIcon Kind="PaletteSwatchOutline"
+                                                    Width="22"
+                                                    Height="22"
+                                                    Foreground="{StaticResource AccentBrush}"
+                                                    HorizontalAlignment="Center"
+                                                    VerticalAlignment="Center"/>
+                    </Border>
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <TextBlock Text="CHROMA LIBRARY"
+                                   FontSize="16"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource TextPrimary}"/>
+                        <TextBlock Text="{Binding StatusText}"
+                                   Margin="0,2,0,0"
+                                   FontSize="11"
+                                   Foreground="{StaticResource TextSecondary}"
+                                   TextTrimming="CharacterEllipsis"
+                                   Opacity="0.8"/>
                     </StackPanel>
-                </StackPanel>
+                </Grid>
 
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                    <Button Style="{StaticResource SecondaryButton}" 
-                            Padding="18,0" Height="32" Margin="0,0,10,0"
+                <WrapPanel Grid.Column="1"
+                            Orientation="Horizontal"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Center">
+                    <Button Height="30" Click="ChangeSourceButton_Click" Style="{StaticResource SecondaryButton}"
+                            Padding="10,0"
+                            Margin="0,0,8,0"
+                            Background="{StaticResource SidebarBackground}"
+                            BorderBrush="{StaticResource BorderColor}"
+                            BorderThickness="1"
+                            ToolTip="{Binding CurrentSourcePath}">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <materialIcons:MaterialIcon Kind="SourceBranch"
+                                                        Width="13"
+                                                        Height="13"
+                                                        Margin="0,0,6,0"
+                                                        Foreground="{StaticResource AccentBrush}"/>
+                            <TextBlock Text="CURRENT"
+                                       FontSize="9"
+                                       FontWeight="Bold"
+                                       Foreground="{StaticResource TextSecondary}"
+                                       VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Button Style="{StaticResource SecondaryButton}"
+                            Height="30"
+                            Padding="11,0"
+                            Visibility="{Binding HasReference, Converter={StaticResource InverseBooleanToVisibilityConverter}}"
+                            Click="AddReferenceButton_Click">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <materialIcons:MaterialIcon Kind="Plus"
+                                                        Width="14"
+                                                        Height="14"
+                                                        Margin="0,0,6,0"/>
+                            <TextBlock Text="ADD REFERENCE"
+                                       FontSize="9"
+                                       FontWeight="SemiBold"
+                                       VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Border Height="30"
+                            Padding="10,0,4,0"
+                            Background="{StaticResource SidebarBackground}"
+                            BorderBrush="{StaticResource AccentBrush}"
+                            BorderThickness="1.5"
+                            CornerRadius="7"
+                            ToolTip="{Binding ReferenceSourcePath}"
+                            Visibility="{Binding HasReference, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <materialIcons:MaterialIcon Kind="Compare"
+                                                        Width="13"
+                                                        Height="13"
+                                                        Margin="0,0,6,0"
+                                                        Foreground="{StaticResource AccentBrush}"/>
+                            <TextBlock Text="REFERENCE"
+                                       FontSize="9"
+                                       FontWeight="Bold"
+                                       Foreground="{StaticResource TextPrimary}"
+                                       VerticalAlignment="Center"/>
+                            <Button Style="{StaticResource TransparentIconButton}"
+                                    Width="22"
+                                    Height="22"
+                                    Margin="5,0,0,0"
+                                    ToolTip="Remove reference"
+                                    Click="RemoveReferenceButton_Click">
+                                <materialIcons:MaterialIcon Kind="Close"
+                                                            Width="12"
+                                                            Height="12"/>
+                            </Button>
+                        </StackPanel>
+                    </Border>
+                </WrapPanel>
+            </Grid>
+        </Border>
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="260"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0"
+                    Padding="18,18,14,18"
+                    Background="{StaticResource SidebarBackground}"
+                    BorderBrush="{StaticResource BorderColor}"
+                    BorderThickness="0,0,1,0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Margin="4,0,4,12">
+                        <TextBlock Text="SOURCE SKINS"
+                                   FontSize="10"
+                                   FontWeight="Bold"
+                                   Foreground="{StaticResource TextMuted}"/>
+                        <TextBlock Text="Choose the model family"
+                                   Margin="0,2,0,0"
+                                   FontSize="11"
+                                   Foreground="{StaticResource TextSecondary}"/>
+                    </StackPanel>
+
+                    <ListBox x:Name="FamilyListBox"
+                             Grid.Row="1"
+                             ItemsSource="{Binding AvailableFamilies}"
+                             SelectedItem="{Binding SelectedFamily, Mode=OneWay}"
+                             SelectionChanged="FamilyListBox_SelectionChanged"
+                             ItemTemplate="{StaticResource ChromaFamilyTemplate}"
+                             ItemContainerStyle="{StaticResource ChromaFamilyItemStyle}"
+                             Background="Transparent"
+                             BorderThickness="0"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+                </Grid>
+            </Border>
+
+            <Grid Grid.Column="1" Background="{StaticResource SidebarBackground}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <Border Padding="24,15"
+                        Background="{StaticResource CardBackground}"
+                        BorderBrush="{StaticResource BorderColor}"
+                        BorderThickness="0,0,0,1">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <Border Width="38"
+                                    Height="38"
+                                    Margin="0,0,12,0"
+                                    Background="{StaticResource SidebarBackground}"
+                                    CornerRadius="9">
+                                <materialIcons:MaterialIcon Kind="SourceBranch"
+                                                            Width="20"
+                                                            Height="20"
+                                                            Foreground="{StaticResource AccentBrush}"
+                                                            HorizontalAlignment="Center"
+                                                            VerticalAlignment="Center"/>
+                            </Border>
+                            <StackPanel VerticalAlignment="Center">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="{Binding SelectedFamily.Name}"
+                                               FontSize="14"
+                                               FontWeight="Bold"
+                                               Foreground="{StaticResource TextPrimary}"/>
+                                    <TextBlock Text="  CHROMAS"
+                                               FontSize="14"
+                                               FontWeight="Bold"
+                                               Foreground="{StaticResource AccentBrush}"/>
+                                </StackPanel>
+                                <TextBlock Margin="0,2,0,0"
+                                           FontSize="10"
+                                           Foreground="{StaticResource TextMuted}">
+                                    <Run Text="{Binding SelectedFamily.ModelName, Mode=OneWay}"/>
+                                    <Run Text=" · "/>
+                                    <Run Text="{Binding SelectedFamily.ChromaCountText, Mode=OneWay}"/>
+                                </TextBlock>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="1"
+                                    Orientation="Horizontal"
+                                    VerticalAlignment="Center">
+                            <Button Style="{StaticResource SecondaryButton}"
+                                    Height="30"
+                                    Padding="12,0"
+                                    Margin="0,0,8,0"
+                                    HorizontalContentAlignment="Center"
+                                    VerticalContentAlignment="Center"
+                                    Click="SelectFamilyButton_Click">
+                                <StackPanel Orientation="Horizontal"
+                                            VerticalAlignment="Center">
+                                    <materialIcons:MaterialIcon Kind="CheckAll"
+                                                                Width="14"
+                                                                Height="14"
+                                                                Margin="0,0,6,0"
+                                                                VerticalAlignment="Center"/>
+                                    <TextBlock Text="SELECT FAMILY"
+                                               FontSize="10"
+                                               FontWeight="SemiBold"
+                                               VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                            <Button Style="{StaticResource SecondaryButton}"
+                                    Height="30"
+                                    Padding="12,0"
+                                    HorizontalContentAlignment="Center"
+                                    VerticalContentAlignment="Center"
+                                    Click="ClearFamilyButton_Click">
+                                <StackPanel Orientation="Horizontal"
+                                            VerticalAlignment="Center">
+                                    <materialIcons:MaterialIcon Kind="Eraser"
+                                                                Width="14"
+                                                                Height="14"
+                                                                Margin="0,0,6,0"
+                                                                VerticalAlignment="Center"/>
+                                    <TextBlock Text="CLEAR"
+                                               FontSize="10"
+                                               FontWeight="SemiBold"
+                                               VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <ScrollViewer Grid.Row="1"
+                              HorizontalScrollBarVisibility="Disabled"
+                              VerticalScrollBarVisibility="Auto">
+                    <ItemsControl ItemsSource="{Binding SelectedFamily.Chromas}"
+                                  ItemTemplate="{StaticResource ChromaCardTemplate}"
+                                  Margin="13"
+                                  ScrollViewer.CanContentScroll="True">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <vwp:VirtualizingWrapPanel Orientation="Horizontal"
+                                                          SpacingMode="Uniform"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                    </ItemsControl>
+                </ScrollViewer>
+            </Grid>
+        </Grid>
+
+        <Border Grid.Row="2"
+                Padding="24,12"
+                Background="{StaticResource CardBackground}"
+                BorderBrush="{StaticResource BorderColor}"
+                BorderThickness="0,1,0,0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <Grid VerticalAlignment="Center" Margin="0,0,24,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <materialIcons:MaterialIcon Kind="CubeOutline"
+                                                Width="18"
+                                                Height="18"
+                                                Margin="0,0,9,0"
+                                                VerticalAlignment="Center"
+                                                Foreground="{StaticResource AccentBrush}"/>
+                    <StackPanel Grid.Column="1">
+                        <TextBlock Text="{Binding SelectionText}"
+                                   FontSize="11"
+                                   FontWeight="Bold"
+                                   TextTrimming="CharacterEllipsis"
+                                   Foreground="{StaticResource TextPrimary}"/>
+                        <TextBlock Text="Open in tabs or add to a scene." TextTrimming="CharacterEllipsis"
+                                   Margin="0,2,0,0"
+                                   FontSize="10"
+                                   Foreground="{StaticResource TextMuted}"/>
+                    </StackPanel>
+                </Grid>
+
+                <WrapPanel Grid.Column="1" Orientation="Horizontal"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Center">
+                    <Button Style="{StaticResource SecondaryButton}"
+                            Height="34"
+                            Padding="16,0"
+                            Margin="0,0,10,0"
+                            Click="CloseButton_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <materialIcons:MaterialIcon Kind="Close"
+                                                        Width="15"
+                                                        Height="15"
+                                                        Margin="0,0,7,0"/>
+                            <TextBlock Text="BACK TO SCENE" FontWeight="SemiBold"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Style="{StaticResource SecondaryButton}" Height="34" Padding="14,0" Margin="0,0,10,0"
+                            IsEnabled="{Binding HasSelection}" Click="AddToSceneButton_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <materialIcons:MaterialIcon Kind="Plus" Width="15" Height="15" Margin="0,0,7,0"/>
+                            <TextBlock Text="ADD TO SCENE" FontWeight="SemiBold"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Style="{StaticResource PrimaryButton}"
+                            Height="34"
+                            Padding="18,0"
+                            IsEnabled="{Binding HasSelection}"
                             Click="LoadSelectedButton_Click">
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
-                            <materialIcons:MaterialIcon Kind="PlayCircle" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                            <TextBlock Text="LOAD SELECTED" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                        <StackPanel Orientation="Horizontal">
+                            <materialIcons:MaterialIcon Kind="PlayCircle"
+                                                        Width="16"
+                                                        Height="16"
+                                                        Margin="0,0,8,0"/>
+                            <TextBlock Text="OPEN IN TABS" FontWeight="SemiBold"/>
                         </StackPanel>
                     </Button>
-
-                    <Button Style="{StaticResource SecondaryButton}" 
-                            Padding="18,0" Height="32" Click="CloseButton_Click">
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
-                            <materialIcons:MaterialIcon Kind="Close" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                            <TextBlock Text="CANCEL" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                        </StackPanel>
-                    </Button>
-                </StackPanel>
+                </WrapPanel>
             </Grid>
         </Border>
 
-        <!-- 2. Chroma Grid -->
-        <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-            <ItemsControl ItemsSource="{Binding AvailableSkins}" 
-                          ItemTemplate="{StaticResource ChromaCardTemplate}" 
-                          Padding="16"
-                          ScrollViewer.CanContentScroll="True">
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <vwp:VirtualizingWrapPanel Orientation="Horizontal" SpacingMode="Uniform" />
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-            </ItemsControl>
-        </ScrollViewer>
-
-        <!-- 3. Loading Overlay -->
-        <Border Grid.Row="1" Background="{StaticResource SidebarBackground}" Opacity="0.9"
+        <Border Grid.Row="1"
+                Grid.RowSpan="2"
+                Background="{StaticResource SidebarBackground}"
+                Opacity="0.94"
                 Visibility="{Binding IsLoading, Converter={StaticResource BooleanToVisibilityConverter}}">
             <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                <materialIcons:MaterialIcon Kind="Sync" Width="48" Height="48" Foreground="{StaticResource AccentBrush}" Style="{StaticResource SpinningIconStyle}"/>
-                <TextBlock Text="ANALYZING CHROMAS..." FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="0,15,0,0" HorizontalAlignment="Center"/>
+                <Border Width="64"
+                        Height="64"
+                        Background="{StaticResource CardBackground}"
+                        BorderBrush="{StaticResource BorderColor}"
+                        BorderThickness="1"
+                        CornerRadius="16">
+                    <materialIcons:MaterialIcon Kind="Sync"
+                                                Width="32"
+                                                Height="32"
+                                                Foreground="{StaticResource AccentBrush}"
+                                                Style="{StaticResource SpinningIconStyle}"
+                                                HorizontalAlignment="Center"
+                                                VerticalAlignment="Center"/>
+                </Border>
+                <TextBlock Text="ANALYZING CHROMA FAMILIES..."
+                           Margin="0,16,0,0"
+                           HorizontalAlignment="Center"
+                           TextAlignment="Center"
+                           FontSize="13"
+                           FontWeight="Bold"
+                           Foreground="{StaticResource TextPrimary}"/>
+                <TextBlock Text="Linking inherited models and texture variants"
+                           Margin="0,4,0,0"
+                           HorizontalAlignment="Center"
+                           TextAlignment="Center"
+                           FontSize="10"
+                           Foreground="{StaticResource TextMuted}"/>
             </StackPanel>
         </Border>
     </Grid>

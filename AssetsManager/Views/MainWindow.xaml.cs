@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Threading;
 using Hardcodet.Wpf.TaskbarNotification;
 using Microsoft.Extensions.DependencyInjection;
 using AssetsManager.Services.Comparator;
@@ -14,6 +15,7 @@ using AssetsManager.Services.Downloads;
 using AssetsManager.Services.Explorer;
 using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Monitor;
+using AssetsManager.Services.News;
 using AssetsManager.Services.Updater;
 using AssetsManager.Utils;
 using AssetsManager.Utils.Win;
@@ -22,6 +24,7 @@ using AssetsManager.Views.Dialogs;
 using AssetsManager.Views.Helpers;
 using AssetsManager.Views.Models.Dialogs.Controls;
 using AssetsManager.Views.Models.Notifications;
+using AssetsManager.Views.Models.News;
 using AssetsManager.Views.Models.Wad;
 using LeagueToolkit.Core.Wad;
 
@@ -46,25 +49,25 @@ namespace AssetsManager.Views
         private readonly UpdateCheckService _updateCheckService;
         private readonly ProgressUIManager _progressUIManager;
         private readonly DiffViewService _diffViewService;
-        private readonly MonitorService _monitorService;
         private readonly VersionService _versionService;
         private readonly ExtractionService _extractionService;
         private readonly ReportGenerationService _reportGenerationService;
         private readonly TaskCancellationManager _taskCancellationManager;
         private readonly NotificationService _notificationService;
+        private readonly NewsService _newsService;
         private readonly ComparisonHistoryService _comparisonHistoryService;
+        private ComparatorWindow _comparatorWindow;
+        private HashGuessingWindow _hashGuessingWindow;
+        private bool _isUpdatePromptOpen;
 
-        private string _latestAppVersionAvailable;
-        
         // New fields to manage the state of the extraction after comparison
-        private bool _isExtractingAfterComparison = false;
         private string _extractionOldLolPath;
         private string _extractionNewLolPath;
         private string _extractionVersion;
         private List<SerializableChunkDiff> _diffsForExtraction;
 
         private GridLength _lastLogHeight = new GridLength(180);
-        private bool _isLogMinimized = false;
+        private bool _isLogMinimized;
 
         public MainWindow(
             IServiceProvider serviceProvider,
@@ -80,12 +83,12 @@ namespace AssetsManager.Views
             UpdateCheckService updateCheckService,
             ProgressUIManager progressUIManager,
             DiffViewService diffViewService,
-            MonitorService monitorService,
             VersionService versionService,
             ExtractionService extractionService,
             ReportGenerationService reportGenerationService,
             TaskCancellationManager taskCancellationManager,
             NotificationService notificationService,
+            NewsService newsService,
             ComparisonHistoryService comparisonHistoryService)
         {
             InitializeComponent();
@@ -103,12 +106,12 @@ namespace AssetsManager.Views
             _updateCheckService = updateCheckService;
             _progressUIManager = progressUIManager;
             _diffViewService = diffViewService;
-            _monitorService = monitorService;
             _versionService = versionService;
             _extractionService = extractionService;
             _reportGenerationService = reportGenerationService;
             _taskCancellationManager = taskCancellationManager;
             _notificationService = notificationService;
+            _newsService = newsService;
             _comparisonHistoryService = comparisonHistoryService;
 
             // Peer-to-Peer Injection
@@ -122,24 +125,23 @@ namespace AssetsManager.Views
             // --- Progress events wired directly to ProgressUIManager ---
             _wadComparatorService.ComparisonStarted += _progressUIManager.OnComparisonStarted;
             _wadComparatorService.ComparisonProgressChanged += _progressUIManager.OnComparisonProgressChanged;
-            _wadComparatorService.ComparisonCompleted += OnWadComparisonCompleted;
+            _wadComparatorService.ComparisonCompleted += OnWadComparisonCompletedAsync;
 
             _extractionService.ExtractionStarted += _progressUIManager.OnExtractionStarted;
             _extractionService.ExtractionProgressChanged += _progressUIManager.OnExtractionProgressChanged;
-            _extractionService.ExtractionCompleted += OnExtractionCompleted;
+            _extractionService.ExtractionCompleted += _progressUIManager.OnExtractionCompletedAsync;
 
             _backupManager.BackupStarted += _progressUIManager.OnBackupStarted;
             _backupManager.BackupProgressChanged += _progressUIManager.OnBackupProgressChanged;
-            _backupManager.BackupCompleted += _progressUIManager.OnBackupCompleted;
+            _backupManager.BackupCompleted += _progressUIManager.OnBackupCompletedAsync;
 
             _extractionService.SavingStarted += _progressUIManager.OnSavingStarted;
             _extractionService.SavingProgressChanged += _progressUIManager.OnSavingProgressChanged;
-            _extractionService.SavingCompleted += _progressUIManager.OnSavingCompleted;
+            _extractionService.SavingCompleted += _progressUIManager.OnSavingCompletedAsync;
 
             _versionService.VersionDownloadStarted += _progressUIManager.OnVersionDownloadStarted;
             _versionService.VersionDownloadProgressChanged += _progressUIManager.OnVersionDownloadProgressChanged;
-            _versionService.VersionDownloadCompleted += _progressUIManager.OnVersionDownloadCompleted;
-            _versionService.VerificationCompleted += _progressUIManager.OnVersionVerificationCompleted;
+            _versionService.VersionDownloadCompleted += _progressUIManager.OnVersionDownloadCompletedAsync;
 
             _updateCheckService.UpdatesFound += OnUpdatesFound;
 
@@ -209,51 +211,105 @@ namespace AssetsManager.Views
                 TrayIcon.Visibility = Visibility.Visible;
                 Hide();
                 // Show a balloon tip when minimized to tray
-                TrayIcon.ShowBalloonTip("AssetsManager", "The application has been minimized to the tray.", BalloonIcon.Info);
+                string message = "The application has been minimized to the tray.";
+                string toastTitle = NotificationTitleResolver.ResolveToastTitle(message, NotificationCategory.System, "System");
+                TrayIcon.ShowBalloonTip(toastTitle, message, BalloonIcon.Info);
             }
         }
 
         // --- End Taskbar Logic ---
-        private void OnUpdatesFound(string message, string latestVersion)
+        private void OnUpdatesFound(string message, string latestVersion, NotificationCategory category, string title, NewsItemModel newsItem, Func<Window, Task> updateAction)
         {
-            if (!string.IsNullOrEmpty(latestVersion))
-            {
-                _latestAppVersionAvailable = latestVersion;
-            }
+            // Resolve adaptive title for toast balloon notification
+            string toastTitle = NotificationTitleResolver.ResolveToastTitle(message, category, title, newsItem);
 
             // Show System Tray Balloon Notification if window is not visible
             if (Visibility != Visibility.Visible)
             {
                 Dispatcher.InvokeAsync(() =>
                 {
-                    TrayIcon.ShowBalloonTip("AssetsManager", message, BalloonIcon.Info);
+                    TrayIcon.ShowBalloonTip(toastTitle, message, BalloonIcon.Info);
                 });
             }
 
             // Always update internal notification system
-            ShowNotification(true, message);
-        }
-        
-        private void OnExtractionCompleted()
-        {
-            Dispatcher.Invoke(() =>
+            string notificationTitle = !string.IsNullOrEmpty(title) ? title : toastTitle;
+
+            if (category == NotificationCategory.News)
             {
-                _progressUIManager.OnExtractionCompleted();
-                if (_isExtractingAfterComparison)
+                _notificationService.AddNotification(
+                    notificationTitle,
+                    message,
+                    NotificationType.Info,
+                    onClick: () =>
+                    {
+                        _newsService.SetPendingArticle(newsItem);
+                        LoadNewsWindow();
+                    },
+                    category: category,
+                    actionText: "OPEN NEWS",
+                    newsArticleUrl: newsItem?.ActionUrl,
+                    newsPublishedAt: newsItem?.PublishedAt);
+            }
+            else
+            {
+                bool isStableUpdate = category == NotificationCategory.Updates &&
+                                      !string.IsNullOrEmpty(latestVersion);
+
+                if (isStableUpdate || updateAction != null)
                 {
-                    ShowComparisonResultWindow(_diffsForExtraction, _extractionOldLolPath, _extractionNewLolPath, _extractionVersion);
-                    _isExtractingAfterComparison = false; // Reset flag
+                    _notificationService.AddNotification(
+                        notificationTitle,
+                        message,
+                        NotificationType.Info,
+                        onClick: () => OpenUpdatePrompt(updateAction),
+                        category: category,
+                        actionText: "UPDATE NOW");
                 }
-            });
+                else
+                {
+                    ShowNotification(true, message, category, notificationTitle);
+                }
+            }
         }
 
+        private async void OpenUpdatePrompt(Func<Window, Task> updateAction)
+        {
+            if (_isUpdatePromptOpen) return;
+
+            _isUpdatePromptOpen = true;
+
+            try
+            {
+                var hubWindow = Application.Current.Windows
+                    .OfType<NotificationHubWindow>()
+                    .FirstOrDefault();
+
+                hubWindow?.Close();
+                await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ContextIdle);
+                if (updateAction == null)
+                {
+                    await _updateManager.CheckForUpdatesAsync(this, true);
+                }
+                else
+                {
+                    await updateAction(this);
+                }
+            }
+            finally
+            {
+                _isUpdatePromptOpen = false;
+            }
+        }
+        
         private async void StartExtractionAsync()
         {
             var cancellationToken = _taskCancellationManager.PrepareNewOperation();
-            await _extractionService.ExtractNewFilesFromComparisonAsync(_diffsForExtraction, _extractionNewLolPath, cancellationToken);
+            var results = await _extractionService.ExtractNewFilesFromComparisonAsync(_diffsForExtraction, _extractionNewLolPath, cancellationToken);
+            ShowComparisonResultWindow(_diffsForExtraction, _extractionOldLolPath, _extractionNewLolPath, _extractionVersion, results);
         }
         
-        private async void OnWadComparisonCompleted(List<ChunkDiff> diffs, string oldPath, string newPath, string version)
+        private async Task OnWadComparisonCompletedAsync(List<ChunkDiff> diffs, string oldPath, string newPath, string version)
         {
             // Ensure the progress window reaches 100% and closes before any follow-up UI is shown.
             await _progressUIManager.FinishComparisonAsync();
@@ -290,6 +346,10 @@ namespace AssetsManager.Views
                         await _comparisonHistoryService.EnsureArchivedAsync(
                             serializableDiffs, oldPath, newPath, version, displayName);
                     }
+                    catch (FileNotFoundException ex)
+                    {
+                        _logService.LogError(ex, "Failed to auto-save comparison history because a required BASE container is missing.");
+                    }
                     catch (Exception ex)
                     {
                         _logService.LogError(ex, "Failed to auto-save comparison history.");
@@ -304,7 +364,6 @@ namespace AssetsManager.Views
             }
             else if (_appSettings.EnableExtraction)
             {
-                _isExtractingAfterComparison = true;
                 _diffsForExtraction = serializableDiffs;
                 _extractionOldLolPath = oldPath;
                 _extractionNewLolPath = newPath;
@@ -331,19 +390,19 @@ namespace AssetsManager.Views
             return string.IsNullOrEmpty(folderName) ? "Root" : folderName;
         }
 
-        private void ShowComparisonResultWindow(List<SerializableChunkDiff> diffs, string oldPath, string newPath, string version)
+        private void ShowComparisonResultWindow(List<SerializableChunkDiff> diffs, string oldPath, string newPath, string version, List<ExtractResultItem> extractionResults = null)
         {
             var resultWindow = _serviceProvider.GetRequiredService<WadComparisonResultWindow>();
-            resultWindow.Initialize(diffs, oldPath, newPath, null, version);
+            resultWindow.Initialize(diffs, oldPath, newPath, null, version, extractionResults);
             resultWindow.Owner = this;
             resultWindow.Show();
         }
 
-        public void ShowNotification(bool show, string message = "Updates have been detected. Click to dismiss.")
+        public void ShowNotification(bool show, string message = "Updates have been detected. Click to dismiss.", NotificationCategory category = NotificationCategory.System, string title = "System Notification")
         {
             if (show)
             {
-                _notificationService.AddNotification("System Notification", message, NotificationType.Info);
+                _notificationService.AddNotification(title, message, NotificationType.Info, category: category);
             }
         }
 
@@ -376,29 +435,24 @@ namespace AssetsManager.Views
 
                 LogViewRow.Height = _lastLogHeight;
                 _isLogMinimized = false;
-                LogView.ViewModel.SetLogVisibility(true); // <--- Restaurar flecha
+                LogView.ViewModel.SetLogVisibility(true);
             }
             else
             {
                 // Minimize
-                _lastLogHeight = LogViewRow.Height;
-                LogViewRow.Height = GridLength.Auto;
+                // A splitter can leave a star-sized row; restore its actual pixel height.
+                _lastLogHeight = new GridLength(LogViewRow.ActualHeight);
+                LogViewRow.Height = new GridLength(38);
                 _isLogMinimized = true;
-                LogView.ViewModel.SetLogVisibility(false); // <--- Restaurar flecha
+                LogView.ViewModel.SetLogVisibility(false);
             }
         }
 
-        public async void OnNotificationHubRequested(object sender, EventArgs e)
+        public void OnNotificationHubRequested(object sender, EventArgs e)
         {
             var hubWindow = _serviceProvider.GetRequiredService<NotificationHubWindow>();
             hubWindow.Owner = this;
             hubWindow.ShowDialog();
-
-            if (!string.IsNullOrEmpty(_latestAppVersionAvailable))
-            {
-                await _updateManager.CheckForUpdatesAsync(this, true);
-                _latestAppVersionAvailable = null;
-            }
         }
 
         public async void OnSidebarNavigationRequested(string viewTag)
@@ -407,11 +461,7 @@ namespace AssetsManager.Views
             // Dialogs (Settings, Help) do not replace the main content, so no cleanup is needed.
             if (viewTag != "Settings" && viewTag != "Help")
             {
-                if (MainContentArea.Content is ExplorerWindow explorerWindow)
-                {
-                    explorerWindow.CleanupResources();
-                }
-                else if (MainContentArea.Content is ViewerWindow viewerWindow)
+                if (MainContentArea.Content is ViewerWindow viewerWindow)
                 {
                     viewerWindow.CleanupResources();
                 }
@@ -427,6 +477,8 @@ namespace AssetsManager.Views
                 case "Comparator": LoadComparatorWindow(); break;
                 case "Viewer": LoadViewerWindow(); break;
                 case "Monitor": LoadMonitorWindow(); break;
+                case "HashLab": LoadHashGuessingWindow(); break;
+                case "News": LoadNewsWindow(); break;
                 case "Settings": btnSettings_Click(null, null); break;
                 case "Help": btnHelp_Click(null, null); break;
             }
@@ -434,22 +486,44 @@ namespace AssetsManager.Views
 
         private async Task LoadExplorerWithModeAsync(string mode)
         {
-            var explorerWindow = _serviceProvider.GetRequiredService<ExplorerWindow>();
-            MainContentArea.Content = explorerWindow;
-            await explorerWindow.InitializeWithMode(mode);
+            var explorer = _serviceProvider.GetRequiredService<ExplorerWindow>();
+            // Mark explicit initialization before Loaded can start the default mode.
+            var initialization = explorer.InitializeWithMode(mode);
+            SetMainContent(explorer);
+            await initialization;
+        }
+
+        private void SetMainContent(UserControl content)
+        {
+            if (MainContentArea.Content is ExplorerWindow explorer)
+                explorer.CleanupResources();
+            MainContentArea.Content = content;
         }
 
         private void LoadHomeWindow()
         {
             var homeWindow = _serviceProvider.GetRequiredService<HomeWindow>();
             homeWindow.ParentWindow = this;
-            MainContentArea.Content = homeWindow;
+            SetMainContent(homeWindow);
         }
 
-        private void LoadExplorerWindow() => MainContentArea.Content = _serviceProvider.GetRequiredService<ExplorerWindow>();
-        private void LoadComparatorWindow() => MainContentArea.Content = _serviceProvider.GetRequiredService<ComparatorWindow>();
-        private void LoadViewerWindow() => MainContentArea.Content = _serviceProvider.GetRequiredService<ViewerWindow>();
-        private void LoadMonitorWindow() => MainContentArea.Content = _serviceProvider.GetRequiredService<MonitorWindow>();
+        private void LoadExplorerWindow()
+        {
+            SetMainContent(_serviceProvider.GetRequiredService<ExplorerWindow>());
+        }
+        private void LoadComparatorWindow()
+        {
+            _comparatorWindow ??= _serviceProvider.GetRequiredService<ComparatorWindow>();
+            SetMainContent(_comparatorWindow);
+        }
+        private void LoadViewerWindow() => SetMainContent(_serviceProvider.GetRequiredService<ViewerWindow>());
+        private void LoadMonitorWindow() => SetMainContent(_serviceProvider.GetRequiredService<MonitorWindow>());
+        private void LoadHashGuessingWindow()
+        {
+            _hashGuessingWindow ??= _serviceProvider.GetRequiredService<HashGuessingWindow>();
+            SetMainContent(_hashGuessingWindow);
+        }
+        private void LoadNewsWindow() => SetMainContent(_serviceProvider.GetRequiredService<NewsWindow>());
 
         private void btnHelp_Click(object sender, RoutedEventArgs e)
         {
@@ -474,6 +548,10 @@ namespace AssetsManager.Views
 
         private void MainWindow_Closing(object sender, CancelEventArgs e)
         {
+            (MainContentArea.Content as ExplorerWindow)?.CleanupResources();
+            _hashGuessingWindow?.CleanupResources();
+            _hashGuessingWindow = null;
+            _updateCheckService.Stop();
             StateChanged -= MainWindow_StateChanged;
             TrayIcon?.Dispose();
         }

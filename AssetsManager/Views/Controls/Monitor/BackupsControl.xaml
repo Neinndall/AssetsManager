@@ -11,7 +11,8 @@
     <Grid Margin="0,10,0,0">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/> <!-- 1. Control Row (Card + Buttons) -->
-            <RowDefinition Height="*"/>    <!-- 2. Backups List -->
+            <RowDefinition Height="Auto"/> <!-- 2. Filters -->
+            <RowDefinition Height="*"/>    <!-- 3. Backups List -->
         </Grid.RowDefinitions>
         
         <!-- 1. CONTROL ROW (Watcher Alignment Pattern) -->
@@ -67,7 +68,7 @@
                             <materialIcons:MaterialIcon Kind="CheckDecagram" Width="14" Foreground="{StaticResource AccentBlue}" Margin="0,0,8,0" VerticalAlignment="Center" Opacity="0.8"/>
                             <StackPanel VerticalAlignment="Center">
                                 <TextBlock Text="{Binding ActiveClientEnvironment}" FontSize="13" FontWeight="Black" Foreground="{StaticResource TextPrimary}" LineHeight="13"/>
-                                <TextBlock Text="PRIORITY" FontSize="8" FontWeight="Black" Foreground="{StaticResource TextMuted}" Opacity="0.7"/>
+                                <TextBlock Text="FILTER" FontSize="8" FontWeight="Black" Foreground="{StaticResource TextMuted}" Opacity="0.7"/>
                             </StackPanel>
                         </StackPanel>
                     </StackPanel>
@@ -75,7 +76,8 @@
             </Border>
 
             <!-- RIGHT: Actions -->
-            <Button Grid.Column="1" Click="createLolBackupButton_Click" Style="{StaticResource SelectionCardButtonStyle}" Margin="0,0,12,0" Height="90" Padding="0">
+            <Button Grid.Column="1" Click="createLolBackupButton_Click" Style="{StaticResource SelectionCardButtonStyle}" Margin="0,0,12,0" Height="90" Padding="0"
+                    IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBooleanConverter}}">
                 <StackPanel VerticalAlignment="Center">
                     <materialIcons:MaterialIcon Kind="Plus" Width="24" Height="24" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
                     <TextBlock Text="Create Backup" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
@@ -83,7 +85,8 @@
                 </StackPanel>
             </Button>
 
-            <Button Grid.Column="2" Click="DeleteSelectedBackups_Click" Style="{StaticResource DestructiveSelectionCardButtonStyle}" Margin="0" Height="90" Padding="0" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch">
+            <Button Grid.Column="2" Click="DeleteSelectedBackups_Click" Style="{StaticResource DestructiveSelectionCardButtonStyle}" Margin="0" Height="90" Padding="0" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                    IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBooleanConverter}}">
                 <Grid>
                     <Border Background="{StaticResource AccentRed}" Opacity="0.05" CornerRadius="12"/>
                     <StackPanel VerticalAlignment="Center">
@@ -95,206 +98,223 @@
             </Button>
         </Grid>
 
-        <!-- 2. BACKUPS LIST -->
-        <ListView Grid.Row="1" x:Name="BackupsListView" ItemsSource="{Binding AllBackups}" Style="{StaticResource ModernListView}" Background="Transparent" BorderThickness="0">
-            <ListView.ItemContainerStyle>
-                <Style TargetType="ListViewItem">
-                    <EventSetter Event="PreviewMouseLeftButtonDown" Handler="ListViewItem_PreviewMouseLeftButtonDown" />
-                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                    <Setter Property="Background" Value="Transparent"/>
-                    <Setter Property="Margin" Value="0,0,0,8"/>
-                    <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
-                    <Setter Property="Template">
-                        <Setter.Value>
-                            <ControlTemplate TargetType="ListViewItem">
-                                <Grid>
-                                    <!-- Background Layer -->
-                                    <Border x:Name="SelectionBorder" Background="{StaticResource CardBackground}" CornerRadius="12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-                                        <Border.Effect>
-                                            <DropShadowEffect BlurRadius="15" ShadowDepth="0" Opacity="0.1"/>
-                                        </Border.Effect>
-                                    </Border>
-                                    
-                                    <!-- Side Color Accent (Environment Based) -->
-                                    <Border x:Name="AccentStrip" BorderThickness="2,0,0,0" CornerRadius="12,0,0,12">
-                                        <Border.Style>
-                                            <Style TargetType="Border">
-                                                <Setter Property="BorderBrush" Value="{StaticResource AccentGreen}"/>
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsPbe}" Value="True">
-                                                        <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </Border.Style>
-                                    </Border>
+        <Border Grid.Row="1" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="10" Padding="12,8" Margin="0,0,0,12">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <TextBlock Text="ENVIRONMENT" FontSize="9" FontWeight="Bold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                <ComboBox x:Name="EnvironmentFilter" Width="110" Height="30" SelectedIndex="0" Style="{StaticResource ModernComboBox}" SelectionChanged="FilterOrSort_SelectionChanged">
+                    <ComboBoxItem Content="All" Tag="ALL"/>
+                    <ComboBoxItem Content="PBE" Tag="PBE"/>
+                    <ComboBoxItem Content="LIVE" Tag="LIVE"/>
+                </ComboBox>
+                <TextBlock Text="SORT" FontSize="9" FontWeight="Bold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="18,0,8,0"/>
+                <ComboBox x:Name="SortSelector" Width="120" Height="30" SelectedIndex="0" Style="{StaticResource ModernComboBox}" SelectionChanged="FilterOrSort_SelectionChanged">
+                    <ComboBoxItem Content="Newest" Tag="NEWEST"/>
+                    <ComboBoxItem Content="Oldest" Tag="OLDEST"/>
+                    <ComboBoxItem Content="Largest" Tag="LARGEST"/>
+                    <ComboBoxItem Content="Smallest" Tag="SMALLEST"/>
+                </ComboBox>
+            </StackPanel>
+        </Border>
 
-                                    <!-- Content -->
-                                    <Grid Margin="18,10">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/> <!-- Icon -->
-                                            <ColumnDefinition Width="*"/>    <!-- Info -->
-                                            <ColumnDefinition Width="Auto"/> <!-- Selection Mark -->
-                                        </Grid.ColumnDefinitions>
-
-                                        <!-- Folder Icon Box (Environment Based) -->
-                                        <Border Grid.Column="0" Width="42" Height="42" CornerRadius="10" Background="{StaticResource DarkBackground}" Margin="2,0,18,0">
-                                            <materialIcons:MaterialIcon Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                                <materialIcons:MaterialIcon.Style>
-                                                    <Style TargetType="materialIcons:MaterialIcon">
-                                                        <Setter Property="Kind" Value="SealVariant"/>
-                                                        <Setter Property="Foreground" Value="{StaticResource AccentGreen}"/>
-                                                        <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding IsPbe}" Value="True">
-                                                                <Setter Property="Kind" Value="FlaskOutline"/>
-                                                                <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
-                                                            </DataTrigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </materialIcons:MaterialIcon.Style>
-                                            </materialIcons:MaterialIcon>
+        <!-- 3. BACKUPS LIST -->
+        <Grid Grid.Row="2">
+            <ListView x:Name="BackupsListView" ItemsSource="{Binding AllBackups}" Style="{StaticResource ModernListView}" Background="Transparent" BorderThickness="0"
+                      IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBooleanConverter}}">
+                <ListView.ItemContainerStyle>
+                    <Style TargetType="ListViewItem">
+                        <EventSetter Event="PreviewMouseLeftButtonDown" Handler="ListViewItem_PreviewMouseLeftButtonDown" />
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                        <Setter Property="Background" Value="Transparent"/>
+                        <Setter Property="Margin" Value="0,0,0,8"/>
+                        <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="ListViewItem">
+                                    <Grid>
+                                        <!-- Background Layer -->
+                                        <Border x:Name="SelectionBorder" Background="{StaticResource CardBackground}" CornerRadius="12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                                            <Border.Effect>
+                                                <DropShadowEffect BlurRadius="15" ShadowDepth="0" Opacity="0.1"/>
+                                            </Border.Effect>
                                         </Border>
-
-                                        <!-- Info -->
-                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                            <!-- Title Row -->
-                                            <StackPanel Orientation="Horizontal">
-                                                <TextBlock Text="{Binding DisplayName}" FontWeight="Black" FontSize="13" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
-                                                
-                                                <!-- MAIN/BACKUP Badge (Role Identity - Master Level) -->
-                                                <Border CornerRadius="6" Padding="6,2" Margin="10,0,0,0" VerticalAlignment="Center">
-                                                    <Border.Style>
-                                                        <Style TargetType="Border">
-                                                            <Setter Property="Background" Value="{StaticResource HoverColor}"/>
-                                                            <Style.Triggers>
-                                                                <MultiDataTrigger>
-                                                                    <MultiDataTrigger.Conditions>
-                                                                        <Condition Binding="{Binding IsMainClient}" Value="True"/>
-                                                                        <Condition Binding="{Binding IsPbe}" Value="True"/>
-                                                                    </MultiDataTrigger.Conditions>
-                                                                    <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
-                                                                </MultiDataTrigger>
-                                                                <MultiDataTrigger>
-                                                                    <MultiDataTrigger.Conditions>
-                                                                        <Condition Binding="{Binding IsMainClient}" Value="True"/>
-                                                                        <Condition Binding="{Binding IsPbe}" Value="False"/>
-                                                                    </MultiDataTrigger.Conditions>
-                                                                    <Setter Property="Background" Value="{StaticResource AccentGreen}"/>
-                                                                </MultiDataTrigger>
-                                                            </Style.Triggers>
-                                                        </Style>
-                                                    </Border.Style>
-                                                    <TextBlock FontSize="9" FontWeight="SemiBold" VerticalAlignment="Center">
-                                                        <TextBlock.Style>
-                                                            <Style TargetType="TextBlock">
-                                                                <Setter Property="Text" Value="BACKUP"/>
-                                                                <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
-                                                                <Style.Triggers>
-                                                                    <DataTrigger Binding="{Binding IsMainClient}" Value="True">
-                                                                        <Setter Property="Text" Value="MAIN"/>
-                                                                        <Setter Property="Foreground" Value="White"/>
-                                                                    </DataTrigger>
-                                                                </Style.Triggers>
-                                                            </Style>
-                                                        </TextBlock.Style>
-                                                    </TextBlock>
-                                                </Border>
-
-                                                <!-- NEW Badge -->
-                                                <Border Background="{StaticResource AccentPurple}" CornerRadius="6" Padding="6,2" Margin="8,0,0,0" VerticalAlignment="Center"
-                                                        Visibility="{Binding IsCurrentSessionBackup, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                                    <TextBlock Text="NEWLY CREATED" FontSize="8" FontWeight="Black" Foreground="White" VerticalAlignment="Center"/>
-                                                </Border>
-                                            </StackPanel>
-
-                                            <!-- Metadata Row (Unified HUD Pattern) -->
-                                            <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
-                                                <!-- 1. VERSION BADGE -->
-                                                <Border Background="{StaticResource HoverColor}" CornerRadius="6" Padding="6,2" Margin="0,0,8,0" VerticalAlignment="Center">
-                                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                                        <materialIcons:MaterialIcon Kind="Tag" Width="10" Height="10" Foreground="{StaticResource TextMuted}" Margin="0,0,4,0" VerticalAlignment="Center"/>
-                                                        <TextBlock Text="{Binding Version, StringFormat='v{0}'}" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
-                                                    </StackPanel>
-                                                </Border>
-
-                                                <!-- 2. DATE BADGE -->
-                                                <Border Background="{StaticResource HoverColor}" CornerRadius="6" Padding="6,2" Margin="0,0,8,0" VerticalAlignment="Center">
-                                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                                        <materialIcons:MaterialIcon Kind="CalendarClock" Width="10" Height="10" Foreground="{StaticResource TextMuted}" Margin="0,0,4,0" VerticalAlignment="Center"/>
-                                                        <TextBlock Text="{Binding CreationDate, StringFormat='{}{0:dd MMM yyyy · HH:mm}'}" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
-                                                    </StackPanel>
-                                                </Border>
-
-                                                <!-- 3. SIZE BADGE -->
-                                                <Border Background="{StaticResource HoverColor}" CornerRadius="6" Padding="6,2" Margin="0,0,8,0" VerticalAlignment="Center">
-                                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                                        <materialIcons:MaterialIcon Kind="DatabaseOutline" Width="10" Height="10" Foreground="{StaticResource TextMuted}" Margin="0,0,4,0" VerticalAlignment="Center"/>
-                                                        <TextBlock Text="{Binding SizeDisplay}" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
-                                                    </StackPanel>
-                                                </Border>
-
-                                                <!-- 4. PATH BADGE -->
-                                                <Border Background="{StaticResource HoverColor}" CornerRadius="6" Padding="6,2" VerticalAlignment="Center">
-                                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                                        <materialIcons:MaterialIcon Kind="FolderOpenOutline" Width="10" Height="10" Foreground="{StaticResource TextMuted}" Margin="0,0,4,0" VerticalAlignment="Center"/>
-                                                        <TextBlock Text="{Binding Path}" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
-                                                    </StackPanel>
-                                                </Border>
-                                            </StackPanel>
-                                        </StackPanel>
-
-                                        <!-- Selection Mark (Check Circle - Environment Based) -->
-                                        <materialIcons:MaterialIcon Grid.Column="2" 
-                                                                    Kind="CheckCircle" 
-                                                                    Width="20" Height="20" 
-                                                                    VerticalAlignment="Center" 
-                                                                    Margin="16,0,4,0"
-                                                                    Visibility="{Binding IsSelected, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                            <materialIcons:MaterialIcon.Style>
-                                                <Style TargetType="materialIcons:MaterialIcon">
-                                                    <Setter Property="Foreground" Value="{StaticResource AccentGreen}"/>
+                                        
+                                        <!-- Side Color Accent (Environment Based) -->
+                                        <Border x:Name="AccentStrip" BorderThickness="2,0,0,0" CornerRadius="12,0,0,12">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Setter Property="BorderBrush" Value="{StaticResource AccentGreen}"/>
                                                     <Style.Triggers>
                                                         <DataTrigger Binding="{Binding IsPbe}" Value="True">
-                                                            <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+                                                            <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
                                                         </DataTrigger>
                                                     </Style.Triggers>
                                                 </Style>
-                                            </materialIcons:MaterialIcon.Style>
-                                        </materialIcons:MaterialIcon>
-                                    </Grid>
-                                </Grid>
-                                <ControlTemplate.Triggers>
-                                    <Trigger Property="IsMouseOver" Value="True">
-                                        <Setter TargetName="SelectionBorder" Property="Background" Value="{StaticResource HoverColor}"/>
-                                    </Trigger>
-                                    
-                                    <!-- Selection Logic: PBE (AccentBrush) -->
-                                    <MultiDataTrigger>
-                                        <MultiDataTrigger.Conditions>
-                                            <Condition Binding="{Binding IsSelected}" Value="True"/>
-                                            <Condition Binding="{Binding IsPbe}" Value="True"/>
-                                        </MultiDataTrigger.Conditions>
-                                        <Setter TargetName="SelectionBorder" Property="BorderThickness" Value="1.5"/>
-                                        <Setter TargetName="SelectionBorder" Property="Background" Value="{StaticResource HoverColor}"/>
-                                        <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
-                                    </MultiDataTrigger>
+                                            </Border.Style>
+                                        </Border>
 
-                                    <!-- Selection Logic: LIVE (AccentGreen) -->
-                                    <MultiDataTrigger>
-                                        <MultiDataTrigger.Conditions>
-                                            <Condition Binding="{Binding IsSelected}" Value="True"/>
-                                            <Condition Binding="{Binding IsPbe}" Value="False"/>
-                                        </MultiDataTrigger.Conditions>
-                                        <Setter TargetName="SelectionBorder" Property="BorderThickness" Value="1.5"/>
-                                        <Setter TargetName="SelectionBorder" Property="Background" Value="{StaticResource HoverColor}"/>
-                                        <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="{StaticResource AccentGreen}"/>
-                                    </MultiDataTrigger>
-                                </ControlTemplate.Triggers>
-                            </ControlTemplate>
-                        </Setter.Value>
-                    </Setter>
-                </Style>
-            </ListView.ItemContainerStyle>
-        </ListView>
+                                        <!-- Content -->
+                                        <Grid Margin="18,10">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/> <!-- Icon -->
+                                                <ColumnDefinition Width="*"/>    <!-- Info -->
+                                                <ColumnDefinition Width="Auto"/> <!-- Selection Mark -->
+                                            </Grid.ColumnDefinitions>
+
+                                            <!-- Folder Icon Box (Environment Based) -->
+                                            <Border Grid.Column="0" Width="42" Height="42" CornerRadius="10" Background="{StaticResource DarkBackground}" Margin="2,0,18,0">
+                                                <materialIcons:MaterialIcon Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                    <materialIcons:MaterialIcon.Style>
+                                                        <Style TargetType="materialIcons:MaterialIcon">
+                                                            <Setter Property="Kind" Value="SealVariant"/>
+                                                            <Setter Property="Foreground" Value="{StaticResource AccentGreen}"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsPbe}" Value="True">
+                                                                    <Setter Property="Kind" Value="FlaskOutline"/>
+                                                                    <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </materialIcons:MaterialIcon.Style>
+                                                </materialIcons:MaterialIcon>
+                                            </Border>
+
+                                            <!-- Info -->
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                <!-- Title Row -->
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="{Binding DisplayName}" FontWeight="Black" FontSize="13" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                                                    
+                                                    <!-- MAIN/BACKUP Badge (Role Identity - Master Level) -->
+                                                    <Border CornerRadius="6" Padding="6,2" Margin="10,0,0,0" VerticalAlignment="Center">
+                                                        <Border.Style>
+                                                            <Style TargetType="Border">
+                                                                <Setter Property="Background" Value="{StaticResource HoverColor}"/>
+                                                                <Style.Triggers>
+                                                                    <MultiDataTrigger>
+                                                                        <MultiDataTrigger.Conditions>
+                                                                            <Condition Binding="{Binding IsMainClient}" Value="True"/>
+                                                                            <Condition Binding="{Binding IsPbe}" Value="True"/>
+                                                                        </MultiDataTrigger.Conditions>
+                                                                        <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
+                                                                    </MultiDataTrigger>
+                                                                    <MultiDataTrigger>
+                                                                        <MultiDataTrigger.Conditions>
+                                                                            <Condition Binding="{Binding IsMainClient}" Value="True"/>
+                                                                            <Condition Binding="{Binding IsPbe}" Value="False"/>
+                                                                        </MultiDataTrigger.Conditions>
+                                                                        <Setter Property="Background" Value="{StaticResource AccentGreen}"/>
+                                                                    </MultiDataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </Border.Style>
+                                                        <TextBlock FontSize="9" FontWeight="SemiBold" VerticalAlignment="Center">
+                                                            <TextBlock.Style>
+                                                                <Style TargetType="TextBlock">
+                                                                    <Setter Property="Text" Value="BACKUP"/>
+                                                                    <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding IsMainClient}" Value="True">
+                                                                            <Setter Property="Text" Value="MAIN"/>
+                                                                            <Setter Property="Foreground" Value="White"/>
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </TextBlock.Style>
+                                                        </TextBlock>
+                                                    </Border>
+
+                                                    <!-- NEW Badge (HUD Technical Badge) -->
+                                                    <Border Background="#1A00D2C4" BorderBrush="{StaticResource AccentBrush}" BorderThickness="1" CornerRadius="6" Padding="6,2" Margin="8,0,0,0" VerticalAlignment="Center"
+                                                            Visibility="{Binding IsCurrentSessionBackup, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                            <materialIcons:MaterialIcon Kind="Sparkles" Width="10" Height="10" Foreground="{StaticResource AccentBrush}" Margin="0,0,4,0" VerticalAlignment="Center"/>
+                                                            <TextBlock Text="NEW" FontSize="9" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center"/>
+                                                        </StackPanel>
+                                                    </Border>
+                                                </StackPanel>
+
+                                                <!-- Metadata Row (Unified HUD Pattern) -->
+                                                <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                                    <!-- 1. VERSION BADGE -->
+                                                    <Border Background="{StaticResource HoverColor}" CornerRadius="6" Padding="6,2" Margin="0,0,8,0" VerticalAlignment="Center">
+                                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                            <materialIcons:MaterialIcon Kind="Tag" Width="10" Height="10" Foreground="{StaticResource TextMuted}" Margin="0,0,4,0" VerticalAlignment="Center"/>
+                                                            <TextBlock Text="{Binding Version, StringFormat='v{0}'}" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                                                        </StackPanel>
+                                                    </Border>
+
+                                                    <!-- 2. DATE BADGE -->
+                                                    <Border Background="{StaticResource HoverColor}" CornerRadius="6" Padding="6,2" Margin="0,0,8,0" VerticalAlignment="Center">
+                                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                            <materialIcons:MaterialIcon Kind="CalendarClock" Width="10" Height="10" Foreground="{StaticResource TextMuted}" Margin="0,0,4,0" VerticalAlignment="Center"/>
+                                                            <TextBlock Text="{Binding CreationDate, StringFormat='{}{0:dd MMM yyyy · HH:mm}'}" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                                                        </StackPanel>
+                                                    </Border>
+
+                                                    <!-- 3. SIZE BADGE -->
+                                                    <Border Background="{StaticResource HoverColor}" CornerRadius="6" Padding="6,2" Margin="0,0,8,0" VerticalAlignment="Center">
+                                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                            <materialIcons:MaterialIcon Kind="DatabaseOutline" Width="10" Height="10" Foreground="{StaticResource TextMuted}" Margin="0,0,4,0" VerticalAlignment="Center"/>
+                                                            <TextBlock Text="{Binding SizeDisplay}" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                                                        </StackPanel>
+                                                    </Border>
+
+                                                    <!-- 4. PATH BADGE -->
+                                                    <Border Background="{StaticResource HoverColor}" CornerRadius="6" Padding="6,2" VerticalAlignment="Center">
+                                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                            <materialIcons:MaterialIcon Kind="FolderOpenOutline" Width="10" Height="10" Foreground="{StaticResource TextMuted}" Margin="0,0,4,0" VerticalAlignment="Center"/>
+                                                            <TextBlock Text="{Binding Path}" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                                                        </StackPanel>
+                                                    </Border>
+
+                                                </StackPanel>
+                                            </StackPanel>
+
+                                            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,4,0">
+                                                <Button Click="OpenBackupFolder_Click" Width="30" Height="30" Margin="0,0,6,0"
+                                                        Style="{StaticResource TransparentIconButton}" ToolTip="Open Folder">
+                                                    <materialIcons:MaterialIcon Kind="FolderOpenOutline" Width="16" Height="16"/>
+                                                </Button>
+                                                <materialIcons:MaterialIcon Kind="CheckCircle" Width="18" Height="18"
+                                                                            Visibility="{Binding IsSelected, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                                                            Foreground="{StaticResource AccentBrush}"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Grid>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="SelectionBorder" Property="Background" Value="{StaticResource HoverColor}"/>
+                                        </Trigger>
+                                        
+                                        <!-- Selection Logic: PBE (AccentBrush) -->
+                                        <MultiDataTrigger>
+                                            <MultiDataTrigger.Conditions>
+                                                <Condition Binding="{Binding IsSelected}" Value="True"/>
+                                                <Condition Binding="{Binding IsPbe}" Value="True"/>
+                                            </MultiDataTrigger.Conditions>
+                                            <Setter TargetName="SelectionBorder" Property="BorderThickness" Value="1.5"/>
+                                            <Setter TargetName="SelectionBorder" Property="Background" Value="{StaticResource HoverColor}"/>
+                                            <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                                        </MultiDataTrigger>
+
+                                        <!-- Selection Logic: LIVE (AccentGreen) -->
+                                        <MultiDataTrigger>
+                                            <MultiDataTrigger.Conditions>
+                                                <Condition Binding="{Binding IsSelected}" Value="True"/>
+                                                <Condition Binding="{Binding IsPbe}" Value="False"/>
+                                            </MultiDataTrigger.Conditions>
+                                            <Setter TargetName="SelectionBorder" Property="BorderThickness" Value="1.5"/>
+                                            <Setter TargetName="SelectionBorder" Property="Background" Value="{StaticResource HoverColor}"/>
+                                            <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="{StaticResource AccentGreen}"/>
+                                        </MultiDataTrigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </ListView.ItemContainerStyle>
+            </ListView>
+
+        </Grid>
     </Grid>
 </UserControl>

@@ -2,7 +2,7 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Media;
-using AssetsManager.Info;
+using AssetsManager.Utils;
 using Material.Icons;
 
 namespace AssetsManager.Views.Models.Controls
@@ -16,13 +16,13 @@ namespace AssetsManager.Views.Models.Controls
             set { _isExpanded = value; OnPropertyChanged(); }
         }
 
-        // Technical Identity Properties (Resolved once from ApplicationInfos)
-        public string Version => ApplicationInfos.Version;
-        public string BuildType => ApplicationInfos.BuildType;
-        public MaterialIconKind BuildIcon => ApplicationInfos.BuildIcon;
+        // Technical identity properties resolved from VersionInfo.
+        public string Version => VersionInfo.Version;
+        public string BuildType => VersionInfo.IsQA ? "Experimental Build" : "Stable Build";
+        public MaterialIconKind BuildIcon => VersionInfo.IsQA ? MaterialIconKind.Flask : MaterialIconKind.CheckDecagram;
 
         // Visual properties resolved from ResourceDictionary
-        public Brush BuildBrush => Application.Current.FindResource(ApplicationInfos.BuildColorKey) as Brush;
+        public Brush BuildBrush => Application.Current.FindResource(VersionInfo.IsQA ? "AccentOrange" : "AccentGreen") as Brush;
 
         public event PropertyChangedEventHandler PropertyChanged;
         protected void OnPropertyChanged([CallerMemberName] string name = null)

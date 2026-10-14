@@ -16,13 +16,15 @@ namespace AssetsManager.Services.Monitor
     {
         public event Action<int> BackupStarted;
         public event Action<int, int, string> BackupProgressChanged;
-        public event Action<bool> BackupCompleted;
+        public event Func<bool, Task> BackupCompleted;
+        public event Action BackupsChanged;
 
         private readonly DirectoriesCreator _directoriesCreator;
         private readonly LogService _logService;
         private readonly AppSettings _appSettings;
         private readonly VersionService _versionService;
         private readonly HashSet<string> _currentSessionBackups;
+        private readonly object _sessionBackupsSync = new();
 
         public BackupManager(DirectoriesCreator directoriesCreator, LogService logService, AppSettings appSettings, VersionService versionService)
         {
@@ -30,120 +32,87 @@ namespace AssetsManager.Services.Monitor
             _logService = logService;
             _appSettings = appSettings;
             _versionService = versionService;
-            _currentSessionBackups = new HashSet<string>();
+            _currentSessionBackups = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         }
 
+        public readonly record struct BackupStorageEstimate(int FileCount, long TotalBytes, long AvailableBytes);
 
-        public async Task CreateLolPbeDirectoryBackupAsync(string sourceLolPath, string destinationBackupPath, CancellationToken cancellationToken, string logMessage = "Starting backup...")
+        public Task CreateBackupAsync(
+            string sourcePath,
+            string destinationPath,
+            CancellationToken cancellationToken,
+            string logMessage = "Starting backup...") =>
+            CopyBackupAsync(sourcePath, destinationPath, cancellationToken, logMessage);
+
+        public Task CloneBackupAsync(
+            string sourcePath,
+            string destinationPath,
+            CancellationToken cancellationToken) =>
+            CopyBackupAsync(sourcePath, destinationPath, cancellationToken,
+                $"Cloning backup: {Path.GetFileName(sourcePath)}...");
+
+        private async Task CopyBackupAsync(
+            string sourcePath,
+            string destinationPath,
+            CancellationToken cancellationToken,
+            string logMessage)
         {
-            // Notify UI immediately to show activity (Indeterminate spinner)
             BackupStarted?.Invoke(0);
-
             await Task.Run(async () =>
             {
                 try
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-
-                    if (Directory.Exists(destinationBackupPath))
-                    {
-                        Directory.Delete(destinationBackupPath, true);
-                    }
-
+                    if (Directory.Exists(destinationPath)) Directory.Delete(destinationPath, true);
                     _logService.Log(logMessage);
-                    
-                    // Count total files for progress
-                    int totalFiles = 0;
-                    try 
-                    {
-                        totalFiles = Directory.GetFiles(sourceLolPath, "*", SearchOption.AllDirectories).Length;
-                    }
-                    catch (Exception ex)
-                    {
-                        _logService.LogError(ex, $"Could not count files for progress in {sourceLolPath}");
-                    }
-
-                    // Update UI with the real total discovered
-                    BackupStarted?.Invoke(totalFiles);
-
+                    DirectoryMetrics metrics = MeasureDirectory(sourcePath, cancellationToken);
+                    BackupStarted?.Invoke(metrics.FileCount);
                     int processedFiles = 0;
-                    CopyDirectoryRecursive(sourceLolPath, destinationBackupPath, ref processedFiles, totalFiles, cancellationToken);
-                    
-                    _currentSessionBackups.Add(destinationBackupPath);
-                    BackupCompleted?.Invoke(true);
-                }
-                catch (OperationCanceledException)
-                {
-                    BackupCompleted?.Invoke(false);
-                    // Clean up partially created backup if cancelled
-                    if (Directory.Exists(destinationBackupPath))
-                    {
-                        try { Directory.Delete(destinationBackupPath, true); } 
-                        catch (Exception ex) { _logService.LogError(ex, "Could not clean up directory after cancelled operation."); }
-                    }
-                    throw;
-                }
-                catch (Exception ex)
-                {
-                    _logService.LogError(ex, $"Backup failed for source: {sourceLolPath}");
-                    BackupCompleted?.Invoke(false);
-                    throw; 
-                }
-            }, cancellationToken);
-        }
-
-        public async Task CloneBackupAsync(string sourceBackupPath, string destinationBackupPath, CancellationToken cancellationToken)
-        {
-            BackupStarted?.Invoke(0);
-
-            await Task.Run(async () =>
-            {
-                try
-                {
+                    CopyDirectoryRecursive(sourcePath, destinationPath, ref processedFiles, metrics.FileCount, cancellationToken);
                     cancellationToken.ThrowIfCancellationRequested();
-
-                    if (Directory.Exists(destinationBackupPath))
-                    {
-                        Directory.Delete(destinationBackupPath, true);
-                    }
-
-                    _logService.Log($"Cloning backup: {Path.GetFileName(sourceBackupPath)}...");
-
-                    int totalFiles = 0;
+                    MarkCurrentSessionBackup(destinationPath);
+                    await NotifyBackupCompletedAsync(true);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
                     try
                     {
-                        totalFiles = Directory.GetFiles(sourceBackupPath, "*", SearchOption.AllDirectories).Length;
+                        if (Directory.Exists(destinationPath)) Directory.Delete(destinationPath, true);
                     }
-                    catch (Exception ex)
-                    {
-                        _logService.LogError(ex, $"Could not count files for cloning progress: {sourceBackupPath}");
-                    }
-
-                    BackupStarted?.Invoke(totalFiles);
-
-                    int processedFiles = 0;
-                    CopyDirectoryRecursive(sourceBackupPath, destinationBackupPath, ref processedFiles, totalFiles, cancellationToken);
-
-                    _currentSessionBackups.Add(destinationBackupPath);
-                    BackupCompleted?.Invoke(true);
-                }
-                catch (OperationCanceledException)
-                {
-                    BackupCompleted?.Invoke(false);
-                    if (Directory.Exists(destinationBackupPath))
-                    {
-                        try { Directory.Delete(destinationBackupPath, true); } 
-                        catch (Exception ex) { _logService.LogError(ex, "Could not clean up directory after failed/cancelled operation."); }
-                    }
+                    catch (Exception ex) { _logService.LogError(ex, "Could not clean up a cancelled backup."); }
+                    await NotifyBackupCompletedAsync(false);
                     throw;
                 }
                 catch (Exception ex)
                 {
-                    _logService.LogError(ex, $"Error cloning backup: {sourceBackupPath} to {destinationBackupPath}");
-                    BackupCompleted?.Invoke(false);
+                    _logService.LogError(ex, $"Backup failed: {sourcePath} to {destinationPath}");
+                    await NotifyBackupCompletedAsync(false);
                     throw;
                 }
             }, cancellationToken);
+        }
+
+        private async Task NotifyBackupCompletedAsync(bool success)
+        {
+            if (success)
+            {
+                BackupsChanged?.Invoke();
+            }
+
+            Delegate[] handlers = BackupCompleted?.GetInvocationList();
+            if (handlers is null) return;
+
+            foreach (Func<bool, Task> handler in handlers.Cast<Func<bool, Task>>())
+            {
+                try
+                {
+                    await handler(success);
+                }
+                catch (Exception ex)
+                {
+                    _logService.LogError(ex, "A backup completion observer failed.");
+                }
+            }
         }
 
         private void CopyDirectoryRecursive(string sourceDir, string destinationDir, ref int processedFiles, int totalFiles, CancellationToken cancellationToken)
@@ -170,60 +139,99 @@ namespace AssetsManager.Services.Monitor
             }
         }
 
-        public async Task<List<BackupModel>> GetBackupsAsync()
+        public async Task<List<BackupModel>> GetBackupsAsync(
+            CancellationToken cancellationToken = default,
+            bool includeStorageMetrics = true,
+            PreferredClient? client = null)
         {
-            var backups = new List<BackupModel>();
-            var scannedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-            var basePaths = new List<string>();
-            if (!string.IsNullOrEmpty(_appSettings.LolPbeDirectory)) basePaths.Add(_appSettings.LolPbeDirectory);
-            if (!string.IsNullOrEmpty(_appSettings.LolLiveDirectory)) basePaths.Add(_appSettings.LolLiveDirectory);
-
-            foreach (var basePath in basePaths)
+            return await Task.Run(() =>
             {
-                var parentDir = Directory.GetParent(basePath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar))?.FullName;
-                if (string.IsNullOrEmpty(parentDir) || !Directory.Exists(parentDir)) continue;
-
-                try
+                var backups = new List<BackupModel>();
+                var scannedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                string[] configuredPaths = client switch
                 {
-                    foreach (var dir in Directory.EnumerateDirectories(parentDir))
+                    PreferredClient.PBE => new[] { _appSettings.LolPbeDirectory },
+                    PreferredClient.LIVE => new[] { _appSettings.LolLiveDirectory },
+                    _ => new[] { _appSettings.LolPbeDirectory, _appSettings.LolLiveDirectory }
+                };
+                var basePaths = configuredPaths
+                    .Where(path => !string.IsNullOrWhiteSpace(path));
+
+                var candidateEntries = new List<(string Dir, string Version, bool IsPbe, bool IsMain)>();
+
+                foreach (string basePath in basePaths)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var parentDir = Directory.GetParent(basePath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar))?.FullName;
+                    if (string.IsNullOrEmpty(parentDir) || !Directory.Exists(parentDir)) continue;
+                    try
                     {
-                        if (scannedPaths.Contains(dir)) continue;
-                        
-                        string version = await _versionService.GetGameVersionAsync(dir);
-                        if (version != null)
+                        foreach (string dir in Directory.EnumerateDirectories(parentDir))
                         {
+                            cancellationToken.ThrowIfCancellationRequested();
+                            if (!scannedPaths.Add(dir)) continue;
+                            string version = _versionService.GetGameVersionAsync(dir).GetAwaiter().GetResult();
+                            if (version == null) continue;
                             var (isPbe, isMain) = GetPathIdentification(dir);
-
-                            // Filter by preference
-                            if (_appSettings.PreferredClient == PreferredClient.PBE && !isPbe) continue;
-                            if (_appSettings.PreferredClient == PreferredClient.LIVE && isPbe) continue;
-
-                            backups.Add(new BackupModel
-                            {
-                                Name = Path.GetFileName(dir),
-                                DisplayName = GetBackupDisplayName(null, dir),
-                                Version = version,
-                                IsPbe = isPbe,
-                                Path = dir,
-                                IsMainClient = isMain,
-                                CreationDate = Directory.GetCreationTime(dir),
-                                Size = GetDirectorySize(dir),
-                                SizeDisplay = FormatUtils.FormatSize(GetDirectorySize(dir)),
-                                IsSelected = false,
-                                IsCurrentSessionBackup = _currentSessionBackups.Contains(dir)
-                            });
-                            scannedPaths.Add(dir);
+                            candidateEntries.Add((dir, version, isPbe, isMain));
                         }
                     }
+                    catch (Exception ex) when (ex is not OperationCanceledException)
+                    {
+                        _logService.LogError(ex, $"Error scanning directory for backups: {parentDir}");
+                    }
                 }
-                catch (Exception ex)
-                {
-                    _logService.LogError(ex, $"Error scanning directory for backups: {parentDir}");
-                }
-            }
 
-            return backups.OrderByDescending(b => b.CreationDate).ToList();
+                var metricsMap = new Dictionary<string, DirectoryMetrics>(StringComparer.OrdinalIgnoreCase);
+
+                if (includeStorageMetrics)
+                {
+                    foreach (var (dir, _, _, _) in candidateEntries)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        metricsMap[dir] = MeasureDirectory(dir, cancellationToken);
+                    }
+                }
+
+                foreach (var (dir, version, isPbe, isMain) in candidateEntries)
+                {
+                    DirectoryMetrics metrics = metricsMap.TryGetValue(dir, out var m) ? m : default;
+                    backups.Add(new BackupModel
+                    {
+                        Name = Path.GetFileName(dir),
+                        DisplayName = GetBackupDisplayName(dir),
+                        Version = version,
+                        IsPbe = isPbe,
+                        Path = dir,
+                        IsMainClient = isMain,
+                        CreationDate = Directory.GetCreationTime(dir),
+                        Size = metrics.TotalBytes,
+                        SizeDisplay = includeStorageMetrics
+                            ? FormatUtils.FormatSize(metrics.TotalBytes)
+                            : null,
+                        IsSelected = false,
+                        IsCurrentSessionBackup = IsCurrentSessionBackup(dir)
+                    });
+                }
+
+                return FilterByClient(backups, client)
+                    .OrderByDescending(backup => backup.CreationDate)
+                    .ToList();
+            }, cancellationToken);
+        }
+
+        public static IEnumerable<BackupModel> FilterByClient(
+            IEnumerable<BackupModel> backups,
+            PreferredClient? client)
+        {
+            if (backups == null) throw new ArgumentNullException(nameof(backups));
+
+            return client switch
+            {
+                PreferredClient.PBE => backups.Where(backup => backup.IsPbe),
+                PreferredClient.LIVE => backups.Where(backup => !backup.IsPbe),
+                _ => backups
+            };
         }
 
         public (bool IsPbe, bool IsMain) GetPathIdentification(string path)
@@ -233,25 +241,21 @@ namespace AssetsManager.Services.Monitor
             string pbeRoot = _appSettings.LolPbeDirectory;
             string liveRoot = _appSettings.LolLiveDirectory;
 
-            // Prioritize based on user preference
-            bool isPbe;
-            bool isMain;
+            bool isPbeSub = !string.IsNullOrEmpty(pbeRoot) && PathUtils.IsSameOrSubPath(pbeRoot, path);
+            bool isLiveSub = !string.IsNullOrEmpty(liveRoot) && PathUtils.IsSameOrSubPath(liveRoot, path);
 
-            if (_appSettings.PreferredClient == PreferredClient.PBE)
+            bool isPbe = path.Contains("(PBE)", StringComparison.OrdinalIgnoreCase) || isPbeSub;
+
+            bool isMain = isPbeSub || isLiveSub;
+
+            // Fallback for installations outside any configured root (e.g. the LIVE
+            // client when only PBE is configured): any valid game installation that
+            // is not a "_old_" snapshot is the main client of its environment, so it
+            // must be identified as MAIN regardless of the preferred client.
+            if (!isMain)
             {
-                bool isPbeSub = !string.IsNullOrEmpty(pbeRoot) && PathUtils.IsSameOrSubPath(pbeRoot, path);
-                bool isLiveSub = !string.IsNullOrEmpty(liveRoot) && PathUtils.IsSameOrSubPath(liveRoot, path);
-
-                isPbe = path.Contains("(PBE)", StringComparison.OrdinalIgnoreCase) || isPbeSub;
-                isMain = isPbeSub || isLiveSub;
-            }
-            else
-            {
-                bool isLiveSub = !string.IsNullOrEmpty(liveRoot) && PathUtils.IsSameOrSubPath(liveRoot, path);
-                bool isPbeSub = !string.IsNullOrEmpty(pbeRoot) && PathUtils.IsSameOrSubPath(pbeRoot, path);
-
-                isPbe = path.Contains("(PBE)", StringComparison.OrdinalIgnoreCase) || isPbeSub;
-                isMain = isLiveSub || isPbeSub;
+                string folderName = Path.GetFileName(path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+                isMain = !folderName.Contains("_old_", StringComparison.OrdinalIgnoreCase);
             }
 
             return (isPbe, isMain);
@@ -305,41 +309,75 @@ namespace AssetsManager.Services.Monitor
             return null;
         }
 
-        private bool IsSameOrSubPath(string root, string sub)
-        {
-            return PathUtils.IsSameOrSubPath(root, sub);
-        }
-
-        private string GetBackupDisplayName(string folderName, string virtualPath)
+        private string GetBackupDisplayName(string virtualPath)
         {
             var (isPbe, _) = GetPathIdentification(virtualPath);
             return isPbe ? "League of Legends PBE" : "League of Legends LIVE";
         }
-        
-        private long GetDirectorySize(string path)
-        {
-            long size = 0;
-            var dirInfo = new DirectoryInfo(path);
 
-            try
+        public Task<BackupStorageEstimate> GetStorageEstimateAsync(
+            string sourcePath,
+            string destinationPath,
+            CancellationToken cancellationToken = default) =>
+            Task.Run(() =>
             {
-                foreach (FileInfo fi in dirInfo.GetFiles("*", SearchOption.AllDirectories))
-                {
-                    size += fi.Length;
-                }
-            }
-            catch (Exception ex)
+                DirectoryMetrics metrics = MeasureDirectory(sourcePath, cancellationToken);
+                string root = Path.GetPathRoot(Path.GetFullPath(destinationPath));
+                long available = string.IsNullOrEmpty(root) ? 0 : new DriveInfo(root).AvailableFreeSpace;
+                return new BackupStorageEstimate(metrics.FileCount, metrics.TotalBytes, available);
+            }, cancellationToken);
+
+        public bool CanDeleteBackup(string backupPath) =>
+            !string.IsNullOrWhiteSpace(backupPath) &&
+            !GetPathIdentification(backupPath).IsMain;
+
+        private static DirectoryMetrics MeasureDirectory(string path, CancellationToken cancellationToken)
+        {
+            if (string.IsNullOrWhiteSpace(path) || !Directory.Exists(path))
             {
-                _logService.LogError(ex, $"Unable to calculate size for {path}");
+                return default;
             }
-            
-            return size;
+
+            int fileCount = 0;
+            long totalBytes = 0;
+
+            var enumerationOptions = new EnumerationOptions
+            {
+                RecurseSubdirectories = true,
+                IgnoreInaccessible = true,
+                AttributesToSkip = FileAttributes.ReparsePoint
+            };
+
+            var dirInfo = new DirectoryInfo(path);
+            foreach (var file in dirInfo.EnumerateFiles("*", enumerationOptions))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                fileCount++;
+                totalBytes += file.Length;
+            }
+
+            return new DirectoryMetrics(fileCount, totalBytes);
+        }
+
+        private void MarkCurrentSessionBackup(string path)
+        {
+            lock (_sessionBackupsSync) _currentSessionBackups.Add(path);
+        }
+
+        private bool IsCurrentSessionBackup(string path)
+        {
+            lock (_sessionBackupsSync) return _currentSessionBackups.Contains(path);
         }
 
         public bool DeleteBackup(string backupPath, bool showLog = true)
         {
             try
             {
+                if (!CanDeleteBackup(backupPath))
+                {
+                    _logService.LogWarning($"Refused to delete configured MAIN installation: {backupPath}");
+                    return false;
+                }
                 if (Directory.Exists(backupPath))
                 {
                     Directory.Delete(backupPath, true);
@@ -347,7 +385,8 @@ namespace AssetsManager.Services.Monitor
                     {
                         _logService.LogSuccess("The selected backup was deleted successfully.");
                     }
-                    _currentSessionBackups.Remove(backupPath);
+                    lock (_sessionBackupsSync) _currentSessionBackups.Remove(backupPath);
+                    BackupsChanged?.Invoke();
                     return true;
                 }
                 _logService.LogWarning($"Attempted to delete non-existent backup: {backupPath}");
@@ -359,5 +398,7 @@ namespace AssetsManager.Services.Monitor
                 return false;
             }
         }
+
+        private readonly record struct DirectoryMetrics(int FileCount, long TotalBytes);
     }
 }

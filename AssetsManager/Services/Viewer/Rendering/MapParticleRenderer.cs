@@ -1,0 +1,243 @@
+using System;
+using System.Collections.Generic;
+using System.Numerics;
+using AssetsManager.Services.Viewer.Runtime;
+using AssetsManager.Services.Viewer.Semantics;
+using AssetsManager.Services.Viewer.Vfx.Rendering;
+using AssetsManager.Services.Viewer.Vfx.Runtime;
+using AssetsManager.Services.Viewer.Vfx.Session;
+using AssetsManager.Services.Viewer.Vfx.Semantics;
+using AssetsManager.Views.Models.Viewer;
+using Silk.NET.OpenGL;
+
+namespace AssetsManager.Services.Viewer.Rendering
+{
+    /// <summary>
+    /// Scene-scoped renderer for MAP VFX. One OpenGL renderer and one GPU resource uploader are
+    /// shared by every particle placement while the simulation graphs remain independent.
+    /// </summary>
+    internal sealed class MapParticleRenderer : IDisposable, IPreparedParticlePass
+    {
+        private readonly VfxGpuResourceUploader _uploader = new();
+        private readonly List<IReadOnlyList<VfxPlaybackRuntime.EmitterState>> _sources = new();
+        private readonly List<VfxRenderQueueEntry> _queue = new();
+        private readonly List<VfxRenderQueueEntry> _shaded = new();
+        private readonly List<VfxRenderQueueEntry> _distortion = new();
+        private readonly List<VfxRenderQueueEntry> _earlyDistortion = new();
+        private readonly List<VfxRenderQueueEntry> _postColor = new();
+        private readonly List<VfxPlaybackGraphRuntime> _graphs = new();
+        private readonly Dictionary<object, int> _graphOrders = new();
+        private VfxOpenGlRenderer _renderer;
+        private Matrix4x4 _preparedViewProjection;
+        private Matrix4x4 _preparedView;
+        private uint _preparedViewportWidth;
+        private uint _preparedViewportHeight;
+        private bool _preparedShaded;
+        private bool _preparedWireframe;
+        private float _preparedWireOpacity;
+        private bool _ready;
+        private VfxStencilScene _preparedStencilScene;
+        internal bool CacheDrawBindings { set => _renderer.CacheDrawBindings = value; }
+        internal (int Programs, int UniformBuffers) LastDrawBindingCounts => _renderer.LastDrawBindingCounts;
+
+        internal void Initialize(GL gl, AssetsManager.Utils.AppSettings settings = null)
+        {
+            ArgumentNullException.ThrowIfNull(gl);
+            if (_ready) return;
+            _renderer = new VfxOpenGlRenderer();
+            _renderer.Initialize(gl, settings);
+            _ready = true;
+        }
+
+        internal void Render(
+            IReadOnlyList<MapParticleRuntime> runtimes,
+            Matrix4x4 viewProjection,
+            Matrix4x4 view,
+            uint viewportWidth,
+            uint viewportHeight,
+            StudioViewMode viewMode = StudioViewMode.Lit,
+            bool wireOverlay = false)
+        {
+            if (!PrepareRenderFrame(runtimes, viewProjection, view, viewportWidth, viewportHeight, viewMode, wireOverlay))
+                return;
+
+            using IDisposable renderBatch = BeginPreparedRenderBatch();
+            CapturePreparedEarlyDistortionFrame();
+            RenderPreparedEarlyDistortionPass();
+            RenderPreparedColorPass();
+            CapturePreparedDistortionFrame();
+            RenderPreparedDistortionPass();
+            RenderPreparedPostColorPass();
+        }
+
+        internal void SetSun(MapSunData sun)
+        {
+            if (_renderer != null) _renderer.Sun = sun;
+        }
+
+        internal void SetTerrainDepth(uint texture, uint width, uint height)
+            => _renderer?.SetTerrainDepth(texture, width, height);
+
+        internal bool PrepareRenderFrame(
+            IReadOnlyList<MapParticleRuntime> runtimes,
+            Matrix4x4 viewProjection,
+            Matrix4x4 view,
+            uint viewportWidth,
+            uint viewportHeight,
+            StudioViewMode viewMode = StudioViewMode.Lit,
+            bool wireOverlay = false)
+        {
+            _preparedStencilScene = null;
+            if (!_ready || runtimes == null || runtimes.Count == 0)
+                return false;
+
+            _sources.Clear();
+            _graphs.Clear();
+            bool needsSoftParticles = false;
+            bool needsSceneColor = false;
+            foreach (MapParticleRuntime mapRuntime in runtimes)
+            {
+                VfxPlaybackGraphRuntime graph = mapRuntime?.Graph;
+                if (graph == null) continue;
+                _graphs.Add(graph);
+                foreach (VfxPlaybackRuntime runtime in graph.Runtimes)
+                {
+                    IReadOnlyList<VfxPlaybackRuntime.EmitterState> emitters = runtime.Emitters;
+                    _sources.Add(emitters);
+                    if (needsSoftParticles && needsSceneColor) continue;
+                    foreach (VfxPlaybackRuntime.EmitterState emitter in emitters)
+                    {
+                        if (!emitter.IsVisible || emitter.InstanceCount == 0) continue;
+                        var inputs = _renderer.SceneInputsFor(emitter.Def);
+                        needsSoftParticles |= inputs.Depth;
+                        needsSceneColor |= inputs.Color;
+                    }
+                }
+            }
+
+            if (_sources.Count == 0)
+                return false;
+
+            _uploader.UploadPendingResources(_graphs, _renderer);
+            _renderer.CaptureScene(viewportWidth, viewportHeight, needsSceneColor, needsSoftParticles);
+            VfxRenderQueue.BuildInto(_sources, _queue, _graphOrders);
+
+            _preparedView = MapParticleSemantics.ViewportView(view);
+            _preparedViewProjection = MapParticleSemantics.ViewportViewProjection(viewProjection);
+            _preparedViewportWidth = viewportWidth;
+            _preparedViewportHeight = viewportHeight;
+            var previewPasses = VfxRenderSession.ResolvePreviewPasses(viewMode, wireOverlay, _renderer.SupportsWireframe);
+            _preparedShaded = previewPasses.Shaded;
+            _preparedWireframe = previewPasses.Wireframe;
+            _preparedWireOpacity = previewPasses.WireOpacity;
+
+            _shaded.Clear();
+            _distortion.Clear();
+            _earlyDistortion.Clear();
+            _postColor.Clear();
+            foreach (VfxRenderQueueEntry entry in _queue)
+            {
+                VfxRenderPhases phases = VfxRenderPhaseSemantics.Resolve(entry.Emitter.Def, entry.Emitter.HudLayer);
+                if (phases.EarlyDistortion) _earlyDistortion.Add(entry);
+                if (phases.LateDistortion) _distortion.Add(entry);
+                if (phases.Under) _shaded.Add(entry);
+                if (phases.Over) _postColor.Add(entry);
+            }
+            return _queue.Count > 0;
+        }
+
+        public void PrepareStencilScene(VfxStencilScene scene)
+        {
+            foreach (var graph in _graphs) graph.AddStencilClaims(scene, _preparedShaded);
+            _preparedStencilScene = scene;
+        }
+
+        public IDisposable BeginPreparedRenderBatch()
+        {
+            if (_preparedStencilScene == null) PrepareStencilScene(new VfxStencilScene());
+            VfxStencilScene scene = _preparedStencilScene;
+            _preparedStencilScene = null;
+            return _renderer.BeginRenderBatch(scene);
+        }
+
+        public void CapturePreparedEarlyDistortionFrame()
+        {
+            if (_preparedShaded && _earlyDistortion.Count > 0)
+                _renderer.CaptureScene(_preparedViewportWidth, _preparedViewportHeight, true, false);
+        }
+
+        public void RenderPreparedEarlyDistortionPass()
+        {
+            if (_preparedShaded && _earlyDistortion.Count > 0)
+                _renderer.Render(_earlyDistortion, _preparedViewProjection, _preparedView);
+        }
+
+        public void RenderPreparedPostColorPass()
+        {
+            if (_preparedShaded && _postColor.Count > 0)
+                _renderer.Render(_postColor, _preparedViewProjection, _preparedView);
+            // Wire twins draw over both colour phases and the late warp.
+            if (_preparedWireframe && _queue.Count > 0)
+            {
+                _renderer.Render(
+                    _queue,
+                    _preparedViewProjection,
+                    _preparedView,
+                    wireframePass: true,
+                    wireframeOpacity: _preparedWireOpacity);
+            }
+        }
+
+        public void RenderPreparedColorPass()
+        {
+            if (_preparedShaded && _shaded.Count > 0)
+                _renderer.Render(_shaded, _preparedViewProjection, _preparedView);
+        }
+
+        internal bool HasPreparedDistortionPass => _preparedShaded && _distortion.Count > 0;
+
+        public void CapturePreparedDistortionFrame()
+        {
+            if (HasPreparedDistortionPass)
+                _renderer.CaptureScene(_preparedViewportWidth, _preparedViewportHeight, true, false);
+        }
+
+        public void RenderPreparedDistortionPass()
+        {
+            if (HasPreparedDistortionPass)
+                _renderer.Render(_distortion, _preparedViewProjection, _preparedView);
+        }
+
+        internal void Clear()
+        {
+            if (!_ready) return;
+            _renderer.ClearTextures();
+            _uploader.Clear();
+            _sources.Clear();
+            _queue.Clear();
+            _shaded.Clear();
+            _distortion.Clear();
+            _earlyDistortion.Clear();
+            _postColor.Clear();
+            _graphs.Clear();
+            _graphOrders.Clear();
+        }
+
+        public void Dispose()
+        {
+            if (!_ready) return;
+            _renderer.Dispose();
+            _renderer = null;
+            _uploader.Clear();
+            _sources.Clear();
+            _queue.Clear();
+            _shaded.Clear();
+            _distortion.Clear();
+            _earlyDistortion.Clear();
+            _postColor.Clear();
+            _graphs.Clear();
+            _graphOrders.Clear();
+            _ready = false;
+        }
+    }
+}

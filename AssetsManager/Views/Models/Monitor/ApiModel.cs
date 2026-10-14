@@ -9,6 +9,7 @@ using AssetsManager.Utils;
 using AssetsManager.Utils.Framework; // Added for ObservableRangeCollection
 using AssetsManager.Views.Models.Shared;
 using AssetsManager.Views.Models.Monitor;
+using AssetsManager.Views.Models.Settings;
 
 namespace AssetsManager.Views.Models.Monitor
 {
@@ -38,7 +39,10 @@ namespace AssetsManager.Views.Models.Monitor
         public Brush AuthenticationStatusColor { get => _authenticationStatusColor; set => SetProperty(ref _authenticationStatusColor, value); }
 
         private bool _isAuthenticated;
-        public bool IsAuthenticated { get => _isAuthenticated; set => SetProperty(ref _isAuthenticated, value); }
+        public bool IsAuthenticated { get => _isAuthenticated; set { if (SetProperty(ref _isAuthenticated, value)) OnPropertyChanged(nameof(HasClientProfile)); } }
+        private long? _clientSummonerId;
+        private string _clientRegion;
+        public bool HasClientProfile => IsAuthenticated || _clientSummonerId > 0;
 
         private string _authButtonContent;
         public string AuthButtonContent { get => _authButtonContent; set => SetProperty(ref _authButtonContent, value); }
@@ -68,9 +72,9 @@ namespace AssetsManager.Views.Models.Monitor
         private string _issuedAtText;
         private string _expirationText;
 
-        public string RegionText => _regionText ??= $"Region: {_apiSettings?.Token?.Region ?? "N/A"}";
+        public string RegionText => _regionText ??= $"Region: {_clientRegion ?? _apiSettings?.Token?.Region ?? "N/A"}";
         public string PlatformText => _platformText ??= $"Platform: {_apiSettings?.Token?.Platform ?? "N/A"}";
-        public string SummonerIdText => _summonerIdText ??= $"Summoner ID: {(_apiSettings?.Token?.SummonerId > 0 ? _apiSettings.Token.SummonerId.ToString() : "N/A")}";
+        public string SummonerIdText => _summonerIdText ??= $"Summoner ID: {(_clientSummonerId > 0 ? _clientSummonerId.ToString() : _apiSettings?.Token?.SummonerId > 0 ? _apiSettings.Token.SummonerId.ToString() : "N/A")}";
         public string PuuidText => _puuidText ??= $"PUUID: {_apiSettings?.Token?.Puuid ?? "N/A"}";
         public string IssuedAtText => _issuedAtText ??= $"Issued: {(_apiSettings?.Token?.IssuedAt > DateTime.MinValue ? _apiSettings.Token.IssuedAt.ToLocalTime().ToString("HH:mm:ss") : "N/A")}";
         public string ExpirationText => _expirationText ??= $"Expires: {(_apiSettings?.Token?.Expiration > DateTime.MinValue ? _apiSettings.Token.Expiration.ToLocalTime().ToString("HH:mm:ss") : "N/A")}";
@@ -103,6 +107,8 @@ namespace AssetsManager.Views.Models.Monitor
 
         public void Update(AppSettings appSettings)
         {
+            _clientSummonerId = null;
+            _clientRegion = null;
             _apiSettings = appSettings?.ApiSettings;
             _regionText = null;
             _platformText = null;
@@ -117,6 +123,18 @@ namespace AssetsManager.Views.Models.Monitor
             OnPropertyChanged(nameof(PuuidText));
             OnPropertyChanged(nameof(IssuedAtText));
             OnPropertyChanged(nameof(ExpirationText));
+            OnPropertyChanged(nameof(HasClientProfile));
+        }
+
+        public void SetClientProfile(long? summonerId, string region)
+        {
+            _clientSummonerId = summonerId;
+            _clientRegion = region;
+            _summonerIdText = null;
+            _regionText = null;
+            OnPropertyChanged(nameof(SummonerIdText));
+            OnPropertyChanged(nameof(RegionText));
+            OnPropertyChanged(nameof(HasClientProfile));
         }
 
         public event PropertyChangedEventHandler PropertyChanged;

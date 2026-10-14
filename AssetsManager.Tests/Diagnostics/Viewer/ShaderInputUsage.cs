@@ -1,0 +1,167 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using AssetsManager.Services.Viewer.Rendering.GameShaders;
+using AssetsManager.Shaders;
+using AssetsManager.Utils;
+using AssetsManager.Views.Models.Settings;
+using AssetsManager.Views.Models.Viewer;
+
+namespace AssetsManager.Tests.Diagnostics.Viewer
+{
+    /// <summary>
+    /// Aggregates the engine inputs translated game shaders actually read (attributes, engine block
+    /// members and shared textures), to compare against what the preview runtime feeds them.
+    /// </summary>
+    internal sealed class ShaderInputUsage
+    {
+        private readonly Dictionary<string, HashSet<string>> _attributes = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, HashSet<string>> _members = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, HashSet<string>> _sharedTextures = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, HashSet<string>> _failures = new(StringComparer.Ordinal);
+        // Passes whose requested define set the game never compiled, keyed by the nearest permutation's changes.
+        private readonly Dictionary<string, HashSet<string>> _fallbacks = new(StringComparer.Ordinal);
+        private readonly HashSet<string> _seenParticlePrograms = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, HashSet<string>> _shaders = new(StringComparer.Ordinal);
+        // Identical bytecode pairs translate once; later owners reuse the result.
+        private readonly Dictionary<(ulong Vertex, ulong Pixel), GameShaderTranslator.TranslatedProgram> _translations = new();
+
+        public int Passes { get; private set; }
+        public int Translated { get; private set; }
+
+        /// <summary>Reads, translates and tracks every pass of a material program.</summary>
+        public void Collect(GameMaterialProgram program, string owner, AppSettings settings)
+        {
+            if (program?.Passes == null)
+                return;
+
+            foreach (GameMaterialPass pass in program.Passes)
+            {
+                Passes++;
+                GameShaderProgramResolver.ShaderBytecodeRead read =
+                    GameShaderProgramResolver.Read(pass, program.Kind, settings);
+                if (!read.Ready)
+                {
+                    Fail("bytecode: " + read.Failure, owner);
+                    continue;
+                }
+
+                if (read.Program.Fallback != null)
+                    Add(_fallbacks, $"{pass.ShaderPath}: {read.Program.Fallback}", owner);
+                string label = $"{owner}[{pass.ShaderPath?.Split('/').LastOrDefault()}]";
+                Add(_shaders, pass.ShaderPath ?? "?", owner);
+                string parameterFilter = Environment.GetEnvironmentVariable("AM_SHADER_PARAMS");
+                if (!string.IsNullOrWhiteSpace(parameterFilter) && label.Contains(parameterFilter, StringComparison.OrdinalIgnoreCase))
+                {
+                    Console.WriteLine($"[Params] {label} defines={string.Join(";", read.Program.Defines.Select(define => define.Name + "=" + define.Value))}");
+                    foreach (GameMaterialParameter parameter in pass.Parameters ?? Array.Empty<GameMaterialParameter>())
+                        Console.WriteLine($"[Params] {label} {parameter}");
+                    foreach (GameMaterialTexture texture in pass.Textures ?? Array.Empty<GameMaterialTexture>())
+                        Console.WriteLine($"[Params] {label} texture {texture.Name}={texture.Texture?.VirtualPath} sampler={texture.Sampler}");
+                }
+                var key = (System.IO.Hashing.XxHash64.HashToUInt64(read.Program.Vertex),
+                           System.IO.Hashing.XxHash64.HashToUInt64(read.Program.Pixel));
+                if (!_translations.TryGetValue(key, out GameShaderTranslator.TranslatedProgram stages))
+                {
+                    GameShaderTranslator.TranslationRead translated = GameShaderTranslator.Translate(
+                        read.Program.Vertex,
+                        read.Program.VertexReflection,
+                        read.Program.Pixel,
+                        read.Program.PixelReflection);
+                    if (!translated.Ready)
+                    {
+                        Fail($"translate {pass.ShaderPath}: {translated.Failure}", owner);
+                        continue;
+                    }
+                    _translations[key] = stages = translated.Program;
+                    Dump(stages, $"{label}_{key.Item2:x16}");
+                }
+
+                Translated++;
+                Track(stages, label);
+            }
+        }
+
+        /// <summary>
+        /// Tracks the stock particle programs (and authored custom materials) the emitters resolve to,
+        /// once per distinct shader pair and define set.
+        /// </summary>
+        public void CollectParticles(IEnumerable<VfxEmitterDefinition> emitters, string owner, AppSettings settings)
+        {
+            foreach (VfxEmitterDefinition emitter in emitters)
+            {
+                GameMaterialProgram program = emitter.CustomMaterial?.Program ??
+                                              GameParticleProgramResolver.Create(emitter, emitter.IsMeshPrimitive);
+                GameMaterialPass first = program?.Passes?.FirstOrDefault();
+                if (first == null)
+                    continue;
+
+                string key = first.ShaderPath + "|" + string.Join(";", first.Defines.Select(define => define.Name));
+                if (_seenParticlePrograms.Add(key))
+                    Collect(program, $"{owner}:{string.Join("+", first.Defines.Select(define => define.Name))}", settings);
+            }
+        }
+
+        public void Track(GameShaderTranslator.TranslatedProgram program, string owner)
+        {
+            foreach ((string stage, GameShaderTranslator.TranslatedStage translatedStage) in new[] { ("vs", program.Vertex), ("ps", program.Pixel) })
+            {
+                foreach (GameShaderTranslator.UniformBlock block in translatedStage.Sidecar.Blocks.Where(block => block.Name != "$Globals"))
+                foreach (GameShaderTranslator.BlockMember member in block.Members.Where(member => member.Used))
+                    Add(_members, $"{stage}:{block.Name}.{member.Name}@{member.Offset / sizeof(float)}+{member.Size / sizeof(float)}", owner);
+                foreach (GameShaderTranslator.TextureBinding texture in translatedStage.Sidecar.Textures.Where(texture => texture.Name.EndsWith("_SharedTexture", StringComparison.Ordinal)))
+                    Add(_sharedTextures, $"{stage}:{texture.Name}", owner);
+            }
+            foreach (GameShaderTranslator.AttributeBinding attribute in program.Vertex.Sidecar.Attributes)
+                Add(_attributes, $"{attribute.Semantic}{attribute.Index}", owner);
+        }
+
+        public void Print(string tag)
+        {
+            Console.WriteLine($"[{tag}] passes={Passes} translated={Translated}/{Passes} uniquePrograms={_translations.Count}.");
+            foreach ((string failure, HashSet<string> owners) in _failures.OrderByDescending(pair => pair.Value.Count).Take(10))
+                Console.WriteLine($"[{tag}] FAIL x{owners.Count}: {failure} e.g. {string.Join(", ", owners.Take(5))}");
+            foreach ((string fallback, HashSet<string> owners) in _fallbacks.OrderByDescending(pair => pair.Value.Count))
+                Console.WriteLine($"[{tag}] FALLBACK x{owners.Count}: {fallback} e.g. {string.Join(", ", owners.Take(5))}");
+            Print(tag, "shader", _shaders);
+            Print(tag, "attribute", _attributes);
+            Print(tag, "engine", _members);
+            Print(tag, "shared", _sharedTextures);
+        }
+
+        /// <summary>Writes the GLSL of programs whose label contains `AM_SHADER_DUMP` into `AM_SHADER_DUMP_DIR`.</summary>
+        private static void Dump(GameShaderTranslator.TranslatedProgram program, string label)
+        {
+            string filter = Environment.GetEnvironmentVariable("AM_SHADER_DUMP");
+            string directory = Environment.GetEnvironmentVariable("AM_SHADER_DUMP_DIR");
+            if (string.IsNullOrWhiteSpace(filter) || string.IsNullOrWhiteSpace(directory) ||
+                !label.Contains(filter, StringComparison.OrdinalIgnoreCase))
+                return;
+
+            Directory.CreateDirectory(directory);
+            string stem = Path.Combine(directory, string.Concat(label.Split(Path.GetInvalidFileNameChars())));
+            File.WriteAllText(stem + ".vs.glsl", program.Vertex.Glsl);
+            File.WriteAllText(stem + ".ps.glsl", program.Pixel.Glsl);
+            File.WriteAllLines(stem + ".blocks.txt", new[] { ("vs", program.Vertex), ("ps", program.Pixel) }
+                .SelectMany(stage => stage.Item2.Sidecar.Blocks.SelectMany(block => block.Members.Select(member =>
+                    $"{stage.Item1} {block.Name} m[{member.Offset / 16}].{"xyzw"[(int)(member.Offset % 16 / 4)]} {member.Name} size={member.Size} used={member.Used}"))));
+        }
+
+        private void Fail(string failure, string owner) =>
+            Add(_failures, string.IsNullOrWhiteSpace(failure) ? "unknown" : failure, owner);
+
+        private static void Add(IDictionary<string, HashSet<string>> map, string key, string owner)
+        {
+            if (!map.TryGetValue(key, out HashSet<string> owners))
+                map[key] = owners = new HashSet<string>(StringComparer.Ordinal);
+            owners.Add(owner);
+        }
+
+        private static void Print(string tag, string kind, IDictionary<string, HashSet<string>> map)
+        {
+            foreach ((string key, HashSet<string> owners) in map.OrderBy(pair => pair.Key, StringComparer.Ordinal))
+                Console.WriteLine($"[{tag}Use] {kind} {key} programs={owners.Count} e.g. {string.Join(", ", owners.Take(3))}");
+        }
+    }
+}

@@ -13,7 +13,7 @@ using System.Windows.Threading;
 using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using Microsoft.WindowsAPICodePack.Dialogs;
+using Microsoft.Win32;
 using AssetsManager.Utils.Framework;
 using AssetsManager.Utils;
 using AssetsManager.Services.Core;
@@ -37,14 +37,31 @@ namespace AssetsManager.Views.Controls.Explorer
     {
         public FilePreviewerControl FilePreviewer { get; set; }
 
-        public MenuItem PinMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Header?.ToString() == "Pin to Tabs");
-        public MenuItem AddToFavoritesMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Header?.ToString() == "Add to")?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Header?.ToString() == "Favorites");
-        public MenuItem ViewChangesMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Header?.ToString()?.Contains("Differences") == true || m.Header?.ToString()?.Contains("Changes") == true);
-        public MenuItem ExtractMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Header?.ToString() == "Extract");
-        public MenuItem SaveMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Header?.ToString() == "Save");
-        public MenuItem AddToImageMergerMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Header?.ToString() == "Add to")?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Header?.ToString() == "Image Merger");
-        public MenuItem WatchAssetMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Header?.ToString() == "Add to")?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Header?.ToString() == "Watch Asset");
-        public MenuItem CopyMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Header?.ToString() == "Copy");
+        private ContextMenu ExplorerContextMenu => FindResource("ExplorerContextMenu") as ContextMenu;
+
+        public MenuItem PinMenuItem => FindMenuItem(ExplorerContextMenu, nameof(PinMenuItem));
+        public MenuItem AddToFavoritesMenuItem => FindMenuItem(ExplorerContextMenu, nameof(AddToFavoritesMenuItem));
+        public MenuItem ViewChangesMenuItem => FindMenuItem(ExplorerContextMenu, nameof(ViewChangesMenuItem));
+        public MenuItem ExtractMenuItem => FindMenuItem(ExplorerContextMenu, nameof(ExtractMenuItem));
+        public MenuItem SaveMenuItem => FindMenuItem(ExplorerContextMenu, nameof(SaveMenuItem));
+        public MenuItem AddToImageMergerMenuItem => FindMenuItem(ExplorerContextMenu, nameof(AddToImageMergerMenuItem));
+        public MenuItem WatchAssetMenuItem => FindMenuItem(ExplorerContextMenu, nameof(WatchAssetMenuItem));
+        public MenuItem CopyMenuItem => FindMenuItem(ExplorerContextMenu, nameof(CopyMenuItem));
+
+        private static MenuItem FindMenuItem(DependencyObject parent, string name)
+        {
+            if (parent is null) return null;
+            if (parent is MenuItem mi && mi.Name == name) return mi;
+            if (parent is ItemsControl items)
+            {
+                foreach (var child in items.Items.OfType<DependencyObject>())
+                {
+                    var found = FindMenuItem(child, name);
+                    if (found != null) return found;
+                }
+            }
+            return null;
+        }
 
         // Injected Services
         public LogService LogService { get; set; }
@@ -63,7 +80,7 @@ namespace AssetsManager.Views.Controls.Explorer
         public HashResolverService HashResolverService { get; set; }
         public AssetWatcherService AssetWatcherService { get; set; }
         public VersionService VersionService { get; set; }
-        public MonitorService MonitorService { get; set; }
+        public MonitoredFilesService MonitoredFilesService { get; set; }
         public BackupManager BackupManager { get; set; }
         public TaskCancellationManager TaskCancellationManager { get; set; }
         public ImageMergerService ImageMergerService { get; set; }
@@ -81,6 +98,7 @@ namespace AssetsManager.Views.Controls.Explorer
         private readonly FileExplorerModel _viewModel;
         
         private readonly DispatcherTimer _searchTimer;
+        private readonly ExplorerTreeLoadService _treeLoader;
         private string _currentRootPath;
         private string _backupJsonPath;
         private bool _isExternalInitRequested = false;
@@ -97,6 +115,13 @@ namespace AssetsManager.Views.Controls.Explorer
             
             _viewModel = new FileExplorerModel();
             DataContext = _viewModel;
+            _treeLoader = new ExplorerTreeLoadService(_viewModel.RootNodes,
+                () =>
+                {
+                    WadSearchBoxService?.InvalidateIndex(_viewModel.RootNodes);
+                    _viewModel.SelectedItem = null;
+                    _viewModel.SelectedNodes.Clear();
+                });
             
             this.Loaded += FileExplorerControl_Loaded;
             this.Unloaded += FileExplorerControl_Unloaded;
@@ -128,6 +153,7 @@ namespace AssetsManager.Views.Controls.Explorer
             {
                 FavoritesManager.Favorites.CollectionChanged -= Favorites_CollectionChanged;
             }
+            CleanupResources();
         }
 
         private async void OnConfigurationSaved(object sender, EventArgs e)
@@ -154,42 +180,45 @@ namespace AssetsManager.Views.Controls.Explorer
 
         public void CleanupResources()
         {
-            // 1. CRITICAL: Cancel any active tree build or extraction
-            TaskCancellationManager.CancelCurrentOperation();
+            if (_treeLoader.IsDisposed) return;
+            CancelTreeLoad();
 
-            // 2. Stop search timer (Unloaded also does this, but we ensure it here too)
-            if (_searchTimer != null)
-            {
-                _searchTimer.Stop();
-            }
+            // Stop search before detaching the tree.
+            _searchTimer?.Stop();
 
-            // 3. Clear the TreeView binding and events
+            // Detach controls before disposing their nodes.
             if (FileTreeView != null)
             {
                 FileTreeView.SelectedItemChanged -= FileTreeView_SelectedItemChanged;
                 FileTreeView.ItemsSource = null; 
             }
 
-            // 4. DEEP CLEANUP: Dispose all nodes recursively to release megabytes of RAM
-            if (_viewModel.RootNodes != null)
-            {
-                foreach (var rootNode in _viewModel.RootNodes.ToList())
-                {
-                    rootNode.Dispose(); 
-                }
-                _viewModel.RootNodes.Clear();
-            }
+            _viewModel.SelectedItem = null;
+            _viewModel.SelectedNodes.Clear();
+            _treeLoader.Dispose();
+            _viewModel.IsBusy = false;
+            _viewModel.IsTreeReady = false;
 
-            // 5. Break peer connections
+            // Break peer connections.
             FilePreviewer = null; 
 
-            // 6. Reset internal state
+            // Reset navigation state.
             _currentRootPath = null;
+            _backupJsonPath = null;
+            NewLolPath = null;
+            OldLolPath = null;
             _isExternalInitRequested = false;
+        }
+
+        private void CancelTreeLoad()
+        {
+            if (_treeLoader.Cancel() && ProgressUIManager != null)
+                _ = ProgressUIManager.ShowCancellationAsync();
         }
 
         private async void FileExplorerControl_Loaded(object sender, RoutedEventArgs e)
         {
+            if (_treeLoader.IsDisposed) return;
             if (AppSettings != null)
             {
                 AppSettings.ConfigurationSaved -= OnConfigurationSaved;
@@ -243,20 +272,19 @@ namespace AssetsManager.Views.Controls.Explorer
             // First, do the synchronous checks to decide the initial UI state.
             bool shouldLoadWadTree = _viewModel.IsWadMode && wadPath != null;
             bool shouldLoadDirTree = !_viewModel.IsWadMode && !string.IsNullOrEmpty(DirectoriesCreator.AssetsDownloadedPath) && Directory.Exists(DirectoriesCreator.AssetsDownloadedPath);
+            bool shouldLoadHashes = (shouldLoadWadTree || shouldLoadDirTree) &&
+                                    HashResolverService?.HasLocalHashCatalogs == true;
 
-            if (shouldLoadWadTree || shouldLoadDirTree)
+            if (shouldLoadHashes)
             {
                 // Start with Hashes since it's the first async operation
                 _viewModel.SetLoadingState(ExplorerLoadingState.LoadingHashes);
             }
-            else
+            else if (!shouldLoadWadTree && !shouldLoadDirTree)
             {
                 // If we are not going to load, show the correct placeholder immediately.
                 _viewModel.UpdateEmptyState(_viewModel.IsWadMode);
             }
-
-            // Now, perform the async hash loading.
-            await HashResolverService.LoadAllHashesAsync();
 
             // Finally, trigger the tree build if needed.
             if (shouldLoadWadTree)
@@ -360,6 +388,7 @@ namespace AssetsManager.Views.Controls.Explorer
 
         public async Task ReloadTreeAsync()
         {
+            if (_treeLoader.IsDisposed) return;
             if (_viewModel.IsWadMode)
             {
                 string path = _currentRootPath;
@@ -406,14 +435,14 @@ namespace AssetsManager.Views.Controls.Explorer
 
         public async void HandleLoadResults()
         {
-            var openFileDialog = new CommonOpenFileDialog
+            var openFileDialog = new OpenFileDialog
             {
                 Title = "Select a comparison result file",
-                Filters = { new CommonFileDialogFilter("WAD Comparison JSON", "wadcomparison.json"), new CommonFileDialogFilter("All files", "*.*") },
+                Filter = "WadComparison (*.json)|*.json|All files (*.*)|*.*",
                 InitialDirectory = DirectoriesCreator.WadComparisonSavePath
             };
 
-            if (openFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
+            if (openFileDialog.ShowDialog() == true)
             {
                 _currentRootPath = null; // Important: Clear root when loading result
 
@@ -432,46 +461,54 @@ namespace AssetsManager.Views.Controls.Explorer
             bool isBackupMode,
             Action<ObservableRangeCollection<FileSystemNodeModel>> onSuccess = null)
         {
+            if (_treeLoader.IsDisposed) return;
             _viewModel.IsBackupMode = isBackupMode;
-            var cancellationToken = TaskCancellationManager.PrepareNewOperation();
-
             _viewModel.SetLoadingState(loadingState);
+            long version = 0;
 
             try
             {
-                var newNodes = await buildFunc(cancellationToken);
-                cancellationToken.ThrowIfCancellationRequested();
+                var load = _treeLoader.LoadAsync(async ct =>
+                {
+                    if (HashResolverService?.HasLocalHashCatalogs == true)
+                    {
+                        _viewModel.SetLoadingState(ExplorerLoadingState.LoadingHashes);
+                        // The shared hash catalog continues loading; only this view's wait is cancelled.
+                        await HashResolverService.LoadAllHashesAsync().WaitAsync(ct);
+                    }
+                    ct.ThrowIfCancellationRequested();
+                    _viewModel.SetLoadingState(loadingState);
+                    return await buildFunc(ct);
+                });
+                version = _treeLoader.Version;
+                if (!await load || _treeLoader.IsDisposed || version != _treeLoader.Version) return;
+                WadSearchBoxService.RebuildIndex(_viewModel.RootNodes);
 
-                _viewModel.RootNodes.ReplaceRange(newNodes);
-
-                onSuccess?.Invoke(newNodes);
+                onSuccess?.Invoke(_viewModel.RootNodes);
 
                 if (_viewModel.RootNodes.Count == 0 && !isBackupMode)
                 {
                     LogService.LogWarning("No items found in the selected location.");
                     _viewModel.IsEmptyState = true;
                 }
-
-                TaskCancellationManager.CompleteCurrentOperation();
             }
             catch (OperationCanceledException)
             {
                 LogService.LogWarning("The tree build was cancelled.");
-                await Task.Delay(1500);
-                TaskCancellationManager.CompleteCurrentOperation();
             }
             catch (Exception ex)
             {
                 LogService.LogError(ex, errorMsg);
+                if (_treeLoader.IsDisposed || version != _treeLoader.Version) return;
                 CustomMessageBoxService.ShowError("Error", $"{errorMsg} Please check the logs.", Window.GetWindow(this));
                 _viewModel.IsEmptyState = true;
             }
             finally
             {
-                _viewModel.IsBusy = false;
-                if (!_viewModel.IsEmptyState)
+                if (!_treeLoader.IsDisposed && version == _treeLoader.Version)
                 {
-                    _viewModel.IsTreeReady = true;
+                    _viewModel.IsBusy = false;
+                    _viewModel.IsTreeReady = !_viewModel.IsEmptyState;
                 }
             }
         }
@@ -493,8 +530,8 @@ namespace AssetsManager.Views.Controls.Explorer
 
             await ExecuteTreeBuildInternalAsync(
                 async ct => await TreeBuilderService.BuildWadTreeAsync(rootPath, ct, AppSettings.PreferredDirectory, 
-                    (file) => Dispatcher.Invoke(() => _viewModel.UpdateScanningProgress(file)),
-                    (dir) => Dispatcher.Invoke(() => _viewModel.UpdateMountingProgress(dir))),
+                    (file) => Dispatcher.Invoke(() => { if (!ct.IsCancellationRequested && !_treeLoader.IsDisposed) _viewModel.UpdateScanningProgress(file); }),
+                    (dir) => Dispatcher.Invoke(() => { if (!ct.IsCancellationRequested && !_treeLoader.IsDisposed) _viewModel.UpdateMountingProgress(dir); })),
                 ExplorerLoadingState.LoadingWads,
                 "Failed to build WAD tree.",
                 false);
@@ -511,8 +548,8 @@ namespace AssetsManager.Views.Controls.Explorer
 
             await ExecuteTreeBuildInternalAsync(
                 async ct => await TreeBuilderService.BuildDirectoryTreeAsync(rootPath, ct, 
-                    (file) => Dispatcher.Invoke(() => _viewModel.UpdateScanningProgress(file)),
-                    (dir) => Dispatcher.Invoke(() => _viewModel.UpdateMountingProgress(dir))),
+                    (file) => Dispatcher.Invoke(() => { if (!ct.IsCancellationRequested && !_treeLoader.IsDisposed) _viewModel.UpdateScanningProgress(file); }),
+                    (dir) => Dispatcher.Invoke(() => { if (!ct.IsCancellationRequested && !_treeLoader.IsDisposed) _viewModel.UpdateMountingProgress(dir); })),
                 ExplorerLoadingState.ExploringDirectory,
                 "Failed to build directory tree.",
                 false);
@@ -529,8 +566,11 @@ namespace AssetsManager.Views.Controls.Explorer
                 async ct => 
                 {
                     var (nodes, newPath, oldPath) = await TreeBuilderService.BuildTreeFromBackupAsync(jsonPath, _viewModel.IsSortingEnabled, ct);
-                    NewLolPath = newPath;
-                    OldLolPath = oldPath;
+                    if (!ct.IsCancellationRequested && !_treeLoader.IsDisposed)
+                    {
+                        NewLolPath = newPath;
+                        OldLolPath = oldPath;
+                    }
                     return nodes;
                 },
                 ExplorerLoadingState.LoadingResults,
@@ -584,10 +624,10 @@ namespace AssetsManager.Views.Controls.Explorer
             }
             else
             {
-                var dialog = new CommonOpenFileDialog { IsFolderPicker = true, Title = "Select destination folder" };
-                if (dialog.ShowDialog() == CommonFileDialogResult.Ok)
+                var dialog = new OpenFolderDialog { Title = "Select destination folder" };
+                if (dialog.ShowDialog() == true)
                 {
-                    destinationPath = dialog.FileName;
+                    destinationPath = dialog.FolderName;
                 }
             }
 
@@ -606,22 +646,25 @@ namespace AssetsManager.Views.Controls.Explorer
                     {
                         var node = selectedNodes[0];
                         string logName = PathUtils.GetLogName(node.Name);
-                        string logPath = destinationPath;
-
-                        if (node.Type == NodeType.RealDirectory || node.Type == NodeType.VirtualDirectory || node.Type == NodeType.WadFile || node.Type == NodeType.AudioEvent)
-                        {
-                            string cleanName = PathUtils.GetLogName(node.Name);
-                            logPath = Path.Combine(destinationPath, PathUtils.SanitizeName(cleanName));
-                        }
+                        string logPath = ExtractionService.GetNodeTargetPath(node, destinationPath);
 
                         LogService.LogInteractiveSuccess($"Successfully extracted {logName}", logPath, logName);
                     }
                     else
                     {
-                        LogService.LogInteractiveSuccess($"Successfully extracted {selectedNodes.Count} selected items", destinationPath, "Extracted Assets");
-                    }
+                        string logPath = destinationPath;
+                        var firstWad = ExtractionService.GetWadHierarchy(selectedNodes[0]);
+                        if (firstWad.HasValue && selectedNodes.All(n => ExtractionService.GetWadHierarchy(n)?.WadContainerName == firstWad.Value.WadContainerName))
+                        {
+                            string candidate = Path.Combine(destinationPath, firstWad.Value.WadContainerName);
+                            if (Directory.Exists(candidate))
+                            {
+                                logPath = candidate;
+                            }
+                        }
 
-                    TaskCancellationManager.CompleteCurrentOperation();
+                        LogService.LogInteractiveSuccess($"Successfully extracted {selectedNodes.Count} selected items", logPath, "Extracted Assets");
+                    }
                 }
                 catch (OperationCanceledException)
                 {
@@ -668,10 +711,10 @@ namespace AssetsManager.Views.Controls.Explorer
             }
             else
             {
-                var dialog = new CommonOpenFileDialog { IsFolderPicker = true, Title = "Select destination folder" };
-                if (dialog.ShowDialog() == CommonFileDialogResult.Ok)
+                var dialog = new OpenFolderDialog { Title = "Select destination folder" };
+                if (dialog.ShowDialog() == true)
                 {
-                    destinationPath = dialog.FileName;
+                    destinationPath = dialog.FolderName;
                 }
             }
 
@@ -691,21 +734,8 @@ namespace AssetsManager.Views.Controls.Explorer
                     if (selectedNodes.Count == 1)
                     {
                         var node = selectedNodes[0];
-                        string logPath = destinationPath;
-                        string logName = node.Name;
-
-                        if (node.Type == NodeType.SoundBank)
-                        {
-                            string cleanName = PathUtils.GetLogName(node.Name);
-                            logPath = Path.Combine(destinationPath, Path.GetFileNameWithoutExtension(cleanName));
-                            logName = PathUtils.GetLogName(node.Name);
-                        }
-                        else if (node.Type == NodeType.RealDirectory || node.Type == NodeType.VirtualDirectory || node.Type == NodeType.WadFile || node.Type == NodeType.AudioEvent)
-                        {
-                            string cleanName = PathUtils.GetLogName(node.Name);
-                            logPath = Path.Combine(destinationPath, PathUtils.SanitizeName(cleanName));
-                            logName = PathUtils.GetLogName(node.Name);
-                        }
+                        string logName = PathUtils.GetLogName(node.Name);
+                        string logPath = ExtractionService.GetNodeTargetPath(node, destinationPath);
 
                         if (allSavedFiles.Count == 1)
                         {
@@ -717,10 +747,19 @@ namespace AssetsManager.Views.Controls.Explorer
                     }
                     else
                     {
-                        LogService.LogInteractiveSuccess($"Successfully saved {selectedNodes.Count} selected items", destinationPath, "Saved Assets");
-                    }
+                        string logPath = destinationPath;
+                        var firstWad = ExtractionService.GetWadHierarchy(selectedNodes[0]);
+                        if (firstWad.HasValue && selectedNodes.All(n => ExtractionService.GetWadHierarchy(n)?.WadContainerName == firstWad.Value.WadContainerName))
+                        {
+                            string candidate = Path.Combine(destinationPath, firstWad.Value.WadContainerName);
+                            if (Directory.Exists(candidate))
+                            {
+                                logPath = candidate;
+                            }
+                        }
 
-                    TaskCancellationManager.CompleteCurrentOperation();
+                        LogService.LogInteractiveSuccess($"Successfully saved {selectedNodes.Count} selected items", logPath, "Saved Assets");
+                    }
                 }
                 catch (OperationCanceledException)
                 {
@@ -832,7 +871,7 @@ namespace AssetsManager.Views.Controls.Explorer
                     return;
                 }
 
-                MonitorService?.LoadMonitoredAssets();
+                MonitoredFilesService?.LoadMonitoredAssets();
                 LogService.LogSuccess($"Asset added to watcher: {selectedNode.Name}");
             }
         }
@@ -867,7 +906,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 // Deselect immediately so it can be clicked again
                 FavoritesListView.SelectedItem = null;
 
-                var node = await WadSearchBoxService.NavigateToPathAsync(item.VirtualPath, _viewModel.RootNodes, LoadAllChildrenForSearch);
+                var node = await WadSearchBoxService.NavigateToPathAsync(item.VirtualPath, _viewModel.RootNodes);
 
                 if (node != null)
                 {
@@ -911,11 +950,11 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private async void SelectLolDirButton_Click(object sender, RoutedEventArgs e)
         {
-            var dialog = new CommonOpenFileDialog { IsFolderPicker = true, Title = "Select a league of legends directory" };
+            var dialog = new OpenFolderDialog { Title = "Select a league of legends directory" };
 
-            if (dialog.ShowDialog() == CommonFileDialogResult.Ok)
+            if (dialog.ShowDialog() == true)
             {
-                string selectedDirectory = dialog.FileName;
+                string selectedDirectory = dialog.FolderName;
                 if (Directory.Exists(selectedDirectory))
                 {
                     await BuildWadTreeAsync(selectedDirectory);
@@ -934,6 +973,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 if (selectedNode.Type == NodeType.SoundBank && selectedNode.Children.Count == 1 && selectedNode.Children[0].Name == "Loading...")
                 {
                     await TreeBuilderService.ExpandAudioBankAsync(selectedNode, _viewModel.RootNodes, _currentRootPath, NewLolPath, OldLolPath);
+                    WadSearchBoxService.InvalidateIndex(_viewModel.RootNodes);
                 }
                 
                 if (FilePreviewer != null)
@@ -941,6 +981,14 @@ namespace AssetsManager.Views.Controls.Explorer
                     FilePreviewer.UpdateSelectedNode(selectedNode, RootNodes);
                     await FilePreviewer.ShowPreviewAsync(selectedNode);
                 }
+            }
+        }
+
+        private void FileTreeView_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (FilePreviewer != null && FilePreviewer.ViewModel.IsGridMode)
+            {
+                FilePreviewer.FileGridControl?.ClearSelectionSession(resetAnchor: false);
             }
         }
 
@@ -994,18 +1042,6 @@ namespace AssetsManager.Views.Controls.Explorer
             }
         }
 
-        private async Task LoadAllChildrenForSearch(FileSystemNodeModel node)
-        {
-            if (node.Type == NodeType.SoundBank)
-            {
-                await TreeBuilderService.ExpandAudioBankAsync(node, _viewModel.RootNodes, _currentRootPath, NewLolPath, OldLolPath);
-            }
-            else
-            {
-                await TreeBuilderService.EnsureAllChildrenLoadedAsync(node, _currentRootPath);
-            }
-        }
-
         private async void SearchTimer_Tick(object sender, EventArgs e)
         {
             _searchTimer.Stop();
@@ -1028,7 +1064,8 @@ namespace AssetsManager.Views.Controls.Explorer
             }
 
             var selectedNode = FileTreeView.SelectedItem as FileSystemNodeModel;
-            var nodeToSelect = await WadSearchBoxService.PerformSearchAsync(searchText, _viewModel.RootNodes, null, selectedNode);
+            var nodeToSelect = await WadSearchBoxService.PerformSearchAsync(searchText, _viewModel.RootNodes, selectedNode);
+            if (_treeLoader.IsDisposed) return;
 
             // Update No Results found UI after search completes
             if (!string.IsNullOrEmpty(searchText))

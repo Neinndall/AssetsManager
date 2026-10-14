@@ -1,0 +1,318 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Numerics;
+using System.Threading.Tasks;
+using AssetsManager.Services.Viewer.Runtime;
+using AssetsManager.Services.Viewer.Resolvers;
+using AssetsManager.Services.Viewer.Vfx.Resources;
+using AssetsManager.Views.Models.Viewer;
+using Xunit;
+
+namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
+{
+    public sealed class MapParticleResourceContextTests
+    {
+        [Fact]
+        public void ReferenceForSeparatesWadHashesFromVirtualPaths()
+        {
+            MapAssetReference hashed = VfxSceneResourceContext.ReferenceFor("0123456789abcdef.dds");
+            MapAssetReference path = VfxSceneResourceContext.ReferenceFor("assets/maps/test/fire.dds");
+            MapAssetReference truncated = VfxSceneResourceContext.ReferenceFor("89abcdef.dds");
+
+            Assert.Null(hashed.VirtualPath);
+            Assert.Equal(0x0123456789abcdefUL, hashed.PathHash);
+            Assert.Equal("assets/maps/test/fire.dds", path.VirtualPath);
+            Assert.Equal(0UL, path.PathHash);
+            Assert.Equal("89abcdef.dds", truncated.VirtualPath);
+            Assert.Equal(0UL, truncated.PathHash);
+        }
+
+        [Fact]
+        public void CollectRequestsMergesResourceFamiliesForTheSameAuthoredAsset()
+        {
+            const string asset = "0123456789abcdef";
+            VfxEmitterDefinition emitter = Emitter(asset, asset);
+            MapParticleSystemCatalog catalog = Catalog(emitter);
+
+            VfxSceneResourceContext.ResourceRequest request =
+                Assert.Single(VfxSceneResourceContext.CollectRequests(catalog));
+
+            Assert.Equal(asset, request.AuthoredPath);
+            Assert.Contains(".tex", request.Extensions, StringComparer.OrdinalIgnoreCase);
+            Assert.Contains(".dds", request.Extensions, StringComparer.OrdinalIgnoreCase);
+            Assert.Contains(".scb", request.Extensions, StringComparer.OrdinalIgnoreCase);
+            Assert.Contains(".skn", request.Extensions, StringComparer.OrdinalIgnoreCase);
+            Assert.Contains(".tmesh", request.Extensions, StringComparer.OrdinalIgnoreCase);
+            Assert.Contains(".gmesh", request.Extensions, StringComparer.OrdinalIgnoreCase);
+        }
+
+        [Theory]
+        [InlineData(null)]
+        [InlineData("assets/vfx/visible.scb")]
+        [InlineData("assets/vfx/emission.scb")]
+        public void StaticEmissionMeshIsRequestedIndependentlyOfTheVisibleMesh(string visibleMesh)
+        {
+            const string emissionMesh = "assets/vfx/emission.scb";
+            VfxEmitterDefinition emitter = Emitter(null, visibleMesh) with
+            {
+                EmissionMesh = new VfxEmissionMeshDefinition(emissionMesh)
+            };
+
+            IReadOnlyList<VfxSceneResourceContext.ResourceRequest> requests =
+                VfxSceneResourceContext.CollectRequests(Catalog(emitter));
+
+            VfxSceneResourceContext.ResourceRequest request =
+                Assert.Single(requests, item => item.AuthoredPath == emissionMesh);
+            Assert.Contains(".scb", request.Extensions, StringComparer.OrdinalIgnoreCase);
+            if (visibleMesh != null)
+                Assert.Contains(requests, item => item.AuthoredPath == visibleMesh);
+        }
+
+        [Fact]
+        public async Task SharedSceneContextMaterializesAnIndependentStaticEmissionMesh()
+        {
+            string root = Path.Combine(Path.GetTempPath(), "AssetsManagerTests", Guid.NewGuid().ToString("N"));
+            const string emissionMesh = "assets/vfx/emission.scb";
+            string source = Path.Combine(root, "assets", "vfx", "emission.scb");
+            byte[] bytes = { 1, 2, 3, 4 };
+
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(source));
+                await File.WriteAllBytesAsync(source, bytes);
+                VfxEmitterDefinition emitter = Emitter(null, null) with
+                {
+                    EmissionMesh = new VfxEmissionMeshDefinition(emissionMesh)
+                };
+
+                using VfxSceneResourceContext context = await VfxSceneResourceContext.CreateAsync(
+                    Catalog(emitter).Systems, root, new MapAssetResolver(null, null),
+                    hashResolver: null, logService: null);
+
+                string destination = Path.Combine(context.SearchDirectory, "assets", "vfx", "emission.scb");
+                Assert.True(File.Exists(destination));
+                Assert.Equal(bytes, await File.ReadAllBytesAsync(destination));
+            }
+            finally
+            {
+                if (Directory.Exists(root))
+                    Directory.Delete(root, recursive: true);
+            }
+        }
+
+        [Fact]
+        public void SharedSceneContextCollectsSkinnedVariantsEmissionSurfacesAndOwnerAssets()
+        {
+            VfxEmitterDefinition emitter = Emitter("assets/vfx/base.tex", "assets/vfx/mesh.skn") with
+            {
+                MeshSkeletonPath = "assets/vfx/mesh.skl",
+                MeshAnimationVariants = new[] { "assets/vfx/variant_a.anm", "assets/vfx/variant_b.anm" },
+                EmissionSurface = new VfxEmissionSurfaceDefinition(
+                    VfxEmissionSurfaceKind.Mesh,
+                    "assets/vfx/surface.skn",
+                    "assets/vfx/surface.skl",
+                    Array.Empty<uint>(),
+                    Array.Empty<uint>())
+            };
+            MapParticleSystemCatalog catalog = Catalog(emitter);
+            var owner = new VfxOwnerSceneContext(
+                "assets/characters/test/skin.skn",
+                "assets/characters/test/skin.skl",
+                1f);
+
+            string[] paths = VfxSceneResourceContext.CollectRequests(catalog.Systems, owner)
+                .Select(request => request.AuthoredPath)
+                .ToArray();
+
+            Assert.Contains("assets/vfx/variant_a.anm", paths);
+            Assert.Contains("assets/vfx/variant_b.anm", paths);
+            Assert.Contains("assets/vfx/surface.skn", paths);
+            Assert.Contains("assets/vfx/surface.skl", paths);
+            Assert.DoesNotContain("assets/vfx/surface.anm", paths);
+            Assert.Contains("assets/characters/test/skin.skn", paths);
+            Assert.Contains("assets/characters/test/skin.skl", paths);
+        }
+
+        [Fact]
+        public void CustomMaterialResourcesIncludeEveryPassAndUnresolvedWadHashes()
+        {
+            var sampler = new GameMaterialSamplerState(null,
+                MapTextureWrap.Clamp, MapTextureWrap.Clamp, MapTextureWrap.Clamp, true, true);
+            GameMaterialPass Pass(params GameMaterialTexture[] textures) => new(
+                1, "Shaders/Particles/Test", Array.Empty<GameMaterialDefine>(),
+                Array.Empty<KeyValuePair<string, bool>>(), textures,
+                Array.Empty<GameMaterialParameter>(), GameMaterialPassState.Default);
+            var program = new GameMaterialProgram(GameMaterialKind.Particles, false, new[]
+            {
+                Pass(new GameMaterialTexture("Diffuse_Texture",
+                    new MapTextureReference("assets/vfx/custom.tex", 0),
+                    GameMaterialTextureSource.Material, sampler)),
+                Pass(new GameMaterialTexture("Mask_Texture",
+                    new MapTextureReference(null, 0x1234567890abcdefUL),
+                    GameMaterialTextureSource.ShaderDefault, sampler))
+            });
+            VfxEmitterDefinition emitter = Emitter(null, null) with
+            {
+                CustomMaterial = ModelMaterialDefinition.TextureOnly("assets/vfx/custom.tex", program)
+            };
+
+            string[] paths = VfxSceneResourceContext.CollectRequests(Catalog(emitter))
+                .Select(request => request.AuthoredPath).ToArray();
+
+            Assert.Equal(2, paths.Length);
+            Assert.Contains("assets/vfx/custom.tex", paths);
+            Assert.Contains("1234567890abcdef.tex", paths);
+            Assert.Equal(0x1234567890abcdefUL,
+                VfxSceneResourceContext.ReferenceFor("1234567890abcdef.tex").PathHash);
+        }
+
+        [Fact]
+        public void ReachableSystemsKeepsOnlyTransitiveChildrenAndUsesTheParentResolverScope()
+        {
+            const uint rootHash = 1;
+            const uint directHash = 2;
+            const uint resolvedHash = 3;
+            const uint unrelatedHash = 4;
+            const uint effectKey = 77;
+
+            VfxEmitterDefinition rootEmitter = Emitter(null, null) with
+            {
+                ChildParticleSet = new VfxChildParticleSetDefinition(
+                    new VfxChildSystemReference[]
+                    {
+                        new("direct", directHash, 0),
+                        new("resolved", 0, effectKey)
+                    },
+                    false,
+                    VfxCurveF.Zero,
+                    VfxCurve3.Const(Vector3.Zero),
+                    0)
+            };
+            VfxEmitterDefinition cycleEmitter = Emitter(null, null) with
+            {
+                ChildParticleSet = new VfxChildParticleSetDefinition(
+                    new[] { new VfxChildSystemReference("root", rootHash, 0) },
+                    false,
+                    VfxCurveF.Zero,
+                    VfxCurve3.Const(Vector3.Zero),
+                    0)
+            };
+            var localResolver = new Dictionary<uint, uint> { [effectKey] = resolvedHash };
+            var root = new VfxSystemDefinition(rootHash, "root", "root", new[] { rootEmitter }, ResourceMap: localResolver);
+            var direct = new VfxSystemDefinition(directHash, "direct", "direct", new[] { cycleEmitter });
+            var resolved = new VfxSystemDefinition(resolvedHash, "resolved", "resolved", Array.Empty<VfxEmitterDefinition>());
+            var unrelated = new VfxSystemDefinition(unrelatedHash, "unrelated", "unrelated", Array.Empty<VfxEmitterDefinition>());
+            var systems = new Dictionary<uint, VfxSystemDefinition>
+            {
+                [rootHash] = root,
+                [directHash] = direct,
+                [resolvedHash] = resolved,
+                [unrelatedHash] = unrelated
+            };
+
+            IReadOnlyDictionary<uint, VfxSystemDefinition> reachable = VfxSceneResourceContext.ReachableSystems(
+                systems,
+                new Dictionary<uint, uint> { [effectKey] = unrelatedHash },
+                new[] { root });
+
+            Assert.Equal(3, reachable.Count);
+            Assert.Contains(rootHash, reachable.Keys);
+            Assert.Contains(directHash, reachable.Keys);
+            Assert.Contains(resolvedHash, reachable.Keys);
+            Assert.DoesNotContain(unrelatedHash, reachable.Keys);
+        }
+
+        [Fact]
+        public async Task MaterializationUsesExactExplicitExtensionAndPreservesVirtualPath()
+        {
+            string root = Path.Combine(Path.GetTempPath(), "AssetsManagerTests", Guid.NewGuid().ToString("N"));
+            string effects = Path.Combine(root, "assets", "maps", "test");
+            Directory.CreateDirectory(effects);
+            string exact = Path.Combine(effects, "fire.tex");
+            string wrongFallback = Path.Combine(effects, "smoke.dds");
+            await File.WriteAllBytesAsync(exact, new byte[] { 1, 2, 3, 4 });
+            await File.WriteAllBytesAsync(wrongFallback, new byte[] { 5, 6, 7, 8 });
+
+            try
+            {
+                VfxEmitterDefinition first = Emitter("assets/maps/test/fire.tex", null);
+                VfxEmitterDefinition second = Emitter("assets/maps/test/smoke.tex", null);
+                MapParticleSystemCatalog catalog = Catalog(first, second);
+                var resolver = new MapAssetResolver(null, null);
+
+                using VfxSceneResourceContext context = await VfxSceneResourceContext.CreateAsync(
+                    catalog,
+                    root,
+                    resolver,
+                    hashResolver: null,
+                    logService: null);
+
+                Assert.True(File.Exists(Path.Combine(
+                    context.SearchDirectory,
+                    "assets",
+                    "maps",
+                    "test",
+                    "fire.tex")));
+                Assert.False(File.Exists(Path.Combine(
+                    context.SearchDirectory,
+                    "assets",
+                    "maps",
+                    "test",
+                    "smoke.dds")));
+                Assert.False(File.Exists(Path.Combine(
+                    context.SearchDirectory,
+                    "assets",
+                    "maps",
+                    "test",
+                    "smoke.tex")));
+            }
+            finally
+            {
+                if (Directory.Exists(root))
+                    Directory.Delete(root, recursive: true);
+            }
+        }
+
+        private static MapParticleSystemCatalog Catalog(params VfxEmitterDefinition[] emitters)
+        {
+            const uint hash = 0x30000001;
+            var system = new VfxSystemDefinition(
+                hash,
+                "MapVfx",
+                "Maps/Test/MapVfx",
+                emitters ?? Array.Empty<VfxEmitterDefinition>());
+            return new MapParticleSystemCatalog(
+                new Dictionary<uint, VfxSystemDefinition> { [hash] = system },
+                new Dictionary<uint, uint>(),
+                Array.Empty<MapParticleSystemGroupData>());
+        }
+
+        private static VfxEmitterDefinition Emitter(string texturePath, string meshPath) =>
+            new(
+                Name: "Emitter",
+                Rate: VfxCurveF.Const(1f),
+                ParticleLifetime: VfxCurveF.Const(1f),
+                EmitterLifetime: null,
+                ParticleLinger: 0f,
+                TimeBeforeFirstEmission: 0f,
+                IsSingleParticle: false,
+                Disabled: false,
+                BlendMode: 4,
+                BirthScale: VfxCurve3.Const(Vector3.One),
+                ScaleOverLife: null,
+                BirthColor: VfxCurve4.Const(Vector4.One),
+                ColorOverLife: null,
+                BirthVelocity: null,
+                Acceleration: null,
+                BirthRotationalVelocity: null,
+                EmitterPosition: VfxCurve3.Const(Vector3.Zero),
+                TexturePath: texturePath ?? string.Empty,
+                TexDiv: Vector2.One,
+                NumFrames: 1,
+                RandomStartFrame: false,
+                IsMeshPrimitive: !string.IsNullOrWhiteSpace(meshPath),
+                MeshPath: meshPath);
+    }
+}

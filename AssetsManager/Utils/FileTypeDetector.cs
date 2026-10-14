@@ -1,5 +1,6 @@
 using System;
 using System.Text;
+using AssetsManager.Services.Parsers;
 
 namespace AssetsManager.Utils
 {
@@ -29,8 +30,11 @@ namespace AssetsManager.Utils
         private static readonly byte[] RST_SIGNATURE = { 0x52, 0x53, 0x54 }; // "RST"
         private static readonly byte[] BIN_PROP_SIGNATURE = { 0x50, 0x52, 0x4F, 0x50 }; // "PROP"
         private static readonly byte[] BIN_PTCH_SIGNATURE = { 0x50, 0x54, 0x43, 0x48 }; // "PTCH"
+        private static readonly byte[] BIN_IMAA_SIGNATURE = { 0x49, 0x4D, 0x41, 0x41 }; // "IMAA"
         private static readonly byte[] ICO_SIGNATURE = { 0x00, 0x00, 0x01, 0x00 };
         private static readonly byte[] TEX_SIGNATURE = { 0x54, 0x45, 0x58, 0x00 }; // "TEX\0"
+        private static readonly byte[] TOC3_SIGNATURE = { 0x06, 0x00, 0x00, 0x00, 0x54, 0x4F, 0x43, 0x33, 0x2E, 0x30 }; // "\x06\x00\x00\x00TOC3.0"
+        private static readonly byte[] ENCRYPTED_RIOT_TEX_SIGNATURE = { 0xC9, 0xE3, 0x44, 0x26 };
         private static readonly byte[] WASM_SIGNATURE = { 0x00, 0x61, 0x73, 0x6d }; // "\0asm"
 
         private static readonly byte[] UNITYFS_SIGNATURE = { 0x55, 0x6E, 0x69, 0x74, 0x79, 0x46, 0x53 }; // "UnityFS"
@@ -43,7 +47,8 @@ namespace AssetsManager.Utils
                 return string.Empty;
 
             if (StartsWith(data, DDS_SIGNATURE)) return "dds";
-            if (StartsWith(data, TEX_SIGNATURE)) return "tex";
+            if (StartsWith(data, TEX_SIGNATURE) || StartsWith(data, ENCRYPTED_RIOT_TEX_SIGNATURE)) return "tex";
+            if (StartsWith(data, TOC3_SIGNATURE)) return "toc";
             if (StartsWith(data, WASM_SIGNATURE)) return "wasm";
             if (StartsWith(data, UNITYFS_SIGNATURE) || StartsWith(data, UNITYWEB_SIGNATURE) || StartsWith(data, UNITYRAW_SIGNATURE)) return "assetbundle";
             if (StartsWith(data, PNG_SIGNATURE)) return "png";
@@ -61,8 +66,11 @@ namespace AssetsManager.Utils
             if (StartsWith(data, PRELOAD_SIGNATURE)) return "preload";
             if (StartsWith(data, RST_SIGNATURE)) return "stringtable";
 
-            if (StartsWith(data, BIN_PROP_SIGNATURE) || StartsWith(data, BIN_PTCH_SIGNATURE)) return "bin";
+            if (StartsWith(data, BIN_PROP_SIGNATURE) || StartsWith(data, BIN_PTCH_SIGNATURE) || StartsWith(data, BIN_IMAA_SIGNATURE) || ImageAutoAtlas.IsAtlas(data)) return "bin";
             if (StartsWith(data, ICO_SIGNATURE)) return "ico";
+
+            // Riot UIAutoAtlas: no magic bytes, structural validation required.
+            if (IsRiotBinaryAtlas(data)) return "atlas";
 
             if (StartsWith(data, WEBP_SIGNATURE) && Contains(data, WEBP_VP8X_SIGNATURE, 8)) return "webp";
             if (StartsWith(data, WEM_SIGNATURE) && Contains(data, WEM_WAVE_SIGNATURE, 8)) return "wem";
@@ -78,6 +86,117 @@ namespace AssetsManager.Utils
 
             return string.Empty;
         }
+
+        public static bool IsEncryptedRiotTex(ReadOnlySpan<byte> data)
+        {
+            return data.StartsWith(ENCRYPTED_RIOT_TEX_SIGNATURE);
+        }
+
+        public static bool IsPropertyBin(ReadOnlySpan<byte> data)
+        {
+            return data.StartsWith(BIN_PROP_SIGNATURE) || data.StartsWith(BIN_PTCH_SIGNATURE);
+        }
+
+        private static bool IsRiotBinaryAtlas(Span<byte> data)
+        {
+            // Riot UIAutoAtlas layout (little-endian):
+            // uint textureCount
+            // repeat textureCount times: uint texturePathLength + UTF-8 texture path
+            // uint spriteCount
+            // repeat spriteCount times:
+            //   uint spriteNameLength + UTF-8 sprite name
+            //   5 x float32 metadata (20 bytes)
+            //
+            // No fixed magic. The WAD loader provides a truncated buffer (256 bytes),
+            // so validate a minimum structural footprint: first texture path (must
+            // reference a known image extension) + sprite count + one complete sprite.
+            int offset = 0;
+            if (!TryReadUInt32(data, ref offset, out uint textureCount) || textureCount == 0 || textureCount > 256)
+                return false;
+
+            for (uint i = 0; i < textureCount; i++)
+            {
+                if (!TryReadLengthPrefixedBytes(data, ref offset, out Span<byte> texturePath))
+                    return false;
+
+                if (!HasImageExtension(texturePath))
+                    return false;
+            }
+
+            if (!TryReadUInt32(data, ref offset, out uint spriteCount) || spriteCount == 0 || spriteCount > 1_000_000)
+                return false;
+
+            // Validate at least one complete sprite entry
+            if (!TryReadLengthPrefixedBytes(data, ref offset, out Span<byte> spriteName) || !ContainsNonWhitespace(spriteName))
+                return false;
+
+            const int MetadataSize = 5 * sizeof(float);
+            if (data.Length - offset < MetadataSize)
+                return false;
+
+            return true;
+        }
+
+        #region Binary Readers
+
+        private static bool TryReadUInt32(Span<byte> data, ref int offset, out uint value)
+        {
+            value = 0;
+            if (offset < 0 || data.Length - offset < 4)
+                return false;
+
+            value = (uint)(data[offset] |
+                           (data[offset + 1] << 8) |
+                           (data[offset + 2] << 16) |
+                           (data[offset + 3] << 24));
+            offset += 4;
+            return true;
+        }
+
+        private static bool TryReadLengthPrefixedBytes(Span<byte> data, ref int offset, out Span<byte> value)
+        {
+            value = default;
+            if (!TryReadUInt32(data, ref offset, out uint byteLength) || byteLength == 0 || byteLength > 1_048_576)
+                return false;
+
+            if (data.Length - offset < (int)byteLength)
+                return false;
+
+            value = data.Slice(offset, (int)byteLength);
+            offset += (int)byteLength;
+
+            for (int i = 0; i < value.Length; i++)
+            {
+                if (value[i] == 0 || value[i] < 0x09)
+                    return false;
+            }
+            return true;
+        }
+
+        private static bool HasImageExtension(ReadOnlySpan<byte> path)
+        {
+            if (path.Length < 4 || path[^4] != '.') return false;
+            byte first = ToLowerAscii(path[^3]);
+            byte second = ToLowerAscii(path[^2]);
+            byte third = ToLowerAscii(path[^1]);
+            return (first == 't' && second == 'e' && third == 'x') ||
+                   (first == 'p' && second == 'n' && third == 'g') ||
+                   (first == 'd' && second == 'd' && third == 's');
+        }
+
+        private static bool ContainsNonWhitespace(ReadOnlySpan<byte> value)
+        {
+            for (int i = 0; i < value.Length; i++)
+            {
+                if (value[i] > 0x20) return true;
+            }
+            return false;
+        }
+
+        private static byte ToLowerAscii(byte value) =>
+            value is >= (byte)'A' and <= (byte)'Z' ? (byte)(value + 32) : value;
+
+        #endregion
 
         private static bool StartsWith(Span<byte> data, byte[] signature)
         {

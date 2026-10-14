@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using LeagueToolkit.Hashing;
 using AssetsManager.Utils;
 using AssetsManager.Services.Core;
+using AssetsManager.Views.Models.Hashes;
 
 namespace AssetsManager.Services.Hashes
 {
@@ -15,13 +16,32 @@ namespace AssetsManager.Services.Hashes
     {
         internal static readonly SemaphoreSlim _hashFileAccessLock = new SemaphoreSlim(1, 1);
 
-        private readonly List<BinaryHashCache> _gameCaches = new();
-        private readonly List<BinaryHashCache> _binCaches = new();
-        private readonly List<BinaryHashCache> _rstCaches = new();
+        private BinaryHashCache _gameCache;
+        private BinaryHashCache _lcuCache;
+        private BinaryHashCache _binHashCache;
+        private BinaryHashCache _binXxh3Cache;
+        private BinaryHashCache _binEntryCache;
+        private BinaryHashCache _binFieldCache;
+        private BinaryHashCache _binTypeCache;
+        private BinaryHashCache _rstXxh3Cache;
+        private BinaryHashCache _rstXxh64Cache;
 
         private readonly DirectoriesCreator _directoriesCreator;
         private readonly LogService _logService;
         private Task _loadingTask = null;
+
+        private static readonly string[] HashCatalogFileNames =
+        {
+            "hashes.game.txt",
+            "hashes.lcu.txt",
+            "hashes.binhashes.txt",
+            "hashes.binhashes.xxh3.txt",
+            "hashes.binentries.txt",
+            "hashes.binfields.txt",
+            "hashes.bintypes.txt",
+            "hashes.rst.xxh3.txt",
+            "hashes.rst.xxh64.txt"
+        };
 
         public HashResolverService(DirectoriesCreator directoriesCreator, LogService logService)
         {
@@ -29,10 +49,25 @@ namespace AssetsManager.Services.Hashes
             _logService = logService;
         }
 
+        public bool HasLocalHashCatalogs => HashCatalogFileNames.Any(HasLocalHashCatalog);
+
+        public bool HasLocalPathHashCatalogs =>
+            HasLocalHashCatalog("hashes.game.txt") ||
+            HasLocalHashCatalog("hashes.lcu.txt");
+
+        private bool HasLocalHashCatalog(string fileName)
+        {
+            string textPath = Path.Combine(_directoriesCreator.HashesPath, fileName);
+            return File.Exists(textPath) || File.Exists(Path.ChangeExtension(textPath, ".bin"));
+        }
+
         public Task LoadAllHashesAsync()
         {
             if (_loadingTask == null)
             {
+                if (!HasLocalHashCatalogs)
+                    return Task.CompletedTask;
+
                 _loadingTask = LoadAllHashesInternalAsync();
             }
             return _loadingTask;
@@ -43,7 +78,9 @@ namespace AssetsManager.Services.Hashes
             await _hashFileAccessLock.WaitAsync();
             try
             {
-                // Ejecutar en hilo de fondo para no congelar la UI
+                if (!HasLocalHashCatalogs)
+                    return;
+
                 await Task.Run(() =>
                 {
                     LoadHashes();
@@ -71,54 +108,39 @@ namespace AssetsManager.Services.Hashes
         {
             if (_gameLcuHashesLoaded) return;
             var hashesDir = _directoriesCreator.HashesPath;
-            var files = new[] { "hashes.game.txt", "hashes.lcu.txt" };
-            foreach (var file in files)
-            {
-                var path = Path.Combine(hashesDir, file);
-                if (File.Exists(path))
-                {
-                    var cache = new BinaryHashCache(path, _logService);
-                    cache.Load();
-                    _gameCaches.Add(cache);
-                }
-            }
+            _gameCache = LoadHashCache(Path.Combine(hashesDir, "hashes.game.txt"));
+            _lcuCache = LoadHashCache(Path.Combine(hashesDir, "hashes.lcu.txt"));
             _gameLcuHashesLoaded = true;
         }
 
         public void LoadBinHashes()
         {
             if (_binHashesLoaded) return;
-            var binHashesDir = _directoriesCreator.HashesPath;
-            var files = new[] { "hashes.binhashes.txt", "hashes.binentries.txt", "hashes.binfields.txt", "hashes.bintypes.txt" };
-            foreach (var file in files)
-            {
-                var path = Path.Combine(binHashesDir, file);
-                if (File.Exists(path))
-                {
-                    var cache = new BinaryHashCache(path, _logService);
-                    cache.Load();
-                    _binCaches.Add(cache);
-                }
-            }
+            var hashesDir = _directoriesCreator.HashesPath;
+            _binHashCache = LoadHashCache(Path.Combine(hashesDir, "hashes.binhashes.txt"));
+            _binXxh3Cache = LoadHashCache(Path.Combine(hashesDir, "hashes.binhashes.xxh3.txt"));
+            _binEntryCache = LoadHashCache(Path.Combine(hashesDir, "hashes.binentries.txt"));
+            _binFieldCache = LoadHashCache(Path.Combine(hashesDir, "hashes.binfields.txt"));
+            _binTypeCache = LoadHashCache(Path.Combine(hashesDir, "hashes.bintypes.txt"));
             _binHashesLoaded = true;
         }
 
         public void LoadRstHashes()
         {
             if (_rstHashesLoaded) return;
-            var rstHashesDir = _directoriesCreator.HashesPath;
-            var files = new[] { "hashes.rst.xxh3.txt", "hashes.rst.xxh64.txt" };
-            foreach (var file in files)
-            {
-                var path = Path.Combine(rstHashesDir, file);
-                if (File.Exists(path))
-                {
-                    var cache = new BinaryHashCache(path, _logService);
-                    cache.Load();
-                    _rstCaches.Add(cache);
-                }
-            }
+            var hashesDir = _directoriesCreator.HashesPath;
+            _rstXxh3Cache = LoadHashCache(Path.Combine(hashesDir, "hashes.rst.xxh3.txt"));
+            _rstXxh64Cache = LoadHashCache(Path.Combine(hashesDir, "hashes.rst.xxh64.txt"));
             _rstHashesLoaded = true;
+        }
+
+        private BinaryHashCache LoadHashCache(string path)
+        {
+            if (!File.Exists(path) && !File.Exists(Path.ChangeExtension(path, ".bin"))) return null;
+
+            var cache = new BinaryHashCache(path, _logService);
+            cache.Load();
+            return cache;
         }
 
         public Task LoadHashesAsync() { LoadHashes(); return Task.CompletedTask; }
@@ -128,53 +150,99 @@ namespace AssetsManager.Services.Hashes
         private Dictionary<ulong, string> _cachedRstXxh3Hashes;
         private Dictionary<ulong, string> _cachedRstXxh64Hashes;
 
-        public Dictionary<ulong, string> RstXxh3Hashes => _cachedRstXxh3Hashes ??= GetCacheDictionary(_rstCaches.FirstOrDefault(c => c.BinPath.Contains("xxh3")));
-        public Dictionary<ulong, string> RstXxh64Hashes => _cachedRstXxh64Hashes ??= GetCacheDictionary(_rstCaches.FirstOrDefault(c => c.BinPath.Contains("xxh64")));
+        public Dictionary<ulong, string> RstXxh3Hashes => _cachedRstXxh3Hashes ??=
+            BuildCacheDictionary(_rstXxh3Cache);
+        public Dictionary<ulong, string> RstXxh64Hashes => _cachedRstXxh64Hashes ??=
+            BuildCacheDictionary(_rstXxh64Cache);
 
-        private Dictionary<ulong, string> GetCacheDictionary(BinaryHashCache cache)
+        private static Dictionary<ulong, string> BuildCacheDictionary(BinaryHashCache cache)
         {
-            if (cache == null) return new Dictionary<ulong, string>();
             var dict = new Dictionary<ulong, string>();
-            for (int i = 0; i < cache.Count; i++)
+            if (cache == null) return dict;
+            for (int index = 0; index < cache.Count; index++)
             {
-                dict[cache.GetHash(i)] = cache.ResolveByIndex(i);
+                dict[cache.GetHash(index)] = cache.ResolveByIndex(index);
             }
             return dict;
         }
 
         public string ResolveHash(ulong pathHash)
         {
-            foreach (var cache in _gameCaches)
-            {
-                var result = cache.Resolve(pathHash);
-                if (result != null) return result;
-            }
+            string result = _gameCache?.Resolve(pathHash);
+            if (result != null) return result;
+            result = _lcuCache?.Resolve(pathHash);
+            if (result != null) return result;
+
             return pathHash.ToString("x16");
         }
 
+        public bool IsKnownHash(ulong pathHash)
+        {
+            return _gameCache?.Resolve(pathHash) != null ||
+                   _lcuCache?.Resolve(pathHash) != null;
+        }
+
+        public string ResolveBinHash(uint hash) => _binHashCache?.Resolve(hash) ?? hash.ToString("x8");
+
+        public string ResolveBinXxh3(ulong hash) => _binXxh3Cache?.Resolve(hash) ?? hash.ToString("x16");
+
+        public string ResolveBinEntry(uint hash) => _binEntryCache?.Resolve(hash) ?? hash.ToString("x8");
+
+        public string ResolveBinField(uint hash) => _binFieldCache?.Resolve(hash) ?? hash.ToString("x8");
+
+        public string ResolveBinType(uint hash) => _binTypeCache?.Resolve(hash) ?? hash.ToString("x8");
+
+        // BinTreeHash does not carry a domain marker, so generic values need all BIN catalogs.
         public string ResolveBinHashGeneral(uint hash)
         {
-            foreach (var cache in _binCaches)
-            {
-                var result = cache.Resolve(hash);
-                if (result != null) return result;
-            }
+            string result = _binHashCache?.Resolve(hash);
+            if (result != null) return result;
+            result = _binEntryCache?.Resolve(hash);
+            if (result != null) return result;
+            result = _binFieldCache?.Resolve(hash);
+            if (result != null) return result;
+            result = _binTypeCache?.Resolve(hash);
+            if (result != null) return result;
+
             return hash.ToString("x8");
         }
 
         public string ResolveRstHash(ulong rstHash)
         {
-            foreach (var cache in _rstCaches)
-            {
-                var result = cache.Resolve(rstHash);
-                if (result != null) return result;
-            }
+            string result = _rstXxh3Cache?.Resolve(rstHash);
+            if (result != null) return result;
+            result = _rstXxh64Cache?.Resolve(rstHash);
+            if (result != null) return result;
+
             return rstHash.ToString("x16");
         }
+
+        public void ReloadBinRstHashes()
+        {
+            _binXxh3Cache?.Dispose();
+            _binHashCache?.Dispose();
+            _binEntryCache?.Dispose();
+            _binFieldCache?.Dispose();
+            _binTypeCache?.Dispose();
+            _rstXxh3Cache?.Dispose();
+            _rstXxh64Cache?.Dispose();
+
+            _binHashesLoaded = false;
+            _rstHashesLoaded = false;
+            _cachedRstXxh3Hashes = null;
+            _cachedRstXxh64Hashes = null;
+
+            LoadBinHashes();
+            LoadRstHashes();
+        }
+
+
 
         public Task ForceReloadHashesAsync()
         {
             Dispose();
+            _cachedRstXxh3Hashes = null;
+            _cachedRstXxh64Hashes = null;
             _gameLcuHashesLoaded = false;
             _binHashesLoaded = false;
             _rstHashesLoaded = false;
@@ -184,12 +252,24 @@ namespace AssetsManager.Services.Hashes
 
         public void Dispose()
         {
-            foreach (var c in _gameCaches) c.Dispose();
-            foreach (var c in _binCaches) c.Dispose();
-            foreach (var c in _rstCaches) c.Dispose();
-            _gameCaches.Clear();
-            _binCaches.Clear();
-            _rstCaches.Clear();
+            _binXxh3Cache?.Dispose();
+            _binXxh3Cache = null;
+            _gameCache?.Dispose();
+            _lcuCache?.Dispose();
+            _binHashCache?.Dispose();
+            _binEntryCache?.Dispose();
+            _binFieldCache?.Dispose();
+            _binTypeCache?.Dispose();
+            _rstXxh3Cache?.Dispose();
+            _rstXxh64Cache?.Dispose();
+            _gameCache = null;
+            _lcuCache = null;
+            _binHashCache = null;
+            _binEntryCache = null;
+            _binFieldCache = null;
+            _binTypeCache = null;
+            _rstXxh3Cache = null;
+            _rstXxh64Cache = null;
         }
     }
 }

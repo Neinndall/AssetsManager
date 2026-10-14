@@ -16,10 +16,8 @@ namespace AssetsManager.Views.Models.Explorer
     public enum DiffStatus { Unchanged, New, Modified, Renamed, Removed, Dependency }
     public enum AudioSourceType { Wpk, Bnk }
 
-    public class FileSystemNodeModel : INotifyPropertyChanged, IDisposable, IMultiSelectable
+    public class FileSystemNodeModel : INotifyPropertyChanged, IDisposable, ISelectableTreeNode
     {
-        private static readonly Dictionary<string, string> _wadPathPool = new(StringComparer.OrdinalIgnoreCase);
-
         public string Name { get; set; }
         public NodeType Type { get; set; }
 
@@ -103,21 +101,7 @@ namespace AssetsManager.Views.Models.Explorer
         public string SourceWadPath
         {
             get => _sourceWadPath;
-            set
-            {
-                if (value == null) _sourceWadPath = null;
-                else
-                {
-                    lock (_wadPathPool)
-                    {
-                        if (!_wadPathPool.TryGetValue(value, out _sourceWadPath))
-                        {
-                            _sourceWadPath = value;
-                            _wadPathPool[value] = value;
-                        }
-                    }
-                }
-            }
+            set => _sourceWadPath = value;
         }
 
         public string BackupChunkPath { get; set; } // Only for nodes from a backup
@@ -143,12 +127,11 @@ namespace AssetsManager.Views.Models.Explorer
                 if (Type == NodeType.WadFile)
                 {
                     if (string.IsNullOrEmpty(Name)) return string.Empty;
-                    string lowerName = Name.ToLowerInvariant();
-                    if (lowerName.EndsWith(".wad.client"))
+                    if (Name.EndsWith(".wad.client", StringComparison.OrdinalIgnoreCase))
                     {
                         return Name.Substring(0, Name.Length - ".wad.client".Length);
                     }
-                    else if (lowerName.EndsWith(".wad"))
+                    else if (Name.EndsWith(".wad", StringComparison.OrdinalIgnoreCase))
                     {
                         return Name.Substring(0, Name.Length - ".wad".Length);
                     }
@@ -244,6 +227,9 @@ namespace AssetsManager.Views.Models.Explorer
             }
         }
 
+        System.Collections.IEnumerable ISelectableTreeNode.SelectionChildren => Children;
+        bool ISelectableTreeNode.IsSelectionVisible => IsVisible;
+
         private string _preMatch;
         public string PreMatch
         {
@@ -312,12 +298,13 @@ namespace AssetsManager.Views.Models.Explorer
             }
             else
             {
-                string lowerPath = path.ToLowerInvariant();
-                if (lowerPath.EndsWith(".wad") || lowerPath.EndsWith(".wad.client"))
+                if (path.EndsWith(".wad", StringComparison.OrdinalIgnoreCase) ||
+                    path.EndsWith(".wad.client", StringComparison.OrdinalIgnoreCase))
                 {
                     Type = NodeType.WadFile;
                 }
-                else if (lowerPath.EndsWith(".wpk") || lowerPath.EndsWith(".bnk"))
+                else if (path.EndsWith(".wpk", StringComparison.OrdinalIgnoreCase) ||
+                         path.EndsWith(".bnk", StringComparison.OrdinalIgnoreCase))
                 {
                     Type = NodeType.SoundBank;
                     Children.Add(new FileSystemNodeModel()); // Add dummy child
@@ -342,8 +329,8 @@ namespace AssetsManager.Views.Models.Explorer
             }
             else
             {
-                string lowerName = name.ToLowerInvariant();
-                if (lowerName.EndsWith(".wpk") || lowerName.EndsWith(".bnk"))
+                if (name.EndsWith(".wpk", StringComparison.OrdinalIgnoreCase) ||
+                    name.EndsWith(".bnk", StringComparison.OrdinalIgnoreCase))
                 {
                     Type = NodeType.SoundBank;
                     Children.Add(new FileSystemNodeModel()); // Add dummy child
@@ -386,14 +373,21 @@ namespace AssetsManager.Views.Models.Explorer
 
         public void Dispose()
         {
-            // Limpiar hijos recursivamente
+            if (_visibleChildren != null && !ReferenceEquals(_visibleChildren, _children))
+            {
+                _visibleChildren.Clear();
+                _visibleChildren = null;
+            }
+
+            // Limpiar hijos recursivamente sin copias intermedias
             if (_children != null)
             {
-                foreach (var child in _children)
+                for (int i = 0; i < _children.Count; i++)
                 {
-                    child.Dispose();
+                    _children[i]?.Dispose();
                 }
                 _children.Clear();
+                _children = null;
             }
 
             // Limpiar referencias

@@ -51,7 +51,7 @@ namespace AssetsManager.Services.Formatting
         public string ConvertToJson(string cssContent, ParseOptions options = null)
         {
             if (string.IsNullOrWhiteSpace(cssContent))
-                throw new ArgumentException("El contenido CSS no puede estar vacío", nameof(cssContent));
+                throw new ArgumentException("CSS content cannot be empty.", nameof(cssContent));
 
             options ??= new ParseOptions();
 

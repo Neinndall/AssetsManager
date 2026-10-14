@@ -1,0 +1,602 @@
+using System;
+using System.Collections.Generic;
+using System.IO.Hashing;
+using System.Linq;
+using System.Text;
+using AssetsManager.Utils;
+using AssetsManager.Views.Models.Hashes;
+using LeagueToolkit.Hashing;
+
+namespace AssetsManager.Services.Hashes
+{
+    internal sealed class InternalHashEvidenceMatcher
+    {
+        private static readonly int[] RstBitOptions = { 64, 40, 39, 38 };
+        private readonly Dictionary<InternalHashKind, HashSet<ulong>> _targets;
+        private readonly Dictionary<InternalHashKind, HashSet<ulong>> _matched;
+        private readonly Dictionary<(InternalHashKind Kind, ulong Hash, string Value), InternalHashGuessMatch> _matches = new();
+        private readonly Dictionary<(InternalHashKind Kind, uint Hash), string> _verifiedValues = new();
+        private readonly List<InternalHashGuessMatch> _pendingMatches = new();
+        private readonly HashSet<uint> _observedItemDataEntries = new();
+        private readonly HashSet<uint> _observedItemListHashes = new();
+        // FNV-1a is 32-bit: a probe tested against every remaining unknown collides by chance with
+        // probability remaining / 2^32. Untargeted hits are only trusted when that accumulated noise
+        // is negligible against the number of hits the same probes produced.
+        private const double HashSpace = 4294967296.0;
+        internal const double MaxGateFalseDiscoveryRate = 0.01;
+        private readonly NoiseGate _untargetedGate = new("Untargeted BIN context");
+        private NoiseGate _activeGate;
+
+        private sealed class NoiseGate
+        {
+            internal NoiseGate(string name) => Name = name;
+            internal string Name { get; }
+            internal double ExpectedChanceMatches { get; set; }
+            internal List<(InternalHashKind Kind, ulong Hash, string Value)> Hits { get; } = new();
+        }
+
+        internal readonly record struct NoiseGateResult(string Name, int Hits, double ExpectedChanceMatches, bool Accepted);
+
+        private readonly Action<InternalHashGuessMatch> _onMatchFound;
+
+        internal InternalHashEvidenceMatcher(
+            Dictionary<InternalHashKind, HashSet<ulong>> targets,
+            Action<InternalHashGuessMatch> onMatchFound = null)
+        {
+            foreach (InternalHashKind kind in Enum.GetValues<InternalHashKind>())
+                if (!targets.ContainsKey(kind)) targets[kind] = new HashSet<ulong>();
+            _targets = targets;
+            _matched = Enum.GetValues<InternalHashKind>().ToDictionary(
+                kind => kind,
+                kind => new HashSet<ulong>());
+            _onMatchFound = onMatchFound;
+        }
+
+        internal IReadOnlyCollection<InternalHashGuessMatch> Matches => _matches.Values;
+        // Verified checks already remove their hashes; research findings remain pending.
+        internal int Remaining => _targets.Sum(pair => pair.Value.Count);
+        internal long CheckedCandidates { get; private set; }
+
+        internal int GetRemainingCount(InternalHashKind kind) =>
+            _targets.TryGetValue(kind, out HashSet<ulong> values)
+                ? values.Count
+                : 0;
+
+        internal bool TryGetVerifiedValue(InternalHashKind kind, uint hash, out string value) =>
+            _verifiedValues.TryGetValue((kind, hash), out value);
+
+        internal void ObserveItemDataEntry(uint hash) => _observedItemDataEntries.Add(hash);
+
+        internal void ObserveItemListHash(uint hash) => _observedItemListHashes.Add(hash);
+
+        internal uint[] GetCollectedItemHashCandidates() =>
+            _observedItemListHashes.Where(_observedItemDataEntries.Contains).ToArray();
+
+        internal IReadOnlyList<InternalHashGuessMatch> TakePendingMatches()
+        {
+            if (_pendingMatches.Count == 0) return Array.Empty<InternalHashGuessMatch>();
+            InternalHashGuessMatch[] matches = _pendingMatches.ToArray();
+            _pendingMatches.Clear();
+            return matches;
+        }
+
+        internal void BeginGate(string name)
+        {
+            if (_activeGate != null) throw new InvalidOperationException($"Noise gate '{_activeGate.Name}' is still open.");
+            _activeGate = new NoiseGate(name);
+        }
+
+        internal void AddGateNoise(double expectedChanceMatches)
+        {
+            if (_activeGate != null) _activeGate.ExpectedChanceMatches += expectedChanceMatches;
+        }
+
+        internal NoiseGateResult EndGate()
+        {
+            NoiseGate gate = _activeGate ?? throw new InvalidOperationException("No noise gate is open.");
+            _activeGate = null;
+            return ResolveGate(gate);
+        }
+
+        internal NoiseGateResult ResolveUntargetedGate()
+        {
+            NoiseGateResult result = ResolveGate(_untargetedGate);
+            _untargetedGate.Hits.Clear();
+            _untargetedGate.ExpectedChanceMatches = 0;
+            return result;
+        }
+
+        private NoiseGateResult ResolveGate(NoiseGate gate)
+        {
+            var hits = gate.Hits.Where(_matches.ContainsKey).ToList();
+            bool accepted = hits.Count == 0 || gate.ExpectedChanceMatches <= hits.Count * MaxGateFalseDiscoveryRate;
+            foreach (var key in hits)
+            {
+                InternalHashGuessMatch match = _matches[key];
+                _pendingMatches.Add(match);
+                _onMatchFound?.Invoke(match);
+            }
+            return new NoiseGateResult(gate.Name, hits.Count, gate.ExpectedChanceMatches, accepted);
+        }
+
+        private double ChanceOfAnyMatch(InternalHashKind kind) => GetRemainingCount(kind) / HashSpace;
+
+        // Gated hits stay out of the live feed until their gate decides whether they are trustworthy.
+        private void Publish(InternalHashGuessMatch match, NoiseGate gate)
+        {
+            if (gate == null)
+            {
+                _pendingMatches.Add(match);
+                _onMatchFound?.Invoke(match);
+            }
+            else gate.Hits.Add((match.Kind, match.Hash, match.Value));
+        }
+
+        internal void Check(
+            string value,
+            InternalHashGuessStrategy strategy,
+            string source,
+            string sourceWad = null,
+            string sourceBin = null,
+            IReadOnlyDictionary<InternalHashKind, HashSet<ulong>> localTargets = null,
+            bool includeTruncatedRst = true)
+        {
+            CheckedCandidates++;
+            if (string.IsNullOrWhiteSpace(value) || value.Length < 3 || value.Length > 512)
+            {                return;
+            }
+            string candidate = NormalizeCandidate(value);
+            uint fnv = Fnv1a.HashLower(candidate);
+            bool content = strategy is InternalHashGuessStrategy.BinContent or InternalHashGuessStrategy.TextContent;
+            bool crossDictionary = strategy == InternalHashGuessStrategy.CrossDictionary;
+            if (content || crossDictionary)
+            {
+                bool isAssetPath = candidate.Contains('.') && !candidate.EndsWith(".bin", StringComparison.OrdinalIgnoreCase);
+                if (!isAssetPath)
+                {
+                    Check32(InternalHashKind.BinEntries, fnv, candidate, strategy, source, sourceWad, sourceBin, HasLocalEvidence(fnv, localTargets, InternalHashKind.BinEntries));
+                    Check32(InternalHashKind.BinHashes, fnv, candidate, strategy, source, sourceWad, sourceBin, HasLocalEvidence(fnv, localTargets, InternalHashKind.BinHashes));
+                }
+            }
+            if ((content || crossDictionary) && IsIdentifier(candidate))
+            {
+                Check32(InternalHashKind.BinFields, fnv, candidate, strategy, source, sourceWad, sourceBin, HasLocalEvidence(fnv, localTargets, InternalHashKind.BinFields));
+                Check32(InternalHashKind.BinTypes, fnv, candidate, strategy, source, sourceWad, sourceBin, HasLocalEvidence(fnv, localTargets, InternalHashKind.BinTypes));
+            }
+
+            if (content || strategy is InternalHashGuessStrategy.CrossDictionary or InternalHashGuessStrategy.CrossVersion or InternalHashGuessStrategy.NumericVariant or InternalHashGuessStrategy.GamePath)
+            {
+                bool hasXxh3 = includeTruncatedRst && _targets[InternalHashKind.RstXxh3].Count > 0;
+                bool hasXxh64 = _targets[InternalHashKind.RstXxh64].Count > 0;
+                if (hasXxh3 || hasXxh64)
+                {
+                    // RST keys are hashed after lower-casing. Keep the original
+                    // spelling in the finding, but never hash the display casing.
+                    string rstCandidate = candidate.ToLowerInvariant();
+                    int byteCount = Encoding.UTF8.GetByteCount(rstCandidate);
+                    Span<byte> bytes = byteCount <= 1536 ? stackalloc byte[byteCount] : new byte[byteCount];
+                    Encoding.UTF8.GetBytes(rstCandidate, bytes);
+                    if (hasXxh3)
+                        CheckRst(InternalHashKind.RstXxh3, XxHash3.HashToUInt64(bytes), candidate, strategy, source, includeTruncatedRst ? RstBitOptions : new[] { 64 }, sourceWad, sourceBin);
+                    if (hasXxh64)
+                        CheckRst(InternalHashKind.RstXxh64, XxHash64.HashToUInt64(bytes), candidate, strategy, source, includeTruncatedRst ? RstBitOptions : new[] { 64 }, sourceWad, sourceBin);
+                }
+            }
+        }
+
+        internal static ulong ComputeBinXxh3(string value)
+        {
+            string candidate = NormalizeCandidate(value).ToLowerInvariant();
+            int byteCount = Encoding.UTF8.GetByteCount(candidate);
+            Span<byte> bytes = byteCount <= 1536 ? stackalloc byte[byteCount] : new byte[byteCount];
+            Encoding.UTF8.GetBytes(candidate, bytes);
+            return XxHash3.HashToUInt64(bytes);
+        }
+
+        internal bool CheckBinXxh3Candidate(
+            string value,
+            string source,
+            string sourceWad = null,
+            string sourceBin = null,
+            ulong? observedHash = null,
+            InternalHashGuessStrategy strategy = InternalHashGuessStrategy.BinContent)
+        {
+            if (GetRemainingCount(InternalHashKind.BinXxh3) == 0) return false;
+            CheckedCandidates++;
+            if (string.IsNullOrWhiteSpace(value) || value.Length > 512) return false;
+            string candidate = NormalizeCandidate(value);
+            ulong hash = ComputeBinXxh3(candidate);
+            // BIN values retain all 64 bits; RST's packed-key masks never apply here.
+            if (observedHash.HasValue && observedHash.Value != hash) return false;
+            if (!_targets[InternalHashKind.BinXxh3].Remove(hash)) return false;
+            var match = new InternalHashGuessMatch
+            {
+                Hash = hash,
+                LookupHash = hash,
+                HashBits = 64,
+                Value = candidate,
+                Kind = InternalHashKind.BinXxh3,
+                Strategy = strategy,
+                Source = source,
+                SourceWad = sourceWad,
+                SourceBin = sourceBin,
+                IsVerified = true,
+                VerificationSchema = InternalHashGuessMatch.CurrentVerificationSchema,
+                Confidence = InternalHashConfidence.Verified,
+                Evidence = InternalHashEvidence.ObservedHashPair,
+                EvidenceOrigin = InternalHashEvidenceOrigin.ShippedData
+            };
+            _matches[(match.Kind, hash, candidate)] = match;
+            Publish(match, null);
+            return true;
+        }
+
+        internal bool CheckContextualCandidate(
+            InternalHashKind kind,
+            string value,
+            string source,
+            string sourceWad = null,
+            uint? observedHash = null,
+            InternalHashEvidence evidence = InternalHashEvidence.ObservedHashPair,
+            IReadOnlyDictionary<InternalHashKind, HashSet<ulong>> localTargets = null)
+        {
+            if (observedHash is uint observed && !IsTargetOrMatched(kind, observed)) return false;
+            CheckedCandidates++;
+            if (kind == InternalHashKind.BinXxh3 || string.IsNullOrWhiteSpace(value) || value.Length > 512)
+            {                return false;
+            }
+
+            string candidate = NormalizeCandidate(value);
+            uint computedHash = Fnv1a.HashLower(candidate);
+            if (observedHash.HasValue && computedHash != observedHash.Value)
+            {                return false;
+            }
+            if (!observedHash.HasValue)
+            {
+                // A hash present in the same BIN is as specific as a targeted check; anything else
+                // was tested against the whole unknown set and must pass the untargeted noise gate.
+                bool local = HasLocalEvidence(computedHash, localTargets, kind);
+                if (!local) _untargetedGate.ExpectedChanceMatches += ChanceOfAnyMatch(kind);
+                return CheckResearchCandidate(
+                    kind,
+                    candidate,
+                    InternalHashGuessStrategy.BinContent,
+                    source,
+                    InternalHashEvidence.SemanticReference,
+                    sourceWad: sourceWad,
+                    countCheck: false,
+                    verified: true,
+                    gate: local ? null : _untargetedGate);
+            }
+
+            int before = _matches.Count;
+            Check32(
+                kind,
+                computedHash,
+                candidate,
+                InternalHashGuessStrategy.BinContent,
+                source,
+                sourceWad,
+                source,
+                true,
+                evidence);
+            return _matches.Count != before;
+        }
+
+        /// <summary>
+        /// Targeted check of a vocabulary candidate for one observed hash. Verified hits join the
+        /// open noise gate, which demotes them when the vocabulary pass is too noisy overall.
+        /// </summary>
+        internal bool CheckVocabularyCandidate(InternalHashKind kind, string value, string source, string sourceWad, uint observedHash) =>
+            !string.IsNullOrWhiteSpace(value) &&
+            Fnv1a.HashLower(NormalizeCandidate(value)) == observedHash &&
+            CheckResearchCandidate(kind, value, InternalHashGuessStrategy.CrossDictionary, source, InternalHashEvidence.SemanticReference,
+                sourceWad, countCheck: true, verified: true, gate: null);
+
+        internal bool CheckResearchCandidate(
+            InternalHashKind kind,
+            string value,
+            InternalHashGuessStrategy strategy,
+            string source,
+            InternalHashEvidence evidence,
+            string sourceWad = null,
+            bool countCheck = true,
+            bool verified = true)
+            => CheckResearchCandidate(kind, value, strategy, source, evidence, sourceWad, countCheck, verified, gate: null);
+
+        private bool CheckResearchCandidate(
+            InternalHashKind kind,
+            string value,
+            InternalHashGuessStrategy strategy,
+            string source,
+            InternalHashEvidence evidence,
+            string sourceWad,
+            bool countCheck,
+            bool verified,
+            NoiseGate gate)
+        {
+            if (countCheck) CheckedCandidates++;
+            if (kind is InternalHashKind.RstXxh3 or InternalHashKind.RstXxh64 or InternalHashKind.BinXxh3 ||
+                string.IsNullOrWhiteSpace(value) ||
+                value.Length > 512)
+            {                return false;
+            }
+
+            string candidate = NormalizeCandidate(value);
+            uint hash = Fnv1a.HashLower(candidate);
+            if (!_targets[kind].Contains(hash))
+            {                return false;
+            }
+            _matched[kind].Add(hash);
+
+            var key = (kind, (ulong)hash, candidate);
+            if (_matches.ContainsKey(key)) return false;
+            if (verified)
+            {
+                _targets[kind].Remove(hash);
+                foreach (var candidateKey in _matches.Keys
+                    .Where(item => item.Kind == kind && item.Hash == hash).ToList())
+                    _matches.Remove(candidateKey);
+            }
+            var match = new InternalHashGuessMatch
+            {
+                Hash = hash,
+                LookupHash = hash,
+                HashBits = 32,
+                Value = candidate,
+                Kind = kind,
+                Strategy = strategy,
+                Source = source,
+                SourceWad = sourceWad,
+                SourceBin = source,
+                IsVerified = verified,
+                VerificationSchema = InternalHashGuessMatch.CurrentVerificationSchema,
+                Confidence = verified ? InternalHashConfidence.Verified : InternalHashConfidence.Candidate,
+                Evidence = evidence,
+                EvidenceOrigin = GetEvidenceOrigin(evidence)
+            };
+            _matches[key] = match;
+            if (verified) _verifiedValues[(kind, hash)] = candidate;
+            Publish(match, gate);
+            return true;
+        }
+
+        internal IReadOnlyCollection<ulong> GetRemaining(InternalHashKind kind) =>
+            _targets.TryGetValue(kind, out HashSet<ulong> values)
+                ? values
+                : Array.Empty<ulong>();
+
+        internal HashSet<ulong> InterfaceTypes { get; set; } = new();
+        internal BinRegistrationBracketValidator RegistrationValidator { get; } = new();
+
+        internal static bool IsInterfaceName(string name) =>
+            !string.IsNullOrEmpty(name) && name.Length >= 2 && name[0] == 'I' && char.IsUpper(name[1]);
+
+        internal bool IsRemaining(InternalHashKind kind, ulong hash) =>
+            _targets.TryGetValue(kind, out HashSet<ulong> values) && values.Contains(hash);
+
+        internal bool IsTargetOrMatched(InternalHashKind kind, uint hash) =>
+            IsRemaining(kind, hash) || _matched[kind].Contains(hash);
+
+        internal bool CheckSchemaCandidate(
+            InternalHashKind kind,
+            string value,
+            InternalHashGuessStrategy strategy,
+            string source,
+            InternalHashEvidence evidence = InternalHashEvidence.MetaSchemaWordset,
+            bool preserveCasing = false)
+        {
+            CheckedCandidates++;
+            if (kind is not (InternalHashKind.BinTypes or InternalHashKind.BinFields) ||
+                string.IsNullOrWhiteSpace(value) ||
+                value.Length > 128)
+            {
+                return false;
+            }
+            string candidate = value.Trim();
+            if (!IsIdentifier(candidate))
+            {
+                return false;
+            }
+            candidate = preserveCasing
+                ? candidate
+                : kind == InternalHashKind.BinTypes
+                    ? UpperFirst(candidate)
+                    : char.ToLowerInvariant(candidate[0]) + candidate[1..];
+            if (_activeGate != null) _activeGate.ExpectedChanceMatches += ChanceOfAnyMatch(kind);
+            uint hash = Fnv1a.HashLower(candidate);
+            if (!_targets[kind].Contains(hash))
+            {
+                return false;
+            }
+
+            // Interface pruning: If candidate is named like an interface (I[A-Z]),
+            // verify against schema metadata. If the class is NOT an interface, reject the candidate.
+            if (kind == InternalHashKind.BinTypes && InterfaceTypes != null && InterfaceTypes.Count > 0)
+            {
+                bool isInterfaceCandidate = IsInterfaceName(candidate);
+                bool isActualInterface = InterfaceTypes.Contains(hash);
+                if (isInterfaceCandidate && !isActualInterface) return false;
+                if (!isInterfaceCandidate && isActualInterface) return false;
+            }
+
+            // Registration bracket validation: Ensure type name candidate conforms to known reflection registration bounds.
+            if (kind == InternalHashKind.BinTypes && !RegistrationValidator.ValidateCandidate(hash, candidate, out _))
+            {
+                return false;
+            }
+
+            _matched[kind].Add(hash);
+            var key = (kind, (ulong)hash, candidate);
+            if (_matches.ContainsKey(key)) return false;
+            bool conflicting = _matches.Keys.Any(item => item.Kind == kind && item.Hash == (ulong)hash);
+            bool verified = !conflicting;
+            if (verified)
+            {
+                _targets[kind].Remove(hash);
+                foreach (var candidateKey in _matches.Keys
+                    .Where(item => item.Kind == kind && item.Hash == hash).ToList())
+                    _matches.Remove(candidateKey);
+            }
+            var match = new InternalHashGuessMatch
+            {
+                Hash = hash,
+                LookupHash = hash,
+                HashBits = 32,
+                Value = candidate,
+                Kind = kind,
+                Strategy = strategy,
+                Source = source,
+                IsVerified = verified,
+                VerificationSchema = InternalHashGuessMatch.CurrentVerificationSchema,
+                Confidence = verified ? InternalHashConfidence.Verified : InternalHashConfidence.Candidate,
+                Evidence = evidence,
+                EvidenceOrigin = GetEvidenceOrigin(evidence)
+            };
+            _matches[key] = match;
+            Publish(match, _activeGate);
+            return true;
+        }
+
+        internal static bool IsIdentifier(string value)
+        {
+            if (value.Length == 0 || value.Length > 128 || !(char.IsLetter(value[0]) || value[0] == '_')) return false;
+            for (int index = 1; index < value.Length; index++)
+                if (!(char.IsLetterOrDigit(value[index]) || value[index] == '_')) return false;
+            return true;
+        }
+
+        private static bool HasLocalEvidence(
+            uint hash,
+            IReadOnlyDictionary<InternalHashKind, HashSet<ulong>> localTargets,
+            InternalHashKind kind)
+        {
+            if (localTargets == null) return false;
+            return localTargets.TryGetValue(kind, out var values) && values.Contains(hash);
+        }
+
+        private void Check32(
+            InternalHashKind kind,
+            uint hash,
+            string value,
+            InternalHashGuessStrategy strategy,
+            string source,
+            string sourceWad,
+            string sourceBin,
+            bool hasLocalEvidence,
+            InternalHashEvidence evidence = InternalHashEvidence.RuntimeContext)
+        {
+            if (!hasLocalEvidence) return;
+            bool alreadyMatched = _matched[kind].Contains(hash);
+            if (!alreadyMatched && !_targets[kind].Contains(hash)) return;
+            if (evidence == InternalHashEvidence.RuntimeContext)
+                evidence = InternalHashEvidence.OwningFileString;
+            var key = (kind, (ulong)hash, value);
+            if (_matches.ContainsKey(key)) return;
+            // FNV-1a ignores case: another spelling of the same name is a duplicate, not a collision.
+            if (_matches.Keys.Any(item => item.Kind == kind && item.Hash == (ulong)hash &&
+                                          string.Equals(item.Value, value, StringComparison.OrdinalIgnoreCase)))
+                return;
+            // A second literal for the same hash stays a candidate instead of
+            // promoting the first one: the store quarantines the collision.
+            bool conflicting = _matches.Keys.Any(item => item.Kind == kind && item.Hash == (ulong)hash);
+            bool verified = !conflicting;
+            if (verified && !conflicting)
+            {
+                _targets[kind].Remove(hash);
+                foreach (var candidateKey in _matches.Keys
+                    .Where(item => item.Kind == kind && item.Hash == (ulong)hash).ToList())
+                    _matches.Remove(candidateKey);
+            }
+            else if (conflicting)
+            {
+                _verifiedValues.Remove((kind, hash));
+            }
+            _matched[kind].Add(hash);
+            var match = new InternalHashGuessMatch
+            {
+                Hash = hash,
+                LookupHash = hash,
+                HashBits = 32,
+                Value = value,
+                Kind = kind,
+                Strategy = strategy,
+                Source = source,
+                SourceWad = sourceWad,
+                SourceBin = sourceBin,
+                IsVerified = verified,
+                VerificationSchema = InternalHashGuessMatch.CurrentVerificationSchema,
+                Confidence = verified ? InternalHashConfidence.Verified : InternalHashConfidence.Candidate,
+                Evidence = evidence,
+                EvidenceOrigin = GetEvidenceOrigin(evidence)
+            };
+            _matches[key] = match;
+            if (verified && !conflicting) _verifiedValues[(kind, hash)] = value;
+            _pendingMatches.Add(match);
+            _onMatchFound?.Invoke(match);
+        }
+
+        private void CheckRst(
+            InternalHashKind kind,
+            ulong fullHash,
+            string value,
+            InternalHashGuessStrategy strategy,
+            string source,
+            IEnumerable<int> bitOptions,
+            string sourceWad = null,
+            string sourceBin = null)
+        {
+            foreach (int bits in bitOptions)
+            {
+                ulong lookup = bits == 64 ? fullHash : fullHash & ((1UL << bits) - 1);
+                if (!_targets[kind].Remove(lookup)) continue;
+                var match = new InternalHashGuessMatch
+                {
+                    Hash = fullHash,
+                    LookupHash = lookup,
+                    HashBits = bits,
+                    Value = value,
+                    Kind = kind,
+                    Strategy = strategy,
+                    Source = source,
+                    SourceWad = sourceWad,
+                    SourceBin = sourceBin,
+                    IsVerified = true,
+                    VerificationSchema = InternalHashGuessMatch.CurrentVerificationSchema,
+                    Confidence = InternalHashConfidence.Verified,
+                    Evidence = InternalHashEvidence.RstHashMatch,
+                    EvidenceOrigin = InternalHashEvidenceOrigin.ShippedData
+                };
+                _matches[(kind, fullHash, value)] = match;
+                _pendingMatches.Add(match);
+                _onMatchFound?.Invoke(match);
+                break;
+            }
+        }
+
+        private static string UpperFirst(string value) =>
+            string.IsNullOrEmpty(value) ? value : char.ToUpperInvariant(value[0]) + value[1..];
+
+        internal static string NormalizeCandidate(string value) =>
+            PathUtils.NormalizeSeparators(value?.Trim());
+
+        private static InternalHashEvidenceOrigin GetEvidenceOrigin(InternalHashEvidence evidence) => evidence switch
+        {
+            InternalHashEvidence.ObservedHashPair or
+            InternalHashEvidence.OwningEntryString or
+            InternalHashEvidence.OwningEntryPrefix or
+            InternalHashEvidence.OwningFileString => InternalHashEvidenceOrigin.RuntimeCorrelation,
+            InternalHashEvidence.RstHashMatch or
+            InternalHashEvidence.GamePathExactMatch => InternalHashEvidenceOrigin.ShippedData,
+            InternalHashEvidence.MetaSchemaWordset or
+            InternalHashEvidence.MetaSchemaRelation or
+            InternalHashEvidence.MetaSchemaUnique => InternalHashEvidenceOrigin.ExternalSchema,
+            InternalHashEvidence.SemanticReference or
+            InternalHashEvidence.DualStemAffixPair or
+            InternalHashEvidence.ContainerElementConvention or
+            InternalHashEvidence.RegistrationBracketMatch or
+            InternalHashEvidence.BinObjectLatticePattern => InternalHashEvidenceOrigin.StructuralInference,
+            _ => InternalHashEvidenceOrigin.Unknown
+        };
+    }
+}

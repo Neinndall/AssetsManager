@@ -17,7 +17,7 @@ using AssetsManager.Services.Comparator;
 using AssetsManager.Services.Explorer;
 using AssetsManager.Views.Helpers;
 using AssetsManager.Services.Audio;
-using AssetsManager.Services.Viewer;
+using AssetsManager.Services.Viewer.Loading;
 using AssetsManager.Views.Models.Dialogs.Controls;
 using AssetsManager.Views.Models.Audio;
 
@@ -214,7 +214,7 @@ namespace AssetsManager.Services.Core
 
                 // [PROGRESS] 100% Reached before opening window
                 await SetStateAndRenderAsync(loadingWindow, DiffLoadingState.Ready);
-                await Task.Delay(350);
+                await Task.Delay(300);
                 diffWindow.ShowDialog();
             }
             catch (Exception ex)
@@ -291,7 +291,7 @@ namespace AssetsManager.Services.Core
 
             // [PROGRESS] 100% Reached before opening window
             await SetStateAndRenderAsync(loadingWindow, DiffLoadingState.Ready);
-            await Task.Delay(350);
+            await Task.Delay(300);
             diffWindow.ShowDialog();
         }
 
@@ -301,14 +301,13 @@ namespace AssetsManager.Services.Core
             var oldImage = await Task.Run(() => TextureUtils.LoadTexture(oldData, extension));
             var newImage = await Task.Run(() => TextureUtils.LoadTexture(newData, extension));
 
-            await SetStateAndRenderAsync(loadingWindow, DiffLoadingState.GeneratingDiffMap);
             var imageDiffWindow = new ImageDiffWindow(oldImage, newImage, oldPath, newPath);
             imageDiffWindow.Owner = owner;
             imageDiffWindow.LoadingWindow = loadingWindow;
             
             // [PROGRESS] 100% Reached before opening window
             await SetStateAndRenderAsync(loadingWindow, DiffLoadingState.Ready);
-            await Task.Delay(350);
+            await Task.Delay(300);
             imageDiffWindow.ShowDialog();
         }
 
@@ -331,10 +330,7 @@ namespace AssetsManager.Services.Core
 
             // [PROGRESS] 100% Reached before opening window
             await SetStateAndRenderAsync(loadingWindow, DiffLoadingState.Ready);
-            await Task.Delay(350);
-            
-            // Close loading window before ShowDialog to prevent it from staying open (ShowDialog is blocking)
-            loadingWindow.Close();
+            await Task.Delay(300);
             sknDiffWindow.ShowDialog();
         }
 
@@ -374,6 +370,18 @@ namespace AssetsManager.Services.Core
 
         private async Task<(string oldText, string newText)> ProcessDataAsync(string dataType, byte[] oldData, byte[] newData)
         {
+            if (dataType == "bin")
+            {
+                try
+                {
+                    return await _contentFormatterService.GetBinDiffRitobinAsync(oldData, newData);
+                }
+                catch (Exception ex)
+                {
+                    _logService.LogError(ex, "Failed to create semantic BIN diff; falling back to full Ritobin comparison.");
+                }
+            }
+
             // Run sequentially to optimize peak memory. Parsing two massive files concurrently (e.g. 33MB .bin files) 
             // creates two massive object graphs in RAM simultaneously, causing LOH fragmentation and OOM exceptions.
             string oldText = await _contentFormatterService.GetFormattedStringAsync(dataType, oldData);
@@ -441,10 +449,8 @@ namespace AssetsManager.Services.Core
 
             // [PROGRESS] 100% Reached before opening batch window
             await SetStateAndRenderAsync(loadingWindow, DiffLoadingState.Ready);
-            await Task.Delay(350);
-
+            await Task.Delay(300);
             await Application.Current.Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.Render);
-
             await showWindowAction(preparedItems);
         }
     }

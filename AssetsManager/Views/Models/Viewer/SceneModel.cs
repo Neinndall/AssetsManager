@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
+using System.Numerics;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Windows;
@@ -25,9 +26,17 @@ namespace AssetsManager.Views.Models.Viewer
                 SetField(ref _name, PathUtils.TruncateAtDot(value));
             }
         }
-        public string SourceType { get; set; } = "Model"; // "Model" or "Chroma"
+        public string FilePath { get; set; } = string.Empty;
         public SkinnedMesh SkinnedMesh { get; set; }
         public ModelVisual3D RootVisual { get; set; }
+        public float SelfIllumination { get; set; }
+
+        /// <summary>
+        /// Buffs, playing clips and death the character's dynamic materials read; each part adds its own gear.
+        /// Null is the resting state.
+        /// </summary>
+        internal GameMaterialState GameState { get; set; }
+        public string EmissiveTexturePath { get; set; }
 
         private double _positionX;
         private double _positionY;
@@ -55,8 +64,7 @@ namespace AssetsManager.Views.Models.Viewer
 
         /// <summary>
         /// The persistent Transform3DGroup that owns the user-defined Position/Rotation/Scale.
-        /// Exposed so the Viewport can safely inject the auto-rotation transform
-        /// without losing its reference when properties change.
+        /// Exposed for consumers that need to inspect the persistent WPF transform state.
         /// </summary>
         public Transform3DGroup UserTransformGroup => _userTransformGroup;
 
@@ -77,10 +85,11 @@ namespace AssetsManager.Views.Models.Viewer
         }
 
         private ObservableRangeCollection<ModelPart> _parts;
+        private readonly HashSet<ModelPart> _trackedParts = new HashSet<ModelPart>();
         public ObservableRangeCollection<ModelPart> Parts
         {
             get => _parts;
-            set
+            private set
             {
                 if (_parts != null)
                 {
@@ -94,33 +103,45 @@ namespace AssetsManager.Views.Models.Viewer
                 OnPropertyChanged();
             }
         }
-
-        public ObservableRangeCollection<AnimationData> Animations { get; set; }
-
         public RigResource Skeleton { get; set; }
+        internal SkinPoseDefinition PoseDefinition { get; set; } = SkinPoseDefinition.Empty;
         public IAnimationAsset CurrentAnimation { get; set; }
         public bool IsAnimationPaused { get; set; } = true;
         public double AnimationTime { get; set; }
+        internal GpuSkinningData GpuSkinningData { get; set; }
+        internal Matrix4x4[] SkinningMatrices { get; set; }
+        private bool _isUpdatingVisibility;
 
         private bool _isVisible = true;
         public bool IsVisible
         {
             get => _isVisible;
-            set => SetField(ref _isVisible, value);
-        }
-
-        private bool _isMeshSyncEnabled;
-        public bool IsMeshSyncEnabled
-        {
-            get => _isMeshSyncEnabled;
-            set => SetField(ref _isMeshSyncEnabled, value);
-        }
-
-        private bool _isTextureSyncEnabled;
-        public bool IsTextureSyncEnabled
-        {
-            get => _isTextureSyncEnabled;
-            set => SetField(ref _isTextureSyncEnabled, value);
+            set
+            {
+                if (SetField(ref _isVisible, value))
+                {
+                    if (!_isUpdatingVisibility)
+                    {
+                        try
+                        {
+                            _isUpdatingVisibility = true;
+                            if (Parts != null)
+                            {
+                                foreach (var part in Parts)
+                                {
+                                    part.IsVisible = value;
+                                }
+                            }
+                            _areAllPartsVisible = value;
+                            OnPropertyChanged(nameof(AreAllPartsVisible));
+                        }
+                        finally
+                        {
+                            _isUpdatingVisibility = false;
+                        }
+                    }
+                }
+            }
         }
 
         private bool _areAllPartsVisible = true;
@@ -129,19 +150,29 @@ namespace AssetsManager.Views.Models.Viewer
             get => _areAllPartsVisible;
             set
             {
-                if (SetField(ref _areAllPartsVisible, value))
+                _areAllPartsVisible = value;
+                OnPropertyChanged();
+                if (Parts != null && !_isUpdatingVisibility)
                 {
-                    foreach (var part in Parts)
+                    try
                     {
-                        part.IsVisible = value;
+                        _isUpdatingVisibility = true;
+                        foreach (var part in Parts)
+                        {
+                            part.IsVisible = value;
+                        }
+                        _isVisible = value;
+                        OnPropertyChanged(nameof(IsVisible));
+                    }
+                    finally
+                    {
+                        _isUpdatingVisibility = false;
                     }
                 }
             }
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
-        public event Action<ModelPart> MeshVisibilityChanged;
-        public event Action<ModelPart> MeshTextureChanged;
 
         protected void OnPropertyChanged([CallerMemberName] string propertyName = null)
         {
@@ -174,25 +205,64 @@ namespace AssetsManager.Views.Models.Viewer
             UpdateTransform();
 
             Parts = new ObservableRangeCollection<ModelPart>();
-            Animations = new ObservableRangeCollection<AnimationData>();
+        }
+
+        public bool AddPart(ModelPart part)
+        {
+            if (part == null || Parts.Contains(part))
+                return false;
+
+            Parts.Add(part);
+            return true;
+        }
+
+        public int AddParts(IEnumerable<ModelPart> parts)
+        {
+            if (parts == null)
+                throw new ArgumentNullException(nameof(parts));
+
+            var existing = new HashSet<ModelPart>(Parts);
+            var additions = parts
+                .Where(part => part != null && existing.Add(part))
+                .ToList();
+
+            Parts.AddRange(additions);
+            return additions.Count;
+        }
+
+        public bool RemovePart(ModelPart part, bool dispose = false)
+        {
+            if (part == null || !Parts.Remove(part))
+                return false;
+
+            if (dispose)
+                part.Dispose();
+            return true;
+        }
+
+        private void SynchronizeParts()
+        {
+            var currentParts = new HashSet<ModelPart>(Parts ?? Enumerable.Empty<ModelPart>());
+            foreach (ModelPart removedPart in _trackedParts.Where(part => !currentParts.Contains(part)).ToList())
+            {
+                removedPart.PropertyChanged -= Part_PropertyChanged;
+                if (removedPart.Visual != null && RootVisual?.Children.Contains(removedPart.Visual) == true)
+                    RootVisual.Children.Remove(removedPart.Visual);
+                _trackedParts.Remove(removedPart);
+            }
+
+            foreach (ModelPart part in currentParts)
+            {
+                if (_trackedParts.Add(part))
+                    part.PropertyChanged += Part_PropertyChanged;
+                if (part.Visual != null && RootVisual?.Children.Contains(part.Visual) == false)
+                    RootVisual.Children.Add(part.Visual);
+            }
         }
 
         private void Parts_CollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
         {
-            if (e.OldItems != null)
-                foreach (ModelPart item in e.OldItems) item.PropertyChanged -= Part_PropertyChanged;
-
-            if (e.NewItems != null)
-                foreach (ModelPart item in e.NewItems) item.PropertyChanged += Part_PropertyChanged;
-
-            if (e.Action == NotifyCollectionChangedAction.Reset)
-            {
-                foreach (var item in Parts)
-                {
-                    item.PropertyChanged -= Part_PropertyChanged;
-                    item.PropertyChanged += Part_PropertyChanged;
-                }
-            }
+            SynchronizeParts();
             UpdateMasterVisibility();
         }
 
@@ -200,31 +270,26 @@ namespace AssetsManager.Views.Models.Viewer
         {
             if (e.PropertyName == nameof(ModelPart.IsVisible))
             {
-                if (sender is ModelPart part)
-                {
-                    if (IsMeshSyncEnabled)
-                    {
-                        MeshVisibilityChanged?.Invoke(part);
-                    }
-                }
                 UpdateMasterVisibility();
-            }
-            else if (e.PropertyName == nameof(ModelPart.SelectedTextureName))
-            {
-                if (sender is ModelPart part)
-                {
-                    if (IsTextureSyncEnabled)
-                    {
-                        MeshTextureChanged?.Invoke(part);
-                    }
-                }
             }
         }
 
         private void UpdateMasterVisibility()
         {
-            var allVisible = Parts.All(p => p.IsVisible);
-            SetField(ref _areAllPartsVisible, allVisible, nameof(AreAllPartsVisible));
+            if (_isUpdatingVisibility) return;
+            try
+            {
+                _isUpdatingVisibility = true;
+                bool allVisible = Parts != null && Parts.Count > 0 && Parts.All(p => p.IsVisible);
+                bool anyVisible = Parts != null && Parts.Any(p => p.IsVisible);
+
+                SetField(ref _areAllPartsVisible, allVisible, nameof(AreAllPartsVisible));
+                SetField(ref _isVisible, anyVisible, nameof(IsVisible));
+            }
+            finally
+            {
+                _isUpdatingVisibility = false;
+            }
         }
 
         public void Dispose()
@@ -256,13 +321,13 @@ namespace AssetsManager.Views.Models.Viewer
                     part.Dispose();
                 }
                 _parts.Clear();
+                _trackedParts.Clear();
 
                 foreach (var dict in uniqueTextureDicts)
                 {
                     dict.Clear();
                 }
             }
-            Animations?.Clear();
 
             if (_userTransformGroup.Children.Contains(_scaleTransform))
             {
@@ -272,30 +337,19 @@ namespace AssetsManager.Views.Models.Viewer
             CurrentAnimation = null;
             SkinnedMesh = null;
             Skeleton = null;
+            PoseDefinition = SkinPoseDefinition.Empty;
+            GpuSkinningData = null;
+            SkinningMatrices = null;
             RootVisual = null;
 
             IsAnimationPaused = false;
             AnimationTime = 0;
-            
+
             if (PropertyChanged != null)
             {
                 foreach (var d in PropertyChanged.GetInvocationList())
                 {
                     PropertyChanged -= (PropertyChangedEventHandler)d;
-                }
-            }
-            if (MeshVisibilityChanged != null)
-            {
-                foreach (var d in MeshVisibilityChanged.GetInvocationList())
-                {
-                    MeshVisibilityChanged -= (Action<ModelPart>)d;
-                }
-            }
-            if (MeshTextureChanged != null)
-            {
-                foreach (var d in MeshTextureChanged.GetInvocationList())
-                {
-                    MeshTextureChanged -= (Action<ModelPart>)d;
                 }
             }
         }

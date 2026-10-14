@@ -45,10 +45,18 @@ namespace AssetsManager.Views.Dialogs
 
         private void Timer_Tick(object sender, EventArgs e)
         {
-            UpdateEstimatedTime(_completedFiles, _totalFiles);
+            if (_totalFiles > 0)
+            {
+                UpdateEstimatedTime(_completedFiles, _totalFiles);
+            }
+            else
+            {
+                TimeSpan elapsed = DateTime.Now - _startTime;
+                ViewModel.EstimatedTimeText = $"Elapsed time: {elapsed.ToString(@"hh\:mm\:ss")}";
+            }
         }
 
-        public void UpdateProgress(int completedFiles, int totalFiles, string currentFileName, bool isSuccess, string errorMessage)
+        public void UpdateProgress(int completedFiles, int totalFiles, string currentFileName, bool isSuccess, string errorMessage, string customProgressText = null)
         {
             _completedFiles = completedFiles;
             _totalFiles = totalFiles;
@@ -86,10 +94,15 @@ namespace AssetsManager.Views.Dialogs
                     ViewModel.CurrentFileName = currentFileName;
                 }
             }
-            else
+            else if (totalFiles > 0)
             {
                 ViewModel.ItemProgressText = $"{completedFiles} of {totalFiles}";
                 ViewModel.CurrentFileName = string.IsNullOrEmpty(currentFileName) ? "Initializing..." : currentFileName;
+            }
+            else
+            {
+                ViewModel.ItemProgressText = !string.IsNullOrWhiteSpace(customProgressText) ? customProgressText : (completedFiles > 0 ? $"{completedFiles:N0} checked" : "Scanning...");
+                ViewModel.CurrentFileName = string.IsNullOrEmpty(currentFileName) ? "Scanning candidates..." : currentFileName;
             }
 
             string fileSpecificProgress = null;
@@ -118,20 +131,23 @@ namespace AssetsManager.Views.Dialogs
 
             if (totalFiles > 0)
             {
+                ViewModel.IsIndeterminate = false;
                 ViewModel.ProgressValue = (double)completedFiles / totalFiles * 100;
+                UpdateEstimatedTime(completedFiles, totalFiles);
+
+                if (completedFiles >= totalFiles)
+                {
+                    _timer.Stop();
+                    ViewModel.EstimatedTimeText = "Estimated time remaining: 00:00:00";
+                    ViewModel.ProgressValue = 100;
+                }
             }
             else
             {
+                ViewModel.IsIndeterminate = true;
                 ViewModel.ProgressValue = 0;
-            }
-
-            UpdateEstimatedTime(completedFiles, totalFiles);
-
-            if (completedFiles >= totalFiles && totalFiles > 0)
-            {
-                _timer.Stop();
-                ViewModel.EstimatedTimeText = "Estimated time remaining: 00:00:00";
-                ViewModel.ProgressValue = 100;
+                TimeSpan elapsed = DateTime.Now - _startTime;
+                ViewModel.EstimatedTimeText = $"Elapsed time: {elapsed.ToString(@"hh\:mm\:ss")}";
             }
         }
 

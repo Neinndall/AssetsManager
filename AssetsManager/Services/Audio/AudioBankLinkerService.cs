@@ -13,11 +13,11 @@ using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Explorer;
 using AssetsManager.Services.Explorer.Tree;
+using AssetsManager.Utils;
 using AssetsManager.Views.Models.Audio;
 using AssetsManager.Views.Models.Explorer;
 using AssetsManager.Views.Models.Wad;
 using AssetsManager.Utils.Framework;
-using AssetsManager.Utils;
 
 namespace AssetsManager.Services.Audio
 {
@@ -52,7 +52,8 @@ namespace AssetsManager.Services.Audio
         public async Task<LinkedAudioBank> LinkAudioBankAsync(FileSystemNodeModel clickedNode, ObservableRangeCollection<FileSystemNodeModel> rootNodes, string currentRootPath)
         {
             bool isBackupMode = clickedNode.ChunkDiff != null;
-            string modeLabel = isBackupMode ? "BACKUP" : "LIVE";
+            // "CURRENT" refers to reading directly from the active local client files on disk (Live or PBE)
+            string modeLabel = isBackupMode ? "BACKUP" : "CURRENT";
             
             _logService.LogDebug($"[LinkAudioBankAsync] [{modeLabel} MODE] Linking audio bank. Node: '{clickedNode.Name}', Path: '{clickedNode.VirtualPath}'");
 
@@ -80,13 +81,13 @@ namespace AssetsManager.Services.Audio
             else
             {
                 var (binNode, baseName, binType) = await FindAssociatedBinFileAsync(clickedNode, rootNodes, currentRootPath);
-                _logService.LogDebug($"[LinkAudioBankAsync] [LIVE] BinNode resolved: {binNode != null}, BaseName: {baseName}, Type: {binType}");
+                _logService.LogDebug($"[LinkAudioBankAsync] [CURRENT] BinNode resolved: {binNode != null}, BaseName: {baseName}, Type: {binType}");
 
                 byte[] binData = null;
                 if (binNode != null) binData = await _wadContentProvider.GetVirtualFileBytesAsync(binNode);
 
                 var siblingsResult = await FindSiblingFilesFromWadsInternalAsync(clickedNode, clickedNode.SourceWadPath, baseName);
-                _logService.LogDebug($"[LinkAudioBankAsync] [LIVE] Siblings: WPK={siblingsResult.WpkNode != null}, AudioBNK={siblingsResult.AudioBnkNode != null}, EventsBNK={siblingsResult.EventsBnkNode != null}");
+                _logService.LogDebug($"[LinkAudioBankAsync] [CURRENT] Siblings: WPK={siblingsResult.WpkNode != null}, AudioBNK={siblingsResult.AudioBnkNode != null}, EventsBNK={siblingsResult.EventsBnkNode != null}");
 
                 return new LinkedAudioBank
                 {
@@ -285,18 +286,18 @@ namespace AssetsManager.Services.Audio
                 potential.Add((basePart + "_audio.bnk", AudioDependencyType.AudioBnk));
             }
 
-            string siblingDir = Path.GetDirectoryName(pathForStrategy)?.Replace('\\', '/') ?? string.Empty;
+            string siblingDir = PathUtils.NormalizeSeparators(Path.GetDirectoryName(pathForStrategy));
             foreach (var (siblingFileName, siblingType) in potential)
             {
                 string siblingVirtualPath = string.IsNullOrEmpty(siblingDir)
                     ? siblingFileName
-                    : Path.Combine(siblingDir, siblingFileName).Replace('\\', '/');
+                    : PathUtils.NormalizeSeparators(Path.Combine(siblingDir, siblingFileName));
 
                 siblings.Add(new AudioDependencyInfo
                 {
                     Path = siblingVirtualPath,
                     SourceWad = sourceWadFile,
-                    PathHash = XxHash64Ext.Hash(siblingVirtualPath.ToLower()),
+                    PathHash = XxHash64Ext.Hash(PathUtils.NormalizePath(siblingVirtualPath)),
                     Type = siblingType
                 });
             }
@@ -329,14 +330,14 @@ namespace AssetsManager.Services.Audio
                 }
                 else if (!string.IsNullOrEmpty(sourceWadDirectory))
                 {
-                    targetWadRelativePath = Path.Combine(sourceWadDirectory, binStrategy.TargetWadName).Replace('\\', '/');
+                    targetWadRelativePath = PathUtils.NormalizeSeparators(Path.Combine(sourceWadDirectory, binStrategy.TargetWadName));
                 }
 
                 deps.Add(new AudioDependencyInfo
                 {
                     Path = binVirtualPath,
                     SourceWad = targetWadRelativePath,
-                    PathHash = XxHash64Ext.Hash(binVirtualPath.ToLower()),
+                    PathHash = XxHash64Ext.Hash(PathUtils.NormalizePath(binVirtualPath)),
                     Type = AudioDependencyType.Bin
                 });
             }
@@ -399,15 +400,13 @@ namespace AssetsManager.Services.Audio
             }
             else
             {
-                Func<FileSystemNodeModel, Task> loader = async (node) => await _wadNodeLoaderService.EnsureAllChildrenLoadedAsync(node, currentRootPath);
-                
                 // BRIDGE FIX: Try to find the target WAD node anywhere in the tree (not just top-level)
                 var targetWadNode = FindNodeByName(rootNodes, strategy.TargetWadName);
                 
                 if (targetWadNode != null)
                 {
                     _logService.LogDebug($"[FindAssociatedBinFileAsync] [LIVE] Target WAD '{strategy.TargetWadName}' found in tree. Searching for BIN '{strategy.BinPath}'...");
-                    var binNode = await _wadSearchBoxService.PerformSearchAsync(strategy.BinPath, new ObservableRangeCollection<FileSystemNodeModel> { targetWadNode }, loader);
+                    var binNode = await _wadSearchBoxService.PerformSearchAsync(strategy.BinPath, new ObservableRangeCollection<FileSystemNodeModel> { targetWadNode });
                     if (binNode != null) return (binNode, baseName, strategy.Type);
                 }
                 else
@@ -422,7 +421,7 @@ namespace AssetsManager.Services.Audio
                            if (match != null)
                            {
                                _logService.LogDebug($"[FindAssociatedBinFileAsync] [LIVE] Fallback: Found target WAD '{strategy.TargetWadName}' in sub-hierarchy.");
-                               var binNode = await _wadSearchBoxService.PerformSearchAsync(strategy.BinPath, new ObservableRangeCollection<FileSystemNodeModel> { match }, loader);
+                               var binNode = await _wadSearchBoxService.PerformSearchAsync(strategy.BinPath, new ObservableRangeCollection<FileSystemNodeModel> { match });
                                if (binNode != null) return (binNode, baseName, strategy.Type);
                            }
                         }
@@ -432,7 +431,7 @@ namespace AssetsManager.Services.Audio
                 var commonWadNode = FindNodeByName(rootNodes, "Common.wad.client");
                 if (commonWadNode != null && commonWadNode != targetWadNode)
                 {
-                    var binNodeInCommon = await _wadSearchBoxService.PerformSearchAsync(strategy.BinPath, new ObservableRangeCollection<FileSystemNodeModel> { commonWadNode }, loader);
+                    var binNodeInCommon = await _wadSearchBoxService.PerformSearchAsync(strategy.BinPath, new ObservableRangeCollection<FileSystemNodeModel> { commonWadNode });
                     if (binNodeInCommon != null) return (binNodeInCommon, baseName, strategy.Type);
                 }
             }
@@ -493,16 +492,14 @@ namespace AssetsManager.Services.Audio
                 audioBnkData: oldAudioBnk,
                 eventsData: oldEventsBnk,
                 binData: oldBin,
-                baseName: baseName,
-                binType: binStrategy?.Type ?? BinType.Unknown);
+                baseName: baseName);
 
             var newNodes = _audioBankService.ParseAudioBank(
                 wpkData: newWpk,
                 audioBnkData: newAudioBnk,
                 eventsData: newEventsBnk,
                 binData: newBin,
-                baseName: baseName,
-                binType: binStrategy?.Type ?? BinType.Unknown);
+                baseName: baseName);
 
             return (oldNodes, newNodes);
         }
@@ -526,8 +523,6 @@ namespace AssetsManager.Services.Audio
             bool clickedIsEventsBnk = fileName.Contains("_events", StringComparison.OrdinalIgnoreCase);
 
             var binStrategy = GetBinFileSearchStrategy(diff.NewPath ?? diff.OldPath, diff.SourceWadFile);
-            var binType = binStrategy?.Type ?? BinType.Unknown;
-
             byte[] oldEventsBnk = null, oldAudioBnk = null, oldWpk = null, oldBin = null;
             byte[] newEventsBnk = null, newAudioBnk = null, newWpk = null, newBin = null;
 
@@ -535,8 +530,16 @@ namespace AssetsManager.Services.Audio
             {
                 if (!depByPath.TryGetValue(dep.Path, out var assoc) || assoc == null) continue;
 
-                byte[] oldBytes = await _wadContentProvider.GetBackupChunkBytesAsync(backupRoot, dep.SourceWad, assoc.OldPathHash, assoc.CompressionType, isOld: true);
-                byte[] newBytes = await _wadContentProvider.GetBackupChunkBytesAsync(backupRoot, dep.SourceWad, assoc.NewPathHash, assoc.CompressionType, isOld: false);
+                byte[] oldBytes = await _wadContentProvider.GetBackupChunkBytesAsync(
+                    backupRoot, dep.SourceWad, assoc.OldPathHash,
+                    assoc.OldCompressionType ?? assoc.CompressionType,
+                    isOld: true,
+                    uncompressedSize: assoc.OldUncompressedSize);
+                byte[] newBytes = await _wadContentProvider.GetBackupChunkBytesAsync(
+                    backupRoot, dep.SourceWad, assoc.NewPathHash,
+                    assoc.NewCompressionType ?? assoc.CompressionType,
+                    isOld: false,
+                    uncompressedSize: assoc.NewUncompressedSize);
 
                 switch (dep.Type)
                 {
@@ -568,16 +571,14 @@ namespace AssetsManager.Services.Audio
                 audioBnkData: oldAudioBnk,
                 eventsData: oldEventsBnk,
                 binData: oldBin,
-                baseName: baseName,
-                binType: binType);
+                baseName: baseName);
 
             var newNodes = _audioBankService.ParseAudioBank(
                 wpkData: newWpk,
                 audioBnkData: newAudioBnk,
                 eventsData: newEventsBnk,
                 binData: newBin,
-                baseName: baseName,
-                binType: binType);
+                baseName: baseName);
 
             return (oldNodes, newNodes);
         }
@@ -627,7 +628,7 @@ namespace AssetsManager.Services.Audio
                 {
                     targetWadRelativePath = string.IsNullOrEmpty(sourceWadDirectory)
                         ? binStrategy.TargetWadName
-                        : Path.Combine(sourceWadDirectory, binStrategy.TargetWadName).Replace('\\', '/');
+                        : PathUtils.NormalizeSeparators(Path.Combine(sourceWadDirectory, binStrategy.TargetWadName));
                 }
 
                 string targetWadFullPath = Path.Combine(basePath, targetWadRelativePath);

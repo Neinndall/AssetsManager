@@ -1,0 +1,384 @@
+using System;
+using System.Buffers;
+using System.Collections.Generic;
+using System.Linq;
+using System.Diagnostics;
+using System.IO.Hashing;
+using System.Text;
+using System.Text.RegularExpressions;
+using AssetsManager.Utils;
+using AssetsManager.Views.Models.Hashes;
+using LeagueToolkit.Hashing;
+
+namespace AssetsManager.Services.Hashes
+{
+    public sealed class HashGuessEngine
+    {
+
+
+        private readonly HashSet<ulong> _unknownHashes;
+        private readonly Dictionary<ulong, HashGuessMatch> _matches = new();
+        private readonly Action<HashGuessMatch> _matchFound;
+        private readonly Stopwatch _stopwatch = Stopwatch.StartNew();
+
+        public HashGuessEngine(HashGuessDomain domain, HashSet<ulong> unknownHashes, Action<HashGuessMatch> matchFound = null)
+        {
+            Domain = domain;
+            _unknownHashes = unknownHashes ?? throw new ArgumentNullException(nameof(unknownHashes));
+            _matchFound = matchFound;
+        }
+
+        public HashGuessDomain Domain { get; }
+        public IReadOnlyDictionary<ulong, HashGuessMatch> Matches => _matches;
+        public int RemainingUnknownCount => _unknownHashes.Count;
+        public IReadOnlyCollection<ulong> UnknownHashes => _unknownHashes;
+        public long CheckedCandidates { get; private set; }
+        public long DiscardedCandidates { get; private set; }
+        public void EnsureUnknown(ulong hash) => _unknownHashes.Add(hash);
+
+        public bool Check(string candidate, HashGuessStrategy strategy, string source = "Generated", ulong sourceChunkHash = 0)
+        {
+            CheckedCandidates++;
+            string normalizedPath = PathUtils.NormalizePath(candidate);
+            if (normalizedPath.Length == 0)
+            {
+                DiscardedCandidates++;
+                return false;
+            }
+
+            ulong hash = XxHash64Ext.Hash(normalizedPath);
+            if (!_unknownHashes.Contains(hash))
+            {
+                DiscardedCandidates++;
+                return false;
+            }
+
+            _AddKnown(hash, normalizedPath, strategy, source, sourceChunkHash);
+            return true;
+        }
+
+        /// <summary>
+        /// Evaluates a candidate formed by prefix and suffix spans with zero heap allocations on misses,
+        /// using a stack buffer for XXH64 hashing and materializing a string only upon a confirmed match.
+        /// </summary>
+        public bool CheckPrefixSuffix(
+            ReadOnlySpan<char> prefix,
+            ReadOnlySpan<char> suffix,
+            HashGuessStrategy strategy,
+            string source = "Generated",
+            ulong sourceChunkHash = 0)
+            => CheckNormalizedParts(prefix, ReadOnlySpan<char>.Empty, suffix, strategy, source, sourceChunkHash);
+
+        /// <summary>
+        /// Evaluates a pre-normalized candidate path span directly without heap allocation on misses.
+        /// Materializes a string only upon a confirmed match.
+        /// </summary>
+        public bool CheckNormalizedPath(
+            ReadOnlySpan<char> normalizedPath,
+            HashGuessStrategy strategy,
+            string source = "Generated",
+            ulong sourceChunkHash = 0)
+        {
+            CheckedCandidates++;
+            if (normalizedPath.Length == 0)
+            {
+                DiscardedCandidates++;
+                return false;
+            }
+
+            ulong hash = XxHash64Ext.Hash(normalizedPath);
+            if (!_unknownHashes.Contains(hash))
+            {
+                DiscardedCandidates++;
+                return false;
+            }
+
+            string path = normalizedPath.ToString();
+            _AddKnown(hash, path, strategy, source, sourceChunkHash);
+            return true;
+        }
+
+        // Callers must provide normalized path parts, as with CheckPrefixSuffix.
+        internal bool CheckNormalizedParts(
+            ReadOnlySpan<char> prefix,
+            ReadOnlySpan<char> word,
+            ReadOnlySpan<char> suffix,
+            HashGuessStrategy strategy,
+            string source,
+            ulong sourceChunkHash = 0,
+            ulong? expectedHash = null)
+        {
+            CheckedCandidates++;
+            int totalLength = prefix.Length + word.Length + suffix.Length;
+            if (totalLength == 0)
+            {
+                DiscardedCandidates++;
+                return false;
+            }
+
+            Span<char> buffer = totalLength <= 256 ? stackalloc char[totalLength] : new char[totalLength];
+            prefix.CopyTo(buffer);
+            word.CopyTo(buffer[prefix.Length..]);
+            suffix.CopyTo(buffer[(prefix.Length + word.Length)..]);
+
+            ulong hash = XxHash64Ext.Hash(buffer);
+            if ((expectedHash.HasValue && hash != expectedHash.Value) || !_unknownHashes.Contains(hash))
+            {
+                DiscardedCandidates++;
+                return false;
+            }
+
+            string path = buffer.ToString();
+            _AddKnown(hash, path, strategy, source, sourceChunkHash);
+            return true;
+        }
+
+        // Shared normalized parts can be encoded once instead of once per candidate.
+        internal bool CheckNormalizedUtf8Parts(ReadOnlySpan<byte> prefix, ReadOnlySpan<byte> word,
+            ReadOnlySpan<byte> suffix, HashGuessStrategy strategy, string source, ulong sourceChunkHash = 0)
+        {
+            CheckedCandidates++;
+            int length = prefix.Length + word.Length + suffix.Length;
+            if (length == 0)
+            {
+                DiscardedCandidates++;
+                return false;
+            }
+            byte[] rented = null;
+            Span<byte> buffer = length <= 512 ? stackalloc byte[length] :
+                (rented = ArrayPool<byte>.Shared.Rent(length)).AsSpan(0, length);
+            try
+            {
+                prefix.CopyTo(buffer);
+                word.CopyTo(buffer[prefix.Length..]);
+                suffix.CopyTo(buffer[(prefix.Length + word.Length)..]);
+                ulong hash = XxHash64.HashToUInt64(buffer);
+                if (!_unknownHashes.Contains(hash))
+                {
+                    DiscardedCandidates++;
+                    return false;
+                }
+                _AddKnown(hash, Encoding.UTF8.GetString(buffer), strategy, source, sourceChunkHash);
+                return true;
+            }
+            finally
+            {
+                if (rented != null) ArrayPool<byte>.Shared.Return(rented);
+            }
+        }
+
+        internal bool CheckCombined(
+            string directory,
+            string relativePath,
+            HashGuessStrategy strategy,
+            string source,
+            ulong sourceChunkHash)
+        {
+            CheckedCandidates++;
+            string combinedPath = string.IsNullOrEmpty(directory)
+                ? relativePath
+                : string.Concat(directory, "/", relativePath);
+            string normalizedPath = PathUtils.NormalizePath(combinedPath);
+            if (normalizedPath.Length == 0)
+            {
+                DiscardedCandidates++;
+                return false;
+            }
+
+            int byteCount = Encoding.UTF8.GetByteCount(normalizedPath);
+            byte[] rented = null;
+            Span<byte> utf8 = byteCount <= 1024
+                ? stackalloc byte[byteCount]
+                : (rented = ArrayPool<byte>.Shared.Rent(byteCount));
+            try
+            {
+                int written = Encoding.UTF8.GetBytes(normalizedPath, utf8);
+                ulong hash = XxHash64.HashToUInt64(utf8[..written]);
+                if (!_unknownHashes.Contains(hash))
+                {
+                    DiscardedCandidates++;
+                    return false;
+                }
+
+                _AddKnown(hash, normalizedPath, strategy, source, sourceChunkHash);
+                return true;
+            }
+            finally
+            {
+                if (rented != null) ArrayPool<byte>.Shared.Return(rented);
+            }
+        }
+
+        internal void _AddKnown(
+            ulong hash,
+            string path,
+            HashGuessStrategy strategy,
+            string source,
+            ulong sourceChunkHash = 0)
+        {
+            _unknownHashes.Remove(hash);
+            var match = new HashGuessMatch
+            {
+                Hash = hash,
+                Path = path,
+                Domain = Domain,
+                Strategy = strategy,
+                SourceWadPath = source,
+                SourceChunkHash = sourceChunkHash
+            };
+            _matches[hash] = match;
+            _matchFound?.Invoke(match);
+        }
+
+        public HashGuessProgress CreateProgress(
+            string stage,
+            int processedChunks = 0,
+            int processedWads = 0,
+            int totalWads = 0)
+        {
+            TimeSpan elapsed = _stopwatch.Elapsed;
+            return new HashGuessProgress
+            {
+                ProcessedWads = processedWads,
+                TotalWads = totalWads,
+                ProcessedChunks = processedChunks,
+                FoundMatches = _matches.Count,
+                RemainingUnknowns = _unknownHashes.Count,
+                CurrentWad = stage,
+                CheckedCandidates = CheckedCandidates,
+                DiscardedCandidates = DiscardedCandidates,
+                CandidatesPerSecond = elapsed.TotalSeconds > 0 ? CheckedCandidates / elapsed.TotalSeconds : 0,
+                Elapsed = elapsed,
+                ManagedMemoryBytes = GC.GetTotalMemory(false)
+            };
+        }
+
+        public static IReadOnlyList<string> BuildWordlist(IEnumerable<string> paths)
+        {
+            ArgumentNullException.ThrowIfNull(paths);
+
+            var words = new HashSet<string>(StringComparer.Ordinal);
+            foreach (string path in paths)
+            {
+                if (string.IsNullOrEmpty(path)) continue;
+
+                string normalized = path.Replace('/', '-').Replace('_', '-').Replace('.', '-');
+                string[] tokens = normalized.Split('-');
+                for (int index = 0; index < tokens.Length - 1; index++)
+                {
+                    string word = tokens[index];
+                    if (word.Length == 0 || IsLargeNumericWord(word)) continue;
+                    words.Add(word);
+                }
+            }
+
+            return words.OrderBy(word => word, StringComparer.Ordinal).ToList();
+        }
+
+        private static bool IsLargeNumericWord(string word)
+        {
+            if (word.Length < 3) return false;
+            foreach (char character in word)
+                if (character < '0' || character > '9') return false;
+            return true;
+        }
+
+        public static IReadOnlyList<string> BuildBasenameWordlist(IEnumerable<string> paths, int minimumLength = 1, int maximumLength = 48)
+        {
+            var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            foreach (string path in paths)
+            {
+                string basename = System.IO.Path.GetFileNameWithoutExtension(path ?? string.Empty);
+                foreach (string word in TokenizePath(basename))
+                {
+                    if (word.Length < minimumLength || word.Length > maximumLength) continue;
+                    counts.TryGetValue(word, out int count);
+                    counts[word] = count + 1;
+                }
+            }
+            return counts.OrderByDescending(pair => pair.Value)
+                .ThenBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase)
+                .Select(pair => pair.Key)
+                .ToList();
+        }
+
+        public static IReadOnlyList<string> BuildFrequencyWordlist(IEnumerable<string> paths)
+        {
+            var basenameCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            var tokens = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (string path in paths)
+            {
+                if (string.IsNullOrEmpty(path)) continue;
+                List<string> pathTokens = TokenizePath(path);
+                if (pathTokens.Count == 0) continue;
+                for (int index = 0; index < pathTokens.Count - 1; index++)
+                    tokens.Add(pathTokens[index]);
+                foreach (string word in TokenizePath(System.IO.Path.GetFileNameWithoutExtension(path)))
+                {
+                    basenameCounts.TryGetValue(word, out int count);
+                    basenameCounts[word] = count + 1;
+                }
+            }
+            return tokens
+                .OrderByDescending(word => basenameCounts.TryGetValue(word, out int count) ? count : 0)
+                .ThenBy(word => word, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
+        private static List<string> TokenizePath(string path)
+        {
+            var list = new List<string>();
+            if (string.IsNullOrEmpty(path)) return list;
+
+            int start = 0;
+            for (int i = 0; i <= path.Length; i++)
+            {
+                if (i == path.Length || path[i] == '/' || path[i] == '_' || path[i] == '.' || path[i] == '-')
+                {
+                    int length = i - start;
+                    if (length > 0)
+                    {
+                        bool isNumericFilter = false;
+                        if (length >= 3)
+                        {
+                            isNumericFilter = true;
+                            for (int j = start; j < i; j++)
+                            {
+                                if (path[j] < '0' || path[j] > '9')
+                                {
+                                    isNumericFilter = false;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (!isNumericFilter)
+                        {
+                            list.Add(path.Substring(start, length));
+                        }
+                    }
+                    start = i + 1;
+                }
+            }
+            return list;
+        }
+
+        public static IReadOnlyList<string> BuildDirectoryList(IEnumerable<string> paths)
+        {
+            var directories = new HashSet<string>(StringComparer.Ordinal);
+            foreach (string path in paths)
+            {
+                int separator = path?.LastIndexOf('/') ?? -1;
+                while (separator >= 0)
+                {
+                    directories.Add(path[..separator]);
+                    if (separator == 0) break;
+                    separator = path.LastIndexOf('/', separator - 1);
+                }
+            }
+            directories.Add(string.Empty);
+            return directories.OrderBy(path => path, StringComparer.Ordinal).ToList();
+        }
+
+    }
+}

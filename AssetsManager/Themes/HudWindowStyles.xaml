@@ -5,7 +5,7 @@
 
     <ResourceDictionary.MergedDictionaries>
         <ResourceDictionary Source="/Themes/Colors.xaml"/>
-        <ResourceDictionary Source="/Themes/ModernButton.xaml"/>
+        <ResourceDictionary Source="/Themes/ButtonStyles.xaml"/>
     </ResourceDictionary.MergedDictionaries>
 
     <Style x:Key="HudWindowStyle" TargetType="{x:Type base:HudWindow}">

@@ -18,11 +18,11 @@ jobs:
         path: app_root
         fetch-depth: 0
 
-    - name: Checkout LeagueToolkit Fork
+    - name: Checkout LeagueToolkit Dev
       uses: actions/checkout@v6
       with:
         repository: Neinndall/LeagueToolkit
-        ref: model-loading-optimization
+        ref: dev
         path: LeagueToolkit-4.1.0-beta.53
 
     - name: Setup .NET

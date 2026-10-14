@@ -23,6 +23,20 @@ namespace AssetsManager.Views.Models.Versions
             }
         }
 
+        private bool _isNew;
+        public bool IsNew
+        {
+            get { return _isNew; }
+            set
+            {
+                if (_isNew != value)
+                {
+                    _isNew = value;
+                    OnPropertyChanged(nameof(IsNew));
+                }
+            }
+        }
+
         public event PropertyChangedEventHandler PropertyChanged;
 
         protected void OnPropertyChanged(string propertyName)

@@ -1,0 +1,144 @@
+using System;
+using System.Collections.Generic;
+using System.Numerics;
+using System.Windows;
+using System.Windows.Media;
+using System.Windows.Media.Media3D;
+using AssetsManager.Services.Viewer.Interaction;
+using AssetsManager.Views.Models.Viewer;
+using Xunit;
+
+namespace AssetsManager.Tests.xUnit.Services.Viewer.Interaction
+{
+    public sealed class ViewerInteractionServiceTests
+    {
+        [Fact]
+        public void CenteredPositionsRespectWidthsOrderAndGap()
+        {
+            IReadOnlyList<double> positions =
+                ViewerInteractionService.CalculateCenteredPositions(
+                    new[] { 100d, 200d, 100d },
+                    20);
+
+            Assert.Equal(new[] { -170d, 0d, 170d }, positions);
+        }
+
+        [Fact]
+        public void ProjectionMapsWorldOriginToViewportCenter()
+        {
+            Matrix4x4 view = Matrix4x4.CreateLookAt(
+                new Vector3(0, 0, 1000),
+                Vector3.Zero,
+                Vector3.UnitY);
+            Matrix4x4 projection = Matrix4x4.CreatePerspectiveFieldOfView(
+                MathF.PI / 4,
+                16f / 9f,
+                10,
+                100000);
+
+            bool projected = ViewerInteractionService.TryProject(
+                Vector3.Zero,
+                view * projection,
+                1920,
+                1080,
+                out Point point);
+
+            Assert.True(projected);
+            Assert.Equal(960, point.X, 6);
+            Assert.Equal(540, point.Y, 6);
+        }
+
+        [Fact]
+        public void PickingChoosesVisibleModelUnderPointer()
+        {
+            SceneModel centered = CreateModel("Centered", 0);
+            SceneModel offset = CreateModel("Offset", 500);
+            var camera = new PerspectiveCamera(
+                new Point3D(0, 0, 1000),
+                new Vector3D(0, 0, -1000),
+                new Vector3D(0, 1, 0),
+                45);
+
+            SceneModel picked = ViewerInteractionService.PickModel(
+                new[] { offset, centered },
+                new Point(400, 300),
+                800,
+                600,
+                camera);
+
+            Assert.Same(centered, picked);
+            centered.Dispose();
+            offset.Dispose();
+        }
+
+        [Fact]
+        public void PickingUsesTheConsumerWorldMatrixWhenSupplied()
+        {
+            // The consumer draws this model at the origin even though its placement is off-screen.
+            SceneModel drawnAtOrigin = CreateModel("Mirrored", 500);
+            var camera = new PerspectiveCamera(
+                new Point3D(0, 0, 1000),
+                new Vector3D(0, 0, -1000),
+                new Vector3D(0, 1, 0),
+                45);
+
+            SceneModel withDefault = ViewerInteractionService.PickModel(
+                new[] { drawnAtOrigin }, new Point(400, 300), 800, 600, camera);
+            SceneModel withProvider = ViewerInteractionService.PickModel(
+                new[] { drawnAtOrigin }, new Point(400, 300), 800, 600, camera,
+                _ => Matrix4x4.CreateScale(-1f, 1f, 1f));
+
+            Assert.Null(withDefault);
+            Assert.Same(drawnAtOrigin, withProvider);
+            drawnAtOrigin.Dispose();
+        }
+
+        [Theory]
+        [InlineData(200, false)]
+        [InlineData(2000, false)]
+        [InlineData(200, true)]
+        [InlineData(2000, true)]
+        public void GizmoAxisKeepsScreenSizeAtSelectedActorDepth(float depth, bool orthographic)
+        {
+            var origin = new Vector3(120, 0, -depth);
+            var projection = orthographic
+                ? Matrix4x4.CreateOrthographic(1600, 1200, 1, 10000)
+                : Matrix4x4.CreatePerspectiveFieldOfView(MathF.PI / 4, 4f / 3, 1, 10000);
+            Assert.True(ViewerInteractionService.TryCalculateGizmoAxisLength(origin, projection, 600, out double length));
+            Assert.True(ViewerInteractionService.TryProject(origin, projection, 800, 600, out Point start));
+            Assert.True(ViewerInteractionService.TryProject(origin + Vector3.UnitY * (float)length,
+                projection, 800, 600, out Point end));
+            Assert.InRange((end - start).Length, 79.95, 80.05);
+        }
+
+        [Fact]
+        public void GizmoRejectsInvalidProjectionAndActorBehindCamera()
+        {
+            Assert.False(ViewerInteractionService.TryCalculateGizmoAxisLength(Vector3.Zero,
+                default, 600, out _));
+            var projection = Matrix4x4.CreatePerspectiveFieldOfView(MathF.PI / 4, 1, 1, 10000);
+            Assert.False(ViewerInteractionService.TryCalculateGizmoAxisLength(Vector3.UnitZ,
+                projection, 600, out _));
+        }
+
+        private static SceneModel CreateModel(string name, double positionX)
+        {
+            var geometry = new MeshGeometry3D
+            {
+                Positions = new Point3DCollection
+                {
+                    new(-50, -50, -50),
+                    new(50, 50, 50)
+                },
+                TriangleIndices = new Int32Collection()
+            };
+            var model = new SceneModel
+            {
+                Name = name,
+                PositionX = positionX
+            };
+            model.Parts.Add(new ModelPart(name, new GeometryModel3D { Geometry = geometry }));
+            return model;
+        }
+    }
+}

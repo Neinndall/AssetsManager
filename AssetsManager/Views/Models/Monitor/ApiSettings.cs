@@ -1,4 +1,5 @@
 using System;
+using AssetsManager.Views.Models.Settings;
 
 namespace AssetsManager.Views.Models.Monitor
 {
@@ -25,6 +26,13 @@ namespace AssetsManager.Views.Models.Monitor
     {
         public ConnectionInfo Connection { get; set; } = new ConnectionInfo();
         public TokenInfo Token { get; set; } = new TokenInfo();
-        public bool UsePbeForApi { get; set; }
+        public ApiClientTarget ClientTarget { get; set; } = ApiClientTarget.PBE;
+        public bool OfflineCachePersistence { get; set; } = true;
+
+        public bool UsePbeForApi
+        {
+            get => ClientTarget == ApiClientTarget.PBE;
+            set => ClientTarget = value ? ApiClientTarget.PBE : ApiClientTarget.LIVE;
+        }
     }
 }

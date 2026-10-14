@@ -1,0 +1,821 @@
+<UserControl x:Class="AssetsManager.Views.Controls.Viewer.StudioViewportControl"
+
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+
+        xmlns:shared="clr-namespace:AssetsManager.Views.Controls.Shared"
+        xmlns:viewerControls="clr-namespace:AssetsManager.Views.Controls.Viewer"
+
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+
+        xmlns:models="clr-namespace:AssetsManager.Views.Models.Viewer"
+
+        xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
+
+        xmlns:glWpfControl="clr-namespace:OpenTK.Wpf;assembly=GLWpfControl"
+
+        mc:Ignorable="d" FontFamily="{StaticResource AppFontFamily}"
+
+       >
+    <UserControl.Resources>
+<BooleanToVisibilityConverter x:Key="BoolToVis"/>
+    </UserControl.Resources>
+<Grid>
+
+                    <!-- Base background with rounded corners -->
+
+                    <Border x:Name="ViewportBackgroundSurface"
+
+                            Background="{StaticResource ViewportBackground}" CornerRadius="10"/>
+
+
+
+                    <!-- Viewport surface clipped cleanly to rounded geometry -->
+
+                    <Grid x:Name="ViewportClipGrid" SizeChanged="ViewportClipGrid_SizeChanged">
+
+                        <!-- Reveal the native surface only after its first complete frame. -->
+
+                        <glWpfControl:GLWpfControl x:Name="OpenTkControl" Opacity="0"
+
+                                             Ready="OpenTkControl_Ready"
+
+                                             Render="OpenTkControl_Render"/>
+
+
+
+                        <!-- Shared input surface: the Character transform gizmo gets first chance to
+
+                             consume axis drags; unhandled gestures continue to the camera controller. -->
+
+                        <Border x:Name="CameraInputSurface" Background="Transparent" Panel.ZIndex="2"/>
+
+
+
+                        <shared:ViewportTransformGizmo x:Name="CharacterTransformGizmoCanvas" IsHitTestVisible="False" Panel.ZIndex="5"/>
+
+
+
+                        <!-- Character/Skin armature and optional joint labels follow the same pose as the SKN. -->
+
+                        <Canvas x:Name="CharacterArmatureCanvas"
+
+                                Panel.ZIndex="6"
+
+                                IsHitTestVisible="False"
+
+                                ClipToBounds="True"/>
+
+
+
+                        <!-- HUD Overlay in Viewport (Top-Left: System & Live Particles) -->
+
+                        <Border VerticalAlignment="Top" HorizontalAlignment="Left" Margin="12"
+
+                                Background="#CC12131A" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
+
+                                CornerRadius="6" Padding="10,6" IsHitTestVisible="False">
+
+                            <StackPanel Orientation="Horizontal">
+
+                                <materialIcons:MaterialIcon Kind="AutoAwesome" Width="15" Height="15" Foreground="{StaticResource AccentGreen}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+
+                                <TextBlock Text="{Binding ViewportSelectionTitle}" FontWeight="Bold" FontSize="11.5" Foreground="White" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="230"/>
+
+                                <Border Width="1" Height="14" Background="{StaticResource BorderColor}" Margin="8,0" VerticalAlignment="Center"/>
+
+                                <materialIcons:MaterialIcon Kind="InformationOutline" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" Margin="0,0,4,0" VerticalAlignment="Center"/>
+
+                                <TextBlock Text="{Binding ViewportSelectionDetail}" FontSize="10.5" FontFamily="Consolas" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="420"/>
+
+                            </StackPanel>
+
+                        </Border>
+
+
+
+                        <!-- Bottom-center action toolbar. Viewport tools on an acrylic surface. -->
+
+                        <Border VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,0,0,16"
+
+                                Panel.ZIndex="20"
+
+                                Background="#E618181B" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
+
+                                CornerRadius="18" Padding="6,4"
+
+                                Visibility="{Binding ViewportToolbarVisible, Converter={StaticResource BoolToVisibilityConverter}}">
+
+                            <Border.Effect>
+
+                                <DropShadowEffect Color="Black" BlurRadius="22" ShadowDepth="4" Opacity="0.4"/>
+
+                            </Border.Effect>
+
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+
+                                <!-- Group 1: Character / Actor Gizmo & Framing (Skin workspace only) -->
+
+                                <Border Background="#1AFFFFFF" CornerRadius="11" Padding="2,1" Margin="0,0,2,0"
+
+                                        Visibility="{Binding IsSkinWorkspace, Converter={StaticResource BoolToVisibilityConverter}}">
+
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+
+                                        <ToggleButton IsChecked="{Binding CharacterTransformGizmoEnabled, Mode=TwoWay}"
+
+                                                      Style="{StaticResource TransparentIconToggleButton}"
+
+                                                      Width="30" Height="30"
+
+                                                      ToolTip="Move Character in viewport">
+
+                                            <materialIcons:MaterialIcon Kind="AxisArrow" Width="14" Height="14"/>
+
+                                        </ToggleButton>
+
+                                        <ToggleButton IsChecked="{Binding CharacterAutoRotate, Mode=TwoWay}"
+
+                                                      Style="{StaticResource TransparentIconToggleButton}"
+
+                                                      Width="30" Height="30" Margin="2,0,0,0"
+
+                                                      ToolTip="Auto Rotate Character">
+
+                                            <materialIcons:MaterialIcon Kind="Rotate3DVariant" Width="14" Height="14"/>
+
+                                        </ToggleButton>
+
+                                    </StackPanel>
+
+                                </Border>
+
+
+
+                                <Rectangle Width="1" Fill="#22FFFFFF" Margin="2,7" VerticalAlignment="Stretch"
+
+                                           Visibility="{Binding IsSkinWorkspace, Converter={StaticResource BoolToVisibilityConverter}}"/>
+
+
+
+                                <!-- Group 2: Display & Camera Options (Dropdown menus and shaders) -->
+
+                                <Border Background="#1AFFFFFF" CornerRadius="11" Padding="2,1" Margin="2,0">
+
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+
+                                        <!-- Show dropdown -->
+
+                                        <Button x:Name="PreviewShowButton"
+
+                                                Click="PreviewShow_Click"
+
+                                                Style="{StaticResource TransparentIconButton}"
+
+                                                Height="30" Padding="8,0"
+
+                                                ToolTip="Preview display options">
+
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+
+                                                <materialIcons:MaterialIcon Kind="Eye" Width="14" Height="14"
+
+                                                                            Foreground="{StaticResource TextSecondary}" Margin="0,0,5,0" VerticalAlignment="Center"/>
+
+                                                <TextBlock Text="Show" FontSize="11" FontWeight="SemiBold"
+
+                                                           Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+
+                                                <TextBlock Text="{Binding PreviewDisplayCount, StringFormat=' {0}'}" FontSize="10"
+
+                                                           FontFamily="Consolas" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+
+                                                <materialIcons:MaterialIcon Kind="ChevronDown" Width="12" Height="12"
+
+                                                                            Foreground="{StaticResource TextSecondary}" Margin="4,0,0,0" VerticalAlignment="Center"/>
+
+                                            </StackPanel>
+
+                                        </Button>
+
+
+
+                                        <!-- View Mode dropdown -->
+
+                                        <Button x:Name="PreviewViewModeButton"
+
+                                                Click="PreviewViewMode_Click"
+
+                                                Style="{StaticResource TransparentIconButton}"
+
+                                                Height="30" Padding="8,0" Margin="2,0,0,0"
+
+                                                ToolTip="Preview view mode">
+
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+
+                                                <materialIcons:MaterialIcon Kind="CubeOutline" Width="13" Height="13"
+
+                                                                            Foreground="{StaticResource TextSecondary}" Margin="0,0,5,0" VerticalAlignment="Center"/>
+
+                                                <TextBlock Text="{Binding PreviewViewModeText}" FontSize="11" FontWeight="SemiBold"
+
+                                                           Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+
+                                                <materialIcons:MaterialIcon Kind="ChevronDown" Width="12" Height="12"
+
+                                                                            Foreground="{StaticResource TextSecondary}" Margin="4,0,0,0" VerticalAlignment="Center"/>
+
+                                            </StackPanel>
+
+                                        </Button>
+
+
+
+                                        <!-- Camera Preset dropdown -->
+
+                                        <Button x:Name="PreviewCameraButton"
+
+                                                Click="PreviewCamera_Click"
+
+                                                Style="{StaticResource TransparentIconButton}"
+
+                                                Height="30" Padding="8,0" Margin="2,0,0,0"
+
+                                                ToolTip="Preview camera preset">
+
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+
+                                                <materialIcons:MaterialIcon Kind="VideoOutline" Width="13" Height="13"
+
+                                                                            Foreground="{StaticResource TextSecondary}" Margin="0,0,5,0" VerticalAlignment="Center"/>
+
+                                                <TextBlock Text="{Binding PreviewCameraText}" FontSize="11" FontWeight="SemiBold"
+
+                                                           Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+
+                                                <materialIcons:MaterialIcon Kind="ChevronDown" Width="12" Height="12"
+
+                                                                            Foreground="{StaticResource TextSecondary}" Margin="4,0,0,0" VerticalAlignment="Center"/>
+
+                                            </StackPanel>
+
+                                        </Button>
+
+
+
+                                        <!-- Standalone Simulation Rig Motion Preset -->
+
+                                        <Button x:Name="RigPresetButton"
+
+                                                Click="RigPreset_Click"
+
+                                                Style="{StaticResource TransparentIconButton}"
+
+                                                Height="30" Padding="8,0,12,0" Margin="2,0,0,0"
+
+                                                Visibility="{Binding HasStandaloneSystem, Converter={StaticResource BoolToVisibilityConverter}}"
+
+                                                ToolTip="Standalone system motion">
+
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+
+                                                <materialIcons:MaterialIcon Kind="{Binding RigPresetIcon}" Width="13" Height="13" Foreground="{StaticResource AccentBrush}" Margin="0,0,5,0" VerticalAlignment="Center"/>
+
+                                                <TextBlock Text="{Binding RigPresetText}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+
+                                                <materialIcons:MaterialIcon Kind="ChevronDown" Width="12" Height="12" Foreground="{StaticResource TextSecondary}" Margin="4,0,0,0" VerticalAlignment="Center"/>
+
+                                            </StackPanel>
+
+                                            <Button.ContextMenu>
+
+                                                <ContextMenu x:Name="RigPresetContextMenu"
+
+                                                             Closed="RigPresetContextMenu_Closed"
+
+                                                             Background="#FF161822" BorderBrush="{StaticResource BorderColor}" Foreground="White"
+
+                                                             DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+
+                                                    <MenuItem Header="Still — Stationary, once" Tag="Still" Click="SetRigPreset_Click">
+
+                                                        <MenuItem.Icon>
+
+                                                            <materialIcons:MaterialIcon Kind="CrosshairsGps" Width="14" Height="14" Foreground="{StaticResource TextSecondary}"/>
+
+                                                        </MenuItem.Icon>
+
+                                                    </MenuItem>
+
+                                                    <MenuItem Header="Burst — Stationary, loop" Tag="Burst" Click="SetRigPreset_Click">
+
+                                                        <MenuItem.Icon>
+
+                                                            <materialIcons:MaterialIcon Kind="Sparkles" Width="14" Foreground="{StaticResource AccentGreen}"/>
+
+                                                        </MenuItem.Icon>
+
+                                                    </MenuItem>
+
+                                                    <MenuItem Header="Missile — Moving path" Tag="Missile" Click="SetRigPreset_Click">
+
+                                                        <MenuItem.Icon>
+
+                                                            <materialIcons:MaterialIcon Kind="RocketLaunchOutline" Width="14" Height="14" Foreground="{StaticResource AccentBrush}"/>
+
+                                                        </MenuItem.Icon>
+
+                                                    </MenuItem>
+
+                                                    <MenuItem Header="Trail — Orbiting path" Tag="Trail" Click="SetRigPreset_Click">
+
+                                                        <MenuItem.Icon>
+
+                                                            <materialIcons:MaterialIcon Kind="RotateRight" Width="14" Height="14" Foreground="{StaticResource AccentPurple}"/>
+
+                                                        </MenuItem.Icon>
+
+                                                    </MenuItem>
+
+
+
+                                                </ContextMenu>
+
+                                            </Button.ContextMenu>
+
+                                        </Button>
+
+                                    </StackPanel>
+
+                                </Border>
+
+
+
+                                <Rectangle Width="1" Fill="#22FFFFFF" Margin="2,7" VerticalAlignment="Stretch"/>
+
+                                <Border Background="#1AFFFFFF" CornerRadius="11" Padding="2,1" Margin="2,0,0,0">
+
+                                    <Button x:Name="ViewportSnapshotButton"
+
+                                            Click="ViewportSnapshotButton_Click"
+
+                                            Style="{StaticResource TransparentIconButton}"
+
+                                            ToolTip="Take 4K Snapshot" Width="30" Height="30">
+
+                                        <materialIcons:MaterialIcon Kind="Camera" Width="13" Height="13"/>
+
+                                    </Button>
+
+                                </Border>
+
+
+
+                                <!-- Popups for display & camera options -->
+
+                                <Popup x:Name="PreviewShowPopup"
+
+                                       PlacementTarget="{Binding ElementName=PreviewShowButton}"
+
+                                       Placement="Top" HorizontalOffset="-58" VerticalOffset="-6"
+
+                                       AllowsTransparency="True" PopupAnimation="Fade" StaysOpen="False"
+
+                                       Closed="PreviewShowPopup_Closed"
+
+                                       DataContext="{Binding DataContext, ElementName=PreviewShowButton}">
+
+                                    <Border Width="190" Background="#FF161822" BorderBrush="{StaticResource BorderColor}"
+
+                                            BorderThickness="1" CornerRadius="7" Padding="10">
+
+                                        <Border.Effect>
+
+                                            <DropShadowEffect Color="Black" BlurRadius="14" ShadowDepth="3" Opacity="0.45"/>
+
+                                        </Border.Effect>
+
+                                        <StackPanel>
+
+                                            <StackPanel Orientation="Horizontal" Margin="2,0,0,6" VerticalAlignment="Center">
+
+                                                <materialIcons:MaterialIcon Kind="Eye" Width="12" Height="12"
+
+                                                                            Foreground="{StaticResource AccentBrush}" Margin="0,0,5,0" VerticalAlignment="Center"/>
+
+                                                <TextBlock Text="SHOW" FontSize="10" FontWeight="Bold"
+
+                                                           Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+
+                                            </StackPanel>
+
+                                            <CheckBox Content="Ground" Style="{StaticResource ModernCheckBox}" Margin="0,3,0,0"
+
+                                                      IsChecked="{Binding ShowPreviewGround, Mode=TwoWay}"/>
+
+                                            <CheckBox Content="Grid" Style="{StaticResource ModernCheckBox}" Margin="0,3,0,0"
+
+                                                      IsChecked="{Binding ShowPreviewGrid, Mode=TwoWay}"/>
+
+                                            <CheckBox Content="Stage" Style="{StaticResource ModernCheckBox}" Margin="0,3,0,0"
+
+                                                      IsChecked="{Binding ShowPreviewStage, Mode=TwoWay}"/>
+
+                                            <CheckBox Content="Sky" Style="{StaticResource ModernCheckBox}" Margin="0,3,0,0"
+
+                                                      IsChecked="{Binding ShowPreviewSky, Mode=TwoWay}"/>
+
+
+
+
+
+                                            <StackPanel Orientation="Horizontal" Margin="0,12,0,6">
+
+                                                <materialIcons:MaterialIcon Kind="PaletteOutline" Width="13" Height="13"
+
+                                                                            Foreground="{StaticResource AccentBrush}" Margin="0,0,6,0"
+
+                                                                            VerticalAlignment="Center"/>
+
+                                                <TextBlock Text="BACKGROUND" Foreground="{StaticResource TextSecondary}" FontSize="10"
+
+                                                           FontWeight="Bold" VerticalAlignment="Center"/>
+
+                                            </StackPanel>
+
+                                            <ComboBox x:Name="BgComboBox" Style="{StaticResource ModernComboBox}" Height="28"
+
+                                                      SelectionChanged="BgMode_SelectionChanged" SelectedIndex="0"
+
+                                                      ToolTip="Preview backdrop. Sky and scene surfaces draw over it.">
+
+                                                <ComboBoxItem Content="Dark" Tag="Dark"/>
+
+                                                <ComboBoxItem Content="Light" Tag="Light"/>
+
+                                                <ComboBoxItem Content="Alpha (checkerboard)" Tag="Alpha"/>
+
+                                            </ComboBox>
+
+
+
+                                        </StackPanel>
+
+                                    </Border>
+
+                                </Popup>
+
+
+
+                                <Popup x:Name="PreviewViewModePopup"
+
+                                       PlacementTarget="{Binding ElementName=PreviewViewModeButton}"
+
+                                       Placement="Top" HorizontalOffset="-58" VerticalOffset="-6"
+
+                                       AllowsTransparency="True" PopupAnimation="Fade" StaysOpen="False"
+
+                                       Closed="PreviewViewModePopup_Closed"
+
+                                       DataContext="{Binding DataContext, ElementName=PreviewViewModeButton}">
+
+                                    <Border Width="190" Background="#FF161822" BorderBrush="{StaticResource BorderColor}"
+
+                                            BorderThickness="1" CornerRadius="7" Padding="7">
+
+                                        <Border.Effect>
+
+                                            <DropShadowEffect Color="Black" BlurRadius="14" ShadowDepth="3" Opacity="0.45"/>
+
+                                        </Border.Effect>
+
+                                        <StackPanel>
+
+                                            <RadioButton GroupName="StudioViewMode" Content="Lit"
+
+                                                         Style="{StaticResource SegmentedRadioButtonStyle}"
+
+                                                         IsChecked="{Binding IsPreviewViewLit, Mode=TwoWay}"/>
+
+                                            <RadioButton GroupName="StudioViewMode" Content="Unshaded"
+
+                                                         Style="{StaticResource SegmentedRadioButtonStyle}"
+
+                                                         IsChecked="{Binding IsPreviewViewUnshaded, Mode=TwoWay}"/>
+
+                                            <RadioButton GroupName="StudioViewMode" Content="Untextured"
+
+                                                         Style="{StaticResource SegmentedRadioButtonStyle}"
+
+                                                         IsChecked="{Binding IsPreviewViewUntextured, Mode=TwoWay}"/>
+
+                                            <RadioButton GroupName="StudioViewMode" Content="Wireframe"
+
+                                                         Style="{StaticResource SegmentedRadioButtonStyle}"
+
+                                                         IsChecked="{Binding IsPreviewViewWireframe, Mode=TwoWay}"/>
+
+                                            <Separator Margin="0,6,0,5"/>
+
+                                            <CheckBox Content="Wire overlay"
+
+                                                      Style="{StaticResource ModernCheckBox}"
+
+                                                      IsChecked="{Binding PreviewWireOverlay, Mode=TwoWay}"
+
+                                                      IsEnabled="{Binding CanPreviewWireOverlay}"/>
+
+                                        </StackPanel>
+
+                                    </Border>
+
+                                </Popup>
+
+
+
+                                <Popup x:Name="PreviewCameraPopup"
+
+                                       PlacementTarget="{Binding ElementName=PreviewCameraButton}"
+
+                                       Placement="Top" HorizontalOffset="-42" VerticalOffset="-6"
+
+                                       AllowsTransparency="True" PopupAnimation="Fade" StaysOpen="False"
+
+                                       Closed="PreviewCameraPopup_Closed"
+
+                                       DataContext="{Binding DataContext, ElementName=PreviewCameraButton}">
+
+                                    <Border Width="160" Background="#FF161822" BorderBrush="{StaticResource BorderColor}"
+
+                                            BorderThickness="1" CornerRadius="7" Padding="7">
+
+                                        <Border.Effect>
+
+                                            <DropShadowEffect Color="Black" BlurRadius="14" ShadowDepth="3" Opacity="0.45"/>
+
+                                        </Border.Effect>
+
+                                        <StackPanel>
+
+                                            <RadioButton GroupName="StudioCamera" Content="Game"
+
+                                                         Style="{StaticResource SegmentedRadioButtonStyle}"
+
+                                                         IsChecked="{Binding IsPreviewCameraGame, Mode=TwoWay}"/>
+
+                                            <RadioButton GroupName="StudioCamera" Content="Orbit"
+
+                                                         Style="{StaticResource SegmentedRadioButtonStyle}"
+
+                                                         IsChecked="{Binding IsPreviewCameraOrbit, Mode=TwoWay}"/>
+
+                                            <RadioButton GroupName="StudioCamera" Content="Top"
+
+                                                         Style="{StaticResource SegmentedRadioButtonStyle}"
+
+                                                         IsChecked="{Binding IsPreviewCameraTop, Mode=TwoWay}"/>
+
+                                            <RadioButton GroupName="StudioCamera" Content="Front"
+
+                                                         Style="{StaticResource SegmentedRadioButtonStyle}"
+
+                                                         IsChecked="{Binding IsPreviewCameraFront, Mode=TwoWay}"/>
+
+                                            <RadioButton GroupName="StudioCamera" Content="Side"
+
+                                                         Style="{StaticResource SegmentedRadioButtonStyle}"
+
+                                                         IsChecked="{Binding IsPreviewCameraSide, Mode=TwoWay}"/>
+
+                                        </StackPanel>
+
+                                    </Border>
+
+                                </Popup>
+
+
+
+                                <Rectangle Width="1" Fill="#22FFFFFF" Margin="2,7" VerticalAlignment="Stretch"
+
+                                           Visibility="{Binding HasViewportContentControls, Converter={StaticResource BoolToVisibilityConverter}}"/>
+
+
+
+                                <!-- Group 3: Content Controls & Shaders (Champion mesh/effects, Map structures/VFX, and Lit Shaders) -->
+
+                                <Border Background="#1AFFFFFF" CornerRadius="11" Padding="2,1" Margin="2,0"
+
+                                        Visibility="{Binding HasViewportContentControls, Converter={StaticResource BoolToVisibilityConverter}}">
+
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+
+                                        <!-- Champion Controls -->
+
+                                        <StackPanel Orientation="Horizontal"
+
+                                                    Visibility="{Binding HasChampionMesh, Converter={StaticResource BoolToVisibilityConverter}}">
+
+                                            <ToggleButton IsChecked="{Binding ShowChampionMesh, Mode=TwoWay}"
+
+                                                          Style="{StaticResource TransparentIconToggleButton}"
+
+                                                          Width="30" Height="30"
+
+                                                          ToolTip="Show/Hide Champion">
+
+                                                <materialIcons:MaterialIcon Kind="AccountBoxOutline" Width="14" Height="14"/>
+
+                                            </ToggleButton>
+
+                                            <ToggleButton Click="PreviewBindPoseToggle_Click"
+
+                                                          IsChecked="{Binding SelectedAnimation.IsBindPose, Mode=OneWay, FallbackValue=False, TargetNullValue=False}"
+
+                                                          Style="{StaticResource TransparentIconToggleButton}"
+
+                                                          IsEnabled="{Binding HasCharacterSkeleton}"
+
+                                                          Width="30" Height="30" Margin="2,0,0,0"
+
+                                                          ToolTip="T-Pose: toggle bind pose / return to animation">
+
+                                                <materialIcons:MaterialIcon Kind="Human" Width="14" Height="14"/>
+
+                                            </ToggleButton>
+
+                                            <ToggleButton IsChecked="{Binding CharacterEffectsEnabled, Mode=TwoWay}"
+
+                                                          Style="{StaticResource TransparentIconToggleButton}"
+
+                                                          Width="30" Height="30" Margin="2,0,0,0"
+
+                                                          ToolTip="Show champion VFX">
+
+                                                <materialIcons:MaterialIcon Kind="MagicStaff" Width="14" Height="14"/>
+
+                                            </ToggleButton>
+
+                                        </StackPanel>
+
+
+
+                                        <!-- Map Controls -->
+
+                                        <StackPanel Orientation="Horizontal"
+
+                                                    Visibility="{Binding HasMapPreview, Converter={StaticResource BoolToVisibilityConverter}}">
+
+                                            <ToggleButton IsChecked="{Binding MapStructuresVisible, Mode=TwoWay}"
+
+                                                          Style="{StaticResource TransparentIconToggleButton}"
+
+                                                          Width="30" Height="30" Margin="2,0,0,0"
+
+                                                          ToolTip="Show map structures and props">
+
+                                                <materialIcons:MaterialIcon Kind="HomeOutline" Width="14" Height="14"/>
+
+                                            </ToggleButton>
+
+                                            <ToggleButton IsChecked="{Binding MapParticlesVisible, Mode=TwoWay}"
+
+                                                          Style="{StaticResource TransparentIconToggleButton}"
+
+                                                          Width="30" Height="30" Margin="2,0,0,0"
+
+                                                          ToolTip="Show map VFX">
+
+                                                <materialIcons:MaterialIcon Kind="WeatherWindy" Width="14" Height="14"/>
+
+                                            </ToggleButton>
+
+                                        </StackPanel>
+
+
+
+                                        <!-- Shaders Toggle (Active for Lit meshes and terrain) -->
+
+                                        <ToggleButton x:Name="PreviewShadersToggle"
+
+                                                      Style="{StaticResource TransparentIconToggleButton}"
+
+                                                      Width="30" Height="30" Margin="2,0,0,0"
+
+                                                      ToolTip="Show game shaders"
+
+                                                      IsChecked="{Binding PreviewShaders, Mode=TwoWay}">
+
+                                            <materialIcons:MaterialIcon Kind="PaletteOutline" Width="14" Height="14"/>
+
+                                        </ToggleButton>
+
+                                    </StackPanel>
+
+                                </Border>
+
+
+
+                                <Rectangle Width="1" Fill="#22FFFFFF" Margin="2,7" VerticalAlignment="Stretch"/>
+
+
+
+                                <!-- Group 4: Fit / Reset Camera -->
+
+                                <Border Background="#1AFFFFFF" CornerRadius="11" Padding="2,1" Margin="2,0,0,0">
+
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+
+                                        <Button Click="ResetCamera_Click"
+
+                                                Style="{StaticResource TransparentIconButton}"
+
+                                                Width="30" Height="30"
+
+                                                ToolTip="Fit to view">
+
+                                            <materialIcons:MaterialIcon Kind="CropFree" Width="14" Height="14"/>
+
+                                        </Button>
+
+                                    </StackPanel>
+
+                                </Border>
+
+                            </StackPanel>
+
+                        </Border>
+
+
+
+                        <!-- Compact viewport-toolbar affordance, for viewport tools. -->
+
+                        <ToggleButton IsChecked="{Binding ViewportToolbarVisible, Mode=TwoWay}"
+
+                                      HorizontalAlignment="Right" VerticalAlignment="Bottom"
+
+                                      Margin="0,0,12,12" Cursor="Hand" Panel.ZIndex="30"
+
+                                      ToolTip="Show / Hide Viewport Toolbar">
+
+                            <ToggleButton.Template>
+
+                                <ControlTemplate TargetType="ToggleButton">
+
+                                    <Border x:Name="border" Width="36" Height="36" CornerRadius="18"
+
+                                            Background="#E618181B" BorderBrush="{StaticResource AccentBrush}" BorderThickness="1.5">
+
+                                        <Border.Effect>
+
+                                            <DropShadowEffect Color="Black" BlurRadius="14" ShadowDepth="3" Opacity="0.4"/>
+
+                                        </Border.Effect>
+
+                                        <materialIcons:MaterialIcon x:Name="Icon" Kind="TuneVariant" Width="16" Height="16"
+
+                                                                    Foreground="{StaticResource AccentBrush}"
+
+                                                                    HorizontalAlignment="Center" VerticalAlignment="Center"/>
+
+                                    </Border>
+
+                                    <ControlTemplate.Triggers>
+
+                                        <Trigger Property="IsMouseOver" Value="True">
+
+                                            <Setter TargetName="border" Property="Background" Value="#FF1E2233"/>
+
+                                        </Trigger>
+
+                                        <Trigger Property="IsChecked" Value="False">
+
+                                            <Setter TargetName="border" Property="Opacity" Value="0.7"/>
+
+                                            <Setter TargetName="border" Property="BorderBrush" Value="{StaticResource BorderColor}"/>
+
+                                            <Setter TargetName="Icon" Property="Foreground" Value="{StaticResource TextSecondary}"/>
+
+                                        </Trigger>
+
+                                    </ControlTemplate.Triggers>
+
+                                </ControlTemplate>
+
+                            </ToggleButton.Template>
+
+                        </ToggleButton>
+
+                    </Grid>
+
+
+
+                    <!-- Rounded Border Stroke Overlay (crisp 1px outline, unclipped, hit-test transparent) -->
+
+                    <Border CornerRadius="10" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" IsHitTestVisible="False"/>
+
+                </Grid>
+</UserControl>

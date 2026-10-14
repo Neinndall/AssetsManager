@@ -93,6 +93,7 @@
                       Margin="6,0,0,0" 
                       ItemsSource="{Binding RootNodes}"
                       SelectedItemChanged="FileTreeView_SelectedItemChanged"
+                      PreviewMouseLeftButtonDown="FileTreeView_PreviewMouseLeftButtonDown"
                       Style="{StaticResource ModernTreeView}"
                       Visibility="{Binding IsTreeReady, Converter={StaticResource BoolToVisibilityConverter}}">
                 <TreeView.Resources>
@@ -163,10 +164,6 @@
                                                 <Setter Property="Foreground" Value="{StaticResource AccentTeal}"/>
                                             </MultiDataTrigger>
                                             
-                                            <!-- Selection Override -->
-                                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
-                                                <Setter Property="Foreground" Value="White"/>
-                                            </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
                                 </materialIcons:MaterialIcon.Style>
@@ -203,10 +200,7 @@
                                                 <Setter Property="Foreground" Value="{StaticResource AccentTeal}"/>
                                             </DataTrigger>
 
-                                            <!-- Selection and Loading overrides -->
-                                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
-                                                <Setter Property="Foreground" Value="White"/>
-                                            </DataTrigger>
+                                            <!-- Loading override -->
                                             <DataTrigger Binding="{Binding Name}" Value="Loading...">
                                                 <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
                                                 <Setter Property="FontStyle" Value="Italic"/>
@@ -241,7 +235,6 @@
                 <TreeView.ItemContainerStyle>
                     <Style TargetType="TreeViewItem" BasedOn="{StaticResource ModernTreeViewItem}">
                         <Setter Property="ContextMenu" Value="{StaticResource ExplorerContextMenu}"/>
-                        <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
                         <Setter Property="Background" Value="Transparent"/>
                         <Setter Property="VerticalContentAlignment" Value="Center" />
                         <Setter Property="Visibility" Value="{Binding IsVisible, Converter={StaticResource BoolToVisibilityConverter}}" />

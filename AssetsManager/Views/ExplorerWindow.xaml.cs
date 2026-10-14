@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Windows;
@@ -22,26 +23,26 @@ namespace AssetsManager.Views
             LogService logService,
             CustomMessageBoxService customMessageBoxService,
             WadContentProvider wadContentProvider,
+            WadNodeLoaderService wadNodeLoaderService,
             WadSearchBoxService wadSearchBoxService,
-            DirectoriesCreator directoriesCreator,
-            ExplorerPreviewService explorerPreviewService,
             DiffViewService diffViewService,
+            DirectoriesCreator directoriesCreator,
             AppSettings appSettings,
             TreeBuilderService treeBuilderService,
             TreeUIManager treeUIManager,
             AudioBankService audioBankService,
             AudioBankLinkerService audioBankLinkerService,
-            WadNodeLoaderService wadNodeLoaderService,
             HashResolverService hashResolverService,
             VersionService versionService,
             TaskCancellationManager taskCancellationManager,
             FavoritesManager favoritesManager,
             ImageMergerService imageMergerService,
-            MonitorService monitorService,
+            MonitoredFilesService monitoredFilesService,
             BackupManager backupManager,
             AssetWatcherService assetWatcherService,
             ProgressUIManager progressUIManager,
-            ExtractionService extractionService)
+            ExtractionService extractionService,
+            ExplorerPreviewService explorerPreviewService)
         {
             InitializeComponent();
             FileExplorer.LogService = logService;
@@ -61,18 +62,18 @@ namespace AssetsManager.Views
             FileExplorer.TaskCancellationManager = taskCancellationManager;
             FileExplorer.FavoritesManager = favoritesManager;
             FileExplorer.ImageMergerService = imageMergerService;
-            FileExplorer.MonitorService = monitorService;
+            FileExplorer.MonitoredFilesService = monitoredFilesService;
             FileExplorer.BackupManager = backupManager;
             FileExplorer.AssetWatcherService = assetWatcherService;
             FileExplorer.ProgressUIManager = progressUIManager;
             FileExplorer.ExtractionService = extractionService;
-
+ 
             FilePreviewer.LogService = logService;
             FilePreviewer.CustomMessageBoxService = customMessageBoxService;
             FilePreviewer.DirectoriesCreator = directoriesCreator;
             FilePreviewer.ExplorerPreviewService = explorerPreviewService;
             FilePreviewer.TreeUIManager = treeUIManager;
-
+ 
             FileExplorer.FilePreviewer = FilePreviewer;
             FilePreviewer.FileExplorer = FileExplorer;
         }
@@ -88,6 +89,7 @@ namespace AssetsManager.Views
         public void CleanupResources()
         {
             FileExplorer?.CleanupResources();
+            FilePreviewer?.CleanupResources();
 
             if (FileExplorer != null)
             {

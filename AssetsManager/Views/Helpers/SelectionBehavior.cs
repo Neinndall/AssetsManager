@@ -1,19 +1,18 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
-using AssetsManager.Views.Models.Dialogs.Controls;
-using AssetsManager.Views.Models.Explorer;
-using AssetsManager.Views.Models.Wad;
+using System.Windows.Threading;
 
 namespace AssetsManager.Views.Helpers
 {
     /// <summary>
     /// Orquestador universal de interacción y selección. 
-    /// Centraliza la lógica de selección múltiple (CTRL) y acciones primarias (Navegación).
+    /// Centraliza la lógica de selección múltiple y acciones primarias (Navegación).
     /// </summary>
     public static class SelectionBehavior
     {
@@ -27,6 +26,9 @@ namespace AssetsManager.Views.Helpers
 
         public static readonly DependencyProperty EnableUnifiedSelectionProperty =
             DependencyProperty.RegisterAttached("EnableUnifiedSelection", typeof(bool), typeof(SelectionBehavior), new UIPropertyMetadata(false, OnEnableUnifiedSelectionChanged));
+
+        private static readonly DependencyProperty RangeAnchorProperty =
+            DependencyProperty.RegisterAttached("RangeAnchor", typeof(object), typeof(SelectionBehavior));
 
         // Evento que se dispara cuando el usuario realiza una acción primaria (clic sin modificadores)
         public static readonly RoutedEvent PrimaryActionEvent = 
@@ -52,8 +54,16 @@ namespace AssetsManager.Views.Helpers
         {
             if (d is TreeViewItem item)
             {
-                if ((bool)e.NewValue) item.PreviewMouseLeftButtonDown += OnItemPreviewMouseLeftButtonDown;
-                else item.PreviewMouseLeftButtonDown -= OnItemPreviewMouseLeftButtonDown;
+                if ((bool)e.NewValue)
+                {
+                    item.PreviewMouseLeftButtonDown += OnItemPreviewMouseLeftButtonDown;
+                    AttachSelectionSynchronization(item);
+                }
+                else
+                {
+                    item.PreviewMouseLeftButtonDown -= OnItemPreviewMouseLeftButtonDown;
+                    DetachSelectionSynchronization(item);
+                }
             }
         }
 
@@ -68,10 +78,18 @@ namespace AssetsManager.Views.Helpers
 
         private static void OnEnableUnifiedSelectionChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
-            if (d is FrameworkElement item)
+            if (d is ListBoxItem item)
             {
-                if ((bool)e.NewValue) item.PreviewMouseLeftButtonDown += OnItemPreviewMouseLeftButtonDown;
-                else item.PreviewMouseLeftButtonDown -= OnItemPreviewMouseLeftButtonDown;
+                if ((bool)e.NewValue)
+                {
+                    item.PreviewMouseLeftButtonDown += OnItemPreviewMouseLeftButtonDown;
+                    AttachSelectionSynchronization(item);
+                }
+                else
+                {
+                    item.PreviewMouseLeftButtonDown -= OnItemPreviewMouseLeftButtonDown;
+                    DetachSelectionSynchronization(item);
+                }
             }
         }
 
@@ -82,6 +100,31 @@ namespace AssetsManager.Views.Helpers
             if (sender is FrameworkElement item)
             {
                 if (item is TreeViewItem && FindAncestor<TreeViewItem>(e.OriginalSource as DependencyObject) != item) return;
+
+                if (item is ListBoxItem listItem && ItemsControl.ItemsControlFromItemContainer(listItem) is ListBox list)
+                {
+                    if (!listItem.IsSelected)
+                    {
+                        ClearAllMultiSelected(list.ItemsSource ?? list.Items);
+                        list.UnselectAll();
+                        SetItemSelected(listItem, true);
+                    }
+                    else listItem.Focus();
+                    e.Handled = true;
+                    return;
+                }
+
+                if (item is TreeViewItem treeItem && FindAncestor<TreeView>(treeItem) is TreeView tree)
+                {
+                    if (!GetIsMultiSelected(treeItem.DataContext))
+                    {
+                        ClearAllMultiSelected(tree.ItemsSource ?? tree.Items);
+                        tree.SetValue(RangeAnchorProperty, treeItem.DataContext);
+                    }
+                    SetItemSelected(treeItem, true);
+                    e.Handled = true;
+                    return;
+                }
 
                 if (GetIsMultiSelected(item.DataContext) || IsItemSelected(item)) return;
 
@@ -94,8 +137,31 @@ namespace AssetsManager.Views.Helpers
         {
             if (sender is not FrameworkElement item || e.OriginalSource is ToggleButton) return;
             if (item is TreeViewItem && FindAncestor<TreeViewItem>(e.OriginalSource as DependencyObject) != item) return;
+            // Ignore clicks that originate inside an interactive control (e.g. eye-toggle Button)
+            // embedded in the TreeViewItem content; those controls handle their own input.
+            if (item is TreeViewItem && FindAncestor<ButtonBase>(e.OriginalSource as DependencyObject) is ButtonBase ancestor
+                && ancestor is not ToggleButton { Name: "Expander" }) return;
 
-            // 1. Lógica de Selección Múltiple (CTRL)
+            // TreeView owns its CTRL toggle; ListBox keeps native Extended selection.
+            if (item is TreeViewItem treeItem && IsRangeSelectIntent())
+            {
+                TreeView tree = FindAncestor<TreeView>(treeItem);
+                var anchor = tree?.GetValue(RangeAnchorProperty) as ISelectableTreeNode;
+                if (treeItem.DataContext is ISelectableTreeNode target &&
+                    SelectTreeRange(
+                        tree?.ItemsSource,
+                        anchor,
+                        target,
+                        IsMultiSelectIntent(),
+                        out bool usedAnchor))
+                {
+                    if (!usedAnchor) tree?.SetValue(RangeAnchorProperty, target);
+                    SetItemSelected(treeItem, true);
+                    e.Handled = true;
+                }
+                return;
+            }
+
             if (IsMultiSelectIntent())
             {
                 if (item is TreeViewItem)
@@ -103,46 +169,203 @@ namespace AssetsManager.Views.Helpers
                     bool current = GetIsMultiSelected(item.DataContext);
                     if (SetIsMultiSelected(item.DataContext, !current))
                     {
+                        FindAncestor<TreeView>(item)?.SetValue(RangeAnchorProperty, item.DataContext);
                         e.Handled = true;
                         return;
                     }
                 }
             }
 
-            // 2. Lógica de Acción Primaria / Navegación
+            // SHIFT ranges are handled by ListBox.SelectionMode=Extended.
             if (IsPrimaryActionIntent())
             {
-                // Limpiar selección múltiple en todo el árbol/lista
                 var rootControl = (ItemsControl)FindAncestor<TreeView>(item) ?? FindAncestor<ListBox>(item);
                 if (rootControl?.ItemsSource != null)
                 {
                     ClearAllMultiSelected(rootControl.ItemsSource);
                 }
 
-                // Disparar el evento de acción primaria para que el control sepa que debe "ejecutar" el nodo
-                item.RaiseEvent(new RoutedEventArgs(PrimaryActionEvent, item));
+                if (item is TreeViewItem)
+                    FindAncestor<TreeView>(item)?.SetValue(RangeAnchorProperty, item.DataContext);
 
-                if (item is TreeViewItem tvi && tvi.HasItems)
+                if (item is ListBoxItem listBoxItem)
                 {
-                    tvi.IsExpanded = !tvi.IsExpanded;
-                    tvi.IsSelected = true;
-                    tvi.Focus();
+                    listBoxItem.Dispatcher.BeginInvoke(
+                        DispatcherPriority.Input,
+                        new Action(() => listBoxItem.RaiseEvent(
+                            new RoutedEventArgs(PrimaryActionEvent, listBoxItem))));
+                }
+                else
+                {
+                    item.RaiseEvent(new RoutedEventArgs(PrimaryActionEvent, item));
+                }
+
+                if (item is TreeViewItem tvi)
+                {
+                    ApplyPrimaryTreeAction(tvi);
                     e.Handled = true;
                 }
             }
         }
 
+        internal static bool SelectTreeRange(
+            IEnumerable roots,
+            ISelectableTreeNode anchor,
+            ISelectableTreeNode target,
+            bool additive,
+            out bool usedAnchor)
+        {
+            usedAnchor = false;
+            if (roots == null || target == null) return false;
+            var visible = new System.Collections.Generic.List<ISelectableTreeNode>();
+            CollectVisibleTreeNodes(roots, visible);
+            int targetIndex = visible.IndexOf(target);
+            if (targetIndex < 0) return false;
+
+            int anchorIndex = anchor == null ? -1 : visible.IndexOf(anchor);
+            if (!additive) ClearAllMultiSelected(roots);
+            if (anchorIndex < 0)
+            {
+                target.IsMultiSelected = true;
+                return true;
+            }
+
+            usedAnchor = true;
+            int start = Math.Min(anchorIndex, targetIndex);
+            int end = Math.Max(anchorIndex, targetIndex);
+            for (int index = start; index <= end; index++)
+                visible[index].IsMultiSelected = true;
+            return true;
+        }
+
+        private static void CollectVisibleTreeNodes(
+            IEnumerable nodes,
+            System.Collections.Generic.ICollection<ISelectableTreeNode> visible)
+        {
+            foreach (object item in nodes)
+            {
+                if (item is not ISelectableTreeNode node || !node.IsSelectionVisible) continue;
+                visible.Add(node);
+                if (node.IsExpanded && node.SelectionChildren != null)
+                    CollectVisibleTreeNodes(node.SelectionChildren, visible);
+            }
+        }
+
+        internal static void ApplyPrimaryTreeAction(TreeViewItem item)
+        {
+            if (item.HasItems)
+            {
+                item.IsExpanded = !item.IsExpanded;
+            }
+
+            item.IsSelected = true;
+            SynchronizeSelectionState(item.DataContext, true);
+            item.Focus();
+        }
+
+        private static void AttachSelectionSynchronization(FrameworkElement item)
+        {
+            item.AddHandler(Selector.SelectedEvent, new RoutedEventHandler(OnItemSelected));
+            item.AddHandler(Selector.UnselectedEvent, new RoutedEventHandler(OnItemUnselected));
+            item.DataContextChanged += OnItemDataContextChanged;
+        }
+
+        private static void DetachSelectionSynchronization(FrameworkElement item)
+        {
+            item.RemoveHandler(Selector.SelectedEvent, new RoutedEventHandler(OnItemSelected));
+            item.RemoveHandler(Selector.UnselectedEvent, new RoutedEventHandler(OnItemUnselected));
+            item.DataContextChanged -= OnItemDataContextChanged;
+        }
+
+        private static void OnItemSelected(object sender, RoutedEventArgs e)
+        {
+            if (ReferenceEquals(sender, e.OriginalSource) && sender is FrameworkElement item)
+            {
+                SynchronizeSelectionState(item.DataContext, true);
+            }
+        }
+
+        private static void OnItemUnselected(object sender, RoutedEventArgs e)
+        {
+            if (ReferenceEquals(sender, e.OriginalSource) && sender is FrameworkElement item)
+            {
+                SynchronizeSelectionState(item.DataContext, false);
+            }
+        }
+
+        private static void OnItemDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
+        {
+            SynchronizeSelectionState(e.OldValue, false);
+            if (sender is FrameworkElement item)
+            {
+                SynchronizeSelectionState(e.NewValue, IsItemSelected(item));
+            }
+        }
+
+        internal static void SynchronizeSelectionState(object dataContext, bool isSelected)
+        {
+            if (dataContext is ISelectable selectable)
+            {
+                selectable.IsSelected = isSelected;
+            }
+        }
+
         #region Helpers
+
+        internal static T SelectItems<T>(
+            IList<T> items, T anchor, T target, ModifierKeys modifiers,
+            Func<T, bool> isSelected, Action<T, bool> setSelected) where T : class
+        {
+            bool control = modifiers.HasFlag(ModifierKeys.Control);
+            bool shift = modifiers.HasFlag(ModifierKeys.Shift);
+            if (target != null && !items.Contains(target)) return anchor;
+            if (target == null)
+            {
+                if (!control && !shift)
+                    foreach (T item in items) setSelected(item, false);
+                return control || shift ? anchor : null;
+            }
+
+            if (shift)
+            {
+                int from = items.IndexOf(anchor);
+                int to = items.IndexOf(target);
+                if (from < 0) { from = to; anchor = target; }
+                int first = Math.Min(from, to);
+                int last = Math.Max(from, to);
+                for (int i = 0; i < items.Count; i++)
+                    setSelected(items[i], (control && isSelected(items[i])) || (i >= first && i <= last));
+                return anchor;
+            }
+
+            if (control)
+                setSelected(target, !isSelected(target));
+            else
+                foreach (T item in items) setSelected(item, ReferenceEquals(item, target));
+            return target;
+        }
 
         public static bool IsMultiSelectIntent()
         {
             return Keyboard.Modifiers.HasFlag(ModifierKeys.Control);
         }
 
+        public static bool IsRangeSelectIntent()
+        {
+            return IsRangeSelectIntent(Keyboard.Modifiers);
+        }
+
         public static bool IsPrimaryActionIntent()
         {
-            return !IsMultiSelectIntent();
+            return IsPrimaryActionIntent(Keyboard.Modifiers);
         }
+
+        internal static bool IsRangeSelectIntent(ModifierKeys modifiers) =>
+            modifiers.HasFlag(ModifierKeys.Shift);
+
+        internal static bool IsPrimaryActionIntent(ModifierKeys modifiers) =>
+            !modifiers.HasFlag(ModifierKeys.Control) &&
+            !modifiers.HasFlag(ModifierKeys.Shift);
 
         private static bool IsItemSelected(FrameworkElement container)
         {
@@ -155,6 +378,7 @@ namespace AssetsManager.Views.Helpers
         {
             if (container is ListBoxItem lbi) lbi.IsSelected = value;
             else if (container is TreeViewItem tvi) tvi.IsSelected = value;
+            SynchronizeSelectionState(container.DataContext, value);
             if (value) container.Focus();
         }
 
@@ -185,17 +409,9 @@ namespace AssetsManager.Views.Helpers
                     if (ms.IsMultiSelected) ms.IsMultiSelected = false;
                 }
 
-                if (node is FileSystemNodeModel fsm && fsm.HasLoadedChildren)
+                if (node is ISelectableTreeNode treeNode && treeNode.SelectionChildren != null)
                 {
-                    ClearAllMultiSelected(fsm.Children);
-                }
-                else if (node is WadGroupViewModel wgv && wgv.Types != null)
-                {
-                    ClearAllMultiSelected(wgv.Types);
-                }
-                else if (node is DiffTypeGroupViewModel dtgv && dtgv.Diffs != null)
-                {
-                    ClearAllMultiSelected(dtgv.Diffs);
+                    ClearAllMultiSelected(treeNode.SelectionChildren);
                 }
             }
         }

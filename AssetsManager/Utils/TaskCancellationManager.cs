@@ -1,5 +1,6 @@
 using System;
 using System.Threading;
+using AssetsManager.Services.Core;
 
 namespace AssetsManager.Utils
 {
@@ -8,7 +9,7 @@ namespace AssetsManager.Utils
         private CancellationTokenSource _cancellationTokenSource;
 
         public bool IsCancelling { get; private set; }
-        public string CancellationMessage { get; private set; } = "Cancelling Task...";
+        public string CancellationMessage { get; private set; } = CancellationStatusState.Message;
 
         public event EventHandler OperationStateChanged;
 
@@ -32,7 +33,7 @@ namespace AssetsManager.Utils
             return _cancellationTokenSource.Token;
         }
 
-        public void CancelCurrentOperation(bool notifyUI = true, string message = "Cancelling Task...")
+        public void CancelCurrentOperation(bool notifyUI = true, string message = CancellationStatusState.Message)
         {
             if (_cancellationTokenSource != null && !_cancellationTokenSource.IsCancellationRequested)
             {

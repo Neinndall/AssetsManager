@@ -1,0 +1,453 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Numerics;
+using System.Threading;
+using System.Threading.Tasks;
+using AssetsManager.Services.Core;
+using AssetsManager.Services.Hashes;
+using AssetsManager.Services.Viewer.Resolvers;
+using AssetsManager.Services.Viewer.Runtime;
+using AssetsManager.Services.Viewer.Vfx.Loading;
+using AssetsManager.Services.Viewer.Vfx.Runtime;
+using AssetsManager.Services.Viewer.Vfx.Semantics;
+using AssetsManager.Views.Models.Viewer;
+
+namespace AssetsManager.Services.Viewer.Vfx.Resources
+{
+    /// <summary>
+    /// Scene-scoped resource overlay for VFX whose assets live in project/WAD storage rather than
+    /// a directly browsable extraction. Referenced assets are materialized once into a temporary
+    /// virtual-path tree so every host (MAP placements, Animation Clip events, etc.) reuses the
+    /// audited VFX resolver/runtime unchanged.
+    /// </summary>
+    internal sealed class VfxSceneResourceContext : IDisposable
+    {
+        private static readonly string[] TextureExtensions = { ".tex", ".dds" };
+        private static readonly string[] SkeletonExtensions = { ".skl" };
+        private static readonly string[] AnimationExtensions = { ".anm" };
+        private const int MaximumConcurrentCopies = 4;
+
+        private readonly MapAssetResolver _assetResolver;
+        private readonly VfxLoadingService _loadingService;
+        private readonly LogService _logService;
+        private readonly SemaphoreSlim _materializeGate = new(1, 1);
+        private readonly object _materializedCandidatesGate = new();
+        private readonly HashSet<string> _materializedCandidates = new(StringComparer.OrdinalIgnoreCase);
+        private bool _disposed;
+
+        private VfxSceneResourceContext(
+            MapAssetResolver assetResolver,
+            HashResolverService hashResolver,
+            LogService logService,
+            string searchDirectory)
+        {
+            _assetResolver = assetResolver;
+            _loadingService = new VfxLoadingService(hashResolver);
+            _logService = logService;
+            SearchDirectory = searchDirectory;
+        }
+
+        internal string SearchDirectory { get; }
+
+        internal static Task<VfxSceneResourceContext> CreateAsync(
+            MapParticleSystemCatalog catalog,
+            string projectRoot,
+            MapAssetResolver assetResolver,
+            HashResolverService hashResolver,
+            LogService logService,
+            CancellationToken cancellationToken = default)
+            => CreateAsync(
+                catalog?.Systems,
+                projectRoot,
+                assetResolver,
+                hashResolver,
+                logService,
+                cancellationToken);
+
+        internal static async Task<VfxSceneResourceContext> CreateAsync(
+            IReadOnlyDictionary<uint, VfxSystemDefinition> systems,
+            string projectRoot,
+            MapAssetResolver assetResolver,
+            HashResolverService hashResolver,
+            LogService logService,
+            CancellationToken cancellationToken = default,
+            VfxOwnerSceneContext ownerSceneContext = null)
+        {
+            ArgumentNullException.ThrowIfNull(assetResolver);
+
+            string tempRoot = Path.Combine(
+                Path.GetTempPath(),
+                "AssetsManager",
+                "SceneVfx",
+                Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(tempRoot);
+            var context = new VfxSceneResourceContext(
+                assetResolver,
+                hashResolver,
+                logService,
+                tempRoot);
+            try
+            {
+                await context.EnsureMaterializedAsync(systems, ownerSceneContext, projectRoot, cancellationToken);
+                return context;
+            }
+            catch
+            {
+                context.Dispose();
+                throw;
+            }
+        }
+
+        internal IReadOnlyList<MapParticleRuntime> CreateMapRuntimes(MapParticleSystemCatalog catalog)
+        {
+            ThrowIfDisposed();
+            return MapParticleRuntime.CreateAll(catalog, PreparePlaybackAtWorldTransform);
+        }
+
+        internal async Task EnsureMaterializedAsync(
+            IReadOnlyDictionary<uint, VfxSystemDefinition> systems,
+            VfxOwnerSceneContext ownerSceneContext,
+            string projectRoot,
+            CancellationToken cancellationToken = default)
+        {
+            ThrowIfDisposed();
+            await _materializeGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                ThrowIfDisposed();
+                await MaterializeAsync(systems, ownerSceneContext, projectRoot, cancellationToken).ConfigureAwait(false);
+            }
+            finally
+            {
+                _materializeGate.Release();
+            }
+        }
+
+        internal VfxPlaybackRuntime PreparePlaybackAtWorldTransform(
+            VfxSystemDefinition definition,
+            Matrix4x4 worldTransform,
+            int seed)
+        {
+            ThrowIfDisposed();
+            return _loadingService.PreparePlaybackAtWorldTransform(
+                definition,
+                SearchDirectory,
+                worldTransform,
+                seed,
+                _logService);
+        }
+
+        internal static IReadOnlyList<ResourceRequest> CollectRequests(MapParticleSystemCatalog catalog)
+            => CollectRequests(catalog?.Systems);
+
+        internal static IReadOnlyDictionary<uint, VfxSystemDefinition> ReachableSystems(
+            IReadOnlyDictionary<uint, VfxSystemDefinition> systems,
+            IReadOnlyDictionary<uint, uint> resourceMap,
+            IEnumerable<VfxSystemDefinition> roots)
+        {
+            if (systems == null || systems.Count == 0 || roots == null)
+                return new Dictionary<uint, VfxSystemDefinition>();
+
+            resourceMap ??= new Dictionary<uint, uint>();
+            var reachable = new Dictionary<uint, VfxSystemDefinition>();
+            var pending = new Queue<VfxSystemDefinition>(roots.Where(system => system != null));
+            while (pending.Count > 0)
+            {
+                VfxSystemDefinition system = pending.Dequeue();
+                if (system == null || !reachable.TryAdd(system.PathHash, system))
+                    continue;
+
+                foreach (VfxEmitterDefinition emitter in system.Emitters ?? Array.Empty<VfxEmitterDefinition>())
+                {
+                    foreach (VfxChildSystemReference child in emitter?.ChildParticleSet?.Children ?? Array.Empty<VfxChildSystemReference>())
+                    {
+                        if (child == null)
+                            continue;
+
+                        VfxSystemDefinition childSystem = VfxPlaybackGraphRuntime.ResolveSystem(
+                            child, systems, system.ResourceMap, resourceMap);
+                        if (childSystem != null)
+                            pending.Enqueue(childSystem);
+                    }
+                }
+            }
+
+            return reachable;
+        }
+
+        internal static IReadOnlyList<ResourceRequest> CollectRequests(
+            IReadOnlyDictionary<uint, VfxSystemDefinition> systems,
+            VfxOwnerSceneContext ownerSceneContext = null)
+        {
+            var requests = new Dictionary<string, ResourceRequest>(StringComparer.OrdinalIgnoreCase);
+            if (systems != null)
+            foreach (VfxSystemDefinition system in systems.Values)
+            {
+                if (system?.Emitters == null)
+                    continue;
+                foreach (VfxEmitterDefinition emitter in system.Emitters)
+                {
+                    if (emitter == null)
+                        continue;
+                    Add(requests, emitter.TexturePath, TextureExtensions);
+                    Add(requests, emitter.TextureMultPath, TextureExtensions);
+                    Add(requests, emitter.Distortion?.NormalMapTexturePath, TextureExtensions);
+                    Add(requests, emitter.AlphaErosion?.TexturePath, TextureExtensions);
+                    Add(requests, emitter.Reflection?.TexturePath, TextureExtensions);
+                    Add(requests, emitter.PaletteDefinition?.PaletteTexturePath, TextureExtensions);
+                    Add(requests, emitter.ParticleColorTexturePath, TextureExtensions);
+                    Add(requests, emitter.CustomMaterial?.BaseTextureName, TextureExtensions);
+                    if (emitter.CustomMaterial?.Program?.Passes is { } passes)
+                    foreach (GameMaterialPass pass in passes)
+                    foreach (GameMaterialTexture binding in pass.Textures ?? Array.Empty<GameMaterialTexture>())
+                    {
+                        if (binding?.Texture is not { IsEmpty: false } texture)
+                            continue;
+                        string path = !string.IsNullOrWhiteSpace(texture.VirtualPath)
+                            ? texture.VirtualPath
+                            : $"{texture.PathHash:x16}.tex";
+                        Add(requests, path, TextureExtensions);
+                    }
+                    Add(requests, emitter.MeshPath, VfxMeshFormatSemantics.SceneExtensions);
+                    Add(requests, emitter.MeshFallbackPath, VfxMeshFormatSemantics.SceneExtensions);
+                    Add(requests, emitter.MeshSkeletonPath, SkeletonExtensions);
+                    Add(requests, emitter.MeshAnimationPath, AnimationExtensions);
+                    foreach (string variant in emitter.MeshAnimationVariants ?? Array.Empty<string>())
+                        Add(requests, variant, AnimationExtensions);
+                    Add(requests, emitter.EmissionMesh?.MeshPath, VfxMeshFormatSemantics.SceneExtensions);
+                    if (emitter.EmissionSurface is { } surface)
+                    {
+                        Add(requests, surface.MeshPath, VfxMeshFormatSemantics.SceneExtensions);
+                        Add(requests, surface.SkeletonPath, SkeletonExtensions);
+                    }
+                }
+            }
+
+            if (ownerSceneContext != null)
+            {
+                Add(requests, ownerSceneContext.MeshPath, VfxMeshFormatSemantics.SceneExtensions);
+                Add(requests, ownerSceneContext.SkeletonPath, SkeletonExtensions);
+            }
+            return requests.Values.ToArray();
+        }
+
+        internal static MapAssetReference ReferenceFor(string candidate)
+        {
+            if (string.IsNullOrWhiteSpace(candidate))
+                return null;
+
+            string normalized = candidate.Replace('\\', '/').TrimStart('/');
+            string fileName = Path.GetFileName(normalized);
+            string stem = Path.GetFileNameWithoutExtension(fileName);
+            bool pathless = normalized.Equals(fileName, StringComparison.OrdinalIgnoreCase);
+            if (pathless && stem.Length == 16 && ulong.TryParse(
+                    stem,
+                    System.Globalization.NumberStyles.HexNumber,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    out ulong hash))
+            {
+                return new MapAssetReference(null, hash);
+            }
+
+            return new MapAssetReference(normalized, 0);
+        }
+
+        private async Task MaterializeAsync(
+            IReadOnlyDictionary<uint, VfxSystemDefinition> systems,
+            VfxOwnerSceneContext ownerSceneContext,
+            string projectRoot,
+            CancellationToken cancellationToken)
+        {
+            IReadOnlyList<ResourceRequest> requests = CollectRequests(systems, ownerSceneContext);
+            if (requests.Count == 0)
+                return;
+
+            var candidates = new List<Candidate>();
+            foreach (ResourceRequest request in requests)
+            {
+                foreach (string candidatePath in CandidatePaths(request.AuthoredPath, request.Extensions))
+                {
+                    MapAssetReference reference = ReferenceFor(candidatePath);
+                    if (reference?.IsEmpty == false)
+                        candidates.Add(new Candidate(request.AuthoredPath, candidatePath, reference));
+                }
+            }
+
+            MapAssetReference[] uniqueReferences = candidates
+                .Select(candidate => candidate.Reference)
+                .Distinct()
+                .ToArray();
+            IReadOnlyDictionary<MapAssetReference, MapResolvedAsset> resolved =
+                await _assetResolver.ResolveReferencesAsync(uniqueReferences, projectRoot, cancellationToken);
+
+            var chosen = new Dictionary<string, Candidate>(StringComparer.OrdinalIgnoreCase);
+            foreach (Candidate candidate in candidates)
+            {
+                if (chosen.ContainsKey(candidate.AuthoredPath) || !resolved.ContainsKey(candidate.Reference))
+                    continue;
+                chosen[candidate.AuthoredPath] = candidate;
+            }
+
+            using var gate = new SemaphoreSlim(MaximumConcurrentCopies, MaximumConcurrentCopies);
+            Candidate[] copyCandidates = chosen.Values
+                .GroupBy(candidate => candidate.CandidatePath, StringComparer.OrdinalIgnoreCase)
+                .Select(group => group.First())
+                .Where(candidate => !IsMaterialized(candidate.CandidatePath))
+                .ToArray();
+            Task[] copies = copyCandidates.Select(async candidate =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                await gate.WaitAsync(cancellationToken);
+                try
+                {
+                    MapResolvedAsset asset = resolved[candidate.Reference];
+                    byte[] bytes = await _assetResolver.ReadBytesAsync(asset, cancellationToken);
+                    if (bytes == null || bytes.Length == 0)
+                        return;
+                    string destination = SafeDestination(SearchDirectory, candidate.CandidatePath);
+                    if (destination == null)
+                        return;
+                    string directory = Path.GetDirectoryName(destination);
+                    if (!string.IsNullOrWhiteSpace(directory))
+                        Directory.CreateDirectory(directory);
+                    await File.WriteAllBytesAsync(destination, bytes, cancellationToken);
+                    MarkMaterialized(candidate.CandidatePath);
+                }
+                finally
+                {
+                    gate.Release();
+                }
+            }).ToArray();
+
+            await Task.WhenAll(copies);
+        }
+
+        private static IEnumerable<string> CandidatePaths(
+            string authoredPath,
+            IReadOnlyList<string> extensions)
+        {
+            if (string.IsNullOrWhiteSpace(authoredPath))
+                yield break;
+
+            string normalized = authoredPath.Replace('\\', '/').TrimStart('/');
+            string authoredExtension = Path.GetExtension(normalized);
+            bool syntheticHashAsset = IsSyntheticHashAsset(normalized);
+            if (!string.IsNullOrWhiteSpace(authoredExtension) && !syntheticHashAsset)
+            {
+                if ((extensions ?? Array.Empty<string>()).Contains(
+                        authoredExtension,
+                        StringComparer.OrdinalIgnoreCase))
+                {
+                    yield return normalized;
+                }
+                yield break;
+            }
+
+            if (!string.IsNullOrWhiteSpace(authoredExtension))
+                yield return normalized;
+
+            foreach (string extension in extensions ?? Array.Empty<string>())
+            {
+                string candidate = Path.ChangeExtension(normalized, extension);
+                if (!candidate.Equals(normalized, StringComparison.OrdinalIgnoreCase))
+                    yield return candidate;
+            }
+        }
+
+        private static void Add(
+            IDictionary<string, ResourceRequest> requests,
+            string authoredPath,
+            IReadOnlyList<string> extensions)
+        {
+            if (string.IsNullOrWhiteSpace(authoredPath))
+                return;
+
+            if (requests.TryGetValue(authoredPath, out ResourceRequest existing))
+            {
+                string[] merged = (existing.Extensions ?? Array.Empty<string>())
+                    .Concat(extensions ?? Array.Empty<string>())
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToArray();
+                requests[authoredPath] = existing with { Extensions = merged };
+                return;
+            }
+
+            requests[authoredPath] = new ResourceRequest(
+                authoredPath,
+                (extensions ?? Array.Empty<string>()).Distinct(StringComparer.OrdinalIgnoreCase).ToArray());
+        }
+
+        private bool IsMaterialized(string candidatePath)
+        {
+            lock (_materializedCandidatesGate)
+                return _materializedCandidates.Contains(candidatePath);
+        }
+
+        private void MarkMaterialized(string candidatePath)
+        {
+            lock (_materializedCandidatesGate)
+                _materializedCandidates.Add(candidatePath);
+        }
+
+        private static bool IsSyntheticHashAsset(string path)
+        {
+            string stem = Path.GetFileNameWithoutExtension(path ?? string.Empty);
+            if (stem.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+                stem = stem[2..];
+            if (stem.Length is not (8 or 16))
+                return false;
+            return ulong.TryParse(
+                stem,
+                System.Globalization.NumberStyles.HexNumber,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out _);
+        }
+
+        private static string SafeDestination(string root, string relativePath)
+        {
+            if (string.IsNullOrWhiteSpace(root) || string.IsNullOrWhiteSpace(relativePath))
+                return null;
+
+            string normalized = relativePath.Replace('/', Path.DirectorySeparatorChar)
+                .TrimStart(Path.DirectorySeparatorChar);
+            if (Path.IsPathRooted(normalized))
+                return null;
+
+            string rootFull = Path.GetFullPath(root)
+                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+            string destination = Path.GetFullPath(Path.Combine(rootFull, normalized));
+            return destination.StartsWith(rootFull, StringComparison.OrdinalIgnoreCase)
+                ? destination
+                : null;
+        }
+
+        private void ThrowIfDisposed()
+        {
+            if (_disposed)
+                throw new ObjectDisposedException(nameof(VfxSceneResourceContext));
+        }
+
+        public void Dispose()
+        {
+            if (_disposed) return;
+            _disposed = true;
+            _loadingService.Dispose();
+            try
+            {
+                if (Directory.Exists(SearchDirectory))
+                    Directory.Delete(SearchDirectory, recursive: true);
+            }
+            catch (IOException)
+            {
+            }
+            catch (UnauthorizedAccessException)
+            {
+            }
+        }
+
+        internal sealed record ResourceRequest(string AuthoredPath, IReadOnlyList<string> Extensions);
+        private sealed record Candidate(string AuthoredPath, string CandidatePath, MapAssetReference Reference);
+    }
+}

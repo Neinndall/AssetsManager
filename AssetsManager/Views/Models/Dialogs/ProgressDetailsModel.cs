@@ -7,15 +7,22 @@ namespace AssetsManager.Views.Models.Dialogs
     public class ProgressDetailsModel : INotifyPropertyChanged
     {
         private string _operationVerb;
-        private string _itemProgressText = "0 of 0";
+        private string _itemProgressText = "Initializing...";
         private string _currentFileName = "...";
         private double _progressValue = 0;
-        private string _subProgressText = "0 of 0";
+        private bool _isIndeterminate = false;
+        private string _subProgressText = "";
         private string _estimatedTimeText = "Calculating...";
         private bool _showChunks = false;
         private bool _isFinished = false;
 
         public event PropertyChangedEventHandler PropertyChanged;
+
+        public bool IsIndeterminate
+        {
+            get => _isIndeterminate;
+            set { if (_isIndeterminate != value) { _isIndeterminate = value; OnPropertyChanged(); } }
+        }
 
         public string OperationVerb
         {

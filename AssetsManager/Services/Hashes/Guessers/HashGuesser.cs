@@ -1,0 +1,952 @@
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Globalization;
+using System.IO;
+using System.Linq;
+using System.Text;
+using System.Text.RegularExpressions;
+using System.Threading;
+using AssetsManager.Services.Parsers;
+using AssetsManager.Utils;
+using AssetsManager.Views.Models.Hashes;
+using LeagueToolkit.Core.Wad;
+using LeagueToolkit.Hashing;
+
+namespace AssetsManager.Services.Hashes.Guessers
+{
+    internal readonly record struct HashGuessCandidate(string Path, HashGuessStrategy Strategy);
+    internal sealed record HashWadInventory(IReadOnlyList<string> WadPaths, HashSet<ulong> Hashes, long ChunkCount, ulong HashXor, ulong HashSum);
+
+    internal abstract class HashGuesser
+    {
+        private static readonly UTF8Encoding StrictUtf8 = new(false, true);
+        private readonly object _corpusSync = new();
+        private HashCorpusIndex _corpus;
+
+        protected HashGuesser(HashFile hashFile, string wadPattern)
+        {
+            HashFile = hashFile ?? throw new ArgumentNullException(nameof(hashFile));
+            Domain = hashFile.Domain;
+            WadPattern = wadPattern;
+        }
+
+        protected HashFile HashFile { get; }
+        internal HashGuessDomain Domain { get; }
+        internal string WadPattern { get; }
+        protected HashCorpusIndex Corpus
+        {
+            get
+            {
+                IReadOnlyList<string> paths = HashFile.LoadPaths();
+                long revision = HashFile.Revision;
+                lock (_corpusSync)
+                {
+                    if (_corpus == null || _corpus.Revision != revision)
+                        _corpus = new HashCorpusIndex(revision, paths);
+                    return _corpus;
+                }
+            }
+        }
+
+        internal IReadOnlyList<string> KnownPaths => Corpus.Paths;
+
+        internal virtual void ReleaseMemory()
+        {
+            HashFile.Invalidate();
+            lock (_corpusSync)
+            {
+                _corpus = null;
+            }
+        }
+
+
+        internal static HashSet<ulong> UnknownFromExport(string directory) =>
+            HashFile.LoadUnknownFromExport(directory);
+
+        internal IReadOnlyList<string> DirectoryList() =>
+            Corpus.GetOrCreate("directories", HashGuessEngine.BuildDirectoryList);
+
+        internal string[] FindWads(string rootDirectory)
+        {
+            if (string.IsNullOrWhiteSpace(rootDirectory) || !Directory.Exists(rootDirectory))
+                throw new DirectoryNotFoundException("The selected game directory does not exist.");
+
+            string searchPath = rootDirectory;
+            if (WadPattern == "*.wad")
+            {
+                string pluginsPath = Path.Combine(rootDirectory, "Plugins");
+                if (Directory.Exists(pluginsPath))
+                {
+                    searchPath = pluginsPath;
+                }
+            }
+            else if (WadPattern == "*.wad.client")
+            {
+                string gamePath = Path.Combine(rootDirectory, "Game");
+                if (Directory.Exists(gamePath))
+                {
+                    searchPath = gamePath;
+                }
+            }
+
+            return Directory.EnumerateFiles(searchPath, WadPattern, SearchOption.AllDirectories)
+                .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+        }
+
+        internal HashWadInventory FromWads(
+            IEnumerable<string> wadPaths,
+            CancellationToken cancellationToken,
+            Action<string, Exception> onUnreadableWad = null,
+            Action<int, int, string> onProgress = null)
+        {
+            string expectedSuffix = WadPattern.TrimStart('*');
+            string[] paths = wadPaths
+                .Where(path => path.EndsWith(expectedSuffix, StringComparison.OrdinalIgnoreCase))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            var hashes = new HashSet<ulong>();
+            ulong hashXor = 0;
+            ulong hashSum = 0;
+            long chunkCount = 0;
+
+            for (int i = 0; i < paths.Length; i++)
+            {
+                string wadPath = paths[i];
+                cancellationToken.ThrowIfCancellationRequested();
+                onProgress?.Invoke(i + 1, paths.Length, Path.GetFileName(wadPath));
+                try
+                {
+                    using var stream = File.OpenRead(wadPath);
+                    using var wad = new WadFile(stream);
+                    foreach (WadChunk chunk in wad.Chunks.Values)
+                    {
+                        hashes.Add(chunk.PathHash);
+                        hashXor ^= chunk.PathHash;
+                        hashSum = unchecked(hashSum + chunk.PathHash);
+                        chunkCount++;
+
+                        if (Domain == HashGuessDomain.Game &&
+                            chunk.Compression != WadChunkCompression.Satellite &&
+                            chunk.UncompressedSize >= 24 &&
+                            chunk.UncompressedSize <= 32_768)
+                        {
+                            try
+                            {
+                                using var dataOwner = wad.LoadChunkDecompressed(chunk);
+                                var data = dataOwner.DangerousGetArray();
+                                if (ImageAutoAtlas.IsAtlas(data.AsSpan()) && ImageAutoAtlas.TryRead(data.Array[data.Offset..(data.Offset + data.Count)], out var atlas))
+                                {
+                                    foreach (var sprite in atlas.Sprites)
+                                    {
+                                        if (hashes.Add(sprite.SpriteHash))
+                                        {
+                                            hashXor ^= sprite.SpriteHash;
+                                            hashSum = unchecked(hashSum + sprite.SpriteHash);
+                                        }
+                                    }
+                                }
+                            }
+                            catch
+                            {
+                            }
+                        }
+                    }
+                }
+                catch (Exception exception) when (exception is not OperationCanceledException)
+                {
+                    onUnreadableWad?.Invoke(wadPath, exception);
+                }
+            }
+
+            return new HashWadInventory(paths, hashes, chunkCount, hashXor, hashSum);
+        }
+
+        internal static bool TryDecodeWadText(ArraySegment<byte> data, out string text)
+        {
+            text = string.Empty;
+            if (data.Count == 0) return false;
+            try
+            {
+                text = StrictUtf8.GetString(data.Array, data.Offset, data.Count);
+                if (text.Length > 0 && text[0] == '\uFEFF') text = text[1..];
+                return text.Length > 0;
+            }
+            catch (DecoderFallbackException)
+            {
+                return false;
+            }
+        }
+
+        internal virtual bool ShouldGrepExtension(string extension) => true;
+
+        internal abstract IReadOnlyList<string> BuildWordlist();
+        internal void GrepWad(
+            HashGuessEngine engine,
+            ArraySegment<byte> data,
+            string sourcePath,
+            string sourceWadPath,
+            ulong sourceChunkHash) =>
+            GrepWad(engine, data, sourcePath, sourceWadPath, sourceChunkHash, CancellationToken.None);
+
+        internal abstract void GrepWad(
+            HashGuessEngine engine,
+            ArraySegment<byte> data,
+            string sourcePath,
+            string sourceWadPath,
+            ulong sourceChunkHash,
+            CancellationToken cancellationToken);
+
+        protected virtual void CheckCandidate(
+            HashGuessEngine engine,
+            HashGuessCandidate candidate,
+            string sourceWadPath,
+            ulong sourceChunkHash,
+            CancellationToken cancellationToken)
+        {
+            CheckIter(
+                engine,
+                ExpandCandidate(candidate),
+                candidate.Strategy,
+                sourceWadPath,
+                cancellationToken,
+                sourceChunkHash);
+        }
+
+        internal virtual IEnumerable<HashGuessCandidate> GenerateNumberCandidates(
+            int numberLimit,
+            int candidateBudget = int.MaxValue,
+            int? digits = null,
+            bool inferDigits = false,
+            bool includeCommonPadding = true) =>
+            GenerateNumberCandidates(KnownPaths, numberLimit, candidateBudget, digits, inferDigits, includeCommonPadding);
+
+        protected int _SubstituteNumbers(
+            HashGuessEngine engine,
+            IEnumerable<string> paths,
+            int numberLimit,
+            int? digits,
+            bool inferDigits,
+            CancellationToken cancellationToken,
+            string source,
+            Action<int> progress = null,
+            IReadOnlySet<string> unpaddedFormatsAlreadyChecked = null)
+        {
+            ArgumentNullException.ThrowIfNull(engine);
+            ArgumentNullException.ThrowIfNull(paths);
+            int? effectiveDigits = ResolveNumberDigits(numberLimit, digits, inferDigits);
+            int checkedCount = 0;
+
+            IReadOnlyList<string> formats = BuildNumberFormats(paths, effectiveDigits);
+            string formatSpecifier = effectiveDigits.HasValue ? $"D{effectiveDigits.Value}" : null;
+            Span<char> numSpan = stackalloc char[16];
+
+            foreach (string format in ProgressIterator(formats, value => value, cancellationToken))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                int marker = format.IndexOf("{number}", StringComparison.Ordinal);
+                if (marker < 0) continue;
+
+                ReadOnlySpan<char> formatPrefix = format.AsSpan(0, marker);
+                ReadOnlySpan<char> formatSuffix = format.AsSpan(marker + 8);
+
+                int limit = effectiveDigits == 2 && unpaddedFormatsAlreadyChecked?.Contains(format) == true
+                    ? Math.Min(numberLimit, 10) : numberLimit;
+                for (int value = 0; value < limit; value++)
+                {
+                    bool formatted = formatSpecifier != null
+                        ? value.TryFormat(numSpan, out int charsWritten, formatSpecifier, CultureInfo.InvariantCulture)
+                        : value.TryFormat(numSpan, out charsWritten, default, CultureInfo.InvariantCulture);
+
+                    if (!formatted) continue;
+
+                    engine.CheckNormalizedParts(
+                        formatPrefix,
+                        numSpan[..charsWritten],
+                        formatSuffix,
+                        HashGuessStrategy.NumberVariant,
+                        source);
+
+                    checkedCount++;
+                }
+
+                if ((checkedCount & 0x3FFF) == 0) progress?.Invoke(checkedCount);
+                if (engine.RemainingUnknownCount == 0) break;
+            }
+
+            return checkedCount;
+        }
+
+        protected IEnumerable<HashGuessCandidate> GenerateNumberCandidates(
+            IEnumerable<string> knownPaths,
+            int numberLimit,
+            int candidateBudget,
+            int? digits = null,
+            bool inferDigits = false,
+            bool includeCommonPadding = true)
+        {
+            if (candidateBudget < 0) throw new ArgumentOutOfRangeException(nameof(candidateBudget));
+            int? effectiveDigits = ResolveNumberDigits(numberLimit, digits, inferDigits);
+            int generated = 0;
+            foreach (string format in BuildNumberFormats(knownPaths, effectiveDigits))
+            foreach (HashGuessCandidate candidate in GenerateNumberCandidatesForFormat(
+                         format,
+                         numberLimit,
+                         effectiveDigits,
+                         includeCommonPadding))
+            {
+                yield return candidate;
+                if (CountCandidate(ref generated, candidateBudget)) yield break;
+            }
+        }
+
+        protected IReadOnlyList<string> BuildNumberFormats(IEnumerable<string> knownPaths, int? effectiveDigits)
+        {
+            if (ReferenceEquals(knownPaths, KnownPaths))
+            {
+                string cacheKey = $"number-formats-{AnchorNumberMatchesToFileName}-{effectiveDigits}";
+                return Corpus.GetOrCreate(cacheKey, paths => ExtractNumberFormats(paths, effectiveDigits));
+            }
+
+            return ExtractNumberFormats(knownPaths, effectiveDigits);
+        }
+
+        private IReadOnlyList<string> ExtractNumberFormats(IEnumerable<string> knownPaths, int? effectiveDigits)
+        {
+            string digitExpression = effectiveDigits.HasValue ? $"[0-9]{{{effectiveDigits.Value}}}" : "[0-9]+";
+            string numberPattern = AnchorNumberMatchesToFileName
+                ? digitExpression + @"(?=[^/]*\.[^/]+$)"
+                : digitExpression;
+            var formats = new HashSet<string>(StringComparer.Ordinal);
+            foreach (string path in knownPaths)
+            {
+                if (!IncludeNumberPath(path)) continue;
+
+                if (AnchorNumberMatchesToFileName)
+                {
+                    int lastSlash = path.LastIndexOf('/');
+                    ReadOnlySpan<char> fileName = lastSlash >= 0 ? path.AsSpan(lastSlash + 1) : path.AsSpan();
+                    bool hasDigit = false;
+                    foreach (char c in fileName)
+                    {
+                        if (char.IsAsciiDigit(c))
+                        {
+                            hasDigit = true;
+                            break;
+                        }
+                    }
+                    if (!hasDigit) continue;
+                }
+
+                foreach (Match match in Regex.Matches(path, numberPattern))
+                    formats.Add(path[..match.Index] + "{number}" + path[(match.Index + match.Length)..]);
+            }
+
+            return formats.OrderBy(path => path, StringComparer.Ordinal).ToList();
+        }
+
+        private static int? ResolveNumberDigits(int numberLimit, int? digits, bool inferDigits)
+        {
+            if (numberLimit < 0) throw new ArgumentOutOfRangeException(nameof(numberLimit));
+            if (digits is < 1) throw new ArgumentOutOfRangeException(nameof(digits));
+            return inferDigits
+                ? Math.Max(1, Math.Max(0, numberLimit - 1).ToString(CultureInfo.InvariantCulture).Length)
+                : digits;
+        }
+
+        private static IEnumerable<HashGuessCandidate> GenerateNumberCandidatesForFormat(
+            string format,
+            int numberLimit,
+            int? effectiveDigits,
+            bool includeCommonPadding)
+        {
+            for (int value = 0; value < numberLimit; value++)
+            foreach (string candidate in FormatNumberVariants(format, value, effectiveDigits, includeCommonPadding))
+                yield return new HashGuessCandidate(candidate, HashGuessStrategy.NumberVariant);
+        }
+
+        protected virtual bool IncludeNumberPath(string path) => true;
+
+        protected virtual bool AnchorNumberMatchesToFileName => true;
+
+        internal int SubstituteExtensions(
+            HashGuessEngine engine,
+            CancellationToken cancellationToken,
+            int candidateBudget = int.MaxValue,
+            string source = "Extension substitution",
+            Action<int> progress = null)
+        {
+            ArgumentNullException.ThrowIfNull(engine);
+            if (candidateBudget < 0) throw new ArgumentOutOfRangeException(nameof(candidateBudget));
+            if (candidateBudget == 0) return 0;
+
+            IReadOnlyList<string> orderedExtensions =
+                Corpus.GetOrCreate("known-extensions", paths =>
+                {
+                    var extensions = new HashSet<string>(StringComparer.Ordinal);
+                    foreach (string path in paths)
+                    {
+                        int dot = path.LastIndexOf('.');
+                        if (dot > path.LastIndexOf('/'))
+                        {
+                            string ext = path[dot..];
+                            if (!ext.EndsWith("00", StringComparison.Ordinal))
+                                extensions.Add(ext);
+                        }
+                    }
+                    return (IReadOnlyList<string>)extensions.OrderBy(v => v, StringComparer.Ordinal).ToList();
+                });
+
+            int checkedCount = 0;
+            var seenStems = new HashSet<ulong>();
+
+            foreach (string path in ProgressIterator(KnownPaths, value => value, cancellationToken))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                int slash = path.LastIndexOf('/');
+                int dot = path.LastIndexOf('.');
+                ReadOnlySpan<char> prefixSpan = dot > slash ? path.AsSpan(0, dot) : path.AsSpan();
+                ReadOnlySpan<char> currentExt = dot > slash ? path.AsSpan(dot) : ReadOnlySpan<char>.Empty;
+
+                ulong stemHash = XxHash64Ext.Hash(prefixSpan);
+                if (!seenStems.Add(stemHash)) continue;
+
+                foreach (string extension in orderedExtensions)
+                {
+                    if (checkedCount >= candidateBudget || engine.RemainingUnknownCount == 0) return checkedCount;
+
+                    if (currentExt.Equals(extension.AsSpan(), StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    engine.CheckNormalizedParts(
+                        prefixSpan,
+                        ReadOnlySpan<char>.Empty,
+                        extension.AsSpan(),
+                        HashGuessStrategy.ExtensionVariant,
+                        source);
+
+                    checkedCount++;
+                }
+
+                if ((checkedCount & 0x3FFF) == 0) progress?.Invoke(checkedCount);
+                if (engine.RemainingUnknownCount == 0) break;
+            }
+
+            return checkedCount;
+        }
+
+        internal bool Check(
+            HashGuessEngine engine,
+            string path,
+            HashGuessStrategy strategy,
+            string source = "Generated",
+            ulong sourceChunkHash = 0) =>
+            engine.Check(path, strategy, source, sourceChunkHash);
+
+        protected void _AddKnown(
+            HashGuessEngine engine,
+            ulong hash,
+            string path,
+            HashGuessStrategy strategy = HashGuessStrategy.WordlistVariant,
+            string source = "Generated",
+            ulong sourceChunkHash = 0) =>
+            engine._AddKnown(hash, path, strategy, source, sourceChunkHash);
+
+        internal bool IsKnown(
+            HashGuessEngine engine,
+            string path,
+            HashGuessStrategy strategy = HashGuessStrategy.WordlistVariant,
+            string source = "Generated")
+        {
+            ulong hash = XxHash64Ext.Hash(PathUtils.NormalizePath(path));
+            if (engine.UnknownHashes.Contains(hash))
+            {
+                _AddKnown(engine, hash, path, strategy, source);
+                return true;
+            }
+
+            return HashFile.Load().ContainsKey(hash);
+        }
+
+        internal int CheckIter(
+            HashGuessEngine engine,
+            IEnumerable<string> paths,
+            HashGuessStrategy strategy,
+            string source = "Generated",
+            ulong sourceChunkHash = 0)
+        {
+            return CheckIter(engine, paths, strategy, source, CancellationToken.None, sourceChunkHash);
+        }
+
+        internal int CheckIter(
+            HashGuessEngine engine,
+            IEnumerable<string> paths,
+            HashGuessStrategy strategy,
+            string source,
+            CancellationToken cancellationToken,
+            ulong sourceChunkHash = 0)
+        {
+            ArgumentNullException.ThrowIfNull(paths);
+            int checkedCount = 0;
+            foreach (string path in paths)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                engine.Check(path, strategy, source, sourceChunkHash);
+                checkedCount++;
+                if (engine.RemainingUnknownCount == 0) break;
+            }
+            return checkedCount;
+        }
+
+        internal int CheckIter(
+            HashGuessEngine engine,
+            IEnumerable<HashGuessCandidate> candidates,
+            string source,
+            CancellationToken cancellationToken,
+            Action<int> progress = null,
+            int progressInterval = 0,
+            ulong sourceChunkHash = 0)
+        {
+            ArgumentNullException.ThrowIfNull(candidates);
+            int checkedCount = 0;
+            foreach (HashGuessCandidate candidate in candidates)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                CheckCandidate(engine, candidate, source, sourceChunkHash, cancellationToken);
+                checkedCount++;
+                if (progressInterval > 0 && checkedCount % progressInterval == 0)
+                    progress?.Invoke(checkedCount);
+                if (engine.RemainingUnknownCount == 0) break;
+            }
+            return checkedCount;
+        }
+
+        internal static IEnumerable<T> ProgressIterator<T>(
+            IEnumerable<T> sequence,
+            Func<T, string> formatter = null,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(sequence);
+            if (Console.IsErrorRedirected) return sequence;
+            IReadOnlyList<T> list = sequence as IReadOnlyList<T> ?? sequence.ToList();
+            return ProgressIterate(list, formatter, cancellationToken);
+        }
+
+        internal static IEnumerable<T> ProgressIterate<T>(
+            IReadOnlyList<T> sequence,
+            Func<T, string> formatter = null,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(sequence);
+            formatter ??= value => value?.ToString() ?? string.Empty;
+            for (int index = 0; index < sequence.Count; index++)
+            {
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    double percentage = sequence.Count == 0 ? 100 : 100.0 * index / sequence.Count;
+                    Console.Error.WriteLine($"  {percentage,5:0.0}%  {formatter(sequence[index])}");
+                    cancellationToken.ThrowIfCancellationRequested();
+                }
+
+                yield return sequence[index];
+            }
+        }
+
+        internal int CheckTextList(HashGuessEngine engine, string text, HashGuessStrategy strategy, string source = "Text list") =>
+            CheckIter(engine, text.Split((char[])null, StringSplitOptions.RemoveEmptyEntries), strategy, source);
+
+        internal int CheckXdbgHashes(HashGuessEngine engine, string path, HashGuessStrategy strategy = HashGuessStrategy.EmbeddedPathGrep)
+        {
+            if (!File.Exists(path)) return 0;
+            var candidates = File.ReadLines(path)
+                .Where(line => line.StartsWith("hash: ", StringComparison.Ordinal))
+                .Select(line => line.Split('"'))
+                .Where(parts => parts.Length > 1)
+                .Select(parts => parts[1]);
+            return CheckIter(engine, candidates, strategy, "XDBG hashes");
+        }
+
+        internal int CheckBasenames(
+            HashGuessEngine engine,
+            IEnumerable<string> names,
+            CancellationToken cancellationToken = default,
+            string source = "Basenames",
+            HashGuessStrategy strategy = HashGuessStrategy.PluginVariant,
+            ulong sourceChunkHash = 0)
+        {
+            ArgumentNullException.ThrowIfNull(names);
+            IReadOnlyList<string> dirs = DirectoryList();
+            var dirPrefixes = new string[dirs.Count];
+            var normalizedDirs = new bool[dirs.Count];
+            for (int i = 0; i < dirs.Count; i++)
+            {
+                string dir = dirs[i];
+                normalizedDirs[i] = string.Equals(dir, PathUtils.NormalizePath(dir), StringComparison.Ordinal);
+                dirPrefixes[i] = string.IsNullOrEmpty(dir) ? string.Empty : string.Concat(dir, "/");
+            }
+
+            int checkedCount = 0;
+            foreach (string name in ProgressIterator(names.OrderBy(n => n, StringComparer.Ordinal).ToList(), value => value, cancellationToken))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (engine.RemainingUnknownCount == 0) break;
+                bool normalizedName = string.Equals(name, PathUtils.NormalizePath(name), StringComparison.Ordinal);
+
+                for (int i = 0; i < dirs.Count; i++)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (normalizedName && normalizedDirs[i])
+                    {
+                        engine.CheckNormalizedParts(
+                            dirPrefixes[i].AsSpan(),
+                            name.AsSpan(),
+                            ReadOnlySpan<char>.Empty,
+                            strategy,
+                            source,
+                            sourceChunkHash);
+                    }
+                    else
+                    {
+                        engine.CheckCombined(dirs[i], name, strategy, source, sourceChunkHash);
+                    }
+
+                    checkedCount++;
+                    if (engine.RemainingUnknownCount == 0) break;
+                }
+            }
+            return checkedCount;
+        }
+
+        internal int SubstituteBasenames(
+            HashGuessEngine engine,
+            CancellationToken cancellationToken,
+            int? maxNames = null,
+            int? maxDirectories = null,
+            int candidateBudget = int.MaxValue,
+            Action<int> progress = null)
+        {
+            IReadOnlyList<string> names = Corpus.GetOrCreate("basenames", paths => paths.Select(Path.GetFileName)
+                .Where(name => !string.IsNullOrWhiteSpace(name))
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(name => name, StringComparer.Ordinal)
+                .ToList());
+            IReadOnlyList<string> directories = DirectoryList();
+            if (maxNames.HasValue) names = names.Take(Math.Max(0, maxNames.Value)).ToList();
+            if (maxDirectories.HasValue) directories = directories.Take(Math.Max(0, maxDirectories.Value)).ToList();
+
+            int checkedCount = 0;
+            int lastReportedCount = -1;
+            var progressClock = Stopwatch.StartNew();
+            foreach (string name in ProgressIterator(names, value => value, cancellationToken))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                int remaining = candidateBudget == int.MaxValue ? int.MaxValue : candidateBudget - checkedCount;
+                if (remaining <= 0 || engine.RemainingUnknownCount == 0) break;
+
+                IEnumerable<HashGuessCandidate> candidates = directories.Select(directory =>
+                    new HashGuessCandidate(
+                        string.IsNullOrEmpty(directory) ? name : $"{directory}/{name}",
+                        HashGuessStrategy.PluginVariant));
+                if (remaining != int.MaxValue) candidates = candidates.Take(remaining);
+
+                checkedCount += CheckIter(
+                    engine,
+                    candidates,
+                    "Basename substitution",
+                    cancellationToken);
+                if ((checkedCount & 0x3fff) == 0 && progressClock.ElapsedMilliseconds >= 100)
+                {
+                    progress?.Invoke(checkedCount);
+                    lastReportedCount = checkedCount;
+                    progressClock.Restart();
+                }
+                if (checkedCount >= candidateBudget || engine.RemainingUnknownCount == 0)
+                {
+                    if (lastReportedCount != checkedCount) progress?.Invoke(checkedCount);
+                    return checkedCount;
+                }
+            }
+            if (lastReportedCount != checkedCount) progress?.Invoke(checkedCount);
+            return checkedCount;
+        }
+
+        internal int RunFocusedWordlistSubstitution(HashGuessEngine engine, IEnumerable<string> paths, IEnumerable<string> words, CancellationToken cancellationToken, int candidateBudget = 500_000)
+            => _SubstituteBasenameWords(engine, paths, words, 1, 1, cancellationToken, candidateBudget, "Focused Wordlist");
+
+        internal int RunFocusedWordlistDoubleSubstitution(HashGuessEngine engine, IEnumerable<string> paths, IEnumerable<string> words, CancellationToken cancellationToken, int candidateBudget = 500_000)
+            => _SubstituteBasenameWords(engine, paths, words.Take(150), 2, 2, cancellationToken, candidateBudget, "Double Wordlist");
+
+        internal static IReadOnlyList<(string Prefix, string Suffix)> BuildBasenameWordFormats(IEnumerable<string> paths, int oldWordCount, int newWordCount)
+        {
+            if (oldWordCount < 1) throw new ArgumentOutOfRangeException(nameof(oldWordCount));
+            if (newWordCount < 1) throw new ArgumentOutOfRangeException(nameof(newWordCount));
+            var uniqueFormats = new HashSet<(string Prefix, string Suffix)>();
+            var regex = new Regex($@"([^/_.-]+)(?=((?:[-_][^/_.-]+){{{oldWordCount - 1}}})[^/]*\.[^/]+$)", RegexOptions.Compiled);
+            foreach (string path in paths)
+            {
+                string normalizedPath = PathUtils.NormalizePath(path);
+                foreach (Match match in regex.Matches(normalizedPath))
+                {
+                    int matchedLength = match.Groups[1].Length + match.Groups[2].Length;
+                    var format = (normalizedPath[..match.Index], normalizedPath[(match.Index + matchedLength)..]);
+                    uniqueFormats.Add(format);
+                }
+            }
+            var formats = new List<(string Prefix, string Suffix)>(uniqueFormats);
+            formats.Sort((a, b) =>
+            {
+                int cmp = string.CompareOrdinal(a.Prefix, b.Prefix);
+                return cmp != 0 ? cmp : string.CompareOrdinal(a.Suffix, b.Suffix);
+            });
+            return formats;
+        }
+
+        protected internal int _SubstituteBasenameWords(
+            HashGuessEngine engine,
+            IEnumerable<string> paths,
+            IEnumerable<string> words,
+            int oldWordCount,
+            int newWordCount,
+            CancellationToken cancellationToken,
+            int candidateBudget = int.MaxValue,
+            string source = "Wordlist substitution",
+            Action<int> progress = null,
+            HashGuessStrategy strategy = HashGuessStrategy.WordlistVariant)
+        {
+            ArgumentNullException.ThrowIfNull(engine);
+            ArgumentNullException.ThrowIfNull(paths);
+            ArgumentNullException.ThrowIfNull(words);
+            if (candidateBudget < 0) throw new ArgumentOutOfRangeException(nameof(candidateBudget));
+            if (candidateBudget == 0) return 0;
+
+            static bool IsAscii(string value) => value.AsSpan().IndexOfAnyExceptInRange((char)0, (char)127) < 0;
+            IReadOnlyList<string> wordsList = words.ToList();
+            if (wordsList.Count == 0) return 0;
+
+            if (newWordCount == 1)
+            {
+                var formats1 = BuildBasenameWordFormats(paths, oldWordCount, 1);
+                if (formats1.Count == 0) return 0;
+
+                IReadOnlyList<string> normalizedWords = wordsList
+                    .Select(PathUtils.NormalizePath)
+                    .ToList();
+                byte[][] wordBytes = normalizedWords.Select(Encoding.UTF8.GetBytes).ToArray();
+                bool[] asciiWords = normalizedWords.Select(IsAscii).ToArray();
+
+                long checkedCount = 0;
+                foreach (var format in ProgressIterator(formats1, f => f.Prefix + "%s" + f.Suffix, cancellationToken))
+                {
+                    bool asciiFormat = IsAscii(format.Prefix) && IsAscii(format.Suffix);
+                    byte[] prefixBytes = asciiFormat ? Encoding.UTF8.GetBytes(format.Prefix) : null;
+                    byte[] suffixBytes = asciiFormat ? Encoding.UTF8.GetBytes(format.Suffix) : null;
+                    int remaining = candidateBudget == int.MaxValue
+                        ? int.MaxValue
+                        : (int)Math.Max(0, candidateBudget - checkedCount);
+                    if (remaining <= 0) return (int)Math.Min(int.MaxValue, checkedCount);
+
+                    int wordsToTake = Math.Min(remaining, normalizedWords.Count);
+                    for (int i = 0; i < wordsToTake; i++)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        if (asciiFormat && asciiWords[i])
+                            engine.CheckNormalizedUtf8Parts(prefixBytes, wordBytes[i], suffixBytes, strategy, source);
+                        else
+                            engine.CheckNormalizedParts(format.Prefix, normalizedWords[i], format.Suffix, strategy, source);
+                        checkedCount++;
+                        if (engine.RemainingUnknownCount == 0)
+                        {
+                            int earlyReported = (int)Math.Min(int.MaxValue, checkedCount);
+                            progress?.Invoke(earlyReported);
+                            return earlyReported;
+                        }
+                    }
+
+                    int reportedCount = (int)Math.Min(int.MaxValue, checkedCount);
+                    progress?.Invoke(reportedCount);
+                    if (engine.RemainingUnknownCount == 0) return reportedCount;
+                }
+                return (int)Math.Min(int.MaxValue, checkedCount);
+            }
+
+            IReadOnlyList<string> formats = BuildBasenameWordFormats(paths, oldWordCount, newWordCount)
+                .SelectMany(format => (newWordCount == 1 ? new[] { string.Empty } : new[] { "-", "_" })
+                    .Select(separator => BuildBasenameWordFormat(format.Prefix, format.Suffix, separator, newWordCount)))
+                .OrderBy(format => format, StringComparer.Ordinal)
+                .ToList();
+            if (formats.Count == 0) return 0;
+
+            long checkedCountMulti = 0;
+            foreach (string format in ProgressIterator(formats, format => format, cancellationToken))
+            {
+                int remaining = candidateBudget == int.MaxValue
+                    ? int.MaxValue
+                    : (int)Math.Max(0, candidateBudget - checkedCountMulti);
+                if (remaining <= 0) return (int)Math.Min(int.MaxValue, checkedCountMulti);
+
+                IEnumerable<string> candidates = EnumerateBasenameWordCandidates(format, wordsList, newWordCount, cancellationToken);
+                if (remaining != int.MaxValue) candidates = candidates.Take(remaining);
+
+                checkedCountMulti += CheckIter(engine, candidates, strategy, source);
+                int reportedCount = (int)Math.Min(int.MaxValue, checkedCountMulti);
+                progress?.Invoke(reportedCount);
+                if (engine.RemainingUnknownCount == 0) return reportedCount;
+            }
+            return (int)Math.Min(int.MaxValue, checkedCountMulti);
+        }
+
+        internal static IReadOnlyList<string> BuildWordAdditionFormats(IEnumerable<string> paths)
+        {
+            ArgumentNullException.ThrowIfNull(paths);
+            var formats = new HashSet<string>(StringComparer.Ordinal);
+            var regex = new Regex(@"([^/_.-]+)(?=[^/]*\.[^/]+$)", RegexOptions.Compiled);
+            foreach (string path in paths)
+            foreach (Match match in regex.Matches(path))
+            foreach (string separator in new[] { "-", "_" })
+            {
+                formats.Add(path[..match.Index] + "{0}" + separator + path[match.Index..]);
+                formats.Add(path[..(match.Index + match.Length)] + separator + "{0}" + path[(match.Index + match.Length)..]);
+            }
+            return formats.OrderBy(format => format, StringComparer.Ordinal).ToList();
+        }
+
+        protected internal int _AddBasenameWord(
+            HashGuessEngine engine,
+            IEnumerable<string> paths,
+            IEnumerable<string> words,
+            CancellationToken cancellationToken,
+            int candidateBudget = int.MaxValue,
+            string source = "Word insertion",
+            Action<int> progress = null,
+            HashGuessStrategy strategy = HashGuessStrategy.WordlistVariant)
+        {
+            ArgumentNullException.ThrowIfNull(engine);
+            ArgumentNullException.ThrowIfNull(paths);
+            ArgumentNullException.ThrowIfNull(words);
+            if (candidateBudget < 0) throw new ArgumentOutOfRangeException(nameof(candidateBudget));
+            if (candidateBudget == 0) return 0;
+
+            var formats = BuildWordAdditionFormats(paths);
+            var wordsList = words.ToList();
+            if (formats.Count == 0 || wordsList.Count == 0) return 0;
+
+            int checkedCount = 0;
+            foreach (string format in ProgressIterator(formats, value => value, cancellationToken))
+            {
+                int remaining = candidateBudget == int.MaxValue ? int.MaxValue : candidateBudget - checkedCount;
+                if (remaining <= 0) return checkedCount;
+
+                IEnumerable<HashGuessCandidate> candidates = wordsList.Select(word =>
+                    new HashGuessCandidate(
+                        format.Replace("{0}", word, StringComparison.Ordinal),
+                        strategy));
+                if (remaining != int.MaxValue) candidates = candidates.Take(remaining);
+
+                checkedCount += CheckIter(engine, candidates, source, cancellationToken);
+                progress?.Invoke(checkedCount);
+                if (engine.RemainingUnknownCount == 0) return checkedCount;
+            }
+
+            return checkedCount;
+        }
+
+        protected virtual IEnumerable<string> ExpandCandidate(HashGuessCandidate candidate)
+        {
+            yield return candidate.Path;
+        }
+
+        protected static string NormalizePath(string value) => PathUtils.NormalizePath(value);
+
+        protected static bool CountCandidate(ref int count, int candidateBudget)
+        {
+            count = IncrementSaturating(count);
+            return candidateBudget != int.MaxValue && count >= candidateBudget;
+        }
+
+        private static int IncrementSaturating(int value) => value == int.MaxValue ? value : value + 1;
+
+        private static IEnumerable<IReadOnlyList<string>> EnumerateWordCombinations(IReadOnlyList<string> words, int length)
+        {
+            var buffer = new string[length];
+            return Enumerate(0);
+
+            IEnumerable<IReadOnlyList<string>> Enumerate(int index)
+            {
+                if (index == buffer.Length)
+                {
+                    yield return buffer.ToArray();
+                    yield break;
+                }
+
+                foreach (string word in words)
+                {
+                    buffer[index] = word;
+                    foreach (IReadOnlyList<string> combination in Enumerate(index + 1))
+                        yield return combination;
+                }
+            }
+        }
+
+        private static IEnumerable<string> EnumerateBasenameWordCandidates(
+            string format,
+            IReadOnlyList<string> words,
+            int newWordCount,
+            CancellationToken cancellationToken)
+        {
+            foreach (IReadOnlyList<string> combination in EnumerateWordCombinations(words, newWordCount))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                yield return FormatBasenameWordCandidate(format, combination);
+            }
+        }
+
+        private static string BuildBasenameWordFormat(string prefix, string suffix, string separator, int newWordCount)
+        {
+            var builder = new StringBuilder(prefix);
+            for (int index = 0; index < newWordCount; index++)
+            {
+                if (index > 0) builder.Append(separator);
+                builder.Append("%s");
+            }
+
+            builder.Append(suffix);
+            return builder.ToString();
+        }
+
+        private static string FormatBasenameWordCandidate(string format, IReadOnlyList<string> words)
+        {
+            var builder = new StringBuilder();
+            int offset = 0;
+            foreach (string word in words)
+            {
+                int marker = format.IndexOf("%s", offset, StringComparison.Ordinal);
+                if (marker < 0) throw new FormatException("Basename word format has fewer placeholders than words.");
+                builder.Append(format, offset, marker - offset);
+                builder.Append(word);
+                offset = marker + 2;
+            }
+
+            builder.Append(format, offset, format.Length - offset);
+            return builder.ToString();
+        }
+
+        private static IEnumerable<string> FormatNumberVariants(string format, int value, int? digits, bool includeCommonPadding)
+        {
+            if (digits.HasValue)
+            {
+                yield return format.Replace("{number}", value.ToString($"D{digits.Value}", CultureInfo.InvariantCulture), StringComparison.Ordinal);
+                yield break;
+            }
+
+            yield return format.Replace("{number}", value.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal);
+            if (!includeCommonPadding) yield break;
+            if (value < 10)
+                yield return format.Replace("{number}", value.ToString("D2", CultureInfo.InvariantCulture), StringComparison.Ordinal);
+            if (value < 100)
+                yield return format.Replace("{number}", value.ToString("D3", CultureInfo.InvariantCulture), StringComparison.Ordinal);
+        }
+    }
+}

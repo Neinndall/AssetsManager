@@ -1,3 +1,4 @@
+using System;
 using AssetsManager.Services.Comparator;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Monitor;
@@ -18,8 +19,7 @@ namespace AssetsManager.Views
             AppSettings appSettings,
             TaskCancellationManager taskCancellationManager,
             BackupManager backupManager,
-            VersionService versionService
-            )
+            VersionService versionService)
         {
             InitializeComponent();
 

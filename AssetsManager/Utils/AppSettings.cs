@@ -3,34 +3,72 @@ using System.IO;
 using Newtonsoft.Json;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
+using System.ComponentModel;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
 using AssetsManager.Views.Models.Monitor;
-using AssetsManager.Views.Models.Shared;
 using AssetsManager.Views.Models.Settings;
 using AssetsManager.Views.Models.Audio;
 
 namespace AssetsManager.Utils
 {
-    public class AppSettings
+    public class AppSettings : INotifyPropertyChanged
     {
         public bool SyncHashesWithCDTB { get; set; }
         public bool EnableExtraction { get; set; } 
         public bool OrganizeExtractedAssets { get; set; }
-        public ReportGenerationSettings ReportGeneration { get; set; }
+        public ReportGenerationSettings ReportGeneration { get; set; } = new();
+
+        private StudioParametersSettings _studioParameters;
+        public StudioParametersSettings StudioParameters
+        {
+            get => _studioParameters;
+            set
+            {
+                if (_studioParameters != null)
+                    _studioParameters.PropertyChanged -= OnStudioParametersPropertyChanged;
+                _studioParameters = value ?? new StudioParametersSettings();
+                _studioParameters.PropertyChanged += OnStudioParametersPropertyChanged;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(StudioParameters)));
+            }
+        }
+
+        public AppSettings()
+        {
+            _studioParameters = new StudioParametersSettings();
+            _studioParameters.PropertyChanged += OnStudioParametersPropertyChanged;
+        }
+
+        private void OnStudioParametersPropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(StudioParameters)));
+        }
+
+        // Preserve the existing settings key across the Studio rename.
+        [JsonProperty("VfxStudio")]
+        public StudioSettings Studio { get; set; } = new();
+        private IList<string> _studioRecentProjects = new SafeList<string>();
+        public IList<string> StudioRecentProjects
+        {
+            get => _studioRecentProjects;
+            set => _studioRecentProjects = WrapList(value);
+        }
         public bool AssetWatcherUpdates { get; set; }
         public bool AssetTrackerTimer { get; set; }
         public bool SaveJsonHistory { get; set; }
         public bool SaveWadComparisonHistory { get; set; }
         public bool BackgroundUpdates { get; set; }
         public bool CheckPbeStatus { get; set; }
+        public bool NewsUpdates { get; set; }
         public bool MinimizeToTrayOnClose { get; set; }
 
         public int UpdateCheckFrequency { get; set; }
         public int AssetTrackerFrequency { get; set; }
         public int PbeStatusFrequency { get; set; }
+        public int NewsUpdateFrequency { get; set; }
 
         public string LolPbeDirectory { get; set; }
         public string LolLiveDirectory { get; set; }
@@ -39,7 +77,27 @@ namespace AssetsManager.Utils
         public string LastPbeCheckTime { get; set; }
         public PreferredClient PreferredClient { get; set; } = PreferredClient.PBE;
         public PreferredDirectory PreferredDirectory { get; set; } = PreferredDirectory.All;
-        public string CustomFloorTexturePath { get; set; } = string.Empty;
+        private string _customGroundLogoPath = string.Empty;
+        private double _groundLogoScale = 1.0;
+        private double _groundLogoOpacity = 1.0;
+
+        public string CustomGroundLogoPath
+        {
+            get => _customGroundLogoPath;
+            set => SetGroundLogoProperty(ref _customGroundLogoPath, value);
+        }
+
+        public double GroundLogoScale
+        {
+            get => _groundLogoScale;
+            set => SetGroundLogoProperty(ref _groundLogoScale, value);
+        }
+
+        public double GroundLogoOpacity
+        {
+            get => _groundLogoOpacity;
+            set => SetGroundLogoProperty(ref _groundLogoOpacity, value);
+        }
 
         private static IList<T> WrapList<T>(IList<T> value) =>
             value is SafeList<T> sl ? sl : new SafeList<T>(value ?? new List<T>());
@@ -48,6 +106,7 @@ namespace AssetsManager.Utils
             value is ConcurrentDictionary<TKey, TValue> cd ? cd : new ConcurrentDictionary<TKey, TValue>(value ?? new Dictionary<TKey, TValue>());
 
         private ConcurrentDictionary<string, long> _hashesSizes = new ConcurrentDictionary<string, long>();
+        // Informational snapshot of local catalog sizes; synchronization reads the files directly.
         public IDictionary<string, long> HashesSizes
         {
             get => _hashesSizes;
@@ -57,11 +116,6 @@ namespace AssetsManager.Utils
         public AudioExportFormat AudioExportFormat { get; set; } = AudioExportFormat.Ogg;
         public ImageExportFormat ImageExportFormat { get; set; } = ImageExportFormat.Original;
         public DataExportFormat DataExportFormat { get; set; } = DataExportFormat.Original;
-
-        // Diagnostic: writes a per-file audit log after each comparison so the
-        // user can verify that the New/Modified/Removed/Renamed classification
-        // is correct (Checksum + size + compression per file).
-        public bool VerboseComparisonLog { get; set; } = true;
 
         // New structure for monitored assets (Local WADs/Plugins)
         private IList<MonitoredAsset> _monitoredAssets = new SafeList<MonitoredAsset>();
@@ -76,41 +130,6 @@ namespace AssetsManager.Utils
         {
             get => _diffHistory;
             set => _diffHistory = WrapList(value);
-        }
-
-        private ConcurrentDictionary<string, long> _assetTrackerProgress = new ConcurrentDictionary<string, long>();
-        public IDictionary<string, long> AssetTrackerProgress
-        {
-            get => _assetTrackerProgress;
-            set => _assetTrackerProgress = WrapDictionary(value);
-        }
-
-        private ConcurrentDictionary<string, List<long>> _assetTrackerFailedIds = new ConcurrentDictionary<string, List<long>>();
-        public IDictionary<string, List<long>> AssetTrackerFailedIds
-        {
-            get => _assetTrackerFailedIds;
-            set => _assetTrackerFailedIds = WrapDictionary(value);
-        }
-
-        private ConcurrentDictionary<string, List<long>> _assetTrackerFoundIds = new ConcurrentDictionary<string, List<long>>();
-        public IDictionary<string, List<long>> AssetTrackerFoundIds
-        {
-            get => _assetTrackerFoundIds;
-            set => _assetTrackerFoundIds = WrapDictionary(value);
-        }
-
-        private ConcurrentDictionary<string, Dictionary<long, string>> _assetTrackerUrlOverrides = new ConcurrentDictionary<string, Dictionary<long, string>>();
-        public IDictionary<string, Dictionary<long, string>> AssetTrackerUrlOverrides
-        {
-            get => _assetTrackerUrlOverrides;
-            set => _assetTrackerUrlOverrides = WrapDictionary(value);
-        }
-
-        private ConcurrentDictionary<string, List<long>> _assetTrackerUserRemovedIds = new ConcurrentDictionary<string, List<long>>();
-        public IDictionary<string, List<long>> AssetTrackerUserRemovedIds
-        {
-            get => _assetTrackerUserRemovedIds;
-            set => _assetTrackerUserRemovedIds = WrapDictionary(value);
         }
 
         private IList<string> _favoritePaths = new SafeList<string>();
@@ -134,9 +153,17 @@ namespace AssetsManager.Utils
             set => _audioPlaylists = WrapList(value);
         }
 
-        public ApiSettings ApiSettings { get; set; }
+        public ApiSettings ApiSettings { get; set; } = new ApiSettings();
 
+        public event PropertyChangedEventHandler PropertyChanged;
         public event EventHandler ConfigurationSaved;
+
+        private void SetGroundLogoProperty<T>(ref T field, T value, [CallerMemberName] string propertyName = null)
+        {
+            if (EqualityComparer<T>.Default.Equals(field, value)) return;
+            field = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
 
         private const string ConfigFilePath = "config.json";
         private static readonly SemaphoreSlim _saveSemaphore = new SemaphoreSlim(1, 1);
@@ -194,17 +221,98 @@ namespace AssetsManager.Utils
                 }
 
                 var json = File.ReadAllText(ConfigFilePath);
-                var settings = JsonConvert.DeserializeObject<AppSettings>(json) ?? GetDefaultSettings();
+                var jsonObject = JObject.Parse(json);
+                var settings = jsonObject.ToObject<AppSettings>() ?? GetDefaultSettings();
 
                 bool needsResave = false;
 
+                // Preserve Viewer environment preferences across older config layouts.
+                if (jsonObject["StudioParameters"] == null)
+                {
+                    if (jsonObject["ViewerEnvironment"] is JObject viewerEnvironmentJson)
+                    {
+                        settings.StudioParameters = new StudioParametersSettings
+                        {
+                            GroundVisible = viewerEnvironmentJson.Value<bool?>("GroundVisible") ?? false,
+                            GridVisible = viewerEnvironmentJson.Value<bool?>("GridVisible") ?? true,
+                            SkyVisible = viewerEnvironmentJson.Value<bool?>("SkyVisible") ??
+                                         viewerEnvironmentJson.Value<bool?>("SkyboxVisible") ?? false,
+                            TransparentBackground = viewerEnvironmentJson.Value<bool?>("TransparentBackground") ?? false
+                        };
+                        needsResave = true;
+                    }
+                    else if (jsonObject["StudioGroundVisible"] != null ||
+                             jsonObject["StudioGridVisible"] != null ||
+                             jsonObject["StudioSkyboxVisible"] != null ||
+                             jsonObject["StudioTransparentBackground"] != null)
+                    {
+                        settings.StudioParameters = new StudioParametersSettings
+                        {
+                            GroundVisible = jsonObject.Value<bool?>("StudioGroundVisible") ?? false,
+                            GridVisible = jsonObject.Value<bool?>("StudioGridVisible") ?? true,
+                            SkyVisible = jsonObject.Value<bool?>("StudioSkyboxVisible") ?? false,
+                            TransparentBackground = jsonObject.Value<bool?>("StudioTransparentBackground") ?? false
+                        };
+                        needsResave = true;
+                    }
+                }
+
+                // Migrate the former shared display settings into the Studio preferences.
+                if (jsonObject["VfxStudio"] == null && jsonObject["StudioParameters"] is JObject studioJson &&
+                    (studioJson["VfxCameraPreset"] != null || studioJson["VfxWireframeMode"] != null))
+                {
+                    string legacyWire = studioJson.Value<string>("VfxWireframeMode") ?? "Off";
+                    settings.Studio = new StudioSettings
+                    {
+                        CameraPreset = studioJson.Value<string>("VfxCameraPreset") ?? "Orbit",
+                        ViewMode = LegacyStudioViewMode(legacyWire),
+                        WireOverlay = string.Equals(legacyWire, "Overlay", StringComparison.OrdinalIgnoreCase)
+                    };
+                    needsResave = true;
+                }
+                else if (jsonObject["VfxStudio"] is JObject studioDisplayJson &&
+                         studioDisplayJson["ViewMode"] == null &&
+                         studioDisplayJson["WireframeMode"] != null)
+                {
+                    string legacyWire = studioDisplayJson.Value<string>("WireframeMode") ?? "Off";
+                    settings.Studio ??= new StudioSettings();
+                    settings.Studio.ViewMode = LegacyStudioViewMode(legacyWire);
+                    settings.Studio.WireOverlay = string.Equals(legacyWire, "Overlay", StringComparison.OrdinalIgnoreCase);
+                    needsResave = true;
+                }
+
+                settings.StudioParameters ??= GetDefaultSettings().StudioParameters;
+                settings.Studio ??= GetDefaultSettings().Studio;
+
+                if (jsonObject["StudioParameters"] is JObject currentStudioJson &&
+                    currentStudioJson["SkyVisible"] == null &&
+                    currentStudioJson["SkyboxVisible"] != null)
+                {
+                    settings.StudioParameters.SkyVisible = currentStudioJson.Value<bool?>("SkyboxVisible") ?? false;
+                    needsResave = true;
+                }
+
+                // A previous AssetsManager build temporarily shared these controls through
+                // StudioParameters. Carry those saved choices back into 3D Studio once, then keep
+                // both viewers independent.
+                JObject sharedDisplayJson = jsonObject["StudioParameters"] as JObject;
+                JObject savedStudioJson = jsonObject["VfxStudio"] as JObject;
+                if (savedStudioJson?["ViewMode"] == null)
+                {
+                    string sharedViewMode = sharedDisplayJson?.Value<string>("ViewMode");
+                    if (!string.IsNullOrWhiteSpace(sharedViewMode))
+                        settings.Studio.ViewMode = sharedViewMode;
+                    needsResave = true;
+                }
+                if (savedStudioJson?["WireOverlay"] == null)
+                {
+                    bool? sharedWireOverlay = sharedDisplayJson?.Value<bool?>("WireOverlay");
+                    if (sharedWireOverlay.HasValue)
+                        settings.Studio.WireOverlay = sharedWireOverlay.Value;
+                    needsResave = true;
+                }
                 settings.MonitoredAssets ??= new SafeList<MonitoredAsset>();
                 settings.DiffHistory ??= new SafeList<HistoryEntry>();
-                settings.AssetTrackerProgress ??= new ConcurrentDictionary<string, long>();
-                settings.AssetTrackerFailedIds ??= new ConcurrentDictionary<string, List<long>>();
-                settings.AssetTrackerFoundIds ??= new ConcurrentDictionary<string, List<long>>();
-                settings.AssetTrackerUrlOverrides ??= new ConcurrentDictionary<string, Dictionary<long, string>>();
-                settings.AssetTrackerUserRemovedIds ??= new ConcurrentDictionary<string, List<long>>();
                 settings.FavoritePaths ??= new SafeList<string>();
                 settings.SearchHistory ??= new SafeList<string>();
                 settings.AudioPlaylists ??= new SafeList<AudioPlaylistPack>();
@@ -234,6 +342,13 @@ namespace AssetsManager.Utils
             }
         }
 
+        private static string LegacyStudioViewMode(string legacyWireframeMode) =>
+            legacyWireframeMode?.ToLowerInvariant() switch
+            {
+                "only" => "Wireframe",
+                _ => "Lit"
+            };
+
         public static AppSettings GetDefaultSettings()
         {
             return new AppSettings
@@ -255,14 +370,33 @@ namespace AssetsManager.Utils
                 SaveWadComparisonHistory = false,
                 BackgroundUpdates = false,
                 CheckPbeStatus = false,
+                NewsUpdates = false,
                 MinimizeToTrayOnClose = false,
                 UpdateCheckFrequency = 10,
                 AssetTrackerFrequency = 60,
                 PbeStatusFrequency = 10,
+                NewsUpdateFrequency = 30,
                 LolPbeDirectory = null,
                 LolLiveDirectory = null,
                 DefaultExtractedSelectDirectory = null,
-                CustomFloorTexturePath = null,
+                CustomGroundLogoPath = null,
+                GroundLogoScale = 1.0,
+                GroundLogoOpacity = 1.0,
+                StudioParameters = new StudioParametersSettings
+                {
+                    GroundVisible = false,
+                    GridVisible = true,
+                    SkyVisible = false,
+                    StageVisible = false,
+                    TransparentBackground = false,
+                    EnableFxaa = true
+                },
+                Studio = new StudioSettings
+                {
+                    CameraPreset = "Orbit",
+                    ViewMode = "Lit",
+                    WireOverlay = false
+                },
                 AudioExportFormat = AudioExportFormat.Ogg,
                 ImageExportFormat = ImageExportFormat.Original,
                 DataExportFormat = DataExportFormat.Original,
@@ -273,11 +407,6 @@ namespace AssetsManager.Utils
                 HashesSizes = new ConcurrentDictionary<string, long>(),
                 MonitoredAssets = new SafeList<MonitoredAsset>(),
                 DiffHistory = new SafeList<HistoryEntry>(),
-                AssetTrackerProgress = new ConcurrentDictionary<string, long>(),
-                AssetTrackerFailedIds = new ConcurrentDictionary<string, List<long>>(),
-                AssetTrackerFoundIds = new ConcurrentDictionary<string, List<long>>(),
-                AssetTrackerUrlOverrides = new ConcurrentDictionary<string, Dictionary<long, string>>(),
-                AssetTrackerUserRemovedIds = new ConcurrentDictionary<string, List<long>>(),
                 FavoritePaths = new SafeList<string>(),
                 SearchHistory = new SafeList<string>(),
                 AudioPlaylists = new SafeList<AudioPlaylistPack>(),
@@ -285,7 +414,8 @@ namespace AssetsManager.Utils
                 {
                     Connection = new ConnectionInfo(),
                     Token = new TokenInfo(),
-                    UsePbeForApi = false
+                    ClientTarget = ApiClientTarget.PBE,
+                    OfflineCachePersistence = true
                 },
             };
         }
@@ -311,35 +441,147 @@ namespace AssetsManager.Utils
             LolPbeDirectory = defaultSettings.LolPbeDirectory;
             LolLiveDirectory = defaultSettings.LolLiveDirectory;
             DefaultExtractedSelectDirectory = defaultSettings.DefaultExtractedSelectDirectory;
-            CustomFloorTexturePath = defaultSettings.CustomFloorTexturePath;
+            CustomGroundLogoPath = defaultSettings.CustomGroundLogoPath;
+            GroundLogoScale = defaultSettings.GroundLogoScale;
+            GroundLogoOpacity = defaultSettings.GroundLogoOpacity;
+            StudioParameters = defaultSettings.StudioParameters;
+            Studio = defaultSettings.Studio;
             AudioExportFormat = defaultSettings.AudioExportFormat;
             ImageExportFormat = defaultSettings.ImageExportFormat;
             SaveJsonHistory = defaultSettings.SaveJsonHistory;
             SaveWadComparisonHistory = defaultSettings.SaveWadComparisonHistory;
             BackgroundUpdates = defaultSettings.BackgroundUpdates;
             CheckPbeStatus = defaultSettings.CheckPbeStatus;
+            NewsUpdates = defaultSettings.NewsUpdates;
             MinimizeToTrayOnClose = defaultSettings.MinimizeToTrayOnClose;
             LastPbeStatusMessage = defaultSettings.LastPbeStatusMessage;
             PreferredClient = defaultSettings.PreferredClient;
             PreferredDirectory = defaultSettings.PreferredDirectory;
             UpdateCheckFrequency = defaultSettings.UpdateCheckFrequency;
             PbeStatusFrequency = defaultSettings.PbeStatusFrequency;
+            NewsUpdateFrequency = defaultSettings.NewsUpdateFrequency;
             MonitoredAssets = defaultSettings.MonitoredAssets;
             DiffHistory = defaultSettings.DiffHistory;
             AssetTrackerTimer = defaultSettings.AssetTrackerTimer;
             AssetTrackerFrequency = defaultSettings.AssetTrackerFrequency;
-            AssetTrackerFoundIds = defaultSettings.AssetTrackerFoundIds;
-            AssetTrackerFailedIds = defaultSettings.AssetTrackerFailedIds;
-            AssetTrackerProgress = defaultSettings.AssetTrackerProgress;
-            AssetTrackerUrlOverrides = defaultSettings.AssetTrackerUrlOverrides;
-            AssetTrackerUserRemovedIds = defaultSettings.AssetTrackerUserRemovedIds;
             FavoritePaths = defaultSettings.FavoritePaths;
             SearchHistory = defaultSettings.SearchHistory;
             AudioPlaylists = defaultSettings.AudioPlaylists;
             ApiSettings = defaultSettings.ApiSettings;
             SyncHashesWithCDTB = defaultSettings.SyncHashesWithCDTB;
-            // HashesSizes is intentionally not reset to preserve local cache state.
+            // Preserve the last recorded local catalog sizes.
         }
+    }
+
+    public class StudioParametersSettings : INotifyPropertyChanged
+    {
+        private bool _groundVisible;
+        private bool _gridVisible = true;
+        private bool _skyVisible;
+        private bool _stageVisible;
+        private bool _transparentBackground;
+        private bool _enableFxaa = true;
+        private string _antiAliasingMode = "Fxaa";
+
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        public bool GroundVisible
+        {
+            get => _groundVisible;
+            set => SetProperty(ref _groundVisible, value);
+        }
+
+        public bool GridVisible
+        {
+            get => _gridVisible;
+            set => SetProperty(ref _gridVisible, value);
+        }
+
+        public bool SkyVisible
+        {
+            get => _skyVisible;
+            set => SetProperty(ref _skyVisible, value);
+        }
+
+        public bool StageVisible
+        {
+            get => _stageVisible;
+            set => SetProperty(ref _stageVisible, value);
+        }
+
+        public bool TransparentBackground
+        {
+            get => _transparentBackground;
+            set => SetProperty(ref _transparentBackground, value);
+        }
+
+        public string AntiAliasingMode
+        {
+            get => _antiAliasingMode;
+            set
+            {
+                string mode = string.Equals(value, "Smaa", StringComparison.OrdinalIgnoreCase) ? "Smaa" : "Fxaa";
+                if (_antiAliasingMode == mode) return;
+                SetProperty(ref _antiAliasingMode, mode);
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AntiAliasingSelection)));
+            }
+        }
+
+        public bool EnableFxaa
+        {
+            get => _enableFxaa;
+            set
+            {
+                if (_enableFxaa == value) return;
+                SetProperty(ref _enableFxaa, value);
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AntiAliasingSelection)));
+            }
+        }
+
+        // The selector combines the existing persisted fields without changing saved settings.
+        [JsonIgnore]
+        public string AntiAliasingSelection
+        {
+            get => EnableFxaa ? AntiAliasingMode : "Off";
+            set
+            {
+                if (string.IsNullOrWhiteSpace(value)) return;
+                if (string.Equals(value, "Off", StringComparison.OrdinalIgnoreCase))
+                    EnableFxaa = false;
+                else
+                {
+                    AntiAliasingMode = value;
+                    EnableFxaa = true;
+                }
+            }
+        }
+
+        private void SetProperty<T>(ref T field, T value, [CallerMemberName] string propertyName = null)
+        {
+            if (EqualityComparer<T>.Default.Equals(field, value)) return;
+            field = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+    }
+
+    /// <summary>
+    /// Persisted 3D Studio display choices. Shaders, Champion VFX, Map VFX and Map Structures are
+    /// session-only: they start off on every launch so heavy content loads only when requested.
+    /// </summary>
+    public class StudioSettings
+    {
+        public string CameraPreset { get; set; } = "Orbit";
+        public string ViewMode { get; set; } = "Lit";
+        public bool WireOverlay { get; set; }
+    }
+
+    public class ReportGenerationSettings
+    {
+        public bool Enabled { get; set; }
+        public bool FilterNew { get; set; }
+        public bool FilterModified { get; set; }
+        public bool FilterRenamed { get; set; }
+        public bool FilterRemoved { get; set; }
     }
 
     public class SafeList<T> : IList<T>

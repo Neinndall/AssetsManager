@@ -1,0 +1,413 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Numerics;
+using LeagueToolkit.Core.Animation;
+
+namespace AssetsManager.Views.Models.Viewer
+{
+    /// <summary>Base event authored on an AnimationGraph clip.</summary>
+    public abstract record AnimationClipEventDefinition(uint EventHash, float StartFrame, float EndFrame);
+
+    public sealed record AnimationSubmeshVisibilityEventDefinition(
+        uint EventHash,
+        float StartFrame,
+        float EndFrame,
+        IReadOnlyList<uint> ShowSubmeshHashes,
+        IReadOnlyList<uint> HideSubmeshHashes)
+        : AnimationClipEventDefinition(EventHash, StartFrame, EndFrame);
+
+    public sealed record AnimationJointSnapEventDefinition(
+        uint EventHash,
+        float StartFrame,
+        float EndFrame,
+        uint JointHash,
+        uint SnapToHash,
+        Vector3 Offset)
+        : AnimationClipEventDefinition(EventHash, StartFrame, EndFrame);
+
+    public sealed record AnimationConformToPathEventDefinition(
+        uint EventHash,
+        float StartFrame,
+        float EndFrame,
+        uint MaskHash,
+        float BlendInSeconds,
+        float BlendOutSeconds)
+        : AnimationClipEventDefinition(EventHash, StartFrame, EndFrame);
+
+    public sealed record AnimationSpringEventDefinition(uint EventHash, float StartFrame, float EndFrame,
+        uint SpringHash, float BlendOutSeconds) : AnimationClipEventDefinition(EventHash, StartFrame, EndFrame);
+
+    public sealed record AnimationLockOrientationEventDefinition(uint EventHash, float StartFrame, float EndFrame,
+        uint JointHash, float BlendOutSeconds) : AnimationClipEventDefinition(EventHash, StartFrame, EndFrame);
+
+    public sealed record AnimationOrientationEventDefinition(uint EventHash, float StartFrame, float EndFrame,
+        float? BlendFromSeconds, float BlendToSeconds) : AnimationClipEventDefinition(EventHash, StartFrame, EndFrame);
+
+    /// <summary>Preserves unsupported authored events so event counts remain truthful.</summary>
+    public sealed record AnimationOtherClipEventDefinition(
+        uint EventHash,
+        float StartFrame,
+        float EndFrame,
+        uint ClassHash)
+        : AnimationClipEventDefinition(EventHash, StartFrame, EndFrame);
+
+    /// <summary>One non-particle visual cue placed on the resolved clip pass, in seconds.</summary>
+    public abstract record AnimationClipTimedCue(double AtSeconds, double? UntilSeconds);
+
+    public sealed record AnimationSubmeshVisibilityCue(
+        double AtSeconds,
+        double? UntilSeconds,
+        IReadOnlyList<uint> ShowSubmeshHashes,
+        IReadOnlyList<uint> HideSubmeshHashes)
+        : AnimationClipTimedCue(AtSeconds, UntilSeconds);
+
+    public sealed record AnimationJointSnapCue(
+        double AtSeconds,
+        double? UntilSeconds,
+        uint JointHash,
+        uint SnapToHash,
+        Vector3 Offset)
+        : AnimationClipTimedCue(AtSeconds, UntilSeconds);
+
+    public sealed record AnimationConformToPathCue(
+        double AtSeconds,
+        double? UntilSeconds,
+        uint MaskHash,
+        float BlendInSeconds,
+        float BlendOutSeconds)
+        : AnimationClipTimedCue(AtSeconds, UntilSeconds);
+
+    public sealed record AnimationSpringCue(double AtSeconds, double? UntilSeconds, uint SpringHash,
+        float BlendOutSeconds) : AnimationClipTimedCue(AtSeconds, UntilSeconds);
+
+    public sealed record AnimationLockOrientationCue(double AtSeconds, double? UntilSeconds, uint JointHash,
+        float BlendOutSeconds) : AnimationClipTimedCue(AtSeconds, UntilSeconds);
+
+    public sealed record AnimationOrientationCue(double AtSeconds, double? UntilSeconds,
+        float? BlendFromSeconds, float BlendToSeconds) : AnimationClipTimedCue(AtSeconds, UntilSeconds);
+
+    public sealed record VfxParticleEventAttachment(uint SourceBoneHash, uint TargetBoneHash);
+
+    public sealed record VfxParticleEventDefinition(
+        uint EventHash,
+        uint NameHash,
+        float StartFrame,
+        float EndFrame,
+        uint EffectKey,
+        uint EnemyEffectKey,
+        string EffectName,
+        bool IsLoop,
+        bool IsKillEvent,
+        bool IsDetachable,
+        bool IsSelfOnly,
+        bool FireIfAnimationEndsEarly,
+        bool SkipIfPastEndFrame,
+        bool ScalePlaySpeedWithAnimation,
+        float Scale,
+        IReadOnlyList<VfxParticleEventAttachment> Attachments)
+        : AnimationClipEventDefinition(EventHash, StartFrame, EndFrame);
+
+    public sealed record AnimationGraphKeyReference(
+        uint Hash,
+        string Name,
+        bool Declared);
+
+    public sealed record AnimationTrackDefinition(
+        uint Hash,
+        string Name,
+        byte Priority,
+        byte BlendMode,
+        float BlendWeight);
+
+    public sealed record AnimationMaskDefinition(
+        uint Hash,
+        string Name,
+        uint Id,
+        IReadOnlyList<float> Weights);
+
+    public sealed record AnimationSyncGroupDefinition(
+        uint Hash,
+        string Name,
+        uint Kind);
+
+    public sealed record AnimationGraphDefinition(
+        uint PathHash,
+        IReadOnlyList<AnimationClipDefinition> Clips,
+        IReadOnlyList<AnimationTrackDefinition> Tracks,
+        IReadOnlyList<AnimationMaskDefinition> Masks,
+        IReadOnlyList<AnimationSyncGroupDefinition> SyncGroups,
+        IReadOnlyList<AnimationBlendDefinition> Blends = null);
+
+    public abstract record AnimationBlendDefinition(uint FromClipHash, uint ToClipHash);
+
+    public sealed record AnimationTimeBlendDefinition(uint FromClipHash, uint ToClipHash, float Duration)
+        : AnimationBlendDefinition(FromClipHash, ToClipHash);
+
+    public sealed record AnimationTransitionClipBlendDefinition(uint FromClipHash, uint ToClipHash, uint ClipHash)
+        : AnimationBlendDefinition(FromClipHash, ToClipHash);
+
+    /// <summary>
+    /// One AnimationGraph clip. Atomic clips name an .anm; composite clips name children.
+    /// Events are the complete authored event map, not only particle events.
+    /// </summary>
+    public sealed record AnimationClipDefinition(
+        uint OwnerPathHash,
+        uint OwnerClassHash,
+        float TickDuration,
+        float StartFrame,
+        float EndFrame,
+        IReadOnlyList<AnimationClipEventDefinition> Events,
+        string ClipName = null,
+        string AnimationFilePath = null,
+        uint GraphPathHash = 0,
+        IReadOnlyList<uint> ChildClipHashes = null,
+        IReadOnlyList<float> ChildParameters = null,
+        AnimationGraphKeyReference Track = null,
+        AnimationGraphKeyReference Mask = null,
+        AnimationGraphKeyReference SyncGroup = null,
+        IReadOnlyList<AnimationGraphKeyReference> ChildReferences = null,
+        IReadOnlyList<string> InterruptionGroups = null,
+        uint Flags = 0,
+        IReadOnlyList<float?> ParametricValues = null,
+        string ClassName = null)
+    {
+        public bool UsesEquippedGearParameter { get; init; }
+
+        public IEnumerable<VfxParticleEventDefinition> ParticleEvents
+            => (Events ?? Array.Empty<AnimationClipEventDefinition>()).OfType<VfxParticleEventDefinition>();
+
+        public int ParticleEventCount => ParticleEvents.Count();
+    }
+
+    public sealed record VfxIdleEffectDefinition(
+        uint EffectKey,
+        string EffectName,
+        string BoneName,
+        uint BoneNameHash,
+        string TargetBoneName,
+        uint TargetBoneNameHash,
+        Vector3 Position);
+
+    public sealed record VfxCompositionEvent(
+        VfxParticleEventDefinition Event,
+        uint ResolvedSystemHash,
+        VfxSystemDefinition System,
+        bool UsesEnemyEffect);
+
+    public enum VfxSpellAvailability
+    {
+        Supported,
+        Unsupported,
+        Ambiguous,
+        Unavailable
+    }
+
+    /// <summary>Why a SpellObject has nothing the preview can play.</summary>
+    public enum VfxSpellUnplayableReason
+    {
+        None,
+        /// <summary>A BuffData state: its visuals are spawned by the server script.</summary>
+        Buff,
+        /// <summary>Only a script name, without spell or buff data.</summary>
+        ScriptOnly,
+        /// <summary>Spell data without animation, hit effect or missile.</summary>
+        NoVisuals,
+        /// <summary>A missile whose movement the preview cannot fly.</summary>
+        UnsupportedMissile
+    }
+
+    public enum VfxSpellIssueKind
+    {
+        Invalid,
+        Unsupported
+    }
+
+    public sealed record VfxSpellIssue(string Path, VfxSpellIssueKind Kind);
+
+    public enum VfxSpellMissileMovementKind
+    {
+        Missing,
+        FixedSpeed,
+        FixedTime,
+        Accelerating,
+        FixedSpeedSpline,
+        FixedTimeSpline,
+        Unsupported
+    }
+
+    public sealed record VfxSpellMissilePreview(
+        VfxSpellMissileMovementKind MovementKind,
+        float? Speed,
+        float? Duration,
+        float? StartDelay,
+        string StartBoneName,
+        string TargetBoneName,
+        float? TargetHeight,
+        float? InitialTargetHeight)
+    {
+        public float? Acceleration { get; init; }
+        public float? MinSpeed { get; init; }
+        public float? MaxSpeed { get; init; }
+        public float? InitialSpeed { get; init; }
+        /// <summary>HermiteSplineInfo, in the caster's frame (x right, z forward).</summary>
+        public Vector3 SplineStartOffset { get; init; }
+        public Vector3 SplineControlPoint1 { get; init; }
+        public Vector3 SplineControlPoint2 { get; init; }
+        /// <summary>
+        /// Gravity and BlendedLinear height solvers carry the missile from its launch height down to the target's,
+        /// the ground plus mTargetHeightAugment; without one the missile keeps its launch height.
+        /// </summary>
+        public bool LandsOnTargetHeight { get; init; }
+        /// <summary>GravityHeightSolver: a ballistic arc over the flight's straight height change.</summary>
+        public float Gravity { get; init; }
+        /// <summary>SinusoidalHeightSolver: height waves of this amplitude over the flight.</summary>
+        public float SineAmplitude { get; init; }
+        public float SinePeriods { get; init; }
+    }
+
+    /// <summary>The subset of SpellDataResource consumed by the isolated ability preview.</summary>
+    public sealed record VfxSpellPreview(
+        float? SpellCastTime,
+        float? CastTime,
+        bool? HaveHitEffect,
+        uint HitEffectKey,
+        string HitEffectName,
+        float? CastRange,
+        string AnimationName,
+        VfxSpellMissilePreview Missile,
+        uint MissileEffectKey,
+        string MissileEffectName,
+        IReadOnlyList<VfxSpellIssue> Issues)
+    {
+        public bool HasSpellData { get; init; } = true;
+        public bool HasBuffData { get; init; }
+        internal string ScriptName { get; init; }
+        public bool HasInvalidIssues => Issues?.Any(issue => issue.Kind == VfxSpellIssueKind.Invalid) == true;
+        public bool HasInvalidHitEffectFields => Issues?.Any(issue =>
+            issue.Kind == VfxSpellIssueKind.Invalid &&
+            (issue.Path == "mSpell.bHaveHitEffect" ||
+             issue.Path == "mSpell.mHitEffectKey" ||
+             issue.Path == "mSpell.mHitEffectName")) == true;
+    }
+
+    public enum VfxSpellPlaybackMotion
+    {
+        Static,
+        Path
+    }
+
+    /// <summary>One resolved visual step of a SpellObject preview in the selected skin context.</summary>
+    public sealed record VfxSpellPlaybackStep(
+        string Id,
+        VfxSystemDefinition System,
+        uint EffectKey,
+        double StartTime,
+        double StopTime,
+        Vector3 From,
+        Vector3 To,
+        VfxSpellPlaybackMotion Motion,
+        int Seed,
+        AssetsManager.Services.Viewer.Vfx.Composition.VfxSpellFlightPath Flight = null);
+
+    public sealed record VfxSpellPreviewPlan(
+        VfxSpellAvailability Availability,
+        AnimationClipCatalogItem Animation,
+        IReadOnlyList<VfxSpellPlaybackStep> Steps,
+        double Release,
+        double Arrival,
+        string StartBoneName,
+        Vector3 Source,
+        Vector3 Target,
+        string Status);
+
+    public sealed record VfxAbilityComposition(
+        uint SequencePathHash,
+        uint SequenceClassHash,
+        float TickDuration,
+        float StartFrame,
+        float EndFrame,
+        IReadOnlyList<VfxCompositionEvent> Events,
+        string ClipName = null,
+        string AnimationFilePath = null,
+        uint GraphPathHash = 0,
+        IReadOnlyList<uint> ChildClipHashes = null)
+    {
+        public int ResolvedCount { get; init; }
+        public int UnresolvedCount => Events.Count - ResolvedCount;
+    }
+
+    /// <summary>
+    /// Shared clip metadata and dependencies; receiving actors decode assets in their own catalogs.
+    /// </summary>
+    internal sealed record SynchronizedAnimationSource(
+        AnimationClipCatalogItem Item,
+        AssetsManager.Services.Viewer.Vfx.Loading.VfxLoadingService.Bundle Bundle,
+        string SearchDirectory,
+        string SkeletonSignature);
+
+    /// <summary>
+    /// Resolved AnimationGraph clip ready for preview. The animation asset is owned by the
+    /// catalog that created this entry; the entry itself only carries playback metadata.
+    /// </summary>
+    public sealed record AnimationClipCatalogItem(
+        string Name,
+        string DisplayName,
+        string FilePath,
+        float Duration,
+        IAnimationAsset AnimationAsset,
+        AnimationClipDefinition Clip,
+        VfxAbilityComposition Composition,
+        IReadOnlyList<AnimationClipTimedCue> TimedCues,
+        int EventCount,
+        bool HasVfx,
+        string VfxSummary,
+        IReadOnlyList<float> ParameterValues = null,
+        float? ParameterValue = null)
+    {
+        public const string BindPoseName = "Bind pose";
+        internal SynchronizedAnimationSource SharedSource { get; init; }
+
+        public bool IsBindPose => string.Equals(Name, BindPoseName, StringComparison.OrdinalIgnoreCase);
+
+        public static AnimationClipCatalogItem CreateBindPoseItem() =>
+            new(
+                BindPoseName,
+                BindPoseName,
+                string.Empty,
+                0f,
+                null,
+                null,
+                null,
+                Array.Empty<AnimationClipTimedCue>(),
+                0,
+                false,
+                "Skeleton rest pose (T-Pose)");
+
+        public int VfxEventCount => Composition?.Events.Count(eventCue => !eventCue.Event.IsKillEvent) ?? 0;
+
+        public bool HasParameterValues => ParameterValues is { Count: > 1 };
+
+        public string GraphMetadataSummary
+        {
+            get
+            {
+                var parts = new List<string>();
+                if (!string.IsNullOrWhiteSpace(Clip?.Track?.Name))
+                    parts.Add($"Track {Clip.Track.Name}");
+                if (!string.IsNullOrWhiteSpace(Clip?.Mask?.Name))
+                    parts.Add($"Mask {Clip.Mask.Name}");
+                if (!string.IsNullOrWhiteSpace(Clip?.SyncGroup?.Name))
+                    parts.Add($"Sync {Clip.SyncGroup.Name}");
+                if (Clip?.Flags > 0)
+                    parts.Add($"Flags 0x{Clip.Flags:x8}");
+                return string.Join(" · ", parts);
+            }
+        }
+
+        public string TooltipSummary => string.IsNullOrWhiteSpace(GraphMetadataSummary)
+            ? VfxSummary
+            : $"{VfxSummary} · {GraphMetadataSummary}";
+    }
+
+}

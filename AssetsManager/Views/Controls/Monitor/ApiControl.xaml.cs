@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Text.Json;
 using System.Threading.Tasks;
 using System.Text.RegularExpressions;
@@ -11,10 +13,12 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Threading;
 using System.Windows.Media;
 using System.Windows.Media.Imaging; // Added for RenderTargetBitmap
-using Microsoft.WindowsAPICodePack.Dialogs; // Added for CommonSaveFileDialog
+using System.Windows.Input;
+using Microsoft.Win32;
 using AssetsManager.Utils;
 using AssetsManager.Services.Monitor;
 using AssetsManager.Services.Core;
+using AssetsManager.Services.Downloads;
 using AssetsManager.Views.Models.Monitor;
 using AssetsManager.Views.Models.Shared;
 
@@ -28,8 +32,12 @@ namespace AssetsManager.Views.Controls.Monitor
         public CustomMessageBoxService CustomMessageBoxService { get; set; }
         public LogService LogService { get; set; }
         public DirectoriesCreator DirectoriesCreator { get; set; }
+        public AssetCatalogService CatalogService { get; set; }
+        public AssetDownloader AssetDownloader { get; set; }
 
         private DispatcherTimer _lcuConnectionTimer;
+        private Task _cachedDataLoadTask;
+        private bool _isSyncingBrowserSelection;
 
         // The state model for this view (Container Pattern: Owner)
         private readonly ApiModel _viewModel;
@@ -52,6 +60,19 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private async void ApiControl_Loaded(object sender, RoutedEventArgs e)
         {
+            CdnCatalogControl.CatalogService = CatalogService;
+            CdnCatalogControl.AssetDownloader = AssetDownloader;
+            CdnCatalogControl.AppSettings = AppSettings;
+            CdnCatalogControl.LogService = LogService;
+            CdnCatalogControl.CustomMessageBoxService = CustomMessageBoxService;
+            CdnCatalogControl.CatalogFetched -= CdnCatalogFetched;
+            CdnCatalogControl.CatalogFetched += CdnCatalogFetched;
+            if (_viewModel != null)
+            {
+                _viewModel.PropertyChanged -= ViewModel_PropertyChanged;
+                _viewModel.PropertyChanged += ViewModel_PropertyChanged;
+            }
+
             if (_lcuConnectionTimer != null)
             {
                 _lcuConnectionTimer.Tick -= LcuConnectionTimer_Tick;
@@ -73,14 +94,31 @@ namespace AssetsManager.Views.Controls.Monitor
                 _lcuConnectionTimer.Start();
             }
 
-            // Explicit calls for each module's cache
-            await LoadSalesCacheAsync();
-            await LoadMythicShopCacheAsync();
-            await LoadPassRewardsCacheAsync();
-            await LoadAvailablePassesAsync();
+            // Cache data is loaded once when API Center is first opened. The image
+            // extraction methods already run off the UI thread and reuse local files.
+            await EnsureCachedDataLoadedAsync();
         }
 
-        private async Task LoadAvailablePassesAsync()
+        private Task EnsureCachedDataLoadedAsync()
+        {
+            if (AppSettings?.ApiSettings?.OfflineCachePersistence == false)
+            {
+                return Task.CompletedTask;
+            }
+            return _cachedDataLoadTask ??= LoadCachedDataOnceAsync();
+        }
+
+        private async Task LoadCachedDataOnceAsync()
+        {
+            await Task.WhenAll(
+                LoadSalesCacheAsync(),
+                LoadMythicShopCacheAsync(),
+                LoadPassRewardsCacheAsync(),
+                LoadAvailablePassesAsync()
+            );
+        }
+
+        private async Task LoadAvailablePassesAsync(string passToSelect = null)
         {
             if (DirectoriesCreator == null) return;
 
@@ -97,40 +135,124 @@ namespace AssetsManager.Views.Controls.Monitor
 
                 Dispatcher.Invoke(() =>
                 {
-                    ViewModel.AvailablePasses.Clear();
-                    foreach (var name in passNames) ViewModel.AvailablePasses.Add(name);
+                    string targetSelection = passToSelect ?? ViewModel.SelectedPass;
+                    _isSyncingBrowserSelection = true;
+                    try
+                    {
+                        ViewModel.AvailablePasses.Clear();
+                        foreach (var name in passNames) ViewModel.AvailablePasses.Add(name);
+
+                        if (!string.IsNullOrEmpty(targetSelection) && ViewModel.AvailablePasses.Contains(targetSelection))
+                        {
+                            ViewModel.SelectedPass = targetSelection;
+                        }
+                    }
+                    finally
+                    {
+                        _isSyncingBrowserSelection = false;
+                    }
                 });
             });
         }
 
         private async void PassBrowser_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (ViewModel.SelectedPass == null) return;
+            if (_isSyncingBrowserSelection) return;
+            if (ViewModel?.SelectedPass == null || DirectoriesCreator == null) return;
 
             // Use centralized utility to reconstruct the filename from the UI name
             string cleanName = PathUtils.CleanPassName(ViewModel.SelectedPass.Replace(" ", "_"));
             string fileName = $"{cleanName}_progression.json";
             
             string progPath = Path.Combine(DirectoriesCreator.ApiCachePath, fileName);
-            string rewardsPath = Path.Combine(DirectoriesCreator.ApiCachePath, "pass_rewards.json");
-
-            if (!File.Exists(progPath) || !File.Exists(rewardsPath)) return;
+            if (!File.Exists(progPath)) return;
 
             try
             {
                 var progJson = await File.ReadAllTextAsync(progPath);
-                var rewardsJson = await File.ReadAllTextAsync(rewardsPath);
+                var prog = await Task.Run(() => JsonSerializer.Deserialize<ProgressionResponse>(progJson));
 
-                var prog = JsonSerializer.Deserialize<ProgressionResponse>(progJson);
-                var rewards = JsonSerializer.Deserialize<RewardsResponse>(rewardsJson);
-
-                if (prog != null && rewards != null)
+                if (prog != null && !string.IsNullOrEmpty(prog.Id))
                 {
-                    await ProcessPassRewardsDataAsync(prog, rewards);
-                    LogService.LogSuccess($"Loaded cached pass: {ViewModel.SelectedPass}");
+                    _isSyncingBrowserSelection = true;
+                    try { ViewModel.ManualPassId = prog.Id; }
+                    finally { _isSyncingBrowserSelection = false; }
+                }
+
+                string rewardsPath = Path.Combine(DirectoriesCreator.ApiCachePath, "pass_rewards.json");
+                if (File.Exists(rewardsPath))
+                {
+                    var rewardsJson = await File.ReadAllTextAsync(rewardsPath);
+                    var rewards = await Task.Run(() => JsonSerializer.Deserialize<RewardsResponse>(rewardsJson));
+
+                    if (prog != null && rewards != null)
+                    {
+                        await ProcessPassRewardsDataAsync(prog, rewards);
+                        LogService.LogSuccess($"Loaded cached pass: {ViewModel.SelectedPass}");
+                    }
                 }
             }
             catch (Exception ex) { LogService.LogError(ex, "Failed to load pass from browser selection."); }
+        }
+
+        private string FindPassNameByTrackId(string trackId)
+        {
+            if (string.IsNullOrWhiteSpace(trackId) || DirectoriesCreator == null || !Directory.Exists(DirectoriesCreator.ApiCachePath))
+                return null;
+
+            try
+            {
+                var files = Directory.GetFiles(DirectoriesCreator.ApiCachePath, "*_progression.json");
+                foreach (var file in files)
+                {
+                    var json = File.ReadAllText(file);
+                    using var doc = JsonDocument.Parse(json);
+                    if (doc.RootElement.TryGetProperty("id", out var idProp) &&
+                        string.Equals(idProp.GetString(), trackId.Trim(), StringComparison.OrdinalIgnoreCase))
+                    {
+                        string baseName = Path.GetFileName(file).Replace("_progression.json", "");
+                        return PathUtils.CleanPassName(baseName, forUI: true);
+                    }
+                }
+            }
+            catch { /* Ignore */ }
+
+            return null;
+        }
+
+        private void ViewModel_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(ApiModel.ManualPassId))
+            {
+                if (_isSyncingBrowserSelection) return;
+
+                string currentId = ViewModel?.ManualPassId?.Trim();
+                if (string.IsNullOrEmpty(currentId))
+                {
+                    _isSyncingBrowserSelection = true;
+                    try { ViewModel.SelectedPass = null; }
+                    finally { _isSyncingBrowserSelection = false; }
+                    return;
+                }
+
+                string matchingPass = FindPassNameByTrackId(currentId);
+                if (!string.IsNullOrEmpty(matchingPass) && ViewModel.AvailablePasses != null && ViewModel.AvailablePasses.Contains(matchingPass))
+                {
+                    if (ViewModel.SelectedPass != matchingPass)
+                    {
+                        ViewModel.SelectedPass = matchingPass;
+                    }
+                }
+                else
+                {
+                    if (ViewModel.SelectedPass != null)
+                    {
+                        _isSyncingBrowserSelection = true;
+                        try { ViewModel.SelectedPass = null; }
+                        finally { _isSyncingBrowserSelection = false; }
+                    }
+                }
+            }
         }
 
         private async void OnConfigurationSaved(object sender, EventArgs e)
@@ -138,10 +260,32 @@ namespace AssetsManager.Views.Controls.Monitor
             await Dispatcher.InvokeAsync(async () =>
             {
                 UpdateAuthenticationStatus();
-                // Refresh caches if the paths might have changed
-                await LoadSalesCacheAsync();
-                await LoadMythicShopCacheAsync();
-                await LoadPassRewardsCacheAsync();
+
+                if (RiotApiService != null)
+                {
+                    RiotApiService.InvalidateMetadata();
+                    bool isCurrentlyConnected = await RiotApiService.ReadLockfileAsync(false);
+                    UpdateConnectionStatus(isCurrentlyConnected);
+                }
+
+                if (AppSettings?.ApiSettings?.OfflineCachePersistence != false)
+                {
+                    await EnsureCachedDataLoadedAsync();
+                }
+
+                if (ViewModel?.SalesCatalog != null && ViewModel.SalesCatalog.Any())
+                {
+                    _ = ExtractSkinImagesInBackgroundAsync(ViewModel.SalesCatalog, "sales");
+                }
+
+                if (ViewModel?.MythicShopCategories != null && ViewModel.MythicShopCategories.Any())
+                {
+                    var allMythic = ViewModel.MythicShopCategories.SelectMany(c => c.Items).ToList();
+                    if (allMythic.Any())
+                    {
+                        _ = ExtractSkinImagesInBackgroundAsync(allMythic, "mythic");
+                    }
+                }
             });
         }
 
@@ -153,7 +297,7 @@ namespace AssetsManager.Views.Controls.Monitor
             try
             {
                 string json = await File.ReadAllTextAsync(filePath);
-                var catalog = JsonSerializer.Deserialize<SalesCatalog>(json);
+                var catalog = await Task.Run(() => JsonSerializer.Deserialize<SalesCatalog>(json));
                 if (catalog?.Catalog != null)
                 {
                     var salesItems = catalog.Catalog.Where(i => i.InventoryType == "CHAMPION_SKIN" && i.Sale != null && i.SubInventoryType != "RECOLOR").ToList();
@@ -172,7 +316,7 @@ namespace AssetsManager.Views.Controls.Monitor
             try
             {
                 string json = await File.ReadAllTextAsync(filePath);
-                var response = JsonSerializer.Deserialize<MythicShopResponse>(json);
+                var response = await Task.Run(() => JsonSerializer.Deserialize<MythicShopResponse>(json));
                 if (response != null) ProcessMythicShopData(response);
             }
             catch (Exception ex) { LogService.LogError(ex, "Failed to load mythic shop cache."); }
@@ -190,8 +334,8 @@ namespace AssetsManager.Views.Controls.Monitor
                 var progJson = await File.ReadAllTextAsync(progPath);
                 var rewardsJson = await File.ReadAllTextAsync(rewardsPath);
 
-                var prog = JsonSerializer.Deserialize<ProgressionResponse>(progJson);
-                var rewards = JsonSerializer.Deserialize<RewardsResponse>(rewardsJson);
+                var prog = await Task.Run(() => JsonSerializer.Deserialize<ProgressionResponse>(progJson));
+                var rewards = await Task.Run(() => JsonSerializer.Deserialize<RewardsResponse>(rewardsJson));
 
                 if (prog != null && rewards != null)
                 {
@@ -349,16 +493,16 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private async Task HandleExportRequestAsync(string defaultFileName, System.Collections.IEnumerable items, DataTemplate template, int columns)
         {
-            var dialog = new CommonSaveFileDialog
+            var dialog = new SaveFileDialog
             {
                 Title = $"Save {defaultFileName.Replace("_", " ")} data",
-                DefaultFileName = defaultFileName,
+                FileName = defaultFileName,
                 InitialDirectory = DirectoriesCreator.AssetsDownloadedPath,
-                DefaultExtension = ".png"
+                DefaultExt = "png",
+                Filter = "PNG Image (*.png)|*.png|All Files (*.*)|*.*"
             };
-            dialog.Filters.Add(new CommonFileDialogFilter("PNG Image", "*.png"));
 
-            if (dialog.ShowDialog() == CommonFileDialogResult.Ok)
+            if (dialog.ShowDialog() == true)
             {
                 try
                 {
@@ -381,7 +525,7 @@ namespace AssetsManager.Views.Controls.Monitor
                 SnapsToDevicePixels = true,
                 UseLayoutRounding = true,
                 Orientation = Orientation.Vertical,
-                Width = 1200 // Fixed width for consistent high-quality output
+                Width = Math.Max(1200, columns * 180) // Dynamic width ensuring comfortable card proportions across all column counts
             };
 
             // 2. Logic for both flat lists and categorized lists (Mythic)
@@ -478,51 +622,7 @@ namespace AssetsManager.Views.Controls.Monitor
 
             try
             {
-                ViewModel?.MythicShopCategories.Clear();
-                var categories = new Dictionary<string, MythicShopCategory>();
-                var categoryOrder = new[] { "FEATURED", "BIWEEKLY", "WEEKLY", "DAILY" };
-
-                // Initialize categories to maintain order
-                foreach (var catName in categoryOrder)
-                {
-                    categories[catName] = new MythicShopCategory { CategoryName = catName };
-                }
-
-                foreach (var section in mythicShopResponse.Data)
-                {
-                    var sectionNameParts = section.Name.Split('_');
-                    if (sectionNameParts.Length > 2)
-                    {
-                        var categoryKey = sectionNameParts[2].ToUpper();
-                        if (categories.TryGetValue(categoryKey, out var categoryViewModel))
-                        {
-                            var itemsToAdd = new List<MythicShopModel>();
-                            foreach (var entry in section.CatalogEntries)
-                            {
-                                var purchaseUnit = entry.PurchaseUnits.FirstOrDefault();
-                                if (purchaseUnit == null) continue;
-
-                                var payment = purchaseUnit.PaymentOptions.FirstOrDefault()?.Payments.FirstOrDefault();
-                                if (payment == null) continue;
-
-                                itemsToAdd.Add(new MythicShopModel
-                                {
-                                    Name = purchaseUnit.Fulfillment.Name,
-                                    Price = payment.Delta,
-                                    EndTime = FormatUtils.FormatTimeRemaining(entry.EndTime)
-                                });
-                            }
-                            categoryViewModel.Items.AddRange(itemsToAdd);
-                        }
-                    }
-                }
-
-                // Add to observable collection in the correct order using ReplaceRange
-                var finalCategories = categoryOrder
-                    .Where(categories.ContainsKey)
-                    .Where(catName => categories[catName].Items.Any())
-                    .Select(catName => categories[catName])
-                    .ToList();
+                var finalCategories = MythicShopParser.Parse(mythicShopResponse);
 
                 ViewModel?.MythicShopCategories.ReplaceRange(finalCategories);
 
@@ -551,7 +651,7 @@ namespace AssetsManager.Views.Controls.Monitor
                         string name = (string)nameProperty.GetValue(item);
                         if (string.IsNullOrEmpty(name)) continue;
 
-                        // Unified lookup for skins, emotes, wards, and icons
+                        // Unified lookup for all catalog-backed Mythic items.
                         var assetPath = await RiotApiService.GetMythicAssetPathAsync(name);
                         
                         if (!string.IsNullOrEmpty(assetPath))
@@ -587,6 +687,7 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private void ApiControl_Unloaded(object sender, RoutedEventArgs e)
         {
+            CdnCatalogControl.CatalogFetched -= CdnCatalogFetched;
             if (_lcuConnectionTimer != null)
             {
                 _lcuConnectionTimer.Stop();
@@ -596,6 +697,11 @@ namespace AssetsManager.Views.Controls.Monitor
             if (AppSettings != null)
             {
                 AppSettings.ConfigurationSaved -= OnConfigurationSaved;
+            }
+
+            if (_viewModel != null)
+            {
+                _viewModel.PropertyChanged -= ViewModel_PropertyChanged;
             }
         }
 
@@ -614,9 +720,25 @@ namespace AssetsManager.Views.Controls.Monitor
             MainTabControl.SelectedIndex = 2;
         }
 
+        private void TabCdnTracker_Click(object sender, RoutedEventArgs e)
+        {
+            MainTabControl.SelectedIndex = 3;
+        }
+
+        private void CdnCatalogFetched(AssetCatalogImportBatch batch)
+        {
+            UpdateConnectionStatus(batch.ClientReadSucceeded);
+            ViewModel.SetClientProfile(batch.SummonerId, batch.Region);
+            if (batch.ClientReadSucceeded) _lcuConnectionTimer.Start();
+        }
+
+        private async void CdnSync_Click(object sender, RoutedEventArgs e) => await CdnCatalogControl.SynchronizeAsync();
+        private async void CdnScan_Click(object sender, RoutedEventArgs e) => await CdnCatalogControl.VerifyAsync();
+        private async void CdnDownload_Click(object sender, RoutedEventArgs e) => await CdnCatalogControl.DownloadPageAsync();
+
+
         private async void RequestsPassRewards_Click(object sender, RoutedEventArgs e)
         {
-            if (LogService != null) LogService.Log("Starting pass rewards fetch process...");
             if (RiotApiService == null)
             {
                 CustomMessageBoxService.ShowError("Error", "RiotApiService is not available.", Window.GetWindow(this));
@@ -648,15 +770,38 @@ namespace AssetsManager.Views.Controls.Monitor
                 eventName = await RiotApiService.GetPassNameFromHubAsync(eventId);
             }
 
-            ViewModel.IsBusy = true;
-            ViewModel.StatusText = "Status: Fetching pass data...";
-            string progressionJson = await RiotApiService.GetPassRewardsProgressionAsync(eventId, eventName);
-            string rewardsJson = await RiotApiService.GetPassRewardsRewardsAsync();
+            LogService.Log("Starting pass rewards fetch process...");
 
-            if (string.IsNullOrEmpty(progressionJson) || string.IsNullOrEmpty(rewardsJson))
+            ViewModel.IsBusy = true;
+            ViewModel.StatusText = "Status: Fetching pass progression...";
+            var (progressionJson, statusCode) = await RiotApiService.GetPassRewardsProgressionAsync(eventId, eventName);
+
+            if (string.IsNullOrEmpty(progressionJson))
             {
                 ViewModel.IsBusy = false;
-                CustomMessageBoxService.ShowError("Error", "Could not retrieve pass progression or rewards data.", Window.GetWindow(this));
+                ViewModel.StatusText = "Status: LCU Connected";
+                UpdateAuthenticationStatus();
+
+                if (statusCode != HttpStatusCode.NotFound)
+                {
+                    string errorDetail = statusCode.HasValue ? $"Server returned status: {statusCode.Value}" : "The server response was empty or unreachable.";
+                    CustomMessageBoxService.ShowError(
+                        "Error",
+                        $"Could not retrieve pass progression.\n\n{errorDetail}",
+                        Window.GetWindow(this));
+                }
+                return;
+            }
+
+            ViewModel.StatusText = "Status: Fetching pass rewards...";
+            string rewardsJson = await RiotApiService.GetPassRewardsRewardsAsync();
+
+            if (string.IsNullOrEmpty(rewardsJson))
+            {
+                ViewModel.IsBusy = false;
+                ViewModel.StatusText = "Status: LCU Connected";
+                UpdateAuthenticationStatus();
+                CustomMessageBoxService.ShowError("Error", "Could not retrieve pass rewards catalog from the server.", Window.GetWindow(this));
                 return;
             }
 
@@ -668,8 +813,12 @@ namespace AssetsManager.Views.Controls.Monitor
                 if (progression != null && rewardsResponse != null)
                 {
                     await ProcessPassRewardsDataAsync(progression, rewardsResponse);
-                    // Refresh the browser list since we just saved a new (or updated) pass
-                    await LoadAvailablePassesAsync();
+
+                    string passToSelect = FindPassNameByTrackId(progression.Id)
+                        ?? (!string.IsNullOrEmpty(eventName) ? PathUtils.CleanPassName(eventName, forUI: true) : PathUtils.CleanPassName(progression.Name, forUI: true));
+
+                    // Refresh the browser list and synchronize selection with the fetched pass
+                    await LoadAvailablePassesAsync(passToSelect);
                 }
             }
             catch (Exception ex)
@@ -688,6 +837,7 @@ namespace AssetsManager.Views.Controls.Monitor
             var rewardGroupsMap = rewardsResponse.Data.ToDictionary(g => g.Id, g => g);
             var passRewards = new List<PassRewardModel>();
             var processedKeys = new HashSet<string>();
+            var rewardUrlMap = new List<(PassRewardModel Model, string Url)>();
 
             foreach (var milestone in progression.Milestones)
             {
@@ -716,18 +866,37 @@ namespace AssetsManager.Views.Controls.Monitor
                             details = reward.Localizations.Details;
                         }
 
-                        passRewards.Add(new PassRewardModel
+                        string rawUrl = reward.Media.IconUrl;
+                        string initialIconPath = null;
+                        if (DirectoriesCreator != null && !string.IsNullOrEmpty(rawUrl))
+                        {
+                            string cached = Path.Combine(DirectoriesCreator.ApiCacheRewardsPath, Path.GetFileName(rawUrl));
+                            if (File.Exists(cached))
+                            {
+                                initialIconPath = cached;
+                            }
+                        }
+
+                        var model = new PassRewardModel
                         {
                             Level = translatedLevel,
                             Title = TransformTitle(title, reward.Quantity),
+                            OriginalTitle = TransformTitle(title, reward.Quantity),
                             Details = details,
-                            IconUrl = reward.Media.IconUrl,
+                            IconUrl = initialIconPath,
+                            OriginalIconUrl = initialIconPath,
                             Quantity = reward.Quantity,
                             // Priority logic: _Free takes precedence over _Pass. 
                             // If neither is present (Mini-Events), it defaults to FREE.
                             IsFree = milestone.Name.Contains("_Free", StringComparison.OrdinalIgnoreCase) || 
                                      !milestone.Name.Contains("_Pass", StringComparison.OrdinalIgnoreCase)
-                        });
+                        };
+
+                        passRewards.Add(model);
+                        if (!string.IsNullOrEmpty(rawUrl))
+                        {
+                            rewardUrlMap.Add((model, rawUrl));
+                        }
 
                         processedKeys.Add(key);
                         break; // Following GeneratorRewards logic: process only the first reward
@@ -738,7 +907,11 @@ namespace AssetsManager.Views.Controls.Monitor
             ViewModel.PassRewards.ReplaceRange(passRewards);
 
             // Batch extract icons efficiently
-            var urlsToExtract = passRewards.Select(r => r.IconUrl).ToList();
+            var urlsToExtract = rewardUrlMap
+                .Where(x => x.Model.IconUrl == null)
+                .Select(x => x.Url)
+                .Distinct()
+                .ToList();
             
             _ = Task.Run(async () => 
             {
@@ -747,13 +920,17 @@ namespace AssetsManager.Views.Controls.Monitor
                     await RiotApiService.ExtractRewardIconsBatchAsync(urlsToExtract, async (originalUrl, localPath) => 
                     {
                         // Find all models using this URL (there might be duplicates across levels)
-                        var targets = passRewards.Where(r => r.IconUrl == originalUrl).ToList();
+                        var targets = rewardUrlMap.Where(x => x.Url == originalUrl).Select(x => x.Model).ToList();
                         
                         await Dispatcher.InvokeAsync(() => 
                         {
                             foreach (var target in targets)
                             {
                                 target.IconUrl = localPath;
+                                if (string.IsNullOrEmpty(target.OriginalIconUrl))
+                                {
+                                    target.OriginalIconUrl = localPath;
+                                }
                             }
                         });
                     });
@@ -819,5 +996,106 @@ namespace AssetsManager.Views.Controls.Monitor
             }
             return title;
         }
+
+        #region Pass Rewards In-Place Editing Event Handlers
+
+        private void PassRewards_ButtonClick(object sender, RoutedEventArgs e)
+        {
+            if (e.OriginalSource is FrameworkElement fe)
+            {
+                var model = FindRewardModel(fe);
+                if (model == null) return;
+
+                if (fe.Tag as string == "ChangeImage")
+                {
+                    PromptChangeRewardImage(model);
+                    e.Handled = true;
+                }
+                else if (fe.Tag as string == "RevertImage")
+                {
+                    if (!string.IsNullOrEmpty(model.OriginalTitle))
+                    {
+                        model.Title = model.OriginalTitle;
+                    }
+                    if (!string.IsNullOrEmpty(model.OriginalIconUrl))
+                    {
+                        model.IconUrl = model.OriginalIconUrl;
+                    }
+                    e.Handled = true;
+                }
+            }
+        }
+
+        private void RewardImage_PreviewDragOver(object sender, DragEventArgs e)
+        {
+            if (e.Data.GetDataPresent(DataFormats.FileDrop))
+            {
+                e.Effects = DragDropEffects.Copy;
+                e.Handled = true;
+            }
+            else
+            {
+                e.Effects = DragDropEffects.None;
+            }
+        }
+
+        private void RewardImage_Drop(object sender, DragEventArgs e)
+        {
+            if (e.Data.GetDataPresent(DataFormats.FileDrop) && e.OriginalSource is DependencyObject dep)
+            {
+                var model = FindRewardModel(dep);
+                if (model != null && e.Data.GetData(DataFormats.FileDrop) is string[] files && files.Length > 0)
+                {
+                    string filePath = files[0];
+                    string ext = Path.GetExtension(filePath).ToLowerInvariant();
+                    string[] validExtensions = { ".png", ".jpg" };
+
+                    if (validExtensions.Contains(ext))
+                    {
+                        model.IconUrl = filePath;
+                        e.Handled = true;
+                    }
+                }
+            }
+        }
+
+        private void RewardTitle_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Enter)
+            {
+                Keyboard.ClearFocus();
+                e.Handled = true;
+            }
+        }
+
+        private void PromptChangeRewardImage(PassRewardModel model)
+        {
+            var dialog = new OpenFileDialog
+            {
+                Title = $"Select Reward Image for {model.Level}",
+                Filter = "Image Files (*.png;*.jpg)|*.png;*.jpg|All Files (*.*)|*.*",
+                InitialDirectory = DirectoriesCreator?.AssetsDownloadedPath ?? Environment.GetFolderPath(Environment.SpecialFolder.MyPictures)
+            };
+
+            if (dialog.ShowDialog() == true)
+            {
+                model.IconUrl = dialog.FileName;
+            }
+        }
+
+        private PassRewardModel FindRewardModel(DependencyObject dep)
+        {
+            while (dep != null)
+            {
+                if (dep is FrameworkElement fe && fe.DataContext is PassRewardModel model)
+                {
+                    return model;
+                }
+                dep = VisualTreeHelper.GetParent(dep);
+            }
+            return null;
+        }
+
+        #endregion
     }
 }

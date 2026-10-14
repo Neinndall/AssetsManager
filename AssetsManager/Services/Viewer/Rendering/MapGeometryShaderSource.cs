@@ -1,0 +1,101 @@
+namespace AssetsManager.Services.Viewer.Rendering
+{
+    /// <summary>
+    /// Minimal stock-material shader used by the MAPGEO backdrop.
+    /// It mirrors LTK Manager's MeshLambertMaterial/MeshBasicMaterial split without
+    /// pulling the map through the champion SceneModel material pipeline.
+    /// </summary>
+    internal static class MapGeometryShaderSource
+    {
+        internal const string Vertex = @"
+layout(location = 0) in vec3 aPosition;
+layout(location = 1) in vec3 aNormal;
+layout(location = 2) in vec2 aUv0;
+layout(location = 3) in vec2 aUv1;
+
+uniform mat4 uViewProjection;
+
+uniform vec3 uLightDirection;
+uniform vec3 uSunColor;
+uniform float uSunStrength;
+uniform vec3 uSkyColor;
+uniform vec3 uGroundColor;
+uniform float uAmbientStrength;
+out vec3 vStockLightFront;
+out vec3 vStockLightBack;
+
+vec3 stockLight(vec3 normal)
+{
+    vec3 ambient = mix(uGroundColor, uSkyColor, normal.y * 0.5 + 0.5);
+    float sun = max(dot(normal, normalize(uLightDirection)), 0.0);
+    return uSunColor * sun * uSunStrength + ambient * uAmbientStrength;
+}
+
+out vec3 vNormal;
+out vec2 vUv;
+out vec2 vUv1;
+
+void main()
+{
+    vec3 position = vec3(-aPosition.x, aPosition.y, aPosition.z);
+    vNormal = normalize(vec3(-aNormal.x, aNormal.y, aNormal.z));
+    vStockLightFront = stockLight(vNormal);
+    vStockLightBack = stockLight(-vNormal);
+    vUv = aUv0;
+    vUv1 = aUv1;
+    gl_Position = uViewProjection * vec4(position, 1.0);
+}";
+
+        internal const string Fragment = @"
+in vec3 vStockLightFront;
+in vec3 vStockLightBack;
+in vec2 vUv;
+in vec2 vUv1;
+
+uniform sampler2D uBaseTexture;
+uniform vec3 uColor;
+uniform float uOpacity;
+uniform float uAlphaTest;
+uniform vec2 uUvRepeat;
+uniform int uLit;
+uniform int uPremultipliedAlpha;
+
+uniform int uWireframePass;
+uniform vec4 uWireframeColor;
+
+out vec4 FragColor;
+
+vec3 linearToSrgb(vec3 value)
+{
+    value = max(value, vec3(0.0));
+    vec3 low = value * 12.92;
+    vec3 high = 1.055 * pow(value, vec3(1.0 / 2.4)) - 0.055;
+    return mix(high, low, lessThanEqual(value, vec3(0.0031308)));
+}
+
+void main()
+{
+    if (uWireframePass != 0)
+    {
+        FragColor = uWireframeColor;
+        return;
+    }
+
+    vec4 texel = texture(uBaseTexture, vUv * uUvRepeat);
+    float alpha = texel.a * uOpacity;
+    if (uAlphaTest > 0.0 && alpha < uAlphaTest)
+        discard;
+
+    vec3 color = texel.rgb * uColor;
+    if (uLit != 0)
+    {
+        color *= gl_FrontFacing ? vStockLightFront : vStockLightBack;
+    }
+
+    if (uPremultipliedAlpha != 0)
+        color *= alpha;
+
+    FragColor = vec4(linearToSrgb(color), alpha);
+}";
+    }
+}

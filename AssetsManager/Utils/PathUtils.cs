@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -287,13 +288,53 @@ namespace AssetsManager.Utils
         }
 
         /// <summary>
+        /// Converts mixed path separators to forward slashes without changing path casing or segments.
+        /// </summary>
+        public static string NormalizeSeparators(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return string.Empty;
+            return path.Contains('\\') ? path.Replace('\\', '/') : path;
+        }
+
+        /// <summary>
         /// Normalizes a path by replacing backslashes with forward slashes and converting to lowercase.
         /// Intended for internal WAD virtual paths (e.g. "plugins/rcp-be-lol-game-data/...").
         /// </summary>
         public static string NormalizePath(string path)
         {
-            if (string.IsNullOrEmpty(path)) return string.Empty;
-            return path.Replace('\\', '/').ToLowerInvariant();
+            if (string.IsNullOrWhiteSpace(path)) return string.Empty;
+            // Repeated separators are significant in Riot's historical GAME hashes.
+            return NormalizeSeparators(path.Trim()).ToLowerInvariant();
+        }
+
+        /// <summary>
+        /// Normalizes a grep-extracted path the same way CDTB does: lowercases and
+        /// converts "DATA_SOON/..." (the legacy Riot folder name) back to "data/...".
+        /// </summary>
+        public static string NormalizeGrepPath(string path) =>
+            NormalizePath(path).Replace("data_soon/", "data/", StringComparison.Ordinal);
+
+        /// <summary>
+        /// Resolves "." / ".." segments and collapses duplicate slashes like Python's
+        /// os.path.normpath, without touching the file system (paths are virtual).
+        /// </summary>
+        public static string NormalizeVirtualPath(string path)
+        {
+            var segments = new Stack<string>();
+            foreach (string segment in NormalizeSeparators(path).Split('/'))
+            {
+                if (segment.Length == 0 || segment == ".") continue;
+                if (segment == "..")
+                {
+                    if (segments.Count > 0 && !string.Equals(segments.Peek(), "..", StringComparison.Ordinal))
+                        segments.Pop();
+                    else
+                        segments.Push("..");
+                    continue;
+                }
+                segments.Push(segment);
+            }
+            return string.Join('/', segments.Reverse());
         }
 
         /// <summary>
@@ -320,12 +361,26 @@ namespace AssetsManager.Utils
             }
         }
 
+        public static string ResolveWadPath(string sourcePath, string relativeWadPath)
+        {
+            string normalizedSourcePath = sourcePath?.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            if (SupportedFileTypes.IsWadFile(normalizedSourcePath))
+            {
+                return string.IsNullOrEmpty(relativeWadPath)
+                    || string.Equals(Path.GetFileName(normalizedSourcePath), Path.GetFileName(relativeWadPath), StringComparison.OrdinalIgnoreCase)
+                    ? normalizedSourcePath
+                    : null;
+            }
+
+            return Path.Combine(normalizedSourcePath ?? string.Empty, relativeWadPath ?? string.Empty);
+        }
+
         /// <summary>
         /// Converts a physical or mixed path into a clean virtual path for WAD lookups.
         /// </summary>
         public static string ToVirtualPath(string path)
         {
-            return NormalizePath(path).TrimStart('/');
+            return NormalizePath(path?.Trim()).TrimStart('/');
         }
 
         /// <summary>

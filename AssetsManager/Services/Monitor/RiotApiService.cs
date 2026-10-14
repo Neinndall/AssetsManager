@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Text.Json;
 using System.Threading;
@@ -13,6 +14,7 @@ using AssetsManager.Utils;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Explorer;
 using AssetsManager.Views.Models.Monitor;
+using AssetsManager.Views.Models.Settings;
 
 namespace AssetsManager.Services.Monitor
 {
@@ -25,14 +27,28 @@ namespace AssetsManager.Services.Monitor
         private readonly WadContentProvider _wadContentProvider;
         private readonly SemaphoreSlim _extractionSemaphore = new(1, 1);
 
-        private Dictionary<string, string> _skinNamePathMap;
-        private Dictionary<string, string> _emoteNamePathMap;
-        private Dictionary<string, string> _wardNamePathMap;
-        private Dictionary<string, string> _iconNamePathMap;
+        private Dictionary<string, string> _assetPathMap;
         private readonly Dictionary<string, string> _localEndpoints;
         private readonly Dictionary<string, string> _remoteEndpoints;
 
         private Task _metadataLoadTask;
+
+        public string GetEffectiveGameDirectory()
+        {
+            return _appSettings.ApiSettings.ClientTarget == ApiClientTarget.PBE
+                ? _appSettings.LolPbeDirectory
+                : _appSettings.LolLiveDirectory;
+        }
+
+        public string GetEffectiveClientType()
+        {
+            return _appSettings.ApiSettings.ClientTarget == ApiClientTarget.PBE ? "PBE" : "LIVE";
+        }
+
+        public void InvalidateMetadata()
+        {
+            _metadataLoadTask = null;
+        }
 
         private string GetIconWadPath(string iconUrl)
         {
@@ -44,51 +60,60 @@ namespace AssetsManager.Services.Monitor
             // Pattern: Thread-safe one-time initialization task
             return _metadataLoadTask ??= Task.Run(async () =>
             {
-                _skinNamePathMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-                _emoteNamePathMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-                _wardNamePathMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-                _iconNamePathMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                _assetPathMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-                string lolDirectory = _appSettings.ApiSettings.UsePbeForApi ? _appSettings.LolPbeDirectory : _appSettings.LolLiveDirectory;
+                string lolDirectory = GetEffectiveGameDirectory();
                 if (string.IsNullOrEmpty(lolDirectory)) return;
 
                 string pluginPath = Path.Combine(lolDirectory, "Plugins", "rcp-be-lol-game-data");
 
-                // Mapping definitions to our internal dictionaries
+                // Each catalog supplies the JSON path, name field, and image field.
                 var catalogs = new[] {
-                    new { Info = RiotCatalogDefinitions.SkinCatalog, Map = _skinNamePathMap },
-                    new { Info = RiotCatalogDefinitions.EmoteCatalog, Map = _emoteNamePathMap },
-                    new { Info = RiotCatalogDefinitions.WardCatalog, Map = _wardNamePathMap },
-                    new { Info = RiotCatalogDefinitions.IconCatalog, Map = _iconNamePathMap }
+                    RiotCatalogDefinitions.SkinCatalog,
+                    RiotCatalogDefinitions.EmoteCatalog,
+                    RiotCatalogDefinitions.WardCatalog,
+                    RiotCatalogDefinitions.IconCatalog,
+                    RiotCatalogDefinitions.LootCatalog,
+                    RiotCatalogDefinitions.NexusFinisherCatalog
                 };
+                var catalogNodes = await _wadContentProvider.FindNodesByVirtualPathsAsync(
+                    catalogs.Select(catalog => catalog.Path),
+                    pluginPath);
 
                 foreach (var catalog in catalogs)
                 {
                     try
                     {
-                        var node = await _wadContentProvider.FindNodeByVirtualPathAsync(catalog.Info.Path, pluginPath);
-                        if (node == null) continue;
+                        if (!catalogNodes.TryGetValue(catalog.Path, out var node)) continue;
 
                         byte[] jsonData = await _wadContentProvider.GetVirtualFileBytesAsync(node);
                         if (jsonData == null) continue;
 
                         using var doc = JsonDocument.Parse(jsonData);
-                        if (doc.RootElement.ValueKind == JsonValueKind.Array)
+                        JsonElement root = doc.RootElement;
+                        if (root.ValueKind == JsonValueKind.Object
+                            && root.TryGetProperty("LootItems", out var lootItems))
                         {
-                            foreach (var item in doc.RootElement.EnumerateArray())
-                                AddEntryToMap(item, catalog.Map, catalog.Info.NameKey, catalog.Info.PathKey);
+                            root = lootItems;
                         }
-                        else if (doc.RootElement.ValueKind == JsonValueKind.Object)
+
+                        if (root.ValueKind == JsonValueKind.Array)
                         {
-                            foreach (var property in doc.RootElement.EnumerateObject())
-                                AddEntryToMap(property.Value, catalog.Map, catalog.Info.NameKey, catalog.Info.PathKey);
+                            foreach (var item in root.EnumerateArray())
+                                AddEntryToMap(item, _assetPathMap, catalog.NameKey, catalog.PathKey);
+                        }
+                        else if (root.ValueKind == JsonValueKind.Object)
+                        {
+                            foreach (var property in root.EnumerateObject())
+                                AddEntryToMap(property.Value, _assetPathMap, catalog.NameKey, catalog.PathKey);
                         }
                     }
                     catch (Exception ex)
                     {
-                        _logService.LogError(ex, $"Error loading metadata for {catalog.Info.Path}");
+                        _logService.LogError(ex, $"Error loading metadata for {catalog.Path}");
                     }
                 }
+
             });
         }
 
@@ -99,27 +124,30 @@ namespace AssetsManager.Services.Monitor
                 string name = nameProp.GetString();
                 if (string.IsNullOrEmpty(name)) return;
 
-                // Intentamos la clave principal
                 if (element.TryGetProperty(pathKey, out var pathProp))
                 {
                     string path = pathProp.GetString();
-                    if (!string.IsNullOrEmpty(path))
-                    {
-                        map[name] = path;
-                        return;
-                    }
+                    if (!string.IsNullOrEmpty(path)) map.TryAdd(name, path);
                 }
 
-                // Fallback para iconos que pueden usar imagePath o iconPath indistintamente
-                if (pathKey == "imagePath" || pathKey == "iconPath")
+                // If this skin entry contains nested chromas, index each chroma asset
+                if (element.TryGetProperty("chromas", out var chromasProp) && chromasProp.ValueKind == JsonValueKind.Array)
                 {
-                    string fallbackKey = pathKey == "imagePath" ? "iconPath" : "imagePath";
-                    if (element.TryGetProperty(fallbackKey, out var fallbackProp))
+                    foreach (var chroma in chromasProp.EnumerateArray())
                     {
-                        string path = fallbackProp.GetString();
-                        if (!string.IsNullOrEmpty(path))
+                        string chromaName = chroma.TryGetProperty("name", out var cNameProp) ? cNameProp.GetString() : null;
+                        string chromaPath = chroma.TryGetProperty("chromaPath", out var cPathProp) ? cPathProp.GetString() : null;
+
+                        if (!string.IsNullOrEmpty(chromaName) && !string.IsNullOrEmpty(chromaPath))
                         {
-                            map[name] = path;
+                            map.TryAdd(chromaName, chromaPath);
+
+                            // Also index composite name permutations if the chroma name is short
+                            if (!chromaName.Contains(name, StringComparison.OrdinalIgnoreCase))
+                            {
+                                map.TryAdd($"{name} ({chromaName})", chromaPath);
+                                map.TryAdd($"{name} - {chromaName}", chromaPath);
+                            }
                         }
                     }
                 }
@@ -133,13 +161,8 @@ namespace AssetsManager.Services.Monitor
             await LoadMetadataMapsAsync();
 
             string cleanedName = PathUtils.CleanRiotName(name);
-            var maps = new[] { _skinNamePathMap, _emoteNamePathMap, _wardNamePathMap, _iconNamePathMap };
-
-            foreach (var map in maps)
-            {
-                if (map.TryGetValue(name, out var path)) return path;
-                if (cleanedName != name && map.TryGetValue(cleanedName, out var cleanedPath)) return cleanedPath;
-            }
+            if (_assetPathMap.TryGetValue(name, out var path)) return path;
+            if (cleanedName != name && _assetPathMap.TryGetValue(cleanedName, out var cleanedPath)) return cleanedPath;
 
             return null;
         }
@@ -154,7 +177,9 @@ namespace AssetsManager.Services.Monitor
             {
                 if (File.Exists(destinationPath)) return destinationPath;
 
-                string lolDirectory = _appSettings.ApiSettings.UsePbeForApi ? _appSettings.LolPbeDirectory : _appSettings.LolLiveDirectory;
+                string lolDirectory = GetEffectiveGameDirectory();
+                if (string.IsNullOrEmpty(lolDirectory)) return null;
+
                 string pluginPath = Path.Combine(lolDirectory, "Plugins", "rcp-be-lol-game-data");
                 
                 var node = await _wadContentProvider.FindNodeByVirtualPathAsync(virtualPath, pluginPath);
@@ -212,11 +237,8 @@ namespace AssetsManager.Services.Monitor
 
         public async Task<bool> ReadLockfileAsync(bool logErrorOnFailure = true)
         {
-            string lolDirectory = _appSettings.ApiSettings.UsePbeForApi
-                ? _appSettings.LolPbeDirectory
-                : _appSettings.LolLiveDirectory;
-
-            string clientType = _appSettings.ApiSettings.UsePbeForApi ? "PBE" : "Live";
+            string lolDirectory = GetEffectiveGameDirectory();
+            string clientType = GetEffectiveClientType();
 
             if (string.IsNullOrEmpty(lolDirectory) || !Directory.Exists(lolDirectory))
             {
@@ -430,9 +452,9 @@ namespace AssetsManager.Services.Monitor
             return null;
         }
 
-        public async Task<string> GetPassRewardsProgressionAsync(string eventId, string overrideName = null)
+        public async Task<(string Json, HttpStatusCode? StatusCode)> GetPassRewardsProgressionAsync(string eventId, string overrideName = null)
         {
-            var response = await MakeRemoteRequestAsync("progression", eventId: eventId);
+            using var response = await MakeRemoteRequestAsync("progression", eventId: eventId);
             if (response != null && response.IsSuccessStatusCode)
             {
                 var json = await response.Content.ReadAsStringAsync();
@@ -463,18 +485,26 @@ namespace AssetsManager.Services.Monitor
                 await File.WriteAllTextAsync(Path.Combine(_directoriesCreator.ApiCachePath, fileName), json);
 
                 _logService.LogSuccess($"Pass rewards progression for {fileName} retrieved and cached successfully.");
-                return json;
+                return (json, response.StatusCode);
             }
 
             if (response != null)
             {
-                _logService.LogError($"Failed to retrieve Pass progression. Server returned status: {response.StatusCode}");
+                if (response.StatusCode == HttpStatusCode.NotFound)
+                {
+                    _logService.LogWarning("The pass was not found on Riot servers or may be inactive or temporarily removed.");
+                }
+                else
+                {
+                    _logService.LogError($"Failed to retrieve pass progression. Server returned status: {response.StatusCode}");
+                }
+                return (null, response.StatusCode);
             }
             else
             {
-                _logService.LogError("Failed to retrieve Pass progression. The server response was empty or null.");
+                _logService.LogError("Failed to retrieve pass progression. The server response was empty or null.");
+                return (null, null);
             }
-            return null;
         }
 
         private string SanitizeFileName(string fileName)
@@ -488,7 +518,7 @@ namespace AssetsManager.Services.Monitor
 
         public async Task<string> GetPassRewardsRewardsAsync()
         {
-            var response = await MakeRemoteRequestAsync("rewards");
+            using var response = await MakeRemoteRequestAsync("rewards");
             if (response != null && response.IsSuccessStatusCode)
             {
                 var json = await response.Content.ReadAsStringAsync();
@@ -496,103 +526,100 @@ namespace AssetsManager.Services.Monitor
                 await File.WriteAllTextAsync(Path.Combine(_directoriesCreator.ApiCachePath, "pass_rewards.json"), json);
                 return json;
             }
+
+            if (response != null)
+            {
+                _logService.LogError($"Failed to retrieve pass rewards catalog. Server returned status: {response.StatusCode}");
+            }
+            else
+            {
+                _logService.LogError("Failed to retrieve pass rewards catalog. The server response was empty or null.");
+            }
             return null;
         }
 
         public async Task<(string Id, string Name)> GetActivePassGroupIdAsync()
         {
-            string lolDirectory = _appSettings.ApiSettings.UsePbeForApi ? _appSettings.LolPbeDirectory : _appSettings.LolLiveDirectory;
+            string lolDirectory = GetEffectiveGameDirectory();
             if (string.IsNullOrEmpty(lolDirectory)) return (null, null);
 
             string pluginPath = Path.Combine(lolDirectory, "Plugins", "rcp-be-lol-game-data");
-            string[] possiblePaths = { 
-                "plugins/rcp-be-lol-game-data/global/default/v1/event-hub.json",
-                "global/default/v1/event-hub.json",
-                "v1/event-hub.json"
-            };
+            var node = await _wadContentProvider.FindNodeByVirtualPathAsync(RiotCatalogDefinitions.EventHubJsonPath, pluginPath);
+            if (node == null) return (null, null);
 
-            foreach (var path in possiblePaths)
+            try
             {
-                var node = await _wadContentProvider.FindNodeByVirtualPathAsync(path, pluginPath);
-                if (node == null) continue;
+                byte[] data = await _wadContentProvider.GetVirtualFileBytesAsync(node);
+                if (data == null) return (null, null);
 
-                try
+                using var doc = JsonDocument.Parse(data);
+                var bestEvent = FindActivePass(doc.RootElement, DateTimeOffset.UtcNow);
+                if (bestEvent.Id != null)
                 {
-                    byte[] data = await _wadContentProvider.GetVirtualFileBytesAsync(node);
-                    if (data == null) continue;
-
-                    using var doc = JsonDocument.Parse(data);
-                    var bestEvent = doc.RootElement.EnumerateArray()
-                        .Select(e => e.TryGetProperty("event", out var ev) ? ev : (JsonElement?)null)
-                        .Where(ev => ev != null && ev.Value.TryGetProperty("eventHubType", out var t) && t.GetString() == "kSeasonPass")
-                        .Select(ev => new {
-                            Id = ev.Value.GetProperty("rewardTrack").GetProperty("trackConfig").GetProperty("id").GetString(),
-                            Name = ev.Value.TryGetProperty("localizedName", out var n) ? n.GetString() : "Unknown Event",
-                            Start = ev.Value.TryGetProperty("startDate", out var s) && DateTime.TryParse(s.GetString(), out var sd) ? sd : DateTime.MinValue,
-                            End = ev.Value.TryGetProperty("endDate", out var ed) && DateTime.TryParse(ed.GetString(), out var edd) ? edd : DateTime.MaxValue
-                        })
-                        .Where(e => DateTime.UtcNow <= e.End)
-                        .OrderByDescending(e => e.Start)
-                        .FirstOrDefault();
-
-                    if (bestEvent != null)
-                    {
-                        _logService.LogSuccess($"Active Pass found: {bestEvent.Name}");
-                        return (bestEvent.Id, bestEvent.Name);
-                    }
+                    _logService.LogSuccess($"Active Pass found: {bestEvent.Name}");
+                    return bestEvent;
                 }
-                catch (Exception ex) { _logService.LogError(ex, $"Error parsing event-hub from {node.SourceWadPath}"); }
             }
+            catch (Exception ex) { _logService.LogError(ex, $"Error parsing event-hub from {node.SourceWadPath}"); }
             return (null, null);
+        }
+
+        internal static (string Id, string Name) FindActivePass(JsonElement hub, DateTimeOffset utcNow)
+        {
+            var bestEvent = hub.EnumerateArray()
+                .Select(e => e.TryGetProperty("event", out var ev) ? ev : (JsonElement?)null)
+                .Where(ev => ev != null && ev.Value.TryGetProperty("eventHubType", out var t) && t.GetString() == "kSeasonPass")
+                .Select(ev => new {
+                    Id = ev.Value.GetProperty("rewardTrack").GetProperty("trackConfig").GetProperty("id").GetString(),
+                    Name = ev.Value.TryGetProperty("localizedName", out var n) ? n.GetString() : "Unknown Event",
+                    Start = ev.Value.TryGetProperty("startDate", out var s) && DateTimeOffset.TryParse(s.GetString(), out var sd) ? sd : DateTimeOffset.MinValue,
+                    End = ev.Value.TryGetProperty("endDate", out var ed) && DateTimeOffset.TryParse(ed.GetString(), out var edd) ? edd : DateTimeOffset.MaxValue
+                })
+                .Where(e => e.Start <= utcNow && utcNow <= e.End)
+                .OrderByDescending(e => e.Start)
+                .FirstOrDefault();
+
+            return bestEvent == null ? (null, null) : (bestEvent.Id, bestEvent.Name);
         }
 
         public async Task<string> GetPassNameFromHubAsync(string trackConfigId)
         {
             if (string.IsNullOrEmpty(trackConfigId)) return null;
 
-            string lolDirectory = _appSettings.ApiSettings.UsePbeForApi ? _appSettings.LolPbeDirectory : _appSettings.LolLiveDirectory;
+            string lolDirectory = GetEffectiveGameDirectory();
             if (string.IsNullOrEmpty(lolDirectory)) return null;
 
             string pluginPath = Path.Combine(lolDirectory, "Plugins", "rcp-be-lol-game-data");
-            string[] possiblePaths = { 
-                "plugins/rcp-be-lol-game-data/global/default/v1/event-hub.json",
-                "global/default/v1/event-hub.json",
-                "v1/event-hub.json" 
-            };
+            var node = await _wadContentProvider.FindNodeByVirtualPathAsync(RiotCatalogDefinitions.EventHubJsonPath, pluginPath);
+            if (node == null) return null;
 
-            foreach (var path in possiblePaths)
+            try
             {
-                var node = await _wadContentProvider.FindNodeByVirtualPathAsync(path, pluginPath);
-                if (node == null) continue;
+                byte[] data = await _wadContentProvider.GetVirtualFileBytesAsync(node);
+                if (data == null) return null;
 
-                try 
+                using var doc = JsonDocument.Parse(data);
+                foreach (var item in doc.RootElement.EnumerateArray())
                 {
-                    byte[] data = await _wadContentProvider.GetVirtualFileBytesAsync(node);
-                    if (data == null) continue;
-
-                    using var doc = JsonDocument.Parse(data);
-                    foreach (var item in doc.RootElement.EnumerateArray())
+                    if (item.TryGetProperty("event", out var ev))
                     {
-                        if (item.TryGetProperty("event", out var ev))
+                        if (ev.TryGetProperty("rewardTrack", out var rt) &&
+                            rt.TryGetProperty("trackConfig", out var tc) &&
+                            tc.TryGetProperty("id", out var idProp) &&
+                            string.Equals(idProp.GetString(), trackConfigId, StringComparison.OrdinalIgnoreCase))
                         {
-                            if (ev.TryGetProperty("rewardTrack", out var rt) && 
-                                rt.TryGetProperty("trackConfig", out var tc) &&
-                                tc.TryGetProperty("id", out var idProp) &&
-                                idProp.GetString().Equals(trackConfigId, StringComparison.OrdinalIgnoreCase))
+                            string name = ev.TryGetProperty("localizedName", out var n) ? n.GetString() : null;
+                            if (!string.IsNullOrEmpty(name))
                             {
-                                string name = ev.TryGetProperty("localizedName", out var n) ? n.GetString() : null;
-                                if (!string.IsNullOrEmpty(name))
-                                {
-                                    _logService.Log($"Found name for event ID: {name}");
-                                    return name;
-                                }
+                                _logService.Log($"Found pass name '{name}' with ID: {trackConfigId}");
+                                return name;
                             }
                         }
                     }
-                } catch { }
+                }
             }
+            catch (Exception ex) { _logService.LogError(ex, $"Error parsing event-hub from {node.SourceWadPath}"); }
             
-            _logService.LogWarning($"[EventHub] Could not find a localized name for ID {trackConfigId} in the Hub.");
             return null;
         }
 
@@ -600,7 +627,7 @@ namespace AssetsManager.Services.Monitor
         {
             if (iconUrls == null || !iconUrls.Any()) return;
 
-            string lolDirectory = _appSettings.ApiSettings.UsePbeForApi ? _appSettings.LolPbeDirectory : _appSettings.LolLiveDirectory;
+            string lolDirectory = GetEffectiveGameDirectory();
             if (string.IsNullOrEmpty(lolDirectory)) return;
 
             string pluginPath = Path.Combine(lolDirectory, "Plugins", "rcp-be-lol-game-data");
@@ -622,10 +649,14 @@ namespace AssetsManager.Services.Monitor
             await _extractionSemaphore.WaitAsync();
             try
             {
+                var iconNodes = await _wadContentProvider.FindNodesByVirtualPathsAsync(
+                    remainingUrls.Select(GetIconWadPath),
+                    pluginPath);
+
                 foreach (var url in remainingUrls)
                 {
                     var virtualPath = GetIconWadPath(url);
-                    var node = await _wadContentProvider.FindNodeByVirtualPathAsync(virtualPath, pluginPath);
+                    if (!iconNodes.TryGetValue(virtualPath, out var node)) continue;
 
                     if (node != null)
                     {
@@ -657,6 +688,34 @@ namespace AssetsManager.Services.Monitor
             request.Headers.Add("Authorization", authHeader);
             if (Uri.TryCreate(requestUri, UriKind.Absolute, out var uri)) request.Headers.Host = uri.Authority;
             return await _httpClient.SendAsync(request);
+        }
+
+        internal async Task<string> ResolveRemoteBaseUrlAsync(string endpointKey, string region)
+        {
+            if (endpointKey != "progression")
+                return Endpoints.GetRemoteBaseUrl(endpointKey, region);
+
+            try
+            {
+                using var response = await MakeLocalRequestAsync(_localEndpoints["playerPlatformUrl"]);
+                if (response?.IsSuccessStatusCode == true)
+                {
+                    using var config = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+                    if (config.RootElement.ValueKind == JsonValueKind.String)
+                    {
+                        string baseUrl = Endpoints.GetRemoteBaseUrl(endpointKey, region, config.RootElement.GetString());
+                        if (!string.IsNullOrEmpty(baseUrl)) return baseUrl;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, "Could not read the Player Platform host from the League client.");
+                return null;
+            }
+
+            _logService.LogWarning("Player Platform host is unavailable in the League client configuration. Progression request cancelled.");
+            return null;
         }
 
         private async Task<HttpResponseMessage> MakeRemoteRequestAsync(string endpointKey, int retryCount = 1, string eventId = null)
@@ -691,7 +750,8 @@ namespace AssetsManager.Services.Monitor
             }
 
             var regionKey = Regex.Replace(currentRegion, @"\d+$", "");
-            var baseUrl = Endpoints.BaseUrlLive.Replace("{region}", regionKey);
+            var baseUrl = await ResolveRemoteBaseUrlAsync(endpointKey, regionKey);
+            if (string.IsNullOrEmpty(baseUrl)) return null;
             var requestUri = $"{baseUrl}{tempPath}";
 
             var request = CreateRemoteRequest(requestUri, jwt);

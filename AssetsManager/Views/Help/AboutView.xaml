@@ -100,81 +100,107 @@
         <!-- FEATURES GRID -->
         <TextBlock Text="CORE CAPABILITIES" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="4,0,0,16"/>
         <UniformGrid Columns="2">
-            <!-- Feature 1 -->
+            <!-- Capability 1: Version Manager & Backups -->
             <Border Style="{StaticResource SettingsCard}" Margin="0,0,8,8" Padding="20">
                 <StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
                         <Border Background="{StaticResource HoverColor}" Width="36" Height="36" CornerRadius="10">
                             <materialIcons:MaterialIcon Kind="CloudDownload" Foreground="{StaticResource AccentBlue}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
-                        <TextBlock Text="Auto Downloads" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="12,0,0,0"/>
+                        <TextBlock Text="Version Manager &amp; Backups" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="12,0,0,0"/>
                     </StackPanel>
-                    <TextBlock Text="Seamlessly detects and downloads new PBE assets in the background." FontSize="12" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" LineHeight="20"/>
+                    <TextBlock Text="High-speed RMAN manifest downloader with deduplicated chunk streaming and automated snapshot backups for PBE and Live clients." FontSize="12" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" LineHeight="20"/>
                 </StackPanel>
             </Border>
 
-            <!-- Feature 2 -->
+            <!-- Capability 2: WAD Comparator & Visual Diffs -->
             <Border Style="{StaticResource SettingsCard}" Margin="8,0,0,8" Padding="20">
                 <StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
                         <Border Background="{StaticResource HoverColor}" Width="36" Height="36" CornerRadius="10">
                             <materialIcons:MaterialIcon Kind="FileCompare" Foreground="{StaticResource AccentOrange}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
-                        <TextBlock Text="WAD Comparator" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="12,0,0,0"/>
+                        <TextBlock Text="WAD Comparator &amp; Visual Diffs" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="12,0,0,0"/>
                     </StackPanel>
-                    <TextBlock Text="Advanced differential analysis to pinpoint modified content." FontSize="12" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" LineHeight="20"/>
+                    <TextBlock Text="Deep differential analysis between game versions featuring pixel-accurate Image Diff, 3D Mesh Skn Diff, and BIN/JSON tree comparison." FontSize="12" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" LineHeight="20"/>
                 </StackPanel>
             </Border>
 
-            <!-- Feature 3 -->
+            <!-- Capability 3: Archive Explorer & BIN Tree -->
             <Border Style="{StaticResource SettingsCard}" Margin="0,8,8,8" Padding="20">
                 <StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
                         <Border Background="{StaticResource HoverColor}" Width="36" Height="36" CornerRadius="10">
-                            <materialIcons:MaterialIcon Kind="FolderSearch" Foreground="{StaticResource AccentGreen}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            <materialIcons:MaterialIcon Kind="FolderSearchOutline" Foreground="{StaticResource AccentGreen}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
-                        <TextBlock Text="File Explorer" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="12,0,0,0"/>
+                        <TextBlock Text="Archive Explorer &amp; BIN Tree" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="12,0,0,0"/>
                     </StackPanel>
-                    <TextBlock Text="Browse internal archives with integrated instant previews." FontSize="12" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" LineHeight="20"/>
+                    <TextBlock Text="Full hierarchy navigation of game archives with real-time property inspectors, fast extraction, and instant asset previews." FontSize="12" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" LineHeight="20"/>
                 </StackPanel>
             </Border>
 
-            <!-- Feature 4 -->
+            <!-- Capability 4: 3D Engine & Model Viewer -->
             <Border Style="{StaticResource SettingsCard}" Margin="8,8,0,8" Padding="20">
                 <StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
                         <Border Background="{StaticResource HoverColor}" Width="36" Height="36" CornerRadius="10">
                             <materialIcons:MaterialIcon Kind="CubeOutline" Foreground="{StaticResource AccentPurple}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
-                        <TextBlock Text="3D Viewer" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="12,0,0,0"/>
+                        <TextBlock Text="3D Engine &amp; Model Viewer" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="12,0,0,0"/>
                     </StackPanel>
-                    <TextBlock Text="High-performance rendering of models, skeletons, and animations." FontSize="12" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" LineHeight="20"/>
+                    <TextBlock Text="High-performance rendering of champions, maps, skeletons, animations, and skin chromas with material shading." FontSize="12" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" LineHeight="20"/>
                 </StackPanel>
             </Border>
 
-            <!-- Feature 5 -->
-            <Border Style="{StaticResource SettingsCard}" Margin="0,8,8,0" Padding="20">
+            <!-- Capability 5: VFX Particle Inspector -->
+            <Border Style="{StaticResource SettingsCard}" Margin="0,8,8,8" Padding="20">
                 <StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
                         <Border Background="{StaticResource HoverColor}" Width="36" Height="36" CornerRadius="10">
-                            <materialIcons:MaterialIcon Kind="Radar" Foreground="{StaticResource AccentRed}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            <materialIcons:MaterialIcon Kind="AutoAwesome" Foreground="{StaticResource AccentYellow}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
-                        <TextBlock Text="Live Monitoring" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="12,0,0,0"/>
+                        <TextBlock Text="VFX Particle Inspector" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="12,0,0,0"/>
                     </StackPanel>
-                    <TextBlock Text="Real-time surveillance of remote configs and server health." FontSize="12" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" LineHeight="20"/>
+                    <TextBlock Text="Real-time particle system analysis with interactive timeline scrubber, keyframe curves, emitter hierarchy, and texture visualizer." FontSize="12" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" LineHeight="20"/>
                 </StackPanel>
             </Border>
 
-            <!-- Feature 6 -->
-            <Border Style="{StaticResource SettingsCard}" Margin="8,8,0,0" Padding="20">
+            <!-- Capability 6: Hash Lab & Cryptanalysis -->
+            <Border Style="{StaticResource SettingsCard}" Margin="8,8,0,8" Padding="20">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                        <Border Background="{StaticResource HoverColor}" Width="36" Height="36" CornerRadius="10">
+                            <materialIcons:MaterialIcon Kind="FlaskOutline" Foreground="{StaticResource AccentTeal}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <TextBlock Text="Hash Lab &amp; Cryptanalysis" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="12,0,0,0"/>
+                    </StackPanel>
+                    <TextBlock Text="Deterministic hash guessing and cryptanalysis engine for Game, LCU, BIN, and RST formats powered by token dictionaries and schemas." FontSize="12" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" LineHeight="20"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Capability 7: Audio Bank Studio -->
+            <Border Style="{StaticResource SettingsCard}" Margin="0,8,8,0" Padding="20">
                 <StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
                         <Border Background="{StaticResource HoverColor}" Width="36" Height="36" CornerRadius="10">
                             <materialIcons:MaterialIcon Kind="MusicNote" Foreground="{StaticResource AccentBrush}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
-                        <TextBlock Text="Audio Banks" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="12,0,0,0"/>
+                        <TextBlock Text="Audio Bank Studio" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="12,0,0,0"/>
                     </StackPanel>
-                    <TextBlock Text="Decrypt, inspect, and playback encrypted audio bank events." FontSize="12" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" LineHeight="20"/>
+                    <TextBlock Text="Inspect, decrypt, and playback embedded Wwise audio banks (BNK/WPK) with event triggers and spatial sound extraction." FontSize="12" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" LineHeight="20"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Capability 8: Patch News & RSS Hub -->
+            <Border Style="{StaticResource SettingsCard}" Margin="8,8,0,0" Padding="20">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                        <Border Background="{StaticResource HoverColor}" Width="36" Height="36" CornerRadius="10">
+                            <materialIcons:MaterialIcon Kind="NewspaperVariantOutline" Foreground="{StaticResource AccentRed}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <TextBlock Text="Patch News &amp; RSS Hub" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="12,0,0,0"/>
+                    </StackPanel>
+                    <TextBlock Text="Surveillance center for official League of Legends patch notes, esports broadcasts, developer insights, and live game updates." FontSize="12" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" LineHeight="20"/>
                 </StackPanel>
             </Border>
         </UniformGrid>

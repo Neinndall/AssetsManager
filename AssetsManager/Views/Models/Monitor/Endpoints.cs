@@ -1,16 +1,36 @@
+using System;
 using System.Collections.Generic;
 
 namespace AssetsManager.Views.Models.Monitor
 {
     public static class Endpoints
     {
-        public static string BaseUrlPBE => "https://pbe-red.lol.sgp.pvp.net";
-        public static string BaseUrlLive => "https://{region}-red.lol.sgp.pvp.net";
+        public static string LeagueEdgeUrlTemplate => "https://{region}-red.lol.sgp.pvp.net";
+        public static string PlayerPlatformUrlTemplate => "https://{region}.pp.sgp.pvp.net";
+
+        public static string GetRemoteBaseUrl(string endpointKey, string region, string playerPlatformUrl = null)
+        {
+            if (endpointKey != "progression")
+                return LeagueEdgeUrlTemplate.Replace("{region}", region);
+
+            const string playerPlatformSuffix = ".pp.sgp.pvp.net";
+            if (!Uri.TryCreate(playerPlatformUrl, UriKind.Absolute, out var uri)
+                || uri.Scheme != Uri.UriSchemeHttps
+                || !uri.Host.EndsWith(playerPlatformSuffix, StringComparison.OrdinalIgnoreCase)
+                || !uri.IsDefaultPort || !string.IsNullOrEmpty(uri.UserInfo)
+                || uri.AbsolutePath != "/" || !string.IsNullOrEmpty(uri.Query) || !string.IsNullOrEmpty(uri.Fragment))
+                return null;
+
+            // Player Platform uses the cluster advertised by the selected client, not its League region.
+            string playerPlatformRegion = uri.Host[..^playerPlatformSuffix.Length];
+            return PlayerPlatformUrlTemplate.Replace("{region}", playerPlatformRegion);
+        }
 
         public static Dictionary<string, string> GetLocalEndpoints() => new Dictionary<string, string>
         {
             { "entitlementsToken", "/entitlements/v1/token" },
-            { "leagueSessionToken", "/lol-league-session/v1/league-session-token" }
+            { "leagueSessionToken", "/lol-league-session/v1/league-session-token" },
+            { "playerPlatformUrl", "/client-config/v2/config/lol.client_settings.player_platform_edge.url" }
         };
 
         public static Dictionary<string, string> GetRemoteEndpoints() => new Dictionary<string, string>

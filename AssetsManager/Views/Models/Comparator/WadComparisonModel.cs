@@ -28,6 +28,7 @@ namespace AssetsManager.Views.Models.Comparator
         private bool _isBaseDirectoryPbe;
         private bool _isTargetDirectoryMain;
         private bool _isBaseDirectoryMain;
+        private string _directorySyncSuffix;
 
         // --- WAD FILE STATE ---
         private string _newWadFilePath;
@@ -88,12 +89,18 @@ namespace AssetsManager.Views.Models.Comparator
         public string BaseSourcePath => IsDirectoryMode ? BaseSourceRoot : _oldWadFilePath;
 
         public string TargetSourceRoot => IsDirectoryMode 
-            ? (_selectedTargetDirectoryBackup != null ? _selectedTargetDirectoryBackup.Path : _newDirectoryPath)
+            ? NewDirectoryPath
             : (_selectedTargetWadBackup != null ? _selectedTargetWadBackup.Path : (_newWadFilePath != null ? GetRootFromWadPath(_newWadFilePath) : null));
 
         public string BaseSourceRoot => IsDirectoryMode 
-            ? (_selectedBaseDirectoryBackup != null ? _selectedBaseDirectoryBackup.Path : _oldDirectoryPath)
+            ? OldDirectoryPath
             : (_selectedBaseWadBackup != null ? _selectedBaseWadBackup.Path : (_oldWadFilePath != null ? GetRootFromWadPath(_oldWadFilePath) : null));
+
+        public string ApplySyncSuffix(string path)
+        {
+            if (string.IsNullOrEmpty(path) || string.IsNullOrEmpty(_directorySyncSuffix)) return path;
+            return System.IO.Path.Combine(path, _directorySyncSuffix);
+        }
 
         private string GetRootFromWadPath(string path)
         {
@@ -176,7 +183,7 @@ namespace AssetsManager.Views.Models.Comparator
 
         public string NewDirectoryPath
         {
-            get => _newDirectoryPath;
+            get => _selectedTargetDirectoryBackup != null ? ApplySyncSuffix(_selectedTargetDirectoryBackup.Path) : _newDirectoryPath;
             set 
             { 
                 if (_newDirectoryPath != value) 
@@ -185,9 +192,11 @@ namespace AssetsManager.Views.Models.Comparator
                     if (string.IsNullOrEmpty(value))
                     {
                         _selectedTargetDirectoryBackup = null;
+                        DirectorySyncSuffix = null;
                         ClearMetadata(false);
+                        OldDirectoryPath = null;
                     }
-                    else if (_selectedTargetDirectoryBackup != null && _selectedTargetDirectoryBackup.Path != value)
+                    else if (_selectedTargetDirectoryBackup != null && !string.Equals(ApplySyncSuffix(_selectedTargetDirectoryBackup.Path), value, StringComparison.OrdinalIgnoreCase))
                     {
                         _selectedTargetDirectoryBackup = null;
                     }
@@ -200,7 +209,7 @@ namespace AssetsManager.Views.Models.Comparator
 
         public string OldDirectoryPath
         {
-            get => _oldDirectoryPath;
+            get => _selectedBaseDirectoryBackup != null ? ApplySyncSuffix(_selectedBaseDirectoryBackup.Path) : _oldDirectoryPath;
             set 
             { 
                 if (_oldDirectoryPath != value) 
@@ -211,7 +220,7 @@ namespace AssetsManager.Views.Models.Comparator
                         _selectedBaseDirectoryBackup = null;
                         ClearMetadata(true);
                     }
-                    else if (_selectedBaseDirectoryBackup != null && _selectedBaseDirectoryBackup.Path != value)
+                    else if (_selectedBaseDirectoryBackup != null && !string.Equals(ApplySyncSuffix(_selectedBaseDirectoryBackup.Path), value, StringComparison.OrdinalIgnoreCase))
                     {
                         _selectedBaseDirectoryBackup = null;
                     }
@@ -306,6 +315,26 @@ namespace AssetsManager.Views.Models.Comparator
         {
             get => IsDirectoryMode ? _isBaseDirectoryMain : _isBaseWadMain;
             set { if (IsDirectoryMode) _isBaseDirectoryMain = value; else _isBaseWadMain = value; OnPropertyChanged(); }
+        }
+
+        /// <summary>
+        /// Relative sub-directory (e.g. "Plugins") shared by both directory sources
+        /// so a selected backup mirrors the target's nested path scope.
+        /// </summary>
+        public string DirectorySyncSuffix
+        {
+            get => _directorySyncSuffix;
+            set
+            {
+                if (_directorySyncSuffix != value)
+                {
+                    _directorySyncSuffix = value;
+                    OnPropertyChanged();
+                    OnPropertyChanged(nameof(NewDirectoryPath));
+                    OnPropertyChanged(nameof(OldDirectoryPath));
+                    NotifySourceChanges();
+                }
+            }
         }
 
         public bool IsTargetMain

@@ -8,9 +8,6 @@
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              mc:Ignorable="d" FontFamily="{StaticResource AppFontFamily}">
 
-    <UserControl.Resources>
-    </UserControl.Resources>
-    
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/> <!-- 0. Dynamic Header Identity Card -->
@@ -18,21 +15,18 @@
             <RowDefinition Height="*"/>    <!-- 2. Content Area -->
         </Grid.RowDefinitions>
 
-        <!-- 0. DYNAMIC IDENTITY HEADER (SettingsCard Style) -->
-        <Border Grid.Row="0" Style="{StaticResource SettingsCard}" Margin="32,24,32,0" Padding="24,20">
+        <!-- 0. COMPACT MODULE HEADER -->
+        <Border Grid.Row="0" Style="{StaticResource CompactModuleHeader}">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/> <!-- Hero Icon -->
-                    <ColumnDefinition Width="Auto"/> <!-- Technical Separator -->
+                    <ColumnDefinition Width="16"/> <!-- Icon-to-title gap -->
                     <ColumnDefinition Width="*"/>    <!-- Dynamic Titles -->
                 </Grid.ColumnDefinitions>
 
                 <!-- Hero Icon (Standardized 48x48 / 26x26) -->
-                <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="10" Width="48" Height="48" Margin="0,0,0,0">
+                <Border Grid.Column="0" Background="{StaticResource SidebarBackground}" CornerRadius="10" Width="48" Height="48" Margin="0,0,0,0">
                     <materialIcons:MaterialIcon Width="26" Height="26" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center">
-                        <materialIcons:MaterialIcon.Effect>
-                            <DropShadowEffect Color="#FF5C85FF" BlurRadius="12" ShadowDepth="0" Opacity="0.4"/>
-                        </materialIcons:MaterialIcon.Effect>
                         <materialIcons:MaterialIcon.Style>
                             <Style TargetType="materialIcons:MaterialIcon">
                                 <Setter Property="Kind" Value="MonitorDashboard"/>
@@ -49,12 +43,10 @@
                     </materialIcons:MaterialIcon>
                 </Border>
 
-                <!-- Technical Vertical Separator (1px) -->
-                <Rectangle Grid.Column="1" Width="1" Fill="{StaticResource BorderColor}" Margin="20,8" VerticalAlignment="Stretch" Opacity="0.5"/>
 
                 <!-- Dynamic Titles Area (22px / 12px) -->
                 <StackPanel Grid.Column="2" VerticalAlignment="Center">
-                    <TextBlock FontWeight="SemiBold" FontSize="22" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,2">
+                    <TextBlock FontWeight="SemiBold" FontSize="22" TextTrimming="CharacterEllipsis" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,2">
                         <TextBlock.Style>
                             <Style TargetType="TextBlock">
                                 <Setter Property="Text" Value="MONITOR DASHBOARD"/>
@@ -64,15 +56,15 @@
                                     <DataTrigger Binding="{Binding IsChecked, ElementName=TabAssetTracker}" Value="True"><Setter Property="Text" Value="ASSET TRACKER"/></DataTrigger>
                                     <DataTrigger Binding="{Binding IsChecked, ElementName=TabVersions}" Value="True"><Setter Property="Text" Value="VERSION MANAGER"/></DataTrigger>
                                     <DataTrigger Binding="{Binding IsChecked, ElementName=TabBackups}" Value="True"><Setter Property="Text" Value="BACKUPS REPOSITORY"/></DataTrigger>
-                                    <DataTrigger Binding="{Binding IsChecked, ElementName=TabApi}" Value="True"><Setter Property="Text" Value="RIOT API CENTER"/></DataTrigger>
+                                    <DataTrigger Binding="{Binding IsChecked, ElementName=TabApi}" Value="True"><Setter Property="Text" Value="API CENTER"/></DataTrigger>
                                 </Style.Triggers>
                             </Style>
                         </TextBlock.Style>
                     </TextBlock>
-                    <TextBlock FontSize="12" Foreground="{StaticResource TextSecondary}" Opacity="0.8">
+                    <TextBlock FontSize="12" TextTrimming="CharacterEllipsis" Foreground="{StaticResource TextSecondary}" Opacity="0.8">
                         <TextBlock.Style>
                             <Style TargetType="TextBlock">
-                                <Setter Property="Text" Value="Real-time synchronization of environment status and core metrics."/>
+                                <Setter Property="Text" Value="Server availability, local catalogs and asset activity in one place."/>
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding IsChecked, ElementName=TabFileWatcher}" Value="True"><Setter Property="Text" Value="Local game assets monitoring and real-time change detection after patches."/></DataTrigger>
                                     <DataTrigger Binding="{Binding IsChecked, ElementName=TabHistory}" Value="True"><Setter Property="Text" Value="Audit log of historical changes and version differences."/></DataTrigger>
@@ -88,8 +80,8 @@
             </Grid>
         </Border>
 
-        <!-- 1. NAVIGATION TOOLBAR (SettingsCard Style) -->
-        <Border Grid.Row="1" Style="{StaticResource SettingsCard}" Margin="32,16,32,16" Padding="12,2">
+        <!-- 1. MONITOR DESTINATIONS -->
+        <Border Grid.Row="1" Style="{StaticResource PanelSurface}" Padding="5" Margin="28,12,28,16">
             <UniformGrid Columns="7">
                 <RadioButton x:Name="TabDashboard" Content="Dashboard" IsChecked="True" GroupName="MonitorTabs" Style="{StaticResource MonitorTabStyle}" Tag="Radar"/>
                 <RadioButton x:Name="TabFileWatcher" Content="Watcher" GroupName="MonitorTabs" Style="{StaticResource MonitorTabStyle}" Tag="EyeOutline"/>
@@ -103,98 +95,10 @@
 
         <!-- 2. CONTENT AREA -->
         <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-            <Grid Margin="32,4,32,32">
-                <monitorControls:MonitorDashboardControl x:Name="MonitorDashboardControl">
-                    <monitorControls:MonitorDashboardControl.Style>
-                        <Style TargetType="UserControl">
-                            <Setter Property="Visibility" Value="Collapsed"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsChecked, ElementName=TabDashboard}" Value="True">
-                                    <Setter Property="Visibility" Value="Visible"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </monitorControls:MonitorDashboardControl.Style>
-                </monitorControls:MonitorDashboardControl>
-
-                <monitorControls:AssetWatcherControl x:Name="AssetWatcherControl">
-                    <monitorControls:AssetWatcherControl.Style>
-                        <Style TargetType="UserControl">
-                            <Setter Property="Visibility" Value="Collapsed"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsChecked, ElementName=TabFileWatcher}" Value="True">
-                                    <Setter Property="Visibility" Value="Visible"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </monitorControls:AssetWatcherControl.Style>
-                </monitorControls:AssetWatcherControl>
-
-                <monitorControls:HistoryViewControl x:Name="HistoryViewControl">
-                    <monitorControls:HistoryViewControl.Style>
-                        <Style TargetType="UserControl">
-                            <Setter Property="Visibility" Value="Collapsed"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsChecked, ElementName=TabHistory}" Value="True">
-                                    <Setter Property="Visibility" Value="Visible"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </monitorControls:HistoryViewControl.Style>
-                </monitorControls:HistoryViewControl>
-
-                <monitorControls:AssetTrackerControl x:Name="AssetTrackerControl">
-                    <monitorControls:AssetTrackerControl.Style>
-                        <Style TargetType="UserControl">
-                            <Setter Property="Visibility" Value="Collapsed"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsChecked, ElementName=TabAssetTracker}" Value="True">
-                                    <Setter Property="Visibility" Value="Visible"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </monitorControls:AssetTrackerControl.Style>
-                </monitorControls:AssetTrackerControl>
-
-                <monitorControls:ManageVersionsControl x:Name="ManageVersionsControl">
-                    <monitorControls:ManageVersionsControl.Style>
-                        <Style TargetType="UserControl">
-                            <Setter Property="Visibility" Value="Collapsed"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsChecked, ElementName=TabVersions}" Value="True">
-                                    <Setter Property="Visibility" Value="Visible"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </monitorControls:ManageVersionsControl.Style>
-                </monitorControls:ManageVersionsControl>
-
-                <monitorControls:BackupsControl x:Name="BackupsControl">
-                    <monitorControls:BackupsControl.Style>
-                        <Style TargetType="UserControl">
-                            <Setter Property="Visibility" Value="Collapsed"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsChecked, ElementName=TabBackups}" Value="True">
-                                    <Setter Property="Visibility" Value="Visible"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </monitorControls:BackupsControl.Style>
-                </monitorControls:BackupsControl>
-
-                <monitorControls:ApiControl x:Name="ApiControl">
-                    <monitorControls:ApiControl.Style>
-                        <Style TargetType="UserControl">
-                            <Setter Property="Visibility" Value="Collapsed"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsChecked, ElementName=TabApi}" Value="True">
-                                    <Setter Property="Visibility" Value="Visible"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </monitorControls:ApiControl.Style>
-                </monitorControls:ApiControl>
-            </Grid>
+            <ContentControl x:Name="MonitorContentArea"
+                            Margin="28,4,28,32"
+                            HorizontalContentAlignment="Stretch"
+                            VerticalContentAlignment="Stretch"/>
         </ScrollViewer>
     </Grid>
 </UserControl>

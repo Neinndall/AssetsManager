@@ -118,11 +118,11 @@ namespace AssetsManager.Services.Explorer.Tree
                 // BIN-based parsing (Champions, Maps)
                 if (wpkData != null)
                 {
-                    audioTree = _audioBankService.ParseAudioBank(wpkData, audioBnkFileData, eventsData, linkedBank.BinData, linkedBank.BaseName, linkedBank.BinType);
+                    audioTree = _audioBankService.ParseAudioBank(wpkData, audioBnkFileData, eventsData, linkedBank.BinData, linkedBank.BaseName);
                 }
                 else
                 {
-                    audioTree = _audioBankService.ParseSfxAudioBank(audioBnkFileData, eventsData, linkedBank.BinData, linkedBank.BaseName, linkedBank.BinType);
+                    audioTree = _audioBankService.ParseSfxAudioBank(audioBnkFileData, eventsData, linkedBank.BinData, linkedBank.BaseName);
                 }
             }
             else
@@ -229,11 +229,6 @@ namespace AssetsManager.Services.Explorer.Tree
                 AudioSource = soundNode.Source,
                 Parent = parentNode
             };
-        }
-
-        public async Task EnsureAllChildrenLoadedAsync(FileSystemNodeModel node, string currentRootPath, CancellationToken cancellationToken = default, Action<string> onScanningProgress = null, Action<string> onMountingProgress = null)
-        {
-            await _wadNodeLoaderService.EnsureAllChildrenLoadedAsync(node, currentRootPath, cancellationToken, onScanningProgress, onMountingProgress);
         }
 
         private bool PruneEmptyDirectories(FileSystemNodeModel node)

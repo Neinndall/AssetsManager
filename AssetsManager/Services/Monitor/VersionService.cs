@@ -20,20 +20,19 @@ namespace AssetsManager.Services.Monitor
     {
         public event Action<string> VersionDownloadStarted;
         public event Action<string, int, int, string> VersionDownloadProgressChanged;
-        public event Action<string, bool, string> VersionDownloadCompleted;
-        public event Action VerificationCompleted;
+        public event Func<string, bool, string, Task> VersionDownloadCompleted;
 
         private readonly LogService _logService;
         private readonly HttpClient _httpClient;
         private readonly DirectoriesCreator _directoriesCreator;
-        
+
         private readonly RmanService _rmanService;
         private readonly ManifestDownloader _manifestDownloader;
         private readonly RmanApiService _riotApiService;
 
         public VersionService(
-            LogService logService, 
-            HttpClient httpClient, 
+            LogService logService,
+            HttpClient httpClient,
             DirectoriesCreator directoriesCreator,
             RmanService rmanService,
             ManifestDownloader manifestDownloader,
@@ -42,13 +41,12 @@ namespace AssetsManager.Services.Monitor
             _logService = logService;
             _httpClient = httpClient;
             _directoriesCreator = directoriesCreator;
-            
+
             _rmanService = rmanService;
             _manifestDownloader = manifestDownloader;
             _riotApiService = riotApiService;
 
             _manifestDownloader.ProgressChanged += OnManifestProgressChanged;
-            _manifestDownloader.VerificationCompleted += () => VerificationCompleted?.Invoke();
         }
 
         private void OnManifestProgressChanged(string taskName, int current, int total, string fileName)
@@ -56,13 +54,20 @@ namespace AssetsManager.Services.Monitor
             VersionDownloadProgressChanged?.Invoke(taskName, current, total, fileName);
         }
 
-        public async Task FetchAllVersionsAsync()
+        public Task FetchAllVersionsAsync(CancellationToken cancellationToken = default)
+        {
+            return FetchAllVersionsAsync(null, cancellationToken);
+        }
+
+        public async Task FetchAllVersionsAsync(
+            DateTime? manifestDate,
+            CancellationToken cancellationToken = default)
         {
             _logService.Log("Starting get versions from league client and game client...");
 
             _directoriesCreator.CreateDirectory(_directoriesCreator.VersionsPath);
 
-            var riotVersions = await _riotApiService.FetchVersionsAsync();
+            var riotVersions = await _riotApiService.FetchVersionsAsync(manifestDate, cancellationToken);
 
             if (!riotVersions.Any())
             {
@@ -72,23 +77,26 @@ namespace AssetsManager.Services.Monitor
 
             foreach (var v in riotVersions.Where(x => x.Product == "Game Client"))
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var path = Path.Combine(_directoriesCreator.VersionsPath, "PBE1", "windows", v.Category);
                 _directoriesCreator.CreateDirectory(path);
                 var filePath = Path.Combine(path, $"{v.Version}.txt");
-                if (!File.Exists(filePath)) await File.WriteAllTextAsync(filePath, v.ManifestUrl);
+                if (!File.Exists(filePath)) await File.WriteAllTextAsync(filePath, v.ManifestUrl, cancellationToken);
             }
 
             var pluginConfigs = riotVersions.Where(x => x.Product == "League Client").Select(x => x.ManifestUrl).ToList();
-            var versionInfo = await DownloadAndExtractVersionAsync(pluginConfigs);
+            var versionInfo = await DownloadAndExtractVersionAsync(pluginConfigs, cancellationToken);
 
-            await SaveClientVersionsAsync(versionInfo);
+            await SaveClientVersionsAsync(versionInfo, cancellationToken);
 
             _logService.LogSuccess("Version fetch process completed successfully.");
-            
-            VersionDownloadCompleted?.Invoke("Fetching Versions", true, "Success");
+
+            await NotifyVersionDownloadCompletedAsync("Fetching Versions", true, "Success");
         }
 
-        private async Task<List<(string region, string os, string version, string url)>> DownloadAndExtractVersionAsync(List<string> manifestUrls)
+        private async Task<List<(string region, string os, string version, string url)>> DownloadAndExtractVersionAsync(
+            List<string> manifestUrls,
+            CancellationToken cancellationToken)
         {
             var versions = new List<(string region, string os, string version, string url)>();
             string tempDir = Path.Combine(_directoriesCreator.AppDirectory, "TempVersions");
@@ -97,13 +105,20 @@ namespace AssetsManager.Services.Monitor
             {
                 try
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true);
                     _directoriesCreator.CreateDirectory(tempDir);
 
-                    var manifestBytes = await _httpClient.GetByteArrayAsync(url);
-                    var manifest = _rmanService.Parse(manifestBytes);
+                    var manifestBytes = await _httpClient.GetByteArrayAsync(url, cancellationToken);
+                    var manifest = await Task.Run(
+                        () => _rmanService.Parse(manifestBytes, cancellationToken),
+                        cancellationToken);
 
-                    await _manifestDownloader.DownloadManifestAsync(manifest, tempDir, "LeagueClient.exe");
+                    await _manifestDownloader.DownloadManifestAsync(
+                        manifest,
+                        tempDir,
+                        "LeagueClient.exe",
+                        cancellationToken: cancellationToken);
 
                     string exePath = Path.Combine(tempDir, "LeagueClient.exe");
                     if (File.Exists(exePath))
@@ -111,6 +126,10 @@ namespace AssetsManager.Services.Monitor
                         var version = FileVersionInfo.GetVersionInfo(exePath).FileVersion;
                         if (version != null) versions.Add(("PBE1", "windows", version, url));
                     }
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
                 }
                 catch (Exception ex)
                 {
@@ -125,15 +144,18 @@ namespace AssetsManager.Services.Monitor
             return versions;
         }
 
-        private async Task SaveClientVersionsAsync(List<(string region, string os, string version, string url)> versions)
+        private async Task SaveClientVersionsAsync(
+            List<(string region, string os, string version, string url)> versions,
+            CancellationToken cancellationToken)
         {
             _directoriesCreator.CreateDirectory(_directoriesCreator.VersionsPath);
             foreach (var (region, os, version, url) in versions)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var path = Path.Combine(_directoriesCreator.VersionsPath, region, os, "league-client");
                 _directoriesCreator.CreateDirectory(path);
                 var filePath = Path.Combine(path, $"{version}.txt");
-                if (!File.Exists(filePath)) await File.WriteAllTextAsync(filePath, url);
+                if (!File.Exists(filePath)) await File.WriteAllTextAsync(filePath, url, cancellationToken);
             }
         }
 
@@ -154,11 +176,13 @@ namespace AssetsManager.Services.Monitor
             {
                 // Instant notification to UI: This triggers "Verifying Files..." in ProgressUIManager
                 VersionDownloadStarted?.Invoke(taskName);
-                
+
                 _logService.Log($"Verifying/Updating {taskName}...");
 
                 var manifestBytes = await _httpClient.GetByteArrayAsync(manifestUrl, cancellationToken);
-                var manifest = _rmanService.Parse(manifestBytes);
+                var manifest = await Task.Run(
+                    () => _rmanService.Parse(manifestBytes, cancellationToken),
+                    cancellationToken);
 
                 int updatedCount = await _manifestDownloader.DownloadManifestAsync(manifest, targetDirectory, null, locales, cancellationToken);
 
@@ -170,45 +194,54 @@ namespace AssetsManager.Services.Monitor
                 {
                     _logService.Log("No updates required for this manifest.");
                 }
-                VersionDownloadCompleted?.Invoke(taskName, true, "Finished");
+                await NotifyVersionDownloadCompletedAsync(taskName, true, "Finished");
             }
             catch (OperationCanceledException)
             {
                 // Note: Granular logging is handled inside ManifestDownloader for both Verification and Updating phases.
-                VersionDownloadCompleted?.Invoke(taskName, false, "Cancelled");
+                await NotifyVersionDownloadCompletedAsync(taskName, false, "Cancelled");
             }
             catch (Exception ex)
             {
                 _logService.LogError(ex, $"Error during native {taskName} update");
-                VersionDownloadCompleted?.Invoke(taskName, false, ex.Message);
+                await NotifyVersionDownloadCompletedAsync(taskName, false, ex.Message);
             }
+        }
+
+        private async Task NotifyVersionDownloadCompletedAsync(string taskName, bool success, string message)
+        {
+            if (VersionDownloadCompleted is not null)
+                await VersionDownloadCompleted(taskName, success, message);
         }
 
         public async Task<List<VersionFileInfo>> GetVersionFilesAsync()
         {
-            var versionFiles = new List<VersionFileInfo>();
             string versionsRootPath = _directoriesCreator.VersionsPath;
-            if (!Directory.Exists(versionsRootPath)) return versionFiles;
+            if (!Directory.Exists(versionsRootPath)) return new List<VersionFileInfo>();
 
-            try
+            return await Task.Run(() =>
             {
-                foreach (string directory in Directory.EnumerateDirectories(versionsRootPath, "*", SearchOption.AllDirectories))
+                var versionFiles = new List<VersionFileInfo>();
+                try
                 {
-                    string category = new DirectoryInfo(directory).Name;
-                    foreach (string filePath in Directory.EnumerateFiles(directory, "*.txt"))
+                    foreach (string directory in Directory.EnumerateDirectories(versionsRootPath, "*", SearchOption.AllDirectories))
                     {
-                        versionFiles.Add(new VersionFileInfo
+                        string category = new DirectoryInfo(directory).Name;
+                        foreach (string filePath in Directory.EnumerateFiles(directory, "*.txt"))
                         {
-                            FileName = Path.GetFileName(filePath),
-                            Content = await File.ReadAllTextAsync(filePath),
-                            Category = category,
-                            Date = File.GetCreationTime(filePath).ToString("dd/MM/yyyy HH:mm:ss")
-                        });
+                            versionFiles.Add(new VersionFileInfo
+                            {
+                                FileName = Path.GetFileName(filePath),
+                                Content = File.ReadAllText(filePath),
+                                Category = category,
+                                Date = File.GetCreationTime(filePath).ToString("dd/MM/yyyy HH:mm:ss")
+                            });
+                        }
                     }
                 }
-            }
-            catch (Exception ex) { _logService.LogError(ex, "Error loading version files"); }
-            return versionFiles;
+                catch (Exception ex) { _logService.LogError(ex, "Error loading version files"); }
+                return versionFiles;
+            });
         }
 
         public bool DeleteVersionFiles(IEnumerable<VersionFileInfo> versionFiles)
@@ -246,7 +279,7 @@ namespace AssetsManager.Services.Monitor
             {
                 // Focus on code-metadata.json as requested
                 string metadataName = "code-metadata.json";
-                
+
                 // 1. Check standard location (provided root is the client root containing Game subdirectory)
                 string metadataPath = Path.Combine(rootDirectory, "Game", metadataName);
                 if (File.Exists(metadataPath)) return await ExtractVersionFromFile(metadataPath);

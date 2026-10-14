@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <AssemblyName>AssetsManager.Shaders</AssemblyName>
+    <RootNamespace>AssetsManager.Shaders</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Vortice.SpirvCross" Version="1.5.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="runtimes\win-x64\native\dxbc_spv_lol.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
+</Project>

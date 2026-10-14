@@ -1,0 +1,205 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Numerics;
+using System.Windows.Media.Media3D;
+using LeagueToolkit.Core.Animation;
+using LeagueToolkit.Core.Memory;
+using LeagueToolkit.Core.Mesh;
+
+namespace AssetsManager.Views.Models.Viewer
+{
+    /// <summary>
+    /// Immutable per-part skinning attributes prepared once for the OpenGL vertex stage.
+    /// </summary>
+    internal sealed class GpuSkinningData
+    {
+        internal const int MaxBones = 512;
+
+        internal sealed class PartData
+        {
+            internal PartData(float[] boneIndices, byte[] influenceIndices, float[] boneWeights, Vector4[] tangents, Vector4[] colors = null)
+            {
+                BoneIndices = boneIndices;
+                InfluenceIndices = influenceIndices;
+                BoneWeights = boneWeights;
+                Tangents = tangents;
+                Colors = colors;
+            }
+
+            internal float[] BoneIndices { get; }
+            internal byte[] InfluenceIndices { get; }
+            internal float[] BoneWeights { get; }
+            internal Vector4[] Tangents { get; }
+            /// <summary>The SKN's authored vertex colours (0..1 RGBA), which game shaders read as COLOR; null without them.</summary>
+            internal Vector4[] Colors { get; }
+            internal int VertexCount => BoneIndices.Length / 4;
+        }
+
+        private readonly Dictionary<ModelPart, PartData> _parts;
+
+        private GpuSkinningData(Dictionary<ModelPart, PartData> parts)
+        {
+            _parts = parts;
+        }
+
+        internal bool TryGetPart(ModelPart part, out PartData data) =>
+            _parts.TryGetValue(part, out data);
+
+        internal static GpuSkinningData TryCreate(
+            RigResource skeleton,
+            SkinnedMesh skin,
+            IList<ModelPart> modelParts,
+            out string failureReason)
+        {
+            failureReason = null;
+            if (skeleton == null || skin == null || modelParts == null ||
+                skeleton.Joints.Count == 0 || skeleton.Joints.Count > MaxBones ||
+                skeleton.Influences.Count == 0)
+            {
+                return Fail(out failureReason, "Skeleton or skin data is missing or outside GPU limits.");
+            }
+
+            try
+            {
+                var blendIndices = skin.VerticesView.TryGetAccessor(
+                        VertexElement.BLEND_INDEX.Name,
+                        out VertexElementAccessor blendIndexAccessor)
+                    ? blendIndexAccessor.AsXyzwU8Array().ToArray()
+                    : null;
+                var blendWeights = skin.VerticesView.TryGetAccessor(
+                        VertexElement.BLEND_WEIGHT.Name,
+                        out VertexElementAccessor blendWeightAccessor)
+                    ? blendWeightAccessor.AsVector4Array().ToArray()
+                    : null;
+                Vector4[] sourceTangents = skin.VerticesView.TryGetAccessor(
+                        VertexElement.TANGENT.Name,
+                        out VertexElementAccessor tangentAccessor)
+                    ? tangentAccessor.AsVector4Array().ToArray()
+                    : null;
+                // B8G8R8A8 vertex colours reach the shader as RGBA, as D3D's COLOR semantic does.
+                Vector4[] sourceColors = skin.VerticesView.TryGetAccessor(
+                        ElementName.PrimaryColor,
+                        out VertexElementAccessor colorAccessor)
+                    ? colorAccessor.AsBgraU8Array().ToArray().Select(color => new Vector4(color.r, color.g, color.b, color.a) / 255f).ToArray()
+                    : null;
+                int vertexCount = skin.VerticesView.VertexCount;
+                if ((blendIndices != null && blendIndices.Length != vertexCount) ||
+                    (blendWeights != null && blendWeights.Length != vertexCount) ||
+                    (sourceTangents != null && sourceTangents.Length != vertexCount) ||
+                    (sourceColors != null && sourceColors.Length != vertexCount))
+                {
+                    return Fail(out failureReason, "Blend index or weight data is mismatched.");
+                }
+                if (blendIndices == null || blendWeights == null)
+                {
+                    blendIndices = null;
+                    blendWeights = null;
+                }
+
+                var parts = new Dictionary<ModelPart, PartData>(modelParts.Count);
+                foreach (ModelPart part in modelParts)
+                {
+                    int[] sourceVertexIndices = part?.SourceVertexIndices;
+                    if (part == null || sourceVertexIndices == null || sourceVertexIndices.Length == 0)
+                        return Fail(out failureReason, $"Submesh '{part?.Name ?? "Unknown"}' has no source vertex mapping.");
+                    if (part.Geometry?.Geometry is not MeshGeometry3D mesh ||
+                        mesh.Positions == null ||
+                        sourceVertexIndices.Length != mesh.Positions.Count)
+                    {
+                        return Fail(out failureReason, $"Submesh '{part.Name}' geometry does not match its source vertex mapping.");
+                    }
+
+                    var directBoneIndices = new float[sourceVertexIndices.Length * 4];
+                    var influenceIndices = new byte[sourceVertexIndices.Length * 4];
+                    var weights = new float[sourceVertexIndices.Length * 4];
+                    Vector4[] tangents = sourceTangents == null
+                        ? null
+                        : new Vector4[sourceVertexIndices.Length];
+                    Vector4[] colors = sourceColors == null
+                        ? null
+                        : new Vector4[sourceVertexIndices.Length];
+
+                    for (int localVertex = 0; localVertex < sourceVertexIndices.Length; localVertex++)
+                    {
+                        int sourceVertex = sourceVertexIndices[localVertex];
+                        if ((uint)sourceVertex >= (uint)vertexCount)
+                            return Fail(out failureReason, $"Submesh '{part.Name}' references an out-of-range source vertex.");
+
+                        var sourceIndices = blendIndices == null
+                            ? default
+                            : blendIndices[sourceVertex];
+                        var sourceWeights = blendWeights == null
+                            ? new System.Numerics.Vector4(1f, 0f, 0f, 0f)
+                            : blendWeights[sourceVertex];
+
+                        int destination = localVertex * 4;
+
+                        influenceIndices[destination] = sourceIndices.x < skeleton.Influences.Count ? sourceIndices.x : (byte)0;
+                        influenceIndices[destination + 1] = sourceIndices.y < skeleton.Influences.Count ? sourceIndices.y : (byte)0;
+                        influenceIndices[destination + 2] = sourceIndices.z < skeleton.Influences.Count ? sourceIndices.z : (byte)0;
+                        influenceIndices[destination + 3] = sourceIndices.w < skeleton.Influences.Count ? sourceIndices.w : (byte)0;
+
+                        if (!TryResolveJoint(sourceIndices.x, sourceWeights.X, skeleton, out directBoneIndices[destination]) ||
+                            !TryResolveJoint(sourceIndices.y, sourceWeights.Y, skeleton, out directBoneIndices[destination + 1]) ||
+                            !TryResolveJoint(sourceIndices.z, sourceWeights.Z, skeleton, out directBoneIndices[destination + 2]) ||
+                            !TryResolveJoint(sourceIndices.w, sourceWeights.W, skeleton, out directBoneIndices[destination + 3]))
+                        {
+                            return Fail(out failureReason, $"Submesh '{part.Name}' contains an invalid bone influence.");
+                        }
+
+                        weights[destination] = sourceWeights.X;
+                        weights[destination + 1] = sourceWeights.Y;
+                        weights[destination + 2] = sourceWeights.Z;
+                        weights[destination + 3] = sourceWeights.W;
+                        if (tangents != null)
+                            tangents[localVertex] = sourceTangents[sourceVertex];
+                        if (colors != null)
+                            colors[localVertex] = sourceColors[sourceVertex];
+                    }
+
+                    parts[part] = new PartData(directBoneIndices, influenceIndices, weights, tangents, colors);
+                }
+
+                return new GpuSkinningData(parts);
+            }
+            catch (Exception ex)
+            {
+                failureReason = $"Could not read skin data: {ex.Message}";
+                return null;
+            }
+        }
+
+        private static GpuSkinningData Fail(out string failureReason, string reason)
+        {
+            failureReason = reason;
+            return null;
+        }
+
+        private static bool TryResolveJoint(
+            byte influenceIndex,
+            float weight,
+            RigResource skeleton,
+            out float jointIndex)
+        {
+            if (weight == 0f)
+            {
+                jointIndex = 0;
+                return true;
+            }
+
+            if (influenceIndex >= skeleton.Influences.Count)
+                influenceIndex = 0;
+
+            short resolvedJoint = skeleton.Influences[influenceIndex];
+            if (resolvedJoint < 0 || resolvedJoint >= skeleton.Joints.Count || resolvedJoint >= MaxBones)
+            {
+                jointIndex = 0;
+                return false;
+            }
+
+            jointIndex = resolvedJoint;
+            return true;
+        }
+    }
+}

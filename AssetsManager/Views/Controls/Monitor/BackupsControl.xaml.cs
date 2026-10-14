@@ -1,11 +1,13 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.ComponentModel;
+using System.Diagnostics;
+using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 using Microsoft.Extensions.DependencyInjection;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Monitor;
@@ -20,7 +22,6 @@ namespace AssetsManager.Views.Controls.Monitor
     {
         // Public properties for dependency injection from the container
         public BackupManager BackupManager { get; set; }
-        public VersionService VersionService { get; set; }
         public LogService LogService { get; set; }
         public AppSettings AppSettings { get; set; }
         public CustomMessageBoxService CustomMessageBoxService { get; set; }
@@ -29,6 +30,8 @@ namespace AssetsManager.Views.Controls.Monitor
 
         // The state model for this view (Container Pattern: Owner)
         private readonly BackupsControlModel _viewModel;
+        private readonly List<BackupModel> _loadedBackups = new();
+        private CancellationTokenSource _loadCancellation;
         public BackupsControlModel ViewModel => _viewModel;
 
         public BackupsControl()
@@ -49,7 +52,15 @@ namespace AssetsManager.Views.Controls.Monitor
                 // Defensive pattern to avoid duplicate subscriptions on reload
                 AppSettings.ConfigurationSaved -= OnConfigurationSaved;
                 AppSettings.ConfigurationSaved += OnConfigurationSaved;
+                ApplyPreferredClientFilter();
             }
+
+            if (BackupManager != null)
+            {
+                BackupManager.BackupsChanged -= OnBackupsChanged;
+                BackupManager.BackupsChanged += OnBackupsChanged;
+            }
+
             try
             {
                 await LoadBackupsAsync();
@@ -67,45 +78,59 @@ namespace AssetsManager.Views.Controls.Monitor
                 AppSettings.ConfigurationSaved -= OnConfigurationSaved;
             }
 
-            // Clear heavy data from memory when not in use
-            if (ViewModel != null)
+            if (BackupManager != null)
             {
-                ViewModel.AllBackups.Clear();
+                BackupManager.BackupsChanged -= OnBackupsChanged;
+            }
+
+            _loadCancellation?.Cancel();
+            _loadCancellation?.Dispose();
+            _loadCancellation = null;
+        }
+
+        private async void OnBackupsChanged()
+        {
+            try
+            {
+                Task loadTask = await Dispatcher.InvokeAsync(() =>
+                    IsLoaded && !ViewModel.IsBusy ? LoadBackupsAsync() : Task.CompletedTask);
+                await loadTask;
+            }
+            catch (Exception ex)
+            {
+                LogService.LogError(ex, "Error refreshing the backup inventory.");
             }
         }
 
         private async void OnConfigurationSaved(object sender, EventArgs e)
         {
-            await Dispatcher.InvokeAsync(async () => await LoadBackupsAsync());
+            Task loadTask = await Dispatcher.InvokeAsync(() =>
+            {
+                ApplyPreferredClientFilter();
+                return LoadBackupsAsync();
+            });
+            await loadTask;
         }
 
         private async Task LoadBackupsAsync()
         {
-            if (BackupManager == null) return;
+            if (BackupManager == null || ViewModel.IsBusy) return;
 
             try
             {
-                var backups = await BackupManager.GetBackupsAsync();
-                
-                // Filter actual snapshots for metrics
-                var snapshots = backups.Where(b => !b.IsMainClient).ToList();
-                
-                // Calculate metrics (only for actual backups)
-                long totalSizeBytes = snapshots.Sum(b => b.Size);
-                int count = snapshots.Count;
-                string activeEnv = AppSettings.PreferredClient == PreferredClient.PBE ? "PBE" : "LIVE";
+                _loadCancellation?.Cancel();
+                _loadCancellation?.Dispose();
+                _loadCancellation = new CancellationTokenSource();
+                CancellationToken token = _loadCancellation.Token;
+                var backups = await BackupManager.GetBackupsAsync(token);
+                token.ThrowIfCancellationRequested();
+                if (!IsLoaded || ViewModel.IsBusy) return;
 
-                ViewModel.AllBackups.Clear();
-                foreach (var backup in backups)
-                {
-                    ViewModel.AllBackups.Add(backup);
-                }
-
-                // Update Dashboard Properties
-                ViewModel.TotalBackupsCount = count;
-                ViewModel.TotalStorageSize = FormatUtils.FormatSize(totalSizeBytes);
-                ViewModel.ActiveClientEnvironment = activeEnv;
+                _loadedBackups.Clear();
+                _loadedBackups.AddRange(backups);
+                Dispatcher.Invoke(ApplyFilterAndSort);
             }
+            catch (OperationCanceledException) { }
             catch (Exception ex)
             {
                 LogService.LogError(ex, "Error loading backups.");
@@ -114,124 +139,133 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private async void DeleteSelectedBackups_Click(object sender, RoutedEventArgs e)
         {
-            var selectedBackups = ViewModel.AllBackups.Where(b => b.IsSelected).ToList();
+            if (ViewModel.IsBusy) return;
+            var selectedBackups = ViewModel.AllBackups.Where(b => b.IsSelected && b.CanModify).ToList();
 
-            if (selectedBackups == null || !selectedBackups.Any())
+            if (!selectedBackups.Any())
             {
-                CustomMessageBoxService.ShowWarning("Warning", "No backups selected to delete.", Window.GetWindow(this));
+                CustomMessageBoxService.ShowWarning("Protected Selection", "Select one or more BACKUP snapshots. MAIN installations cannot be deleted.", Window.GetWindow(this));
                 return;
             }
 
             var result = CustomMessageBoxService.ShowYesNo("Delete Backup", $"Are you sure you want to delete the selected backup? This action is irreversible.", Window.GetWindow(this));
-            if (result == true)
+            if (result != true) return;
+            BeginOperation();
+            try
             {
                 int deletedCount = 0;
                 foreach (var backup in selectedBackups)
-                {
-                    if (BackupManager.DeleteBackup(backup.Path))
-                    {
-                        ViewModel.AllBackups.Remove(backup);
-                        deletedCount++;
-                    }
-                }
-
-                if(deletedCount > 0)
-                {
-                    await LoadBackupsAsync();
+                    if (BackupManager.DeleteBackup(backup.Path)) deletedCount++;
+                if (deletedCount > 0)
                     CustomMessageBoxService.ShowInfo("Success", $"Successfully deleted {deletedCount} backup(s).", Window.GetWindow(this));
-                }
                 else
-                {
                     CustomMessageBoxService.ShowError("Error", "Could not delete the selected backups.", Window.GetWindow(this));
-                }
             }
+            finally { await FinishOperationAsync(); }
+        }
+
+        private void BeginOperation()
+        {
+            ViewModel.IsBusy = true;
+            // Keep intermediate copy/delete notifications out of the visible inventory.
+            _loadCancellation?.Cancel();
+        }
+
+        private async Task FinishOperationAsync()
+        {
+            ViewModel.IsBusy = false;
+            if (IsLoaded) await LoadBackupsAsync();
+        }
+
+        private void FilterOrSort_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (IsLoaded) ApplyFilterAndSort();
+        }
+
+        private void ApplyFilterAndSort()
+        {
+            string filter = (EnvironmentFilter?.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "ALL";
+            string sort = (SortSelector?.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "NEWEST";
+            PreferredClient? client = filter switch
+            {
+                "PBE" => PreferredClient.PBE,
+                "LIVE" => PreferredClient.LIVE,
+                _ => null
+            };
+            IEnumerable<BackupModel> query = BackupManager.FilterByClient(_loadedBackups, client);
+            query = sort switch
+            {
+                "OLDEST" => query.OrderBy(backup => backup.CreationDate),
+                "LARGEST" => query.OrderByDescending(backup => backup.Size),
+                "SMALLEST" => query.OrderBy(backup => backup.Size),
+                _ => query.OrderByDescending(backup => backup.CreationDate)
+            };
+            List<BackupModel> filteredBackups = query.ToList();
+            ViewModel.AllBackups.ReplaceRange(filteredBackups);
+
+            List<BackupModel> snapshots = filteredBackups.Where(backup => !backup.IsMainClient).ToList();
+            ViewModel.TotalBackupsCount = snapshots.Count;
+            ViewModel.TotalStorageSize = FormatUtils.FormatSize(snapshots.Sum(backup => backup.Size));
+            ViewModel.ActiveClientEnvironment = filter;
+        }
+
+        private void ApplyPreferredClientFilter()
+        {
+            string preferred = AppSettings.PreferredClient == PreferredClient.PBE ? "PBE" : "LIVE";
+            EnvironmentFilter.SelectedItem = EnvironmentFilter.Items
+                .OfType<ComboBoxItem>()
+                .FirstOrDefault(item => string.Equals(item.Tag?.ToString(), preferred, StringComparison.Ordinal));
         }
 
         private async void createLolBackupButton_Click(object sender, RoutedEventArgs e)
         {
-            // 1. Determine Source and Destination
+            BackupModel selectedBackup = ViewModel.AllBackups.FirstOrDefault(backup => backup.IsSelected);
+            if (selectedBackup == null || selectedBackup.IsMainClient)
+            {
+                await RunBackupOperationAsync(selectedBackup, BackupAction.None);
+                return;
+            }
+
+            var actionDialog = ServiceProvider.GetRequiredService<BackupActionDialog>();
+            actionDialog.Owner = Window.GetWindow(this);
+            if (actionDialog.ShowDialog() == true)
+                await RunBackupOperationAsync(selectedBackup, actionDialog.SelectedAction);
+        }
+
+        private async Task RunBackupOperationAsync(BackupModel selectedBackup, BackupAction action)
+        {
+            if (ViewModel.IsBusy) return;
             string sourcePath;
             string destinationPath;
             string oldBackupPathToDelete = null;
-            var selectedBackup = ViewModel.AllBackups.FirstOrDefault(b => b.IsSelected);
             string clientName;
             bool isCloning = false;
 
-            if (selectedBackup != null)
+            if (action == BackupAction.Overwrite && selectedBackup?.CanModify == true)
             {
-                // Show choice dialog: Overwrite or Clone?
-                var actionDialog = ServiceProvider.GetRequiredService<BackupActionDialog>();
-                actionDialog.Owner = Window.GetWindow(this);
-
-                if (actionDialog.ShowDialog() != true) return;
-
-                if (actionDialog.SelectedAction == BackupAction.Overwrite)
-                {
-                    // OVERWRITE MODE: Use active client as source, NEW timestamped destination
-                    bool isPbe = selectedBackup.DisplayName.Contains("PBE");
-                    sourcePath = isPbe ? AppSettings.LolPbeDirectory : AppSettings.LolLiveDirectory;
-                    oldBackupPathToDelete = selectedBackup.Path;
-                    clientName = isPbe ? "PBE" : "LIVE";
-
-                    // Confirm overwrite
-                    var confirm = CustomMessageBoxService.ShowYesNo("Overwrite Backup",
-                        $"This will update the backup with the current {clientName} data. The old backup folder will be replaced. Are you sure?",
-                        Window.GetWindow(this));
-                    if (confirm != true) return;
-
-                    // Generate NEW destination path for overwrite (Safe-Refresh)
-                    string baseName = oldBackupPathToDelete;
-                    if (baseName.Contains("_old_"))
-                    {
-                        baseName = baseName.Substring(0, baseName.LastIndexOf("_old_"));
-                    }
-                    string dateSuffix = DateTime.Now.ToString("yyyyMMdd_HHmm");
-                    destinationPath = $"{baseName}_old_{dateSuffix}";
-
-                    // Ensure they are different to prevent premature deletion by BackupManager
-                    if (destinationPath == oldBackupPathToDelete)
-                    {
-                        destinationPath += "_updated";
-                    }
-                }
-                else if (actionDialog.SelectedAction == BackupAction.Clone)
-                {
-                    // CLONE MODE: Use selected backup as source, create new destination
-                    sourcePath = selectedBackup.Path;
-                    isCloning = true;
-
-                    string baseName = sourcePath;
-                    if (baseName.Contains("_old_"))
-                    {
-                        baseName = baseName.Substring(0, baseName.LastIndexOf("_old_"));
-                    }
-
-                    string dateSuffix = DateTime.Now.ToString("yyyyMMdd_HHmm");
-                    destinationPath = $"{baseName}_old_{dateSuffix}";
-                    clientName = "BACKUP";
-                }
-                else return;
+                sourcePath = selectedBackup.IsPbe ? AppSettings.LolPbeDirectory : AppSettings.LolLiveDirectory;
+                oldBackupPathToDelete = selectedBackup.Path;
+                clientName = selectedBackup.IsPbe ? "PBE" : "LIVE";
+                destinationPath = CreateUniqueDestinationPath(GetBackupBasePath(selectedBackup.Path));
+            }
+            else if (action == BackupAction.Clone && selectedBackup?.CanModify == true)
+            {
+                sourcePath = selectedBackup.Path;
+                isCloning = true;
+                clientName = selectedBackup.IsPbe ? "PBE" : "LIVE";
+                destinationPath = CreateUniqueDestinationPath(GetBackupBasePath(selectedBackup.Path));
             }
             else
             {
-                // NEW BACKUP MODE
-                sourcePath = AppSettings.PreferredClient == PreferredClient.LIVE 
-                    ? AppSettings.LolLiveDirectory 
-                    : AppSettings.LolPbeDirectory;
-                clientName = AppSettings.PreferredClient == PreferredClient.LIVE ? "LIVE" : "PBE";
-
-                string cleanSource = sourcePath.TrimEnd(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar);
-                string baseName = cleanSource;
-                if (baseName.EndsWith("_old", StringComparison.OrdinalIgnoreCase))
-                {
-                    baseName = baseName.Substring(0, baseName.Length - 4);
-                }
-                
-                string dateSuffix = DateTime.Now.ToString("yyyyMMdd_HHmm");
-                destinationPath = $"{baseName}_old_{dateSuffix}";
+                bool usePbe = selectedBackup?.IsMainClient == true
+                    ? selectedBackup.IsPbe
+                    : AppSettings.PreferredClient != PreferredClient.LIVE;
+                sourcePath = usePbe ? AppSettings.LolPbeDirectory : AppSettings.LolLiveDirectory;
+                clientName = usePbe ? "PBE" : "LIVE";
+                destinationPath = CreateUniqueDestinationPath(
+                    sourcePath?.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
             }
 
-            // 2. Validate Source
             if (string.IsNullOrEmpty(sourcePath))
             {
                 CustomMessageBoxService.ShowWarning("Warning", $"Source directory ({clientName}) is not configured. Please set it in Settings > Default Paths.", Window.GetWindow(this));
@@ -244,11 +278,25 @@ namespace AssetsManager.Views.Controls.Monitor
                 return;
             }
 
-            ViewModel.IsBusy = true;
+            BeginOperation();
             try
             {
                 var cancellationToken = TaskCancellationManager.PrepareNewOperation();
-                
+                BackupManager.BackupStorageEstimate estimate =
+                    await BackupManager.GetStorageEstimateAsync(sourcePath, destinationPath, cancellationToken);
+                string operation = action == BackupAction.Overwrite ? "Refresh" : isCloning ? "Clone" : "Create";
+                string spaceMessage =
+                    $"{operation} {clientName} snapshot?\n\n" +
+                    $"Required: {FormatUtils.FormatSize(estimate.TotalBytes)} ({estimate.FileCount:N0} files)\n" +
+                    $"Available: {FormatUtils.FormatSize(estimate.AvailableBytes)}";
+                if (estimate.TotalBytes > estimate.AvailableBytes)
+                {
+                    CustomMessageBoxService.ShowError("Insufficient Storage", spaceMessage, Window.GetWindow(this));
+                    return;
+                }
+                if (CustomMessageBoxService.ShowYesNo("Backup Storage", spaceMessage, Window.GetWindow(this)) != true)
+                    return;
+
                 if (isCloning)
                 {
                     await BackupManager.CloneBackupAsync(sourcePath, destinationPath, cancellationToken);
@@ -256,7 +304,7 @@ namespace AssetsManager.Views.Controls.Monitor
                 else
                 {
                     string logMsg = !string.IsNullOrEmpty(oldBackupPathToDelete) ? "Overwriting backup..." : "Creating backup...";
-                    await BackupManager.CreateLolPbeDirectoryBackupAsync(sourcePath, destinationPath, cancellationToken, logMsg);
+                    await BackupManager.CreateBackupAsync(sourcePath, destinationPath, cancellationToken, logMsg);
                 }
                 
                 if (!cancellationToken.IsCancellationRequested)
@@ -264,13 +312,13 @@ namespace AssetsManager.Views.Controls.Monitor
                     // SAFE-REFRESH: Delete old backup only after success
                     if (!string.IsNullOrEmpty(oldBackupPathToDelete) && destinationPath != oldBackupPathToDelete)
                     {
-                        BackupManager.DeleteBackup(oldBackupPathToDelete, false);
+                        if (!BackupManager.DeleteBackup(oldBackupPathToDelete, false))
+                            throw new IOException("The new snapshot was created, but the previous backup could not be removed.");
                     }
 
                     LogService.LogSuccess("Backup completed successfully.");
                     CustomMessageBoxService.ShowInfo("Backup", $"Operation completed successfully as:\n{System.IO.Path.GetFileName(destinationPath)}", Window.GetWindow(this));
                 }
-                await LoadBackupsAsync();
             }
             catch (OperationCanceledException)
             {
@@ -283,12 +331,40 @@ namespace AssetsManager.Views.Controls.Monitor
             }
             finally
             {
-                ViewModel.IsBusy = false;
+                await FinishOperationAsync();
             }
+        }
+
+        private void OpenBackupFolder_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as FrameworkElement)?.DataContext is not BackupModel backup || !Directory.Exists(backup.Path)) return;
+            Process.Start(new ProcessStartInfo { FileName = backup.Path, UseShellExecute = true });
+        }
+
+        private static string GetBackupBasePath(string path)
+        {
+            string basePath = path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            int marker = basePath.LastIndexOf("_old_", StringComparison.OrdinalIgnoreCase);
+            return marker > 0 ? basePath[..marker] : basePath;
+        }
+
+        private static string CreateUniqueDestinationPath(string basePath)
+        {
+            string candidate = $"{basePath}_old_{DateTime.Now:yyyyMMdd_HHmmss}";
+            string unique = candidate;
+            for (int suffix = 2; Directory.Exists(unique); suffix++)
+                unique = $"{candidate}_{suffix}";
+            return unique;
         }
 
         private void ListViewItem_PreviewMouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
         {
+            DependencyObject current = e.OriginalSource as DependencyObject;
+            while (current != null && !ReferenceEquals(current, sender))
+            {
+                if (current is Button) return;
+                current = VisualTreeHelper.GetParent(current);
+            }
             if (sender is ListViewItem item && item.IsSelected)
             {
                 item.IsSelected = false;

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -17,6 +18,7 @@ namespace AssetsManager.Views.Controls.Monitor
         public AppSettings AppSettings { get; set; }
         public CustomMessageBoxService CustomMessageBoxService { get; set; }
         public TaskCancellationManager TaskCancellationManager { get; set; }
+        public BackupManager BackupManager { get; set; }
         
         private ManageVersions _viewModel;
         public ManageVersions ViewModel => _viewModel;
@@ -25,6 +27,8 @@ namespace AssetsManager.Views.Controls.Monitor
         {
             InitializeComponent();
             this.Loaded += ManageVersionsControl_Loaded;
+            this.Unloaded += ManageVersionsControl_Unloaded;
+            this.IsVisibleChanged += ManageVersionsControl_IsVisibleChanged;
         }
 
         private async void ManageVersionsControl_Loaded(object sender, RoutedEventArgs e)
@@ -35,16 +39,67 @@ namespace AssetsManager.Views.Controls.Monitor
                 this.DataContext = _viewModel;
                 await _viewModel.LoadVersionFilesAsync();
             }
+
+            if (AppSettings != null)
+            {
+                AppSettings.ConfigurationSaved -= OnConfigurationSaved;
+                AppSettings.ConfigurationSaved += OnConfigurationSaved;
+            }
+
+            if (BackupManager != null)
+            {
+                BackupManager.BackupsChanged -= OnBackupsChanged;
+                BackupManager.BackupsChanged += OnBackupsChanged;
+            }
+
+            await RefreshTargetInstallationsAsync();
+        }
+
+        private void ManageVersionsControl_Unloaded(object sender, RoutedEventArgs e)
+        {
+            if (AppSettings != null)
+            {
+                AppSettings.ConfigurationSaved -= OnConfigurationSaved;
+            }
+
+            if (BackupManager != null)
+            {
+                BackupManager.BackupsChanged -= OnBackupsChanged;
+            }
+        }
+
+        private async void ManageVersionsControl_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
+        {
+            if (e.NewValue is true)
+            {
+                await RefreshTargetInstallationsAsync();
+            }
+        }
+
+        private async void OnBackupsChanged() => await RefreshTargetInstallationsAsync();
+
+        private async void OnConfigurationSaved(object sender, EventArgs e) => await RefreshTargetInstallationsAsync();
+
+        private async Task RefreshTargetInstallationsAsync()
+        {
+            if (_viewModel == null) return;
+            await Dispatcher.InvokeAsync(() => _viewModel.LoadTargetInstallationsAsync(BackupManager, AppSettings));
         }
 
         private async void FetchVersions_Click(object sender, RoutedEventArgs e)
         {
             if (VersionService != null && LogService != null)
             {
-                await VersionService.FetchAllVersionsAsync();
+                var knownFileNames = _viewModel != null
+                    ? new HashSet<string>(_viewModel.AllLeagueClientVersions.Concat(_viewModel.AllLoLGameClientVersions).Select(f => f.FileName))
+                    : new HashSet<string>();
+
+                DateTime? manifestDate = _viewModel?.SelectedManifestDate?.Date;
+                await VersionService.FetchAllVersionsAsync(manifestDate);
                 if (_viewModel != null)
                 {
                     await _viewModel.LoadVersionFilesAsync();
+                    _viewModel.MarkNewFiles(knownFileNames);
                 }
             }
             else
@@ -68,9 +123,10 @@ namespace AssetsManager.Views.Controls.Monitor
             }
             var selectedVersion = selectedVersions.Single();
 
-            if (string.IsNullOrEmpty(AppSettings.LolPbeDirectory))
+            var targetInstallation = _viewModel?.SelectedTargetInstallation;
+            if (targetInstallation == null || string.IsNullOrEmpty(targetInstallation.Path))
             {
-                CustomMessageBoxService.ShowError("Error", "League of Legends directory is not configured. Please set it in Settings > Default Paths.", Window.GetWindow(this));
+                CustomMessageBoxService.ShowError("Error", "No target installation selected or directory is invalid. Please configure it in Settings > Default Paths or select a valid target.", Window.GetWindow(this));
                 return;
             }
 
@@ -86,7 +142,7 @@ namespace AssetsManager.Views.Controls.Monitor
             }
 
             var cancellationToken = TaskCancellationManager.PrepareNewOperation();
-            await VersionService.DownloadPluginsAsync(selectedVersion.Content, AppSettings.LolPbeDirectory, locales, cancellationToken);
+            await VersionService.DownloadPluginsAsync(selectedVersion.Content, targetInstallation.Path, locales, cancellationToken);
         }
 
         private async void GetLoLGameClient_Click(object sender, RoutedEventArgs e)
@@ -104,11 +160,13 @@ namespace AssetsManager.Views.Controls.Monitor
             }
             var selectedVersion = selectedVersions.Single();
 
-            if (string.IsNullOrEmpty(AppSettings.LolPbeDirectory))
+            var targetInstallation = _viewModel?.SelectedTargetInstallation;
+            if (targetInstallation == null || string.IsNullOrEmpty(targetInstallation.Path))
             {
-                CustomMessageBoxService.ShowError("Error", "League of Legends directory is not configured. Please set it in Settings > Default Paths.", Window.GetWindow(this));
+                CustomMessageBoxService.ShowError("Error", "No target installation selected or directory is invalid. Please configure it in Settings > Default Paths or select a valid target.", Window.GetWindow(this));
                 return;
             }
+
             var locales = _viewModel.AvailableLocales
                 .Where(l => l.IsSelected)
                 .Select(l => l.Code)
@@ -121,7 +179,7 @@ namespace AssetsManager.Views.Controls.Monitor
             }
 
             var cancellationToken = TaskCancellationManager.PrepareNewOperation();
-            await VersionService.DownloadGameClientAsync(selectedVersion.Content, AppSettings.LolPbeDirectory, locales, cancellationToken);
+            await VersionService.DownloadGameClientAsync(selectedVersion.Content, targetInstallation.Path, locales, cancellationToken);
         }
 
         private void TabClient_Checked(object sender, RoutedEventArgs e)
@@ -148,32 +206,9 @@ namespace AssetsManager.Views.Controls.Monitor
             // Handle left-click for selection logic
             if (e.ChangedButton == System.Windows.Input.MouseButton.Left)
             {
-                // If Ctrl is pressed, toggle selection (for multi-select delete)
-                if (System.Windows.Input.Keyboard.Modifiers == System.Windows.Input.ModifierKeys.Control)
-                {
-                    clickedVersion.IsSelected = !clickedVersion.IsSelected;
-                }
-                else // If Ctrl is not pressed, behave like a radio button (toggle)
-                {
-                    bool wasSelected = clickedVersion.IsSelected;
-
-                    // 1. Deselect all items in both lists
-                    foreach (var version in _viewModel.AllLeagueClientVersions)
-                    {
-                        version.IsSelected = false;
-                    }
-                    foreach (var version in _viewModel.AllLoLGameClientVersions)
-                    {
-                        version.IsSelected = false;
-                    }
-
-                    // 2. If the item was not already selected, select it.
-                    //    If it was selected, the loop above has already deselected it.
-                    if (!wasSelected)
-                    {
-                        clickedVersion.IsSelected = true;
-                    }
-                }
+                if (_viewModel == null || ItemsControl.ItemsControlFromItemContainer(item) is not ListView list) return;
+                _viewModel.SelectVersion(list.Items.Cast<VersionFileInfo>().ToList(), clickedVersion,
+                    ReferenceEquals(list, LoLGameClientVersionsListView), System.Windows.Input.Keyboard.Modifiers);
                 e.Handled = true;
             }
         }
@@ -207,7 +242,7 @@ namespace AssetsManager.Views.Controls.Monitor
                     _viewModel.AllLeagueClientVersions.Remove(versionFile);
                     _viewModel.AllLoLGameClientVersions.Remove(versionFile);
                 }
-                // Recalculate total pages and update views after deletion
+                // Recalculate total pages and update views after deletion (page is preserved automatically)
                 _viewModel.LeagueClientPaginator.SetFullList(_viewModel.AllLeagueClientVersions);
                 _viewModel.LoLGameClientPaginator.SetFullList(_viewModel.AllLoLGameClientVersions);
             }

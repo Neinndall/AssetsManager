@@ -12,7 +12,27 @@ namespace AssetsManager.Views.Models.Viewer
 {
     public class ModelPart : INotifyPropertyChanged, IDisposable
     {
-        public string Name { get; set; }
+        private ModelVisual3D _visual;
+        private GeometryModel3D _geometry;
+
+        public ModelPart()
+        {
+            _visual = new ModelVisual3D();
+        }
+
+        public ModelPart(string name, GeometryModel3D geometry)
+            : this()
+        {
+            Name = name;
+            Geometry = geometry;
+        }
+
+        private string _name;
+        public string Name
+        {
+            get => _name;
+            set => _name = value;
+        }
 
         private bool _isVisible = true;
         public bool IsVisible
@@ -27,10 +47,38 @@ namespace AssetsManager.Views.Models.Viewer
             }
         }
 
-        public ModelVisual3D Visual { get; set; }
-        public GeometryModel3D Geometry { get; set; }
-        public bool IsTransparent { get; set; }
+        public ModelVisual3D Visual => _visual;
+
+        public GeometryModel3D Geometry
+        {
+            get => _geometry;
+            set
+            {
+                if (ReferenceEquals(_geometry, value)) return;
+                _geometry = value;
+                UpdateVisualContent();
+                OnPropertyChanged();
+            }
+        }
         public int[] SourceVertexIndices { get; set; }
+        public bool IsTextureTiled { get; set; } = true;
+        public bool IsDoubleSided { get; set; } = true;
+        // Runtime tint/opacity used by Viewer and Diff controls; authored SKN color lives in MaterialDefinition.
+        public System.Numerics.Vector4 ColorTint { get; set; } = System.Numerics.Vector4.One;
+        internal bool IsAlphaBlended => ColorTint.W < 0.999f ||
+            MaterialDefinition?.DrawsInTransparentQueue == true;
+        internal float AlphaCutoff { get; set; } = 0.1f;
+        internal bool ForceUnlit { get; set; }
+        internal bool TreatBaseTextureAsSrgb { get; set; }
+        internal bool UseBaseTextureAlpha { get; set; }
+        internal bool UsesSrgbBaseTexture => MaterialDefinition != null || TreatBaseTextureAsSrgb;
+        internal bool UsesUnlitShading => ForceUnlit || (MaterialDefinition != null && !MaterialDefinition.IsLit);
+
+        // SKN loaders attach the authored material here; other mesh pipelines keep their own material semantics.
+        public ModelMaterialDefinition MaterialDefinition { get; set; }
+        // Where the part draws among its model's parts: SknMaterialTextureResolution.DrawRanks, or 0 for list order.
+        internal int DrawRank { get; set; }
+        internal int EquippedGearIndex { get; set; } = -1;
 
         public Dictionary<string, BitmapSource> AllTextures
         {
@@ -40,7 +88,7 @@ namespace AssetsManager.Views.Models.Viewer
                 _allTextures = value;
                 if (_allTextures != null)
                 {
-                    AvailableTextureNames.ReplaceRange(_allTextures.Keys.Select(k => PathUtils.TruncateAtDot(k)));
+                    AvailableTextureNames.ReplaceRange(_allTextures.Keys);
                 }
                 else
                 {
@@ -58,10 +106,8 @@ namespace AssetsManager.Views.Models.Viewer
             get => _selectedTextureName;
             set
             {
-                string normalized = PathUtils.TruncateAtDot(value);
-                if (_selectedTextureName == normalized) return;
-                _selectedTextureName = normalized;
-                TextureUtils.UpdateMaterial(this);
+                if (_selectedTextureName == value) return;
+                _selectedTextureName = value;
                 OnPropertyChanged();
             }
         }
@@ -82,18 +128,18 @@ namespace AssetsManager.Views.Models.Viewer
         public void Dispose()
         {
             IsVisible = false;
-            if (Visual != null)
+            if (_visual != null)
             {
-                Visual.Content = null;
-                Visual = null;
+                _visual.Content = null;
+                _visual = null;
             }
 
-            if (Geometry != null)
+            if (_geometry != null)
             {
-                Geometry.Material = null;
-                Geometry.BackMaterial = null;
-                Geometry.Geometry = null;
-                Geometry = null;
+                _geometry.Material = null;
+                _geometry.BackMaterial = null;
+                _geometry.Geometry = null;
+                _geometry = null;
             }
 
             // Shared texture dictionaries are cleared by the owning SceneModel.
@@ -101,6 +147,10 @@ namespace AssetsManager.Views.Models.Viewer
 
             AvailableTextureNames?.Clear();
             SourceVertexIndices = null;
+            MaterialDefinition = null;
+            ForceUnlit = false;
+            TreatBaseTextureAsSrgb = false;
+            UseBaseTextureAlpha = false;
 
             PropertyChanged = null;
         }

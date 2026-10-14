@@ -3,9 +3,12 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             FontSize="12"
              mc:Ignorable="d">
              
-    <ItemsControl ItemsSource="{Binding Nodes}" AlternationCount="1000">
+    <ItemsControl ItemsSource="{Binding Items}"
+                  AlternationCount="1000"
+                  VerticalAlignment="Center">
         <ItemsControl.ItemsPanel>
             <ItemsPanelTemplate>
                 <StackPanel Orientation="Horizontal"/>
@@ -13,11 +16,12 @@
         </ItemsControl.ItemsPanel>
         <ItemsControl.ItemTemplate>
             <DataTemplate>
-                <StackPanel Orientation="Horizontal">
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                     <TextBlock x:Name="Separator" Text=">" VerticalAlignment="Center" Margin="4,0" Foreground="{StaticResource TextMuted}" Opacity="0.6"/>
-                    <Button Content="{Binding BreadcrumbDisplayName}" 
+                    <Button Content="{Binding DisplayName}"
                             Click="Button_Click"
                             IsEnabled="{Binding IsEnabled}"
+                            VerticalAlignment="Center"
                             Style="{StaticResource TransparentIconButton}">
                     </Button>
                 </StackPanel>

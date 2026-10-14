@@ -19,7 +19,6 @@ using AssetsManager.Utils.Framework;
 using AssetsManager.Views.Models.Explorer;
 using AssetsManager.Views.Controls.Explorer;
 using AssetsManager.Views.Models.Wad;
-using NodeClickedEventArgs = AssetsManager.Views.Controls.Explorer.NodeClickedEventArgs;
 
 namespace AssetsManager.Views.Controls.Explorer
 {
@@ -37,7 +36,10 @@ namespace AssetsManager.Views.Controls.Explorer
         private FileSystemNodeModel _currentNode;
         private FileSystemNodeModel _currentFolderNode;
         private ObservableRangeCollection<FileSystemNodeModel> _rootNodes;
+        private ObservableRangeCollection<FileGridViewModel> _gridItems;
+        private CancellationTokenSource _gridPreviewCancellation;
         private string _currentSearchFilter = string.Empty;
+        private bool _isDisposed;
 
         public FilePreviewerControl()
         {
@@ -201,6 +203,7 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private void FilePreviewerControl_Loaded(object sender, RoutedEventArgs e)
         {
+            if (_isDisposed) return;
             try
             {
                 ExplorerPreviewService.Initialize(
@@ -221,7 +224,6 @@ namespace AssetsManager.Views.Controls.Explorer
                 }
 
                 // Setup sub-controls peer connection
-                Breadcrumbs.ParentPreviewer = this;
                 FileGridControl.ParentPreviewer = this;
                 
                 UpdateScrollButtonsVisibility();
@@ -232,31 +234,54 @@ namespace AssetsManager.Views.Controls.Explorer
             }
         }
 
-        private async void FilePreviewerControl_Unloaded(object sender, RoutedEventArgs e)
+        private void FilePreviewerControl_Unloaded(object sender, RoutedEventArgs e)
         {
+            CleanupResources();
+        }
+
+        public void CleanupResources()
+        {
+            if (_isDisposed) return;
+            _isDisposed = true;
             try
             {
-                await ExplorerPreviewService.ResetPreviewAsync();
-                
-                if (ViewModel.PinnedFilesManager != null)
-                {
-                    ViewModel.PinnedFilesManager.PropertyChanged -= PinnedFilesManager_PropertyChanged;
-                    ViewModel.PinnedFilesManager.PinnedFiles.CollectionChanged -= PinnedFiles_CollectionChanged;
-                }
-
-                // Clear sub-controls peer connection
-                if (Breadcrumbs != null) Breadcrumbs.ParentPreviewer = null;
-                if (FileGridControl != null) FileGridControl.ParentPreviewer = null;
+                CancelGridPreviewLoading();
+                ExplorerPreviewService?.ReleaseResources();
             }
             catch (Exception ex)
             {
-                LogService.LogError(ex, "Error cleaning FilePreviewerControl on unload");
+                LogService?.LogError(ex, "Error releasing Explorer preview resources");
+            }
+
+            try
+            {
+                if (ViewModel?.PinnedFilesManager != null)
+                {
+                    ViewModel.PinnedFilesManager.PropertyChanged -= PinnedFilesManager_PropertyChanged;
+                    ViewModel.PinnedFilesManager.PinnedFiles.CollectionChanged -= PinnedFiles_CollectionChanged;
+                    ViewModel.PinnedFilesManager.PinnedFiles.Clear();
+                }
+
+                // Clear sub-controls peer connection
+                if (FileGridControl != null)
+                {
+                    FileGridControl.ItemsSource = null;
+                    FileGridControl.ParentPreviewer = null;
+                }
+
+                _currentNode = null;
+                _currentFolderNode = null;
+                _rootNodes = null;
+            }
+            catch (Exception ex)
+            {
+                LogService?.LogError(ex, "Error detaching FilePreviewerControl subscriptions");
             }
         }
 
         public async Task ShowPreviewAsync(FileSystemNodeModel node)
         {
-            if (node == null) return;
+            if (_isDisposed || node == null) return;
 
             _currentNode = node;
 
@@ -271,20 +296,18 @@ namespace AssetsManager.Views.Controls.Explorer
                 if (existingPin == null)
                 {
                     // Auto-pin the file so it appears in the tabs and can be closed/managed
+                    // Selecting or recycling the temporary tab raises SelectedFile and starts the preview.
                     ViewModel.PinnedFilesManager.PinFile(node);
-                    existingPin = ViewModel.PinnedFilesManager.PinnedFiles.FirstOrDefault(p => p.Node == node);
+                    return;
                 }
 
                 // Select the tab (this will trigger PinnedFilesManager_PropertyChanged which calls the service)
-                if (existingPin != null)
-                {
-                    var previousSelected = ViewModel.PinnedFilesManager.SelectedFile;
-                    ViewModel.PinnedFilesManager.SelectedFile = existingPin;
+                var previousSelected = ViewModel.PinnedFilesManager.SelectedFile;
+                ViewModel.PinnedFilesManager.SelectedFile = existingPin;
 
-                    if (previousSelected == existingPin)
-                    {
-                        await ExplorerPreviewService.ShowPreviewAsync(node);
-                    }
+                if (previousSelected == existingPin)
+                {
+                    await ExplorerPreviewService.ShowPreviewAsync(node);
                 }
             }
             else
@@ -341,6 +364,11 @@ namespace AssetsManager.Views.Controls.Explorer
                     FileGridControl.ItemsSource = null; // Clear immediately to prevent visual ghosting/flashing of previous folder items
                     RefreshGridItems(_currentFolderNode);
                 }
+                else if (node != previousNode)
+                {
+                    // Clear the active selection in the Grid View when focusing a different node in the same folder context
+                    FileGridControl.ClearSelectionSession(resetAnchor: false);
+                }
 
                 if (!isContainer && !ViewModel.IsGridMode && !ViewModel.HasEverPreviewedAFile)
                 {
@@ -350,6 +378,7 @@ namespace AssetsManager.Views.Controls.Explorer
             else
             {
                 _currentFolderNode = null;
+                CancelGridPreviewLoading();
                 FileGridControl.ItemsSource = null; // Clear immediately when resetting or when folder context is null
             }
             
@@ -358,13 +387,6 @@ namespace AssetsManager.Views.Controls.Explorer
                 // If it's a file, hide status messages immediately to avoid flickers during load
                 ViewModel.IsWelcomeVisible = false;
 
-                // Selective hide: Only hide unsupported if the new file is NOT an image
-                bool isImage = SupportedFileTypes.IsImage(node.Extension);
-                
-                if (!isImage)
-                {
-                    ViewModel.IsUnsupportedVisible = false;
-                }
             }
         }
 
@@ -375,14 +397,40 @@ namespace AssetsManager.Views.Controls.Explorer
             // Defer execution to avoid issues with current mouse events in the ListBox
             Dispatcher.InvokeAsync(() =>
             {
-                var gridItems = new ObservableRangeCollection<FileGridViewModel>(
+                if (_isDisposed) return;
+                CancelGridPreviewLoading();
+                _gridPreviewCancellation = new CancellationTokenSource();
+                var cancellationToken = _gridPreviewCancellation.Token;
+
+                _gridItems = new ObservableRangeCollection<FileGridViewModel>(
                     (!string.IsNullOrEmpty(_currentSearchFilter)
                         ? folderNode.Children.Where(c => c.Name.IndexOf(_currentSearchFilter, StringComparison.OrdinalIgnoreCase) >= 0)
                         : folderNode.Children)
-                    .Select(n => new FileGridViewModel(n, node => ExplorerPreviewService.GetImagePreviewAsync(node, 256))));
+                    .Select(n => new FileGridViewModel(
+                        n,
+                        (node, token) => ExplorerPreviewService.GetImagePreviewAsync(node, 256, token),
+                        cancellationToken,
+                        ex => LogService.LogError(ex, $"Failed to load grid thumbnail for '{n.VirtualPath}'."))));
 
-                FileGridControl.ItemsSource = gridItems;
+                FileGridControl.ItemsSource = _gridItems;
             }, DispatcherPriority.Background);
+        }
+
+        private void CancelGridPreviewLoading()
+        {
+            _gridPreviewCancellation?.Cancel();
+            _gridPreviewCancellation?.Dispose();
+            _gridPreviewCancellation = null;
+
+            if (_gridItems != null)
+            {
+                foreach (var item in _gridItems)
+                {
+                    item.Dispose();
+                }
+
+                _gridItems = null;
+            }
         }
 
         public void HandleNodeClicked(FileSystemNodeModel node)
@@ -435,32 +483,21 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private void UpdateBreadcrumbs(FileSystemNodeModel selectedNode)
         {
-            Breadcrumbs.Nodes.Clear();
+            Breadcrumbs.Clear();
             if (selectedNode == null || _rootNodes == null) return;
 
             var path = TreeUIManager.FindNodePath(_rootNodes, selectedNode);
             if (path == null) return;
 
-            const int maxItems = 5;
+            Breadcrumbs.SetPath(path, node => node.BreadcrumbDisplayName);
+        }
 
-            if (path.Count > maxItems)
+        private void Breadcrumbs_ItemClicked(object sender, BreadcrumbItemClickedEventArgs e)
+        {
+            if (e.Value is FileSystemNodeModel node)
             {
-                var truncatedPath = new List<FileSystemNodeModel>();
-                truncatedPath.Add(path[0]);
-                truncatedPath.Add(path[1]);
-
-                truncatedPath.Add(new FileSystemNodeModel("...", NodeType.VirtualDirectory) { IsEnabled = false });
-
-                for (int i = path.Count - 2; i < path.Count; i++)
-                {
-                    truncatedPath.Add(path[i]);
-                }
-                path = truncatedPath;
-            }
-
-            foreach (var node in path)
-            {
-                Breadcrumbs.Nodes.Add(node);
+                FileGridControl?.ClearSelectionSession(resetAnchor: false);
+                HandleNodeClicked(node);
             }
         }
     }

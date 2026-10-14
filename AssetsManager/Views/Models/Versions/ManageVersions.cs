@@ -5,18 +5,39 @@ using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
+using System.Windows.Input;
+using AssetsManager.Views.Helpers;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Monitor;
 
+using AssetsManager.Utils;
+using AssetsManager.Views.Models.Settings;
 using AssetsManager.Views.Models.Shared;
 using AssetsManager.Views.Models.Versions;
 
 namespace AssetsManager.Views.Models.Versions
 {
+    public class TargetInstallationOption
+    {
+        public string Name { get; set; }
+        public string DisplayName { get; set; }
+        public string Path { get; set; }
+        public bool IsMain { get; set; }
+        public bool IsPbe { get; set; }
+        public string Version { get; set; }
+        public DateTime? CreationDate { get; set; }
+
+        public string TargetSummary => $"Target: {DisplayName} ({(IsMain ? "MAIN" : "BACKUP")})";
+
+        public override string ToString() => DisplayName;
+    }
+
     public class ManageVersions : INotifyPropertyChanged
     {
         private readonly VersionService _versionService;
         private readonly LogService _logService;
+        private VersionFileInfo _leagueClientSelectionAnchor;
+        private VersionFileInfo _gameClientSelectionAnchor;
 
         public List<VersionFileInfo> AllLeagueClientVersions { get; private set; }
         public List<VersionFileInfo> AllLoLGameClientVersions { get; private set; }
@@ -38,6 +59,36 @@ namespace AssetsManager.Views.Models.Versions
         }
 
         public ObservableCollection<LocaleOption> AvailableLocales { get; set; }
+        public ObservableCollection<ManifestDateOption> ManifestDateOptions { get; }
+        public ObservableCollection<TargetInstallationOption> TargetInstallations { get; } = new();
+
+        private ManifestDateOption _selectedManifestDate;
+        public ManifestDateOption SelectedManifestDate
+        {
+            get => _selectedManifestDate;
+            set
+            {
+                if (_selectedManifestDate != value)
+                {
+                    _selectedManifestDate = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        private TargetInstallationOption _selectedTargetInstallation;
+        public TargetInstallationOption SelectedTargetInstallation
+        {
+            get => _selectedTargetInstallation;
+            set
+            {
+                if (_selectedTargetInstallation != value)
+                {
+                    _selectedTargetInstallation = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
 
         public ManageVersions(VersionService versionService, LogService logService)
         {
@@ -51,6 +102,16 @@ namespace AssetsManager.Views.Models.Versions
             LoLGameClientPaginator = new PaginationModel<VersionFileInfo>();
 
             _paginator = LeagueClientPaginator;
+
+            DateTime today = DateTime.Today;
+            DateTime yesterday = today.AddDays(-1);
+            ManifestDateOptions = new ObservableCollection<ManifestDateOption>
+            {
+                new ManifestDateOption(null, "All"),
+                new ManifestDateOption(today, $"Today - {today:dd/MM/yyyy}"),
+                new ManifestDateOption(yesterday, $"Yesterday - {yesterday:dd/MM/yyyy}")
+            };
+            SelectedManifestDate = ManifestDateOptions[0];
 
             AvailableLocales = new ObservableCollection<LocaleOption>
             {
@@ -66,18 +127,145 @@ namespace AssetsManager.Views.Models.Versions
             Paginator = isGame ? (IPaginationModel)LoLGameClientPaginator : (IPaginationModel)LeagueClientPaginator;
         }
 
+        internal void SelectVersion(IList<VersionFileInfo> visibleVersions, VersionFileInfo version,
+            bool isGame, ModifierKeys modifiers)
+        {
+            if (version == null || !visibleVersions.Contains(version)) return;
+            bool wasSelected = version.IsSelected;
+            if (!modifiers.HasFlag(ModifierKeys.Control))
+            {
+                foreach (VersionFileInfo file in AllLeagueClientVersions.Concat(AllLoLGameClientVersions))
+                    file.IsSelected = false;
+            }
+
+            VersionFileInfo anchor = isGame ? _gameClientSelectionAnchor : _leagueClientSelectionAnchor;
+            // A plain second click keeps the existing radio-style deselection.
+            VersionFileInfo target = SelectionBehavior.IsPrimaryActionIntent(modifiers) && wasSelected
+                ? null : version;
+            anchor = SelectionBehavior.SelectItems(visibleVersions, anchor, target, modifiers,
+                file => file.IsSelected, (file, selected) => file.IsSelected = selected);
+            if (isGame) _gameClientSelectionAnchor = anchor;
+            else _leagueClientSelectionAnchor = anchor;
+        }
+
         public async Task LoadVersionFilesAsync()
         {
             if (_versionService != null)
             {
                 var allFiles = await _versionService.GetVersionFilesAsync();
+                var preparedLists = await Task.Run(() =>
+                {
+                    var sortedFiles = allFiles
+                        .OrderByDescending(f => FormatUtils.ParseDate(f.Date, "dd/MM/yyyy HH:mm:ss"))
+                        .ThenBy(f => f.FileName)
+                        .ToList();
 
-                AllLeagueClientVersions = allFiles.Where(f => f.Category == "league-client").ToList();
-                var gameClientCategories = new[] { "lol-game-client" };
-                AllLoLGameClientVersions = allFiles.Where(f => gameClientCategories.Contains(f.Category)).ToList();
+                    return (
+                        LeagueClient: sortedFiles.Where(f => f.Category == "league-client").ToList(),
+                        GameClient: sortedFiles.Where(f => f.Category == "lol-game-client").ToList());
+                });
+
+                AllLeagueClientVersions = preparedLists.LeagueClient;
+                AllLoLGameClientVersions = preparedLists.GameClient;
 
                 LeagueClientPaginator.SetFullList(AllLeagueClientVersions);
                 LoLGameClientPaginator.SetFullList(AllLoLGameClientVersions);
+            }
+        }
+
+        public void MarkNewFiles(ISet<string> knownFileNames)
+        {
+            var allFiles = AllLeagueClientVersions.Concat(AllLoLGameClientVersions);
+            foreach (var file in allFiles)
+            {
+                file.IsNew = !knownFileNames.Contains(file.FileName);
+            }
+        }
+
+        public async Task LoadTargetInstallationsAsync(BackupManager backupManager, AppSettings appSettings)
+        {
+            var previousSelectedPath = SelectedTargetInstallation?.Path;
+            var preferredClient = appSettings?.PreferredClient ?? PreferredClient.PBE;
+            var newInstallations = new List<TargetInstallationOption>();
+
+            if (appSettings != null)
+            {
+                if (preferredClient == PreferredClient.PBE && !string.IsNullOrWhiteSpace(appSettings.LolPbeDirectory) && System.IO.Directory.Exists(appSettings.LolPbeDirectory))
+                {
+                    string pbeVer = _versionService != null ? await _versionService.GetGameVersionAsync(appSettings.LolPbeDirectory) : null;
+                    DateTime? lastWriteTime = System.IO.Directory.GetLastWriteTime(appSettings.LolPbeDirectory);
+
+                    newInstallations.Add(new TargetInstallationOption
+                    {
+                        Name = "League of Legends PBE",
+                        DisplayName = "League of Legends PBE",
+                        Path = appSettings.LolPbeDirectory,
+                        IsMain = true,
+                        IsPbe = true,
+                        Version = !string.IsNullOrEmpty(pbeVer) ? $"v{pbeVer}" : "Active PBE",
+                        CreationDate = lastWriteTime
+                    });
+                }
+                else if (preferredClient == PreferredClient.LIVE && !string.IsNullOrWhiteSpace(appSettings.LolLiveDirectory) && System.IO.Directory.Exists(appSettings.LolLiveDirectory))
+                {
+                    string liveVer = _versionService != null ? await _versionService.GetGameVersionAsync(appSettings.LolLiveDirectory) : null;
+                    DateTime? lastWriteTime = System.IO.Directory.GetLastWriteTime(appSettings.LolLiveDirectory);
+
+                    newInstallations.Add(new TargetInstallationOption
+                    {
+                        Name = "League of Legends LIVE",
+                        DisplayName = "League of Legends LIVE",
+                        Path = appSettings.LolLiveDirectory,
+                        IsMain = true,
+                        IsPbe = false,
+                        Version = !string.IsNullOrEmpty(liveVer) ? $"v{liveVer}" : "Active LIVE",
+                        CreationDate = lastWriteTime
+                    });
+                }
+            }
+
+            if (backupManager != null)
+            {
+                try
+                {
+                    var backups = await backupManager.GetBackupsAsync(includeStorageMetrics: false, client: preferredClient);
+                    foreach (var backup in backups)
+                    {
+                        if (backup.IsMainClient) continue;
+
+                        newInstallations.Add(new TargetInstallationOption
+                        {
+                            Name = backup.Name,
+                            DisplayName = backup.DisplayName,
+                            Path = backup.Path,
+                            IsMain = false,
+                            IsPbe = backup.IsPbe,
+                            Version = !string.IsNullOrEmpty(backup.Version) ? $"v{backup.Version}" : "Backup",
+                            CreationDate = backup.CreationDate
+                        });
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logService?.LogError(ex, "Failed to load backup installations for version management dropdown.");
+                }
+            }
+
+            TargetInstallations.Clear();
+            foreach (var item in newInstallations)
+            {
+                TargetInstallations.Add(item);
+            }
+
+            if (TargetInstallations.Count > 0)
+            {
+                SelectedTargetInstallation = TargetInstallations.FirstOrDefault(t => t.Path != null && t.Path.Equals(previousSelectedPath, StringComparison.OrdinalIgnoreCase))
+                                           ?? TargetInstallations.FirstOrDefault(t => t.IsMain)
+                                           ?? TargetInstallations.FirstOrDefault();
+            }
+            else
+            {
+                SelectedTargetInstallation = null;
             }
         }
 

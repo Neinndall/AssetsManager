@@ -25,6 +25,7 @@ namespace AssetsManager.Services.Core
         private Window _owner;
         private ProgressDetailsWindow _progressDetailsWindow;
         private int _totalFiles;
+        private readonly CancellationStatusState _cancellationStatus = new();
 
         public ProgressUIManager(
             LogService logService,
@@ -51,7 +52,7 @@ namespace AssetsManager.Services.Core
             {
                 _taskCancellationManager.OperationStateChanged -= TaskCancellationManager_OperationStateChanged;
             }
-            
+
             CloseProgressWindow();
             _statusBarViewModel = null;
             _owner = null;
@@ -87,11 +88,11 @@ namespace AssetsManager.Services.Core
                     HeaderIcon = icon,
                     HeaderTitle = headerText
                 };
-                
+
                 _progressDetailsWindow.ViewModel.OperationVerb = verb;
-                
+
                 _progressDetailsWindow.Closed += (s, e) => _progressDetailsWindow = null;
-                _progressDetailsWindow.UpdateProgress(0, totalItems, "Initializing...", true, null);
+                _progressDetailsWindow.UpdateProgress(0, totalItems, "Initializing...", true, null, totalItems > 0 ? null : "Initializing...");
                 // _progressDetailsWindow.Show(); // Ventana en segundo plano por defecto, el usuario la abre si quiere
             });
         }
@@ -99,7 +100,7 @@ namespace AssetsManager.Services.Core
         /// <summary>
         /// Centralizes logic to update both StatusBar and ProgressWindow.
         /// </summary>
-        private void UpdateOperation(string statusMessage, int current, int total, string currentFileDetail, bool success = true, string errorMessage = null)
+        private void UpdateOperation(string statusMessage, int current, int total, string currentFileDetail, bool success = true, string errorMessage = null, string customProgressText = null)
         {
             // Clean statusMessage for StatusBar (remove anything after '|')
             string cleanStatus = statusMessage;
@@ -108,22 +109,22 @@ namespace AssetsManager.Services.Core
                 cleanStatus = cleanStatus.Split('|')[0].Trim();
             }
 
-            UpdateStatusBar(cleanStatus, current, total);
+            UpdateStatusBar(cleanStatus, current, total, customProgressText);
             _owner.Dispatcher.Invoke(() =>
             {
-                _progressDetailsWindow?.UpdateProgress(current, total, currentFileDetail, success, errorMessage);
+                _progressDetailsWindow?.UpdateProgress(current, total, currentFileDetail, success, errorMessage, customProgressText);
             });
         }
 
         /// <summary>
-        private async Task FinishOperation()
+        private async Task FinishOperation(int completionHoldMilliseconds = 100)
         {
             bool wasCancelled = _taskCancellationManager.IsCancelling;
             if (wasCancelled)
             {
                 // Set the status bar text to the cancellation message to ensure it is displayed
                 UpdateStatusBar(_taskCancellationManager.CancellationMessage);
-                await Task.Delay(1500);
+                await Task.Delay(CancellationStatusState.HoldMilliseconds);
             }
             else
             {
@@ -133,8 +134,8 @@ namespace AssetsManager.Services.Core
                     await System.Windows.Application.Current.Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
                 }
 
-                // Give the user 100ms to visually register the completed progress before closing the window
-                await Task.Delay(100);
+                // Keep the final state visible long enough to be registered before closing.
+                await Task.Delay(completionHoldMilliseconds);
             }
 
             _taskCancellationManager.CompleteCurrentOperation();
@@ -155,35 +156,36 @@ namespace AssetsManager.Services.Core
             }
         }
 
-        private void UpdateStatusBar(string message, int completed = -1, int total = -1)
+        private void UpdateStatusBar(string message, int completed = -1, int total = -1, string customProgressText = null)
         {
-            _owner.Dispatcher.Invoke(() =>
+            _owner?.Dispatcher.Invoke(() =>
             {
                 if (_statusBarViewModel == null) return;
+                if (!_cancellationStatus.Allows(message)) return;
 
                 // PROTECT CANCELLATION STATE: If we are cancelling, don't let other progress messages 
                 // overwrite the "Cancelling Task..." message, except for the "Ready" reset.
-                if (_taskCancellationManager.IsCancelling && 
-                    message != _taskCancellationManager.CancellationMessage && 
+                if (_taskCancellationManager.IsCancelling &&
+                    message != _taskCancellationManager.CancellationMessage &&
                     message != "Ready")
                 {
                     return;
                 }
 
                 _statusBarViewModel.StatusText = message;
-                
+
                 if (completed >= 0 && total > 0)
                 {
                     double percentage = (double)completed / total * 100;
-                    _statusBarViewModel.ProgressPercentage = $"{(int)percentage}%";
+                    _statusBarViewModel.ProgressPercentage = $"{(int)Math.Round(percentage)}%";
                 }
-                else if (!string.IsNullOrEmpty(message) && message != "Ready")
+                else if (!string.IsNullOrWhiteSpace(customProgressText))
                 {
-                    _statusBarViewModel.ProgressPercentage = string.Empty; // Show spinner, no number
+                    _statusBarViewModel.ProgressPercentage = customProgressText;
                 }
                 else
                 {
-                    _statusBarViewModel.ProgressPercentage = null; // Hide
+                    _statusBarViewModel.ProgressPercentage = null; // Hide during preparation / when idle
                 }
             });
         }
@@ -192,11 +194,11 @@ namespace AssetsManager.Services.Core
         {
             if (_taskCancellationManager.IsCancelling)
             {
-                UpdateStatusBar(_taskCancellationManager.CancellationMessage);
+                _ = ShowCancellationAsync();
             }
             else
             {
-                _owner.Dispatcher.InvokeAsync(() =>
+                _owner?.Dispatcher.InvokeAsync(() =>
                 {
                     if (_statusBarViewModel != null && _statusBarViewModel.StatusText == _taskCancellationManager.CancellationMessage)
                     {
@@ -212,9 +214,26 @@ namespace AssetsManager.Services.Core
 
         public void ClearStatusText() => UpdateStatusBar("");
 
+        /// <summary>Reports cancellation of view-owned work without cancelling a shared background operation.</summary>
+        public async Task ShowCancellationAsync()
+        {
+            string message = _taskCancellationManager.IsCancelling
+                ? _taskCancellationManager.CancellationMessage : CancellationStatusState.Message;
+            _cancellationStatus.Begin(message);
+            UpdateStatusBar(message);
+            // Timers may wake slightly early; repeated cancellations also extend the shared deadline.
+            while (_cancellationStatus.IsActive)
+                await Task.Delay(Math.Max(1, _cancellationStatus.RemainingMilliseconds));
+            if (!_cancellationStatus.IsActive && !_taskCancellationManager.IsCancelling &&
+                _statusBarViewModel?.StatusText == message)
+            {
+                UpdateStatusBar("Ready");
+            }
+        }
+
         public void ShowDetails()
         {
-             if (_progressDetailsWindow != null)
+            if (_progressDetailsWindow != null)
             {
                 if (!_progressDetailsWindow.IsVisible) _progressDetailsWindow.Show();
                 _progressDetailsWindow.Activate();
@@ -250,7 +269,6 @@ namespace AssetsManager.Services.Core
             UpdateOperation($"Comparing {currentWadFile}", completedFiles, _totalFiles, currentWadFile, isSuccess, errorMessage);
         }
 
-        public async void OnComparisonCompleted(List<ChunkDiff> diffs, string oldPath, string newPath, string version) => await FinishComparisonAsync();
 
         /// <summary>
         /// Closes the comparison progress window after rendering the final 100% state.
@@ -283,7 +301,7 @@ namespace AssetsManager.Services.Core
             UpdateOperation($"Extracting {extractedCount} of {totalFiles} assets: {detail}", extractedCount, totalFiles, message);
         }
 
-        public async void OnExtractionCompleted() => await FinishOperation();
+        public Task OnExtractionCompletedAsync() => FinishOperation();
 
         // --- Saving ---
 
@@ -309,7 +327,7 @@ namespace AssetsManager.Services.Core
             UpdateOperation($"Saving {completedFiles} of {totalFiles} assets: {detail}", completedFiles, totalFiles, currentFile);
         }
 
-        public async void OnSavingCompleted() => await FinishOperation();
+        public Task OnSavingCompletedAsync() => FinishOperation();
 
         // --- Versions (Update) ---
 
@@ -319,34 +337,28 @@ namespace AssetsManager.Services.Core
             StartOperation("Versions Update", "Verifying", "Download", 0, "Preparing Manifests...");
         }
 
-        public async void OnVersionVerificationCompleted()
-        {
-            // Pause so the 100% Verifying state is visible in the UI before switching to Updating.
-            await Task.Delay(100);
-        }
-
         public void OnVersionDownloadProgressChanged(string taskName, int currentValue, int totalValue, string currentFile)
         {
-            _owner.Dispatcher.Invoke(() =>
+            _ = _owner.Dispatcher.InvokeAsync(() =>
             {
                 if (_progressDetailsWindow != null)
                 {
-                    _progressDetailsWindow.ViewModel.OperationVerb = taskName; // Cambia dinámicamente entre Verifying y Updating
+                    _progressDetailsWindow.ViewModel.OperationVerb = taskName;
                 }
+                UpdateOperation($"{taskName} {currentFile}", currentValue, totalValue, currentFile);
             });
-            // data.CurrentFile already contains "X of Y files: name", so we just prepend the TaskName
-            UpdateOperation($"{taskName} {currentFile}", currentValue, totalValue, currentFile);
         }
 
-        public async void OnVersionDownloadCompleted(string taskName, bool success, string message)
+        public async Task OnVersionDownloadCompletedAsync(string taskName, bool success, string message)
         {
             bool wasCancelled = _taskCancellationManager.IsCancelling;
 
-            await FinishOperation();
-            
+            // Hold the final updating state for 200 ms before closing the progress UI.
+            await FinishOperation(200);
+
             await _owner.Dispatcher.InvokeAsync(() =>
             {
-                if (!success && !wasCancelled) 
+                if (!success && !wasCancelled)
                 {
                     _customMessageBoxService.ShowError("Error", message, _owner);
                 }
@@ -378,9 +390,39 @@ namespace AssetsManager.Services.Core
             UpdateOperation($"Backing up {processed} of {total} files: {detail}", processed, total, currentFile);
         }
 
-        public async void OnBackupCompleted(bool success)
+        public async Task OnBackupCompletedAsync(bool success)
         {
             // BackupsControl handles the success message/logic. We just close the progress UI.
+            await FinishOperation();
+        }
+
+        // --- Hash Guessing Lab ---
+
+        public void OnHashGuessingStarted(string operationName, string initialStatus = null, int totalItems = 0)
+        {
+            _owner?.Dispatcher.Invoke(() =>
+            {
+                string status = !string.IsNullOrEmpty(initialStatus) ? initialStatus : $"Preparing {operationName}...";
+                if (_progressDetailsWindow != null && _totalFiles == 0 && totalItems > 0)
+                {
+                    _totalFiles = totalItems;
+                    UpdateStatusBar(status, 0, totalItems);
+                    _progressDetailsWindow.UpdateProgress(0, totalItems, "Initializing...", true, null);
+                    return;
+                }
+
+                StartOperation($"Hash Lab: {operationName}", "Scanning", "TagSearchOutline", totalItems, status);
+            });
+        }
+
+        public void OnHashGuessingProgressChanged(string statusMessage, int current, int total, string currentItemDetail, string customProgressText = null)
+        {
+            string detail = string.IsNullOrEmpty(currentItemDetail) ? "Scanning..." : currentItemDetail;
+            UpdateOperation(statusMessage, current, total, detail, success: true, errorMessage: null, customProgressText: customProgressText);
+        }
+
+        public async Task OnHashGuessingCompletedAsync()
+        {
             await FinishOperation();
         }
 

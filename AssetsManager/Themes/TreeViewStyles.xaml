@@ -24,13 +24,13 @@
 
     <!-- TreeViewItem Style -->
     <Style x:Key="ModernTreeViewItem" TargetType="TreeViewItem">
-        <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}"/>
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
         <Setter Property="FontSize" Value="13"/>
         <Setter Property="Margin" Value="0,0"/>
         <!-- Thinner selection box -->
         <Setter Property="Padding" Value="4,1"/> 
+        <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
         <Setter Property="helpers:SelectionBehavior.SingleClickExpand" Value="True"/>
         <Setter Property="helpers:SelectionBehavior.PreserveSelectionOnRightClick" Value="True"/>
         <Setter Property="ContextMenu" Value="{x:Null}"/>

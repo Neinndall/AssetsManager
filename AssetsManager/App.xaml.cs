@@ -20,12 +20,17 @@ using AssetsManager.Services.Comparator;
 using AssetsManager.Services.Downloads;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Monitor;
-using AssetsManager.Services.Viewer;
+using AssetsManager.Services.Viewer.Loading;
+using AssetsManager.Services.Viewer.Parsing;
+using AssetsManager.Services.Viewer.Runtime;
+using AssetsManager.Services.Viewer.Resolvers;
+using AssetsManager.Services.Viewer.Vfx.Loading;
 using AssetsManager.Services.Explorer;
 using AssetsManager.Services.Explorer.Tree;
 using AssetsManager.Services.Formatting;
 using AssetsManager.Services.Audio;
 using AssetsManager.Services.Parsers;
+using AssetsManager.Services.News;
 
 namespace AssetsManager
 {
@@ -88,7 +93,9 @@ namespace AssetsManager
               }
           };
           
-          return new HttpClient(handler) { Timeout = TimeSpan.FromMinutes(5) };
+          var client = new HttpClient(handler) { Timeout = TimeSpan.FromMinutes(5) };
+          client.DefaultRequestHeaders.UserAgent.ParseAdd("AssetsManager");
+          return client;
       });
 
       // Utils Services
@@ -106,8 +113,8 @@ namespace AssetsManager
       services.AddSingleton<JsonFormatterService>();
       services.AddSingleton<ContentFormatterService>();
       services.AddSingleton<AudioConversionService>();
-      services.AddSingleton<BinPropertyParser>();
-      services.AddSingleton<BinParser>();
+      services.AddSingleton<BinRitobinSerializer>();
+      services.AddSingleton<BinAudioEventExtractor>();
 
       services.AddSingleton<TroybinParser>();
       services.AddSingleton<PreloadParser>();
@@ -116,9 +123,11 @@ namespace AssetsManager
       services.AddSingleton<SvgParser>();
  
       // Explorer Services
+      services.AddTransient<MediaTempFileStore>();
+      services.AddTransient<MediaWebViewPreviewService>();
       services.AddTransient<ExplorerPreviewService>();
-      services.AddSingleton<WadExportService>();
-      services.AddSingleton<WadContentProvider>();
+       services.AddSingleton<AssetExportService>();
+       services.AddSingleton<WadContentProvider>();
       services.AddSingleton<WadNodeLoaderService>();
       services.AddSingleton<WadSearchBoxService>();
       services.AddTransient<TreeBuilderService>();
@@ -135,7 +144,10 @@ namespace AssetsManager
       services.AddSingleton<Requests>();
        
       // Monitor Services
-      services.AddSingleton<MonitorService>();
+      services.AddSingleton<MonitoredFilesService>();
+      services.AddSingleton<AssetTrackerScannerService>();
+      services.AddSingleton<IAssetCatalogSource, AssetCatalogSourceService>();
+      services.AddSingleton<AssetCatalogService>();
       services.AddSingleton<PbeStatusService>();
       services.AddSingleton<RiotApiService>(); // LCU Service
       services.AddSingleton<VersionService>();
@@ -146,20 +158,46 @@ namespace AssetsManager
       services.AddSingleton<RmanService>();
       services.AddSingleton<RmanApiService>();
 
+      // News Services
+      services.AddSingleton<NewsService>();
+
       // Hashes Services
       services.AddSingleton<HashResolverService>();
       services.AddSingleton<HashService>();
+      services.AddSingleton<HashGuessingStore>();
+      services.AddSingleton<HashGuessPersistenceService>();
+      services.AddSingleton<HashGuessingService>();
+      services.AddSingleton<BinRstHashGuessingStore>();
+      services.AddSingleton<MetaSchemaHashSource>();
+      services.AddSingleton<BinRstHashGuessingService>();
 
       // Comparator Services
       services.AddSingleton<WadComparatorService>();
       services.AddSingleton<WadPackagingService>();
       services.AddSingleton<ReportGenerationService>();
 
-      // Models Services
+      // Viewer Loading Services
       services.AddSingleton<SknLoadingService>();
-      services.AddSingleton<ScoLoadingService>();
-      services.AddSingleton<MapGeometryLoadingService>();
-      services.AddSingleton<ChromaScannerService>();
+      services.AddSingleton<MapAssetResolver>();
+      services.AddSingleton<MapGeometryDecoder>();
+      services.AddSingleton<MapMaterialParser>();
+      services.AddSingleton<MapPlaceableParser>();
+      services.AddSingleton<MapCharacterParser>();
+      services.AddSingleton<MapParticleParser>();
+      services.AddSingleton<MapParticleSystemParser>();
+      services.AddSingleton<MapCharacterSkinParser>();
+      services.AddSingleton<MapCharacterMeshDecoder>();
+      services.AddSingleton<MapVariantParser>();
+      services.AddSingleton<MapTextureLoadingService>();
+      services.AddSingleton<MapCharacterLoadingService>();
+      services.AddSingleton<MapSceneLoadingService>();
+      services.AddSingleton<MapSceneRuntimeFactory>();
+      services.AddSingleton<MapViewerSceneService>(provider => new MapViewerSceneService(
+        provider.GetRequiredService<MapSceneLoadingService>(),
+        provider.GetRequiredService<MapSceneRuntimeFactory>(),
+        provider.GetRequiredService<MapTextureLoadingService>()));
+      services.AddSingleton<ChromaLoadingService>();
+      services.AddTransient<VfxLoadingService>();
 
       // Audio Services
       services.AddSingleton<AudioBankService>();
@@ -173,6 +211,8 @@ namespace AssetsManager
       services.AddTransient<ComparatorWindow>();
       services.AddTransient<ViewerWindow>();
       services.AddTransient<MonitorWindow>();
+      services.AddTransient<HashGuessingWindow>();
+      services.AddTransient<NewsWindow>();
       services.AddTransient<HelpWindow>();
       services.AddTransient<SettingsWindow>();
             

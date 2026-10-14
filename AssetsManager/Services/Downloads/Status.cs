@@ -40,7 +40,7 @@ namespace AssetsManager.Services.Downloads
         private readonly DirectoriesCreator _directoriesCreator;
 
         public event Action HashSyncStarted;
-        public event Action HashSyncCompleted;
+        public event Action<bool> HashSyncCompleted;
         public bool IsSyncing { get; private set; } = false;
 
         public Status(
@@ -59,121 +59,68 @@ namespace AssetsManager.Services.Downloads
 
         public async Task<bool> SyncHashesIfNeeds(bool syncHashesWithCDTB, bool silent = false, Action onUpdateFound = null)
         {
+            if (!syncHashesWithCDTB) return false;
             await HashResolverService._hashFileAccessLock.WaitAsync();
+            bool succeeded = false;
             try
             {
                 var outdatedFiles = await GetOutdatedHashFilesAsync(silent, onUpdateFound);
-                if (outdatedFiles.Any())
+                if (outdatedFiles.Count == 0)
                 {
-                    if (!silent) _logService.Log("Server updated or local files out of date. Starting hash synchronization...");
-
-                    if (syncHashesWithCDTB)
-                    {
-                        _directoriesCreator.CreateHashesDirectories();
-                        await _requests.DownloadSpecificHashesAsync(outdatedFiles);
-                    }
-
-                    UpdateConfigWithLocalFileSizes();
-
-                    if (!silent) _logService.LogSuccess("Synchronization completed.");
-
-                    return true;
+                    if (!silent) _logService.Log("No hash files selected for synchronization.");
+                    return false;
                 }
+                IsSyncing = true;
+                HashSyncStarted?.Invoke();
+                if (!silent) _logService.Log("Starting hash synchronization...");
+                _directoriesCreator.CreateHashesDirectories();
+                succeeded = await _requests.DownloadSpecificHashesAsync(outdatedFiles);
+                if (succeeded)
+                {
+                    if (!silent) _logService.LogSuccess("Synchronization completed.");
+                }
+                else _logService.LogWarning("Hash synchronization was incomplete; failed downloads will be retried on the next check.");
+                return succeeded;
             }
             finally
             {
-                HashResolverService._hashFileAccessLock.Release();
-                IsSyncing = false;
-                HashSyncCompleted?.Invoke();
+                try { RefreshLocalHashSizes(); }
+                finally
+                {
+                    HashResolverService._hashFileAccessLock.Release();
+                    if (IsSyncing)
+                    {
+                        IsSyncing = false;
+                        HashSyncCompleted?.Invoke(succeeded);
+                    }
+                }
             }
-
-            if (!silent) _logService.LogSuccess("No server updates found. Local hashes are up-to-date.");
-            return false;
         }
 
-        private void UpdateConfigWithLocalFileSizes()
+        private Dictionary<string, long> RefreshLocalHashSizes()
         {
             var hashesPath = _directoriesCreator.HashesPath;
-            if (!Directory.Exists(hashesPath))
-            {
-                _logService.LogWarning($"Cannot update hash config: 'hashes' directory not found at '{hashesPath}'.");
-                return;
-            }
-
             var newSizes = new Dictionary<string, long>();
             foreach (var filename in AllKnownHashFiles)
             {
                 var filePath = Path.Combine(hashesPath, filename);
-                if (File.Exists(filePath))
-                {
-                    newSizes[filename] = new FileInfo(filePath).Length;
-                }
-                else
-                {
-                    newSizes[filename] = 0;
-                }
+                newSizes[filename] = File.Exists(filePath) ? new FileInfo(filePath).Length : 0;
             }
-
-            _appSettings.HashesSizes = newSizes;
-            AppSettings.SaveSettings(_appSettings);
-        }
-
-        private List<string> GetLocallyOutOfSyncFiles()
-        {
-            var outdatedFiles = new List<string>();
-            var configSizes = _appSettings.HashesSizes;
-            var hashesPath = _directoriesCreator.HashesPath;
-
-            if (string.IsNullOrEmpty(hashesPath) || !Directory.Exists(hashesPath))
+            var recordedSizes = _appSettings.HashesSizes;
+            if (recordedSizes.Count != newSizes.Count || newSizes.Any(pair =>
+                    !recordedSizes.TryGetValue(pair.Key, out long size) || size != pair.Value))
             {
-                _logService.Log($"Hashes not found. Forcing Sync.");
-                return AllKnownHashFiles.ToList();
+                _appSettings.HashesSizes = newSizes;
+                AppSettings.SaveSettings(_appSettings);
             }
-
-            if (configSizes == null || configSizes.Count == 0)
-            {
-                return AllKnownHashFiles.ToList(); // Nothing in config to check against, sync all.
-            }
-
-            foreach (var entry in configSizes)
-            {
-                string filename = entry.Key;
-                long configSize = entry.Value;
-                string filePath = Path.Combine(hashesPath, filename);
-
-                bool isOutOfSync = false;
-                if (!File.Exists(filePath))
-                {
-                    if (configSize > 0) isOutOfSync = true;
-                }
-                else
-                {
-                    long diskSize = new FileInfo(filePath).Length;
-                    if (diskSize < configSize) isOutOfSync = true;
-                }
-
-                if (isOutOfSync)
-                {
-                    outdatedFiles.Add(filename);
-                }
-            }
-
-            return outdatedFiles;
+            return newSizes;
         }
 
         public async Task<List<string>> GetOutdatedHashFilesAsync(bool silent = false, Action onUpdateFound = null)
         {
-            var localOutOfSync = GetLocallyOutOfSyncFiles();
-            if (localOutOfSync.Any())
-            {
-                onUpdateFound?.Invoke();
-                IsSyncing = true;
-                HashSyncStarted?.Invoke(); // Disparar evento para desincronización local
-                return localOutOfSync;
-            }
-
             try
             {
+                var localSizes = RefreshLocalHashSizes();
                 if (!silent) _logService.Log("Getting update sizes from server...");
                 var serverSizes = await GetRemoteHashesSizesAsync();
 
@@ -183,31 +130,9 @@ namespace AssetsManager.Services.Downloads
                     return new List<string>();
                 }
 
-                var localSizes = _appSettings.HashesSizes ?? new Dictionary<string, long>();
-                var filesToUpdate = new List<string>();
-                bool notificationSent = false;
-
-                foreach (var filename in AllKnownHashFiles)
-                {
-                    if (UpdateHashSizeIfDifferent(serverSizes, localSizes, filename))
-                    {
-                        filesToUpdate.Add(filename);
-                        if (!notificationSent)
-                        {
-                            onUpdateFound?.Invoke();
-                            IsSyncing = true;
-                            HashSyncStarted?.Invoke();
-                            notificationSent = true;
-                        }
-                    }
-                }
-
-                if (filesToUpdate.Any())
-                {
-                    _appSettings.HashesSizes = localSizes;
-                    AppSettings.SaveSettings(_appSettings);
-                }
-
+                var filesToUpdate = AllKnownHashFiles.Where(filename =>
+                    serverSizes.GetValueOrDefault(filename, 0) > localSizes[filename]).ToList();
+                if (filesToUpdate.Count > 0) onUpdateFound?.Invoke();
                 return filesToUpdate;
             }
             catch (Exception ex)
@@ -215,25 +140,6 @@ namespace AssetsManager.Services.Downloads
                 _logService.LogError(ex, "Error checking for updates.");
                 return new List<string>();
             }
-        }
-
-        private bool UpdateHashSizeIfDifferent(
-            Dictionary<string, long> serverSizes,
-            IDictionary<string, long> localSizes,
-            string filename)
-        {
-            long serverSize = serverSizes.GetValueOrDefault(filename, 0);
-            long localSize = localSizes.TryGetValue(filename, out var size) ? size : 0;
-
-            // Only sync if server has a LARGER file (more hashes).
-            // If server is smaller or equal, we assume we are up to date or have a better local version.
-            if (serverSize > localSize)
-            {
-                localSizes[filename] = serverSize;
-                return true;
-            }
-
-            return false;
         }
 
         public async Task<Dictionary<string, long>> GetRemoteHashesSizesAsync()
