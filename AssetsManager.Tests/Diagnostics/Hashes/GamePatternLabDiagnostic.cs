@@ -30,12 +30,29 @@ internal static class GamePatternLabDiagnostic
         var known = new HashFile(HashGuessDomain.Game, Path.Combine(local, "hashes", "hashes.game.txt")).Load();
         var unknown = File.ReadLines(Path.Combine(local, "hash_lab", "unknowns.game.txt"))
             .Where(l => !string.IsNullOrWhiteSpace(l)).Select(l => ulong.Parse(l.Trim(), NumberStyles.HexNumber)).ToHashSet();
+        if (Option("--targets") is string targetsFile)
+            unknown.UnionWith(File.ReadLines(targetsFile).Where(line => !string.IsNullOrWhiteSpace(line))
+                .Select(line => ulong.Parse(line.Trim(), NumberStyles.HexNumber)));
         using var cancellation = new CancellationTokenSource();
         if (int.TryParse(Option("--seconds"), out int seconds) && seconds > 0) cancellation.CancelAfter(TimeSpan.FromSeconds(seconds));
         var engine = new HashGuessEngine(HashGuessDomain.Game, unknown,
             m => Console.WriteLine($"MATCH {m.Hash:x16} {m.Path} [{m.SourceWadPath}]"));
         var timer = Stopwatch.StartNew();
         Console.WriteLine($"Pattern lab: {unknown.Count} unknowns, persistence disabled");
+        if (Option("--profile-custom") is string method)
+        {
+            var guesser = new GameHashGuesser(new HashFile(HashGuessDomain.Game, known.Values));
+            long allocated = GC.GetAllocatedBytesForCurrentThread();
+            bool complete = false;
+            try
+            {
+                guesser.RunCustomAttacks(engine, null, cancellation.Token, new HashSet<string> { method }, root);
+                complete = true;
+            }
+            catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+            Console.WriteLine($"Custom profile {method}: {engine.CheckedCandidates:N0} checks; {engine.Matches.Count} matches; {timer.Elapsed.TotalSeconds:F2}s; {(GC.GetAllocatedBytesForCurrentThread() - allocated) / 1_000_000:N0} MB allocated; complete={complete}; no persistence");
+            return;
+        }
         if (args.Contains("--remove-tokens", StringComparer.Ordinal))
         {
             var guesser = new GameHashGuesser(new HashFile(HashGuessDomain.Game, known.Values));

@@ -99,6 +99,32 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
         }
 
         [Theory]
+        [InlineData(0)]
+        [InlineData(600)]
+        public void EncodedBuildListRetainsEveryCombinationAndAttemptIncludingUnicodeAndLongPaths(int padding)
+        {
+            string directory = "assets/characters/example/skins/skin1/" + new string('x', padding);
+            string first = directory + "first", second = directory + "second";
+            string[] prefixes = { first + "_\u00e9toile_tx_", first + "_\u00e9toile_", first + "_",
+                second + "_\u00e9toile_tx_", second + "_\u00e9toile_", second + "_" };
+            string[] suffixes = { "cm.tex", "tx_cm.tex", "\u00e9toile_tx_cm.tex" };
+            var expected = new HashSet<string>();
+            foreach (string prefix in prefixes)
+            foreach (string suffix in suffixes) expected.Add(prefix + suffix);
+            var targets = new HashSet<ulong>();
+            foreach (string path in expected) targets.Add(XxHash64Ext.Hash(path));
+            targets.Add(42);
+            var engine = new HashGuessEngine(HashGuessDomain.Game, targets);
+            var index = new GameTextureFamilyIndex(new[] { first + "_\u00e9toile_tx_cm.tex", second + "_\u00e9toile_tx_cm.tex" }, CancellationToken.None);
+            long count = index.RunBuildList(engine, CancellationToken.None);
+            Assert.Equal(18L, count);
+            Assert.Equal(count, engine.CheckedCandidates);
+            Assert.Equal(expected.Count, engine.Matches.Count);
+            foreach (var match in engine.Matches.Values) Assert.Contains(match.Path, expected);
+            Assert.Equal(1, engine.RemainingUnknownCount);
+        }
+
+        [Theory]
         [InlineData(1)]
         [InlineData(2)]
         [InlineData(5)]

@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Text;
 using System.Threading;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.Hashes;
@@ -225,6 +226,8 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                 if ((checkedCandidates & 0x3fff) == 0) progress?.Invoke(checkedCandidates);
             }
 
+            byte[][] prefixBytes = Array.ConvertAll(_allPrefixes, Encode);
+            byte[][] suffixBytes = Array.ConvertAll(_suffixes, Encode);
             for (int suffixOffset = 0; suffixOffset < _suffixes.Length; suffixOffset += suffixBatchSize)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -234,14 +237,15 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
 
                 for (int i = 0; i < batchCount; i++)
                 {
-                    string suffix = _suffixes[suffixOffset + i];
-                    foreach (string prefix in _allPrefixes)
+                    byte[] suffix = suffixBytes[suffixOffset + i];
+                    foreach (byte[] prefix in prefixBytes)
                     {
                         cancellationToken.ThrowIfCancellationRequested();
                         if (engine.RemainingUnknownCount == 0 || checkedCandidates >= candidateBudget) break;
 
-                        engine.CheckPrefixSuffix(
+                        engine.CheckNormalizedUtf8Parts(
                             prefix,
+                            ReadOnlySpan<byte>.Empty,
                             suffix,
                             HashGuessStrategy.WordlistVariant,
                             "GAME Custom: texture build-list");
@@ -255,6 +259,12 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
 
             progress?.Invoke(checkedCandidates);
             return checkedCandidates;
+
+            byte[] Encode(string value)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                return Encoding.UTF8.GetBytes(value);
+            }
         }
 
         private static bool TryGetSkinTextureDirectory(string path, out string directory)

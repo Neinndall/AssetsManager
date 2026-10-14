@@ -722,6 +722,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             if (candidateBudget < 0) throw new ArgumentOutOfRangeException(nameof(candidateBudget));
             if (candidateBudget == 0) return 0;
 
+            static bool IsAscii(string value) => value.AsSpan().IndexOfAnyExceptInRange((char)0, (char)127) < 0;
             IReadOnlyList<string> wordsList = words.ToList();
             if (wordsList.Count == 0) return 0;
 
@@ -733,10 +734,15 @@ namespace AssetsManager.Services.Hashes.Guessers
                 IReadOnlyList<string> normalizedWords = wordsList
                     .Select(PathUtils.NormalizePath)
                     .ToList();
+                byte[][] wordBytes = normalizedWords.Select(Encoding.UTF8.GetBytes).ToArray();
+                bool[] asciiWords = normalizedWords.Select(IsAscii).ToArray();
 
                 long checkedCount = 0;
                 foreach (var format in ProgressIterator(formats1, f => f.Prefix + "%s" + f.Suffix, cancellationToken))
                 {
+                    bool asciiFormat = IsAscii(format.Prefix) && IsAscii(format.Suffix);
+                    byte[] prefixBytes = asciiFormat ? Encoding.UTF8.GetBytes(format.Prefix) : null;
+                    byte[] suffixBytes = asciiFormat ? Encoding.UTF8.GetBytes(format.Suffix) : null;
                     int remaining = candidateBudget == int.MaxValue
                         ? int.MaxValue
                         : (int)Math.Max(0, candidateBudget - checkedCount);
@@ -746,7 +752,10 @@ namespace AssetsManager.Services.Hashes.Guessers
                     for (int i = 0; i < wordsToTake; i++)
                     {
                         cancellationToken.ThrowIfCancellationRequested();
-                        engine.CheckNormalizedParts(format.Prefix, normalizedWords[i], format.Suffix, strategy, source);
+                        if (asciiFormat && asciiWords[i])
+                            engine.CheckNormalizedUtf8Parts(prefixBytes, wordBytes[i], suffixBytes, strategy, source);
+                        else
+                            engine.CheckNormalizedParts(format.Prefix, normalizedWords[i], format.Suffix, strategy, source);
                         checkedCount++;
                         if (engine.RemainingUnknownCount == 0)
                         {

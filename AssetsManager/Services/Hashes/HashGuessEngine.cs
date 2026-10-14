@@ -133,6 +133,40 @@ namespace AssetsManager.Services.Hashes
             return true;
         }
 
+        // Shared normalized parts can be encoded once instead of once per candidate.
+        internal bool CheckNormalizedUtf8Parts(ReadOnlySpan<byte> prefix, ReadOnlySpan<byte> word,
+            ReadOnlySpan<byte> suffix, HashGuessStrategy strategy, string source, ulong sourceChunkHash = 0)
+        {
+            CheckedCandidates++;
+            int length = prefix.Length + word.Length + suffix.Length;
+            if (length == 0)
+            {
+                DiscardedCandidates++;
+                return false;
+            }
+            byte[] rented = null;
+            Span<byte> buffer = length <= 512 ? stackalloc byte[length] :
+                (rented = ArrayPool<byte>.Shared.Rent(length)).AsSpan(0, length);
+            try
+            {
+                prefix.CopyTo(buffer);
+                word.CopyTo(buffer[prefix.Length..]);
+                suffix.CopyTo(buffer[(prefix.Length + word.Length)..]);
+                ulong hash = XxHash64.HashToUInt64(buffer);
+                if (!_unknownHashes.Contains(hash))
+                {
+                    DiscardedCandidates++;
+                    return false;
+                }
+                _AddKnown(hash, Encoding.UTF8.GetString(buffer), strategy, source, sourceChunkHash);
+                return true;
+            }
+            finally
+            {
+                if (rented != null) ArrayPool<byte>.Shared.Return(rented);
+            }
+        }
+
         internal bool CheckCombined(
             string directory,
             string relativePath,
