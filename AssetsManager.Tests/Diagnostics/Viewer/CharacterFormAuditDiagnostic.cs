@@ -71,6 +71,9 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                     var gear = tree.Objects.GetValueOrDefault(form.PathHash);
                     var gearData = gear?.Properties.GetValueOrDefault(0x639b0013u) as BinTreeStruct;
                     var gearMesh = gearData?.Properties.GetValueOrDefault(Hash("skinMeshProperties")) as BinTreeStruct;
+                    Console.WriteLine($"  show={form.ShowSubmeshHashes.Count} hide={form.HideSubmeshHashes.Count} " +
+                        $"ownerMeshDifferences=[{string.Join(",", (gearMesh?.Properties.Values ?? Enumerable.Empty<BinTreeProperty>()).Where(property =>
+                            mesh?.Properties.TryGetValue(property.NameHash, out var original) != true || !property.Equals(original)).Select(property => Name(property.NameHash)))}]");
                     PrintMesh($"gear {form.GearIndex}", gearMesh, Name);
                     var metadata = SknMaterialTextureResolver.ReadMetadata(
                         new[] { tree }, new[] { tree }, binEntryResolver: Name,

@@ -12,7 +12,8 @@ namespace AssetsManager.Services.Viewer.Parsing
 {
     internal sealed record CharacterFormDocumentData(
         IReadOnlyList<uint?> PrimaryGearUpgradePathHashes,
-        IReadOnlyDictionary<uint, CharacterFormDataProjection> GearForms);
+        IReadOnlyDictionary<uint, CharacterFormDataProjection> GearForms,
+        uint? BaseGearUpgradePathHash = null);
 
     internal sealed record CharacterFormDataProjection(
         IReadOnlyList<uint> ShowSubmeshHashes,
@@ -56,6 +57,7 @@ namespace AssetsManager.Services.Viewer.Parsing
             ArgumentNullException.ThrowIfNull(tree);
 
             IReadOnlyList<uint?> primaryLinks = Array.Empty<uint?>();
+            BinTreeEmbedded ownerMesh = null;
             foreach (BinTreeObject skin in tree.Objects.Values)
             {
                 if (skin.ClassHash != VfxParsingSchema.SkinCharacterDataPropertiesClass ||
@@ -64,10 +66,12 @@ namespace AssetsManager.Services.Viewer.Parsing
                     continue;
 
                 primaryLinks = ReadLinks(Get(upgradeData.Properties, F_gearSkinUpgrades));
+                ownerMesh = Get(skin.Properties, F_skinMeshProperties) as BinTreeEmbedded;
                 break;
             }
 
             var gearForms = new Dictionary<uint, CharacterFormDataProjection>();
+            uint? baseGear = null;
             foreach (BinTreeObject gearUpgrade in tree.Objects.Values)
             {
                 if (gearUpgrade.ClassHash != GearSkinUpgradeClass ||
@@ -75,10 +79,19 @@ namespace AssetsManager.Services.Viewer.Parsing
                     gearData.ClassHash != GearDataClass)
                     continue;
 
-                gearForms.TryAdd(gearUpgrade.PathHash, ParseGearData(gearData.Properties));
+                CharacterFormDataProjection data = ParseGearData(gearData.Properties);
+                gearForms.TryAdd(gearUpgrade.PathHash, data);
+                // Keep an authored default gear's VFX and identity instead of adding a synthetic Base.
+                if (primaryLinks.Count > 0 && primaryLinks[0] == gearUpgrade.PathHash && ownerMesh != null &&
+                    data.ShowSubmeshHashes.All(hash => data.InitialHiddenSubmeshHashes?.Contains(hash) != true) &&
+                    data.HideSubmeshHashes.All(hash => data.InitialHiddenSubmeshHashes?.Contains(hash) == true) &&
+                    Get(gearData.Properties, F_skinMeshProperties) is BinTreeEmbedded mesh &&
+                    mesh.ClassHash == ownerMesh.ClassHash && mesh.Properties.Count == ownerMesh.Properties.Count &&
+                    mesh.Properties.All(pair => ownerMesh.Properties.TryGetValue(pair.Key, out var value) && pair.Value.Equals(value)))
+                    baseGear = gearUpgrade.PathHash;
             }
 
-            return new CharacterFormDocumentData(primaryLinks, gearForms);
+            return new CharacterFormDocumentData(primaryLinks, gearForms, baseGear);
         }
 
         /// <summary>
@@ -117,6 +130,8 @@ namespace AssetsManager.Services.Viewer.Parsing
                 bool reloadsModel = otherMesh || data.HasMaterialOverrides ||
                     IsOtherAsset(data.SkeletonPath, owner?.SkeletonPath);
                 string name = ResolveName(links[index].Value, index, binEntryResolver);
+                if (links[index] == documents[0].BaseGearUpgradePathHash && name.StartsWith("Form ", StringComparison.Ordinal))
+                    name = "Base";
                 if (otherMesh && name.StartsWith("Form ", StringComparison.Ordinal))
                     name = ModelFormName(data.MeshPath, ownerCharacter) ?? name;
 

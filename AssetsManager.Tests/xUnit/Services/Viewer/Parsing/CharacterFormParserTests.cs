@@ -171,6 +171,49 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Parsing
             Assert.Equal(3, view.CharacterGearIndex);
         }
 
+        [Theory]
+        [InlineData(false, false)]
+        [InlineData(true, false)]
+        [InlineData(false, true)]
+        public void OnlyDefaultGearMatchingOwnerAppearanceReplacesTheSyntheticBase(bool differentTexture, bool hidesSubmesh)
+        {
+            const uint gearHash = 0x12345678;
+            uint meshField = Fnv1a.HashLower("skinMeshProperties");
+            BinTreeEmbedded Mesh(string texture, bool reverse) => new(meshField, Fnv1a.HashLower("SkinMeshDataProperties"),
+                reverse ? Fields(texture).Reverse() : Fields(texture));
+            BinTreeProperty[] Fields(string texture) => new BinTreeProperty[]
+            {
+                new BinTreeString(Fnv1a.HashLower("simpleSkin"), "ASSETS/Characters/Test/Skins/Skin0/Test.skn"),
+                new BinTreeString(Fnv1a.HashLower("skeleton"), "ASSETS/Characters/Test/Skins/Skin0/Test.skl"),
+                new BinTreeString(Fnv1a.HashLower("texture"), texture),
+                new BinTreeF32(Fnv1a.HashLower("skinScale"), 0.95f)
+            };
+            BinTree tree = MakePrimary(new[] { gearHash }, MakeUpgrade(gearHash,
+                GearData(show: new uint[] { 11, 12 }, hide: hidesSubmesh ? new uint[] { 10 } : null,
+                    extra: new[] { Mesh(differentTexture ? "Other.tex" : "Base.tex", reverse: true) })));
+            tree.Objects.Values.Single(obj => obj.ClassHash == Fnv1a.HashLower("SkinCharacterDataProperties"))
+                .Properties.Add(meshField, Mesh("Base.tex", reverse: false));
+
+            var forms = CharacterFormParser.Resolve(new[] { CharacterFormParser.ParseDocument(tree) }, null,
+                new VfxOwnerSceneContext("ASSETS/Characters/Test/Skins/Skin0/Test.skn",
+                    "ASSETS/Characters/Test/Skins/Skin0/Test.skl", 0.95f));
+            var options = AssetsManager.Services.Viewer.Semantics.CharacterFormSemantics.FormOptions(forms, null, null);
+            bool sameAppearance = !differentTexture && !hidesSubmesh;
+
+            Assert.Equal(sameAppearance ? new[] { "Base" } : new[] { "Base", "Form 1" },
+                options.Select(option => option.Label));
+            Assert.Same(forms[0], options[^1].Definition);
+            Assert.Equal(gearHash, options[^1].Definition.PathHash);
+            Assert.Equal(0, options[^1].Definition.GearIndex);
+            Assert.True(options[^1].Definition.ReloadsModel);
+            if (sameAppearance)
+            {
+                var named = CharacterFormParser.Resolve(new[] { CharacterFormParser.ParseDocument(tree) },
+                    _ => "Characters/Test/Gear/Empowered.bin");
+                Assert.Equal("Empowered", Assert.Single(named).Name);
+            }
+        }
+
         private static BinTree MakePrimary(
             IReadOnlyList<uint> gearUpgradeHashes,
             params BinTreeObject[] gearUpgrades)

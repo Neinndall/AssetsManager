@@ -11,6 +11,7 @@ Improvements
   - 3D Studio / Aligned Project Browser header icons and grouped thumbnail and Explorer controls with color-only hover feedback.
 
 Bug Fixes
+  - 3D Studio / Removed the duplicate Base and Form 1 choices for Elementalist Lux while preserving the authored form's effects.
   - 3D Studio / Fixed attached VFX using the base model and skeleton after switching character forms, including Elementalist Lux's ice form.
   - 3D Studio / Fixed child effects missing from linked or shared particle files and bone-based children on preview characters.
   - 3D Studio / Fixed ground-layer particle placement and palette handling, including palette colors on projected effects.
