@@ -313,7 +313,8 @@ namespace AssetsManager.Views.Dialogs
                 }
                 else
                 {
-                    NewImageOverlay.Opacity = 1.0;
+                    // Restore the mode's style binding after Timeline's local opacity override.
+                    NewImageOverlay.ClearValue(UIElement.OpacityProperty);
                     if (SliderClip != null) SliderClip.Rect = new Rect(0, 0, 99999, 99999);
                     if (OldBadge != null) OldBadge.Visibility = Visibility.Collapsed;
                     if (NewBadge != null) NewBadge.Visibility = Visibility.Collapsed;

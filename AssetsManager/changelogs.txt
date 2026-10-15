@@ -11,6 +11,7 @@ Improvements
 Changes
 
 Bug Fixes
+  - Image Comparison / Fixed Onion Skin adjustment becoming unresponsive after leaving Timeline mode.
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
