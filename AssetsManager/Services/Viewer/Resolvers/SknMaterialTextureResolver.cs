@@ -27,9 +27,8 @@ namespace AssetsManager.Services.Viewer.Resolvers
         internal string EmissiveTexturePath { get; init; }
 
         /// <summary>
-        /// The draw rank of each submesh, in mesh order. The submeshes skinMeshProperties.submeshRenderOrder names
-        /// take the slots they hold in the mesh in the authored order (Yunara skin10 draws its chick eyes over the
-        /// beads they sit on), and every other submesh keeps its own slot.
+        /// The draw rank of each submesh, in mesh order. Explicitly ordered submeshes draw after unlisted geometry
+        /// so facial overlays blend over the body.
         /// </summary>
         internal int[] DrawRanks(IReadOnlyList<string> submeshNames)
         {
@@ -41,10 +40,10 @@ namespace AssetsManager.Services.Viewer.Resolvers
             for (int at = 0; at < SubmeshRenderOrder.Count; at++)
                 authored.TryAdd(SubmeshRenderOrder[at], at);
 
-            int[] listed = ranks.Where(at => authored.ContainsKey(submeshNames[at] ?? string.Empty)).ToArray();
-            int[] byAuthoredOrder = listed.OrderBy(at => authored[submeshNames[at]]).ToArray();
-            for (int slot = 0; slot < listed.Length; slot++)
-                ranks[byAuthoredOrder[slot]] = listed[slot];
+            int[] ordered = ranks.OrderBy(at => authored.TryGetValue(submeshNames[at] ?? string.Empty, out int order)
+                ? order : -1).ToArray();
+            for (int slot = 0; slot < ordered.Length; slot++)
+                ranks[ordered[slot]] = slot;
             return ranks;
         }
 

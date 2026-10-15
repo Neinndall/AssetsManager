@@ -920,7 +920,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
         }
 
         [Fact]
-        public void DrawRanks_ReorderOnlyTheSubmeshesTheRenderOrderNames()
+        public void DrawRanks_PlaceOrderedSubmeshesAfterUnlistedGeometry()
         {
             var resolution = new SknMaterialTextureResolution(null, new Dictionary<string, ModelMaterialDefinition>())
             {
@@ -930,8 +930,28 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
             // Yunara skin10's mesh lists the eyes before the bead they sit on, and Hair is not named.
             int[] ranks = resolution.DrawRanks(new[] { "EyesA", "Hair", "Bead_1", "Body" });
 
-            Assert.Equal(new[] { 3, 1, 2, 0 }, ranks);
+            Assert.Equal(new[] { 3, 0, 2, 1 }, ranks);
             Assert.Equal(new[] { 0, 1, 2 }, (resolution with { SubmeshRenderOrder = Array.Empty<string>() }).DrawRanks(new[] { "a", "b", "c" }));
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void DrawRanks_ChibiFacialLayersFollowTheBodyWithOrWithoutHiddenExpressions(bool includeHidden)
+        {
+            var resolution = new SknMaterialTextureResolution(null, new Dictionary<string, ModelMaterialDefinition>())
+            {
+                SubmeshRenderOrder = new[] { "Eye_Playful", "Mouth_Playful", "Eye_Base", "Mouth_Base", "Scissors", "Smears" }
+            };
+            string[] names = includeHidden
+                ? new[] { "Eye_Playful", "Mouth_Playful", "Eye_Base", "Mouth_Base", "Body", "Scissors", "Hair", "Smears" }
+                : new[] { "Eye_Base", "Mouth_Base", "Body", "Hair" };
+            int[] ranks = resolution.DrawRanks(names);
+
+            Assert.Equal(includeHidden
+                ? new[] { "Body", "Hair", "Eye_Playful", "Mouth_Playful", "Eye_Base", "Mouth_Base", "Scissors", "Smears" }
+                : new[] { "Body", "Hair", "Eye_Base", "Mouth_Base" },
+                names.Select((name, at) => (name, rank: ranks[at])).OrderBy(entry => entry.rank).Select(entry => entry.name));
         }
 
         [Fact]
