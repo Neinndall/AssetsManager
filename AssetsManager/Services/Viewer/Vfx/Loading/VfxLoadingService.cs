@@ -100,9 +100,15 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                 MissingDependencies = source.MissingDependencies;
                 AmbiguousDependencies = source.AmbiguousDependencies;
                 CharacterForms = source.CharacterForms;
-                // A reloaded form renders at its GearData skinScale, so bone anchors must use it too.
-                OwnerSceneContext = form.ReloadsModel && form.SkinScale is > 0f && source.OwnerSceneContext != null
-                    ? source.OwnerSceneContext with { SkinScale = form.SkinScale.Value }
+                // Attached effects must use the same mesh and joint table as the form's pose palette.
+                OwnerSceneContext = form.ReloadsModel && source.OwnerSceneContext != null
+                    ? source.OwnerSceneContext with
+                    {
+                        MeshPath = string.IsNullOrWhiteSpace(form.MeshPath) ? source.OwnerSceneContext.MeshPath : form.MeshPath,
+                        SkeletonPath = string.IsNullOrWhiteSpace(form.SkeletonPath) ? source.OwnerSceneContext.SkeletonPath : form.SkeletonPath,
+                        SkinScale = form.SkinScale is > 0f ? form.SkinScale.Value : source.OwnerSceneContext.SkinScale,
+                        InitialHiddenSubmeshHashes = form.InitialHiddenSubmeshHashes ?? source.OwnerSceneContext.InitialHiddenSubmeshHashes
+                    }
                     : source.OwnerSceneContext;
 
                 ResourceMap = new Dictionary<uint, uint>(source.ResourceMap);

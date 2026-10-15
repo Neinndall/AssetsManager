@@ -113,10 +113,12 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
             Console.WriteLine($"[Preview Forms] {path} authored={bundle.CharacterForms.Count}");
             foreach (var option in CharacterFormSemantics.FormOptions(bundle.CharacterForms, bundle.OwnerSceneContext, model))
             {
+                VfxOwnerSceneContext playbackOwner = bundle.CreateCharacterPlaybackView(option.Definition).OwnerSceneContext;
                 var hidden = CharacterFormSemantics.HiddenSubmeshes(bundle.OwnerSceneContext.InitialHiddenSubmeshHashes,
                     option.Definition, model.Parts, bundle.OwnerSceneContext.SubmeshConditions);
                 Console.WriteLine($"label={option.Label} gear={option.Definition.GearIndex} path={option.Definition.PathHash:x8} " +
-                    $"visible=[{string.Join(",", model.Parts.Where(part => !hidden.Contains(LeagueToolkit.Hashing.Fnv1a.HashLower(part.Name))).Select(part => part.Name))}]");
+                    $"visible=[{string.Join(",", model.Parts.Where(part => !hidden.Contains(LeagueToolkit.Hashing.Fnv1a.HashLower(part.Name))).Select(part => part.Name))}] " +
+                    $"ownerMesh={playbackOwner?.MeshPath} ownerSkeleton={playbackOwner?.SkeletonPath}");
             }
         }
         private static void PrintMesh(string label, BinTreeStruct mesh, Func<uint, string> name)

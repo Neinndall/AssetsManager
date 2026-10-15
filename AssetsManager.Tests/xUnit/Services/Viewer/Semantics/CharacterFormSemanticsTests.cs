@@ -74,6 +74,53 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Semantics
         }
 
         [Fact]
+        public void ReloadedFormPlaybackUsesItsOwnAttachedMeshSkeletonAndHiddenSubmeshes()
+        {
+            var owner = new VfxOwnerSceneContext("ASSETS/Lux.skn", "ASSETS/Lux.skl", 1f,
+                AnimationGraphPathHash: 7, InitialHiddenSubmeshHashes: new uint[] { 10 });
+            var bundle = new VfxLoadingService.Bundle { OwnerSceneContext = owner };
+            var form = CharacterFormDefinition.CreateBase() with
+            {
+                PathHash = 1, GearIndex = 4, ReloadsModel = true,
+                MeshPath = "ASSETS/LuxIce.skn", SkeletonPath = "ASSETS/LuxIce.skl",
+                SkinScale = 0.95f, InitialHiddenSubmeshHashes = new uint[] { 20 }
+            };
+
+            VfxOwnerSceneContext playback = bundle.CreateCharacterPlaybackView(form).OwnerSceneContext;
+
+            Assert.Equal(form.MeshPath, playback.MeshPath);
+            Assert.Equal(form.SkeletonPath, playback.SkeletonPath);
+            Assert.Equal(form.SkinScale, playback.SkinScale);
+            Assert.Equal(form.InitialHiddenSubmeshHashes, playback.InitialHiddenSubmeshHashes);
+            Assert.Equal(owner.AnimationGraphPathHash, playback.AnimationGraphPathHash);
+            Assert.Same(owner.SubmeshConditions, playback.SubmeshConditions);
+            Assert.Same(owner, bundle.OwnerSceneContext);
+            Assert.Same(owner, bundle.CreateCharacterPlaybackView(null).OwnerSceneContext);
+            Assert.Same(owner, bundle.CreateCharacterPlaybackView(form with { ReloadsModel = false }).OwnerSceneContext);
+        }
+
+        [Theory]
+        [InlineData(null, null)]
+        [InlineData(" ", "")]
+        [InlineData("ASSETS/Alternate.skn", null)]
+        [InlineData(null, "ASSETS/Alternate.skl")]
+        public void ReloadedFormKeepsOwnerAssetsWhenNoReplacementIsAuthored(string mesh, string skeleton)
+        {
+            var owner = new VfxOwnerSceneContext("ASSETS/Base.skn", "ASSETS/Base.skl", 1f);
+            var bundle = new VfxLoadingService.Bundle { OwnerSceneContext = owner };
+            var form = CharacterFormDefinition.CreateBase() with
+            {
+                PathHash = 1, GearIndex = 0, ReloadsModel = true, MeshPath = mesh, SkeletonPath = skeleton
+            };
+
+            VfxOwnerSceneContext playback = bundle.CreateCharacterPlaybackView(form).OwnerSceneContext;
+
+            Assert.Equal(string.IsNullOrWhiteSpace(mesh) ? owner.MeshPath : mesh, playback.MeshPath);
+            Assert.Equal(string.IsNullOrWhiteSpace(skeleton) ? owner.SkeletonPath : skeleton, playback.SkeletonPath);
+            Assert.Equal(owner.SkinScale, playback.SkinScale);
+        }
+
+        [Fact]
         public void PlaybackViewAnchorsEffectsAtTheReloadedFormsSkinScale()
         {
             var bundle = new VfxLoadingService.Bundle
