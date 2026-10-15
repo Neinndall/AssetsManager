@@ -124,12 +124,12 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
                         AlphaReference = alphaReference ?? VfxEmitterRenderState.Default.AlphaReference
                     },
                     SoftParticle: soft,
-                    Beam: new VfxBeamDefinition(0, 0, 1, VfxCurve3.Const(Vector3.One),
+                    Beam: new VfxBeamDefinition(0, 0, 2, VfxCurve3.Const(Vector3.One),
                         VfxCurve4.Const(Vector4.One), false, Vector3.Zero, Vector3.Zero),
                     Trail: new VfxTrailDefinition(VfxCurve3.Const(Vector3.One), 0, 0, 0, 0));
                 Vector4 authored = new(0.3f, 0.2f, 0.1f, 0.5f);
                 Vector4 prepared = VfxColorSemantics.PremultiplyForAddOrSubtract(authored, mode, false);
-                int count = trail ? 2 : 1;
+                int count = trail || primitive == VfxPrimitiveKind.CameraSegmentBeam ? 2 : 1;
                 var instances = new float[count * VfxPlaybackRuntime.InstanceStride];
                 var emitter = new VfxPlaybackRuntime.EmitterState
                 {
@@ -150,9 +150,15 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
                     instances[at + 8] = prepared.W;
                     instances[at + 21] = instances[at + 22] = instances[at + 31] = instances[at + 32] = 1;
                     instances[at + 36] = instances[at + 40] = instances[at + 44] = 1;
+                    if (emitter.Def.PrimitiveKind == VfxPrimitiveKind.CameraSegmentBeam)
+                    {
+                        instances[at] = emitter.SystemOrigin.X;
+                        instances[at + 1] = emitter.SystemOrigin.Y;
+                        instances[at + 2] = emitter.SystemOrigin.Z;
+                    }
                     emitter.Particles.Add(new VfxPlaybackRuntime.Particle
                     {
-                        Serial = (uint)index, Life = 1, BirthFrame = Matrix4x4.Identity,
+                        Serial = (uint)index, Ordinal = (ushort)index, Life = 1, BirthFrame = Matrix4x4.Identity,
                         TrailTiling = new Vector3(2, 1, 0),
                         BirthRotation = primitive == VfxPrimitiveKind.ArbitraryTrail
                             ? new Vector3(0, 0, MathF.PI / 2) : Vector3.Zero

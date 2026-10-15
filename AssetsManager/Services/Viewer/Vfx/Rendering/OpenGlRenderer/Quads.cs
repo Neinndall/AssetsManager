@@ -53,8 +53,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _particleUniforms.Uniform1(_particleUniforms.ArbitraryQuad, arbitrary ? 1 : 0);
             _particleUniforms.Uniform1(_particleUniforms.LegacyOrientation, es.Def.LegacyOrientation);
             _particleUniforms.Uniform1(_particleUniforms.PivotUp, es.Def.LegacyScaleUpFromOrigin ? 1 : 0);
-            bool groundLayer = ShouldProjectToGround(es.Def);
-            _particleUniforms.Uniform1(_particleUniforms.IsGroundLayer, groundLayer ? 1 : 0);
             _particleUniforms.Uniform1(_particleUniforms.PrimitiveKind, (int)es.Def.PrimitiveKind);
             bool ribbonPrimitive = es.Def.PrimitiveKind is VfxPrimitiveKind.CameraTrail or
                 VfxPrimitiveKind.ArbitraryTrail or VfxPrimitiveKind.Beam or VfxPrimitiveKind.CameraSegmentBeam;

@@ -217,10 +217,10 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
-        public void GroundLayerFlattensFinalWorldPositionAtZeroLikeLtk()
+        public void GroundLayerDoesNotFlattenParticleOrMeshVertices()
         {
-            Assert.Contains("if (uIsGroundLayer != 0) world.y = 0.0;", VfxShaderSource.ParticleVertex);
-            Assert.Contains("if (uIsGroundLayer != 0) p.y = 0.0;", VfxShaderSource.MeshVertex);
+            Assert.DoesNotContain("uIsGroundLayer", VfxShaderSource.ParticleVertex);
+            Assert.DoesNotContain("uIsGroundLayer", VfxShaderSource.MeshVertex);
             Assert.DoesNotContain("groundForward", VfxShaderSource.ParticleVertex);
             Assert.DoesNotContain("0.02", VfxShaderSource.ParticleVertex);
         }

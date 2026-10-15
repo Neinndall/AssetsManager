@@ -784,6 +784,36 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void BeamMeshIsQueuedByThePlaybackLoadingFlow()
+        {
+            string root = Path.Combine(Path.GetTempPath(), "AssetsManagerVfxBeam", Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(root);
+            string path = Path.Combine(root, "beam.scb");
+            var mesh = new StaticMesh("beam",
+                new[] { new StaticMeshFace("material", (0, 1, 2), (Vector2.Zero, Vector2.UnitX, Vector2.One)) },
+                new[] { new Vector3(0, -1, -1), new Vector3(0, 1, -1), new Vector3(0, 1, 1) });
+            using (var stream = File.Create(path)) mesh.WriteBinary(stream);
+            try
+            {
+                var emitter = VfxBeamSupportTests.Definition() with { MeshPath = "beam.scb" };
+                var definition = new VfxSystemDefinition(1, "beam", "beam", new[] { emitter });
+                using var logger = new LoggerConfiguration().CreateLogger();
+                using var service = new VfxLoadingService();
+                var runtime = service.PreparePlayback(definition, root, Matrix4x4.Identity, 7, new LogService(logger));
+                var state = Assert.Single(runtime.Emitters);
+                Assert.False(state.Def.IsMeshPrimitive);
+                Assert.True(state.Def.DrawsAsBeamMesh);
+                Assert.True(state.PendingMesh.HasValue);
+                Assert.Equal(9, state.PendingMesh.Value.Positions.Length);
+            }
+            finally
+            {
+                File.Delete(path);
+                Directory.Delete(root);
+            }
+        }
+
+        [Fact]
         public void StaticMeshDecodePreservesAuthoredVertexColors()
         {
             string root = Path.Combine(Path.GetTempPath(), "AssetsManagerVfxMesh", Guid.NewGuid().ToString("N"));
@@ -1027,6 +1057,25 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             {
                 if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
             }
+        }
+
+        [Fact]
+        public void FolderCatalogPreservesEachExtractionResourceRootForIdenticalSkinPaths()
+        {
+            string root = Directory.CreateTempSubdirectory("am-project-roots-").FullName;
+            try
+            {
+                string first = Directory.CreateDirectory(Path.Combine(root, "first")).FullName;
+                string second = Directory.CreateDirectory(Path.Combine(root, "second")).FullName;
+                WriteSkinBin(Path.Combine(first, "skin0.bin"));
+                WriteSkinBin(Path.Combine(second, "skin0.bin"));
+                StudioSkinItem firstSkin = Assert.Single(StudioProjectCatalog.Scan(first, System.Threading.CancellationToken.None));
+                StudioSkinItem secondSkin = Assert.Single(StudioProjectCatalog.Scan(second, System.Threading.CancellationToken.None));
+                Assert.Equal(first, firstSkin.ResourceRoot);
+                Assert.Equal(second, secondSkin.ResourceRoot);
+                Assert.NotEqual(firstSkin.BinPath, secondSkin.BinPath);
+            }
+            finally { Directory.Delete(root, recursive: true); }
         }
 
         [Fact]

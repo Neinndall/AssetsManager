@@ -21,6 +21,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             float FinishedAt,
             bool BurstDone,
             bool InitialEmissionDone,
+            ushort Spawned,
             float TrailDistance,
             Vector3? TrailSpawnedAt,
             int InstanceBufferLength,
@@ -70,6 +71,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                     state.FinishedAt,
                     state.BurstDone,
                     state.InitialEmissionDone,
+                    state.Spawned,
                     state.TrailDistance,
                     state.TrailSpawnedAt,
                     state.InstanceBufferCapacity,
@@ -142,6 +144,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 state.FinishedAt = saved.FinishedAt;
                 state.BurstDone = saved.BurstDone;
                 state.InitialEmissionDone = saved.InitialEmissionDone;
+                state.Spawned = saved.Spawned;
                 state.TrailDistance = saved.TrailDistance;
                 state.TrailSpawnedAt = saved.TrailSpawnedAt;
                 state.NoiseLast = (float[])saved.NoiseLast.Clone();

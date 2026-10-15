@@ -240,10 +240,10 @@ public sealed class VfxStencilGpuTests
                 PrimitiveKind = kind, IsMeshPrimitive = mesh,
                 Trail = trail ? new VfxTrailDefinition(VfxCurve3.Const(Vector3.One), 0, 0, 0, 0) : null,
                 Beam = kind is VfxPrimitiveKind.Beam or VfxPrimitiveKind.CameraSegmentBeam ?
-                    new VfxBeamDefinition(0, 0, 1, VfxCurve3.Const(Vector3.One), VfxCurve4.Const(Vector4.One),
+                    new VfxBeamDefinition(0, 0, 2, VfxCurve3.Const(Vector3.One), VfxCurve4.Const(Vector4.One),
                         false, Vector3.Zero, Vector3.Zero) : null
             };
-            int count = trail ? 2 : 1;
+            int count = trail || kind == VfxPrimitiveKind.CameraSegmentBeam ? 2 : 1;
             var instances = new float[count * VfxPlaybackRuntime.InstanceStride];
             var emitter = new VfxPlaybackRuntime.EmitterState
             {
@@ -262,9 +262,15 @@ public sealed class VfxStencilGpuTests
                 instances[at + 7] = color.Z; instances[at + 8] = color.W;
                 instances[at + 21] = instances[at + 22] = instances[at + 31] = instances[at + 32] = 1;
                 instances[at + 36] = instances[at + 40] = instances[at + 44] = 1;
+                if (kind == VfxPrimitiveKind.CameraSegmentBeam)
+                {
+                    instances[at] = emitter.SystemOrigin.X;
+                    instances[at + 1] = emitter.SystemOrigin.Y;
+                    instances[at + 2] = emitter.SystemOrigin.Z;
+                }
                 emitter.Particles.Add(new VfxPlaybackRuntime.Particle
                 {
-                    Serial = (uint)index, Life = 1, BirthFrame = Matrix4x4.Identity, TrailTiling = new(2, 1, 0),
+                    Serial = (uint)index, Ordinal = (ushort)index, Life = 1, BirthFrame = Matrix4x4.Identity, TrailTiling = new(2, 1, 0),
                     BirthRotation = kind == VfxPrimitiveKind.ArbitraryTrail ? new(0, 0, MathF.PI / 2) : Vector3.Zero
                 });
             }

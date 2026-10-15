@@ -97,6 +97,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             float wireframeOpacity, int passIndex = 0)
         {
             if (es.MeshVao == 0 || es.MeshVertexCount == 0) return;
+            bool beamMesh = es.Def.DrawsAsBeamMesh;
+            Vector3 beamPosition = default;
+            Matrix4x4 beamBasis = Matrix4x4.Identity;
+            float beamStretch = 0f;
+            if (beamMesh && !VfxBeamGeometry.TryMeshPlacement(es, out beamPosition, out beamBasis, out beamStretch)) return;
+            Vector4 beamTint = beamMesh ? VfxBeamGeometry.DistanceColor(es) : Vector4.One;
             bool isDistortion = es.Def.DrawsAsDistortion && !wireframePass;
             // The game draws the scene behind a distorting emitter at any strength, so it always needs the frame.
             bool warpsFrame = isDistortion;
@@ -124,12 +130,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 UploadMeshBonePalette(new ReadOnlySpan<Matrix4x4>(_ownerSkinningMatrices, 0, _ownerSkinningCount));
 
             // Direction-oriented mesh particles take precedence over camera alignment in LTK.
-            bool cameraAlignedMesh = !attachedMesh && !es.Def.IsDirectionOriented &&
+            bool cameraAlignedMesh = !beamMesh && !attachedMesh && !es.Def.IsDirectionOriented &&
                 (es.Def.MeshAlignPitchToCamera || es.Def.MeshAlignYawToCamera);
             _meshUniforms.Uniform1(_meshUniforms.AlignPitchToCamera, cameraAlignedMesh && es.Def.MeshAlignPitchToCamera ? 1 : 0);
             _meshUniforms.Uniform1(_meshUniforms.AlignYawToCamera, cameraAlignedMesh && es.Def.MeshAlignYawToCamera ? 1 : 0);
             _meshUniforms.Uniform1(_meshUniforms.MeshSkinned, es.Def.MeshIsSkinned ? 1 : 0);
-            _meshUniforms.Uniform1(_meshUniforms.IsGroundLayer, es.Def.IsGroundLayer ? 1 : 0);
             _meshUniforms.Uniform1(_meshUniforms.Tex, 0);
             _meshUniforms.Uniform1(_meshUniforms.TexMult, 1);
             _meshUniforms.Uniform1(_meshUniforms.ColorMap, 7);
@@ -354,6 +359,13 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 _meshUniforms.Uniform3(_meshUniforms.PlacementRight, instances[o + 36], instances[o + 37], instances[o + 38]);
                 _meshUniforms.Uniform3(_meshUniforms.PlacementUp, instances[o + 39], instances[o + 40], instances[o + 41]);
                 _meshUniforms.Uniform3(_meshUniforms.PlacementForward, instances[o + 42], instances[o + 43], instances[o + 44]);
+                if (beamMesh)
+                {
+                    _meshUniforms.Uniform3(_meshUniforms.WorldPos, beamPosition.X, beamPosition.Y, beamPosition.Z);
+                    _meshUniforms.Uniform3(_meshUniforms.PlacementRight, beamBasis.M11, beamBasis.M12, beamBasis.M13);
+                    _meshUniforms.Uniform3(_meshUniforms.PlacementUp, beamBasis.M21, beamBasis.M22, beamBasis.M23);
+                    _meshUniforms.Uniform3(_meshUniforms.PlacementForward, beamBasis.M31, beamBasis.M32, beamBasis.M33);
+                }
                 Vector3 orbitRotation = i < es.Particles.Count
                     ? es.Particles[i].BirthOrbitalVelocity * es.Particles[i].Age
                     : Vector3.Zero;
@@ -364,6 +376,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 float scaleX = ClampScale(instances[o + 3]) * ownerScale;
                 float scaleY = ClampScale(instances[o + 4]) * ownerScale;
                 float scaleZ = ClampScale(instances[o + 18]) * ownerScale;
+                if (beamMesh) scaleZ = beamStretch;
                 _meshUniforms.Uniform3(_meshUniforms.Scale, scaleX, scaleY, scaleZ);
                 Vector3 meshRotation = new(
                     instances[o + 15],
@@ -376,7 +389,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                     meshRotation.Z);
                 _meshUniforms.Uniform3(_meshUniforms.GameLookupDrivers, instances[o + 11],
                     new Vector3(instances[o + 12], instances[o + 13], instances[o + 14]).Length(), instances[o + 34]);
-                _meshUniforms.Uniform4(_meshUniforms.Color, instances[o + 5], instances[o + 6], instances[o + 7], instances[o + 8]);
+                _meshUniforms.Uniform4(_meshUniforms.Color, instances[o + 5] * beamTint.X, instances[o + 6] * beamTint.Y,
+                    instances[o + 7] * beamTint.Z, instances[o + 8] * beamTint.W);
                 _meshUniforms.Uniform2(_meshUniforms.BirthUvOffset, instances[o + 19], instances[o + 20]);
                 _meshUniforms.Uniform2(_meshUniforms.UvScale, instances[o + 21], instances[o + 22]);
                 _meshUniforms.Uniform1(_meshUniforms.UvRotation, instances[o + 23]);

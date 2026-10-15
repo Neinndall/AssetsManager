@@ -1,5 +1,27 @@
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
+AssetsManager - League of Legends | v4.1.0.1
+
+HOTFIX UPDATE
+Key fixes and improvements following the release of the BIG PATCH, focusing on the VFX engine.
+
+New Features
+  - 3D Studio / VFX preview now draws stretched beam meshes and particle-driven segment beams.
+  - 3D Studio / Use Open/Add to load multiple project folders with separate trees and shared search; Remove from project preserves files and open scenes.
+
+Improvements
+  - 3D Studio / Project Browser groups parent navigation and breadcrumbs in a bordered path bar that keeps the current folder visible on long paths.
+  - 3D Studio / Aligned Project Browser header icons and grouped thumbnail and Explorer controls with color-only hover feedback.
+
+Bug Fixes
+  - 3D Studio / Removed the duplicate Base and Form 1 choices for Elementalist Lux while preserving the authored form's effects.
+  - 3D Studio / Fixed attached VFX using the base model and skeleton after switching character forms, including Elementalist Lux's ice form.
+  - 3D Studio / Fixed child effects missing from linked or shared particle files and bone-based children on preview characters.
+  - 3D Studio / Fixed ground-layer particle placement and palette handling, including palette colors on projected effects.
+  - 3D Studio / Fixed beam segment emission limits, replay resets and child effect targets.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
 AssetsManager - League of Legends | v4.1.0.0
 
 MAJOR UPDATE

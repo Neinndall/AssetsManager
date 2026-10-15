@@ -33,6 +33,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
         private const string ShaderDefinitionsPath = "data/shaders/shaders.bin";
         private static readonly uint SpellObjectClass = Fnv1a.HashLower("SpellObject");
         private readonly HashResolverService _hashResolverService;
+        private readonly Func<uint, string> _binEntryPathResolver;
         private readonly MapAssetResolver _assetResolver;
         private readonly SemaphoreSlim _catalogGate = new(1, 1);
         private (string Root, BinTree Tree) _shaderDefinitions;
@@ -41,9 +42,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
         public VfxLoadingService(
             HashResolverService hashResolverService = null,
             WadContentProvider wadContentProvider = null,
-            AppSettings appSettings = null)
+            AppSettings appSettings = null,
+            Func<uint, string> binEntryPathResolver = null)
         {
             _hashResolverService = hashResolverService;
+            _binEntryPathResolver = binEntryPathResolver;
             _assetResolver = wadContentProvider != null && appSettings != null
                 ? new MapAssetResolver(wadContentProvider, appSettings)
                 : null;
@@ -54,7 +57,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
         /// 3D Studio uses this only for semantic browser discovery (for example Character Spells).
         /// </summary>
         internal string ResolveBinEntryPath(uint pathHash)
-            => _hashResolverService?.ResolveBinEntry(pathHash);
+            => _binEntryPathResolver?.Invoke(pathHash) ?? _hashResolverService?.ResolveBinEntry(pathHash);
 
         /// <summary>
         /// Resolves a GAME WAD path hash through the shared hash catalog. Installation backdrop
@@ -97,9 +100,15 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                 MissingDependencies = source.MissingDependencies;
                 AmbiguousDependencies = source.AmbiguousDependencies;
                 CharacterForms = source.CharacterForms;
-                // A reloaded form renders at its GearData skinScale, so bone anchors must use it too.
-                OwnerSceneContext = form.ReloadsModel && form.SkinScale is > 0f && source.OwnerSceneContext != null
-                    ? source.OwnerSceneContext with { SkinScale = form.SkinScale.Value }
+                // Attached effects must use the same mesh and joint table as the form's pose palette.
+                OwnerSceneContext = form.ReloadsModel && source.OwnerSceneContext != null
+                    ? source.OwnerSceneContext with
+                    {
+                        MeshPath = string.IsNullOrWhiteSpace(form.MeshPath) ? source.OwnerSceneContext.MeshPath : form.MeshPath,
+                        SkeletonPath = string.IsNullOrWhiteSpace(form.SkeletonPath) ? source.OwnerSceneContext.SkeletonPath : form.SkeletonPath,
+                        SkinScale = form.SkinScale is > 0f ? form.SkinScale.Value : source.OwnerSceneContext.SkinScale,
+                        InitialHiddenSubmeshHashes = form.InitialHiddenSubmeshHashes ?? source.OwnerSceneContext.InitialHiddenSubmeshHashes
+                    }
                     : source.OwnerSceneContext;
 
                 ResourceMap = new Dictionary<uint, uint>(source.ResourceMap);
@@ -197,30 +206,56 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                 if (!string.IsNullOrEmpty(wadRoot)) searchFolder = wadRoot;
 
                 var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                var childLookupBins = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 var clipKeys = new HashSet<(uint Graph, uint Clip)>();
                 var graphKeys = new HashSet<uint>();
                 var queue = new Queue<string>();
                 var characterFormDocuments = new List<CharacterFormDocumentData>();
                 var loadedTrees = new List<BinTree>();
+                var documents = new Dictionary<string, VfxBinDocument>(StringComparer.OrdinalIgnoreCase);
+                var childSkins = new Dictionary<uint, string>();
+                var requestedSkins = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 // VFX custom materials link CustomShaderDefs the global shader BIN declares; without it a
                 // material keeps its textures but no game program, and draws with the stock particle shader.
                 BinTree[] shaderTrees = LoadShaderDefinitions(searchFolder, log, cancellationToken) is { } shaders
                     ? new[] { shaders }
                     : null;
 
-                void Enqueue(string p)
+                void Enqueue(string p, bool childLookupOnly = false)
                 {
                     if (File.Exists(p) && visited.Add(Path.GetFullPath(p)))
+                    {
                         queue.Enqueue(p);
+                        if (childLookupOnly) childLookupBins.Add(Path.GetFullPath(p));
+                    }
                 }
 
                 Enqueue(skinBinPath);
                 int openedLinkedBins = 0;
 
-                while (queue.Count > 0)
+                bool EnqueueChildSkins()
+                {
+                    var opened = documents.GetValueOrDefault(bundle.PrimaryBinPath)?.ResourceMap;
+                    foreach (var system in bundle.Systems.Values)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        if (!VfxLinkedChildResolver.MissingKeys(system, bundle.Systems)
+                                .Any(key => opened?.ContainsKey(key) != true)) continue;
+                        string path = VfxLinkedChildResolver.SkinBin(ResolveBinEntryPath(system.PathHash));
+                        if (path == null) continue;
+                        string resolved = _resources.ResolveLinkedBins(path, wadRoot, searchFolder).FirstOrDefault();
+                        if (resolved == null) continue;
+                        childSkins[system.PathHash] = Path.GetFullPath(resolved);
+                        if (requestedSkins.Add(resolved)) Enqueue(resolved, childLookupOnly: true);
+                    }
+                    return queue.Count > 0;
+                }
+
+                while (queue.Count > 0 || EnqueueChildSkins())
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     string currentBinPath = queue.Dequeue();
+                    bool childLookupOnly = childLookupBins.Contains(Path.GetFullPath(currentBinPath));
                     bool isPrimary = string.Equals(
                         Path.GetFullPath(currentBinPath),
                         bundle.PrimaryBinPath,
@@ -236,7 +271,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                         BinTree tree = VfxGraphParser.ParseTree(File.ReadAllBytes(currentBinPath));
                         loadedTrees.Add(tree);
                         foreach (BinTreeObject spell in tree.Objects.Values.Where(item =>
-                                     item.ClassHash == SpellObjectClass))
+                                     !childLookupOnly && item.ClassHash == SpellObjectClass))
                             bundle.SpellPreviews.TryAdd(spell.PathHash, VfxSpellPreviewReader.Read(spell));
                         VfxBinDocument document = VfxGraphParser.ParseDocument(
                             tree,
@@ -246,7 +281,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                             _hashResolverService == null ? null : _hashResolverService.ResolveBinEntry,
                             shaderTrees);
                         bundle.LoadedBins.Add(Path.GetFullPath(currentBinPath));
-                        if (document.CharacterFormData != null)
+                        documents[Path.GetFullPath(currentBinPath)] = document;
+                        if (!childLookupOnly && document.CharacterFormData != null)
                             characterFormDocuments.Add(document.CharacterFormData);
 
                         foreach (var kv in document.Systems)
@@ -263,14 +299,16 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                             foreach (var kv in document.SkinResourceMap)
                                 bundle.ResourceMap.TryAdd(kv.Key, kv.Value);
                         }
-                        foreach (AnimationClipDefinition sequence in document.EventSequences)
+                        foreach (AnimationClipDefinition sequence in childLookupOnly
+                                     ? Array.Empty<AnimationClipDefinition>() : document.EventSequences)
                         {
                             bundle.EventSequences.TryAdd(sequence.OwnerPathHash, sequence);
                             if (clipKeys.Add((sequence.GraphPathHash, sequence.OwnerPathHash)))
                                 bundle.Clips.Add(sequence);
                         }
                         foreach (AnimationGraphDefinition graph in
-                                 document.AnimationGraphs ?? Array.Empty<AnimationGraphDefinition>())
+                                 childLookupOnly ? Array.Empty<AnimationGraphDefinition>() :
+                                     document.AnimationGraphs ?? Array.Empty<AnimationGraphDefinition>())
                         {
                             if (graphKeys.Add(graph.PathHash))
                                 bundle.AnimationGraphs.Add(graph);
@@ -281,7 +319,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                             foreach (VfxIdleEffectDefinition idle in document.IdleEffects)
                                 bundle.IdleEffects.Add(idle);
                         }
-                        bundle.OwnerSceneContext ??= document.OwnerSceneContext;
+                        if (!childLookupOnly) bundle.OwnerSceneContext ??= document.OwnerSceneContext;
 
                         foreach (var dep in document.Dependencies)
                         {
@@ -295,7 +333,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                                 bundle.AmbiguousDependencies.Add(dep);
                             }
                             foreach (string resolvedDependency in resolvedDependencies)
-                                Enqueue(resolvedDependency);
+                                Enqueue(resolvedDependency, childLookupOnly);
 
                             if (!enqueued)
                             {
@@ -317,8 +355,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                 // A system's custom material may be declared by any BIN it links rather than its own.
                 foreach (uint systemHash in bundle.Systems.Keys.ToArray())
                 {
+                    var system = bundle.Systems[systemHash];
+                    var skin = childSkins.TryGetValue(systemHash, out string childSkin)
+                        ? documents.GetValueOrDefault(childSkin) : null;
                     bundle.Systems[systemHash] = VfxGraphParser.ResolveLinkedCustomMaterials(
-                        bundle.Systems[systemHash],
+                        VfxLinkedChildResolver.Resolve(system, bundle.Systems,
+                            documents.GetValueOrDefault(bundle.PrimaryBinPath)?.ResourceMap, skin?.ResourceMap),
                         loadedTrees,
                         _hashResolverService == null ? null : _hashResolverService.ResolveHash,
                         _hashResolverService == null ? null : _hashResolverService.ResolveBinEntry,
@@ -450,7 +492,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                     continue;
                 }
 
-                if (!emitter.Def.IsMeshPrimitive || string.IsNullOrWhiteSpace(emitter.Def.MeshPath))
+                if (!emitter.Def.DrawsAsMesh || string.IsNullOrWhiteSpace(emitter.Def.MeshPath))
                     continue;
 
                 VfxMeshData? mesh = _resources.ResolveMesh(

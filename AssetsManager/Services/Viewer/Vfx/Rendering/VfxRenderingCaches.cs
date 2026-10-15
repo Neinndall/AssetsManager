@@ -278,6 +278,13 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             emitter.MeshIndexCount = resource.IndexCount;
             emitter.MeshInterleaved = resource.Interleaved;
             emitter.MeshHasSkinning = resource.HasSkinning;
+            float minimum = float.PositiveInfinity, maximum = float.NegativeInfinity;
+            for (int at = 2; at < resource.Interleaved.Length; at += VertexStride)
+            {
+                minimum = MathF.Min(minimum, resource.Interleaved[at]);
+                maximum = MathF.Max(maximum, resource.Interleaved[at]);
+            }
+            emitter.MeshDepth = resource.VertexCount > 0 ? maximum - minimum : 0;
         }
 
         private void ConfigureAttribute(uint location, int componentCount, IntPtr offset)

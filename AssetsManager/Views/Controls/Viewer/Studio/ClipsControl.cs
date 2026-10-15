@@ -150,7 +150,7 @@ namespace AssetsManager.Views.Controls.Viewer
             if (_championModel == null)
             {
                 _model.StatusText = $"{selectedItem.DisplayName} · waiting for character model.";
-                TryLoadChampionModelAsync(_model.RootPath);
+                TryLoadChampionModelAsync(_model.SelectedSkin?.ResourceRoot ?? _model.RootPath);
                 return;
             }
 

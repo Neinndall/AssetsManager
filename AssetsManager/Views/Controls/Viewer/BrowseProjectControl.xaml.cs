@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -26,11 +27,12 @@ namespace AssetsManager.Views.Controls.Viewer
         private CancellationTokenSource _previewCancellation;
         private CancellationTokenSource _treeCancellation;
         private CancellationTokenSource _thumbnailsCancellation;
-        private ProjectBrowserFolder _rootFolder;
+        private readonly ObservableRangeCollection<ProjectBrowserFolder> _rootFolders = new();
         private string _root;
         private string _folder;
         internal LogService LogService { get; set; }
         public event EventHandler CloseRequested;
+        public event Action<string> RemoveFolderRequested;
         public event Action<string> OpenInStudioRequested;
         public static readonly DependencyProperty IsStandaloneProperty = DependencyProperty.Register(
             nameof(IsStandalone), typeof(bool), typeof(BrowseProjectControl), new PropertyMetadata(false));
@@ -58,21 +60,34 @@ namespace AssetsManager.Views.Controls.Viewer
             IsVisibleChanged += OnVisibilityChanged;
         }
 
-        internal void SetProject(string path)
+        internal void SetProject(string path) => SetProjects(string.IsNullOrWhiteSpace(path) ? Array.Empty<string>() : new[] { path });
+
+        internal void SetProjects(IReadOnlyList<string> paths)
         {
-            string root = string.IsNullOrWhiteSpace(path) ? null : Path.GetFullPath(path);
-            if (string.Equals(_root, root, StringComparison.OrdinalIgnoreCase)) return;
-            Clear();
-            _root = root;
-            _folder = root;
-            if (root != null)
-            {
-                _rootFolder = ProjectBrowserFolder.Create(root);
-                _rootFolder.IsExpanded = true;
-                FoldersTree.ItemsSource = new[] { _rootFolder };
-            }
-            SearchBox.Text = string.Empty;
+            string[] roots = paths.Where(path => !string.IsNullOrWhiteSpace(path))
+                .Select(path => Path.TrimEndingDirectorySeparator(Path.GetFullPath(path)))
+                .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+            if (_rootFolders.Select(folder => folder.FullPath).SequenceEqual(roots, StringComparer.OrdinalIgnoreCase)) return;
+            CancelWork();
+            var folders = roots.Select(path => _rootFolders.FirstOrDefault(folder =>
+                string.Equals(folder.FullPath, path, StringComparison.OrdinalIgnoreCase)) ??
+                ProjectBrowserFolder.Create(path)).ToArray();
+            _rootFolders.ReplaceRange(folders);
+            FoldersTree.ItemsSource = _rootFolders;
+            _root = _folder == null ? roots.FirstOrDefault() : ProjectBrowserService.FindRoot(roots, _folder);
+            if (_root == null) _root = roots.FirstOrDefault();
+            if (_folder == null || _root == null || !ProjectBrowserService.IsWithinRoot(_root, _folder)) _folder = _root;
+            ProjectBrowserFolder selectedRoot = folders.FirstOrDefault(folder => string.Equals(folder.FullPath, _root, StringComparison.OrdinalIgnoreCase));
+            if (selectedRoot != null) selectedRoot.IsExpanded = true;
+            if (_root == null) { Clear(); return; }
             if (IsLoaded && IsVisible) _ = BrowseAsync();
+        }
+
+        private void RemoveFolder_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not FrameworkElement { DataContext: ProjectBrowserFolder { IsRoot: true } folder }) return;
+            if (IsStandalone) SetProjects(_rootFolders.Where(root => root != folder).Select(root => root.FullPath).ToArray());
+            else RemoveFolderRequested?.Invoke(folder.FullPath);
         }
 
         private void OnLoaded(object sender, RoutedEventArgs e) => _ = BrowseAsync();
@@ -98,7 +113,8 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             CancelWork();
             _root = _folder = null;
-            _rootFolder = null;
+            UpButton.IsEnabled = false;
+            _rootFolders.Clear();
             FoldersTree.ItemsSource = null;
             _files.Clear();
             Breadcrumbs.Clear();
@@ -118,6 +134,8 @@ namespace AssetsManager.Views.Controls.Viewer
             var cancellation = new CancellationTokenSource();
             _browseCancellation = cancellation;
             string root = _root, folder = _folder, query = SearchBox.Text;
+            UpButton.IsEnabled = !string.Equals(root, folder, StringComparison.OrdinalIgnoreCase);
+            string[] roots = _rootFolders.Select(item => item.FullPath).ToArray();
             try
             {
                 CancelPreview();
@@ -133,13 +151,14 @@ namespace AssetsManager.Views.Controls.Viewer
                         chain.Add(Path.Combine(chain[^1], part));
                 Breadcrumbs.SetPath(chain, path => Path.GetFileName(Path.TrimEndingDirectorySeparator(path)));
                 ProjectBrowserResult result = await Task.Run(() =>
-                    ProjectBrowserService.Read(root, folder, query, cancellation.Token), cancellation.Token);
+                    string.IsNullOrWhiteSpace(query) ? ProjectBrowserService.Read(root, folder, query, cancellation.Token)
+                        : ProjectBrowserService.Search(roots, query, cancellation.Token), cancellation.Token);
                 cancellation.Token.ThrowIfCancellationRequested();
                 _files.ReplaceRange(result.Files);
                 EmptyMessage.Text = result.Files.Count == 0 ? "No matching files." : string.Empty;
                 EmptyMessage.Visibility = result.Files.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
                 SummaryText.Text = result.IsTruncated ? "First 1,000 matches · refine your search" : $"{result.Files.Count} items";
-                await SynchronizeTreeAsync(folder, TreeToken());
+                await SynchronizeTreeAsync(folder, cancellation.Token);
             }
             catch (OperationCanceledException) { }
             catch (Exception ex)
@@ -211,9 +230,19 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             if (e.Value is string path) Navigate(path);
         }
-        private void Navigate(string path)
+        private void BreadcrumbScroll_ScrollChanged(object sender, ScrollChangedEventArgs e)
         {
-            if (_root == null || !ProjectBrowserService.IsWithinRoot(_root, path)) return;
+            if (sender is ScrollViewer scroll && (e.ExtentWidthChange != 0 || e.ViewportWidthChange != 0))
+                scroll.ScrollToHorizontalOffset(scroll.ScrollableWidth);
+        }
+        private void Navigate(string path, string rootPath = null)
+        {
+            if (string.IsNullOrEmpty(path)) return;
+            string root = rootPath ?? (string.IsNullOrEmpty(SearchBox.Text) && _root != null && ProjectBrowserService.IsWithinRoot(_root, path)
+                ? _root : ProjectBrowserService.FindRoot(_rootFolders.Select(folder => folder.FullPath), path));
+            if (root == null) return;
+            if (!ProjectBrowserService.IsWithinRoot(root, path)) return;
+            _root = root;
             if (string.Equals(_folder, path, StringComparison.OrdinalIgnoreCase) && string.IsNullOrEmpty(SearchBox.Text)) return;
             _folder = path;
             if (string.IsNullOrEmpty(SearchBox.Text)) _ = BrowseAsync();
@@ -221,7 +250,8 @@ namespace AssetsManager.Views.Controls.Viewer
         }
         private void Up_Click(object sender, RoutedEventArgs e)
         {
-            if (_folder != null) Navigate(Directory.GetParent(_folder)?.FullName ?? _folder);
+            if (_folder != null && _root != null && !string.Equals(_folder, _root, StringComparison.OrdinalIgnoreCase))
+                Navigate(Directory.GetParent(_folder)?.FullName ?? _folder, _root);
         }
         private void Files_PrimaryAction(object sender, RoutedEventArgs e)
         {
@@ -271,10 +301,10 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             try
             {
-                string root = _root;
+                string root = folder.RootPath;
                 var paths = await Task.Run(() => ProjectBrowserService.ReadFolders(root, folder.FullPath, token), token);
                 token.ThrowIfCancellationRequested();
-                folder.Children.ReplaceRange(paths.Select(ProjectBrowserFolder.Create));
+                folder.Children.ReplaceRange(paths.Select(path => ProjectBrowserFolder.Create(path, folder.RootPath)));
                 folder.IsLoaded = true;
             }
             catch (OperationCanceledException) { }
@@ -284,7 +314,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private async Task SynchronizeTreeAsync(string path, CancellationToken token)
         {
-            ProjectBrowserFolder current = _rootFolder;
+            ProjectBrowserFolder current = _rootFolders.FirstOrDefault(folder => string.Equals(folder.FullPath, _root, StringComparison.OrdinalIgnoreCase));
             if (current == null) return;
             string relative = Path.GetRelativePath(current.FullPath, path);
             if (relative != ".")
@@ -300,7 +330,7 @@ namespace AssetsManager.Views.Controls.Viewer
             }
             await LoadFolderAsync(current, token);
             token.ThrowIfCancellationRequested();
-            ClearTreeSelection(_rootFolder);
+            foreach (ProjectBrowserFolder root in _rootFolders) ClearTreeSelection(root);
             current.IsSelected = current.IsMultiSelected = true;
         }
 
@@ -319,7 +349,8 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void Folders_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
         {
-            if (e.NewValue is ProjectBrowserFolder { FullPath: not null } folder) Navigate(folder.FullPath);
+            if (e.NewValue is ProjectBrowserFolder { FullPath: not null } folder)
+                Navigate(folder.FullPath, folder.RootPath);
         }
 
         private void CancelThumbnails()

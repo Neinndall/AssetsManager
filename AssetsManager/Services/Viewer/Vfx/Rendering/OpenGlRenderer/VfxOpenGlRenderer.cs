@@ -450,7 +450,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             HashSet<(object Graph, string Path, int SourceOrder, int Pass)> renderedSortedQuadGroups = _renderedSortedQuadGroups;
 
             _drawingWireframe = useWireframe;
-            _particlePassCountSelector ??= emitter => ParticlePassCount(emitter, emitter.Def.IsMeshPrimitive, _drawingWireframe);
+            _particlePassCountSelector ??= emitter => ParticlePassCount(emitter, emitter.Def.DrawsAsMesh, _drawingWireframe);
             _particleTransparencySelector ??= (emitter, pass) => ParticlePassTransparent(emitter, pass, _drawingWireframe);
             VfxRenderQueue.BuildPassesInto(renderQueue, _particlePassDraws,
                 _particlePassCountSelector, _particleTransparencySelector);
@@ -468,7 +468,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 ApplyEmitterStencilState(es.Def, stencilScene, useWireframe);
                 // Never synthesize an AttachedMesh proxy. Render only geometry that was
                 // resolved from the real owner scene and filtered by authored submesh masks.
-                if (es.Def.IsMeshPrimitive && es.MeshVao == 0)
+                if (es.Def.DrawsAsMesh && es.MeshVao == 0)
                     continue;
 
                 // LTK allocates one draw component per graph/path/emitter definition. Every live
@@ -506,7 +506,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                     instancesSpan = es.PrepareInstances(renderInstanceCount);
                 }
 
-                if (es.Def.IsMeshPrimitive && es.MeshVao != 0)
+                if (es.Def.DrawsAsMesh && es.MeshVao != 0)
                 {
                     bool meshDistortion = es.Def.DrawsAsDistortion && !useWireframe;
                     ApplyEmitterDepthState(es.Def, meshDistortion);
@@ -533,7 +533,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 }
                 if (es.Def.DrawsAsProjection)
                 {
-                    RenderProjection(es, instancesSpan, renderInstanceCount, viewProj, useWireframe, wireOpacity);
+                    RenderProjection(es, instancesSpan, renderInstanceCount, viewProj, sharedPalettePhase, useWireframe, wireOpacity);
                     continue;
                 }
                 RenderQuadEmitter(es, instancesSpan, renderInstanceCount, sharedPalettePhase, useWireframe, wireOpacity, camPos, camRight, camUp, passIndex);

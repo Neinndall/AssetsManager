@@ -22,9 +22,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             int slot = mesh ? 1 : 0;
             if (materials[slot] == null)
                 materials[slot] = new ParticleMaterial(emitter.HasResolvedCustomMaterial
-                    ? emitter.CustomMaterial.Program : emitter.PaletteDefinition is { } palette &&
-                        (palette.PaletteCount <= 0 || string.IsNullOrWhiteSpace(palette.PaletteTexturePath))
-                        ? null : GameParticleProgramResolver.Create(emitter, mesh),
+                    ? emitter.CustomMaterial.Program : GameParticleProgramResolver.Create(emitter, mesh),
                     GameParticleProgramResolver.BorderedTextures(emitter));
             var material = materials[slot];
             return (material.Program == null ? null : GetOrCreate(material, material.Program, mesh,
@@ -51,9 +49,6 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             var (cache, material) = ParticleEntry(emitter, mesh);
             if (material.Program == null)
                 return emitter.HasResolvedCustomMaterial ? "Custom material without a program."
-                    : emitter.PaletteDefinition is { PaletteCount: <= 0 } ? "Palette with no rows."
-                    : emitter.PaletteDefinition is { } palette && string.IsNullOrWhiteSpace(palette.PaletteTexturePath)
-                        ? "Palette without a texture."
                     : !mesh && emitter.Reflection is not null ? "Reflective quad (stock by design)."
                     : !mesh && emitter.UvMode is 1 or 2 ? $"UvMode {emitter.UvMode} quad (stock by design)."
                     : "No native program for this emitter.";

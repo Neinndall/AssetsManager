@@ -3603,16 +3603,16 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
-        public void FollowingTerrainAloneDoesNotUseGroundLayerProjection()
+        public void GroundLayerClassificationDoesNotMakeAnEmitterAPlanarProjection()
         {
             VfxEmitterDefinition regular = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default);
             VfxEmitterDefinition terrain = regular with { IsFollowingTerrain = true };
             VfxEmitterDefinition ground = regular with { IsGroundLayer = true };
             VfxEmitterDefinition projection = regular with { PrimitiveKind = VfxPrimitiveKind.PlanarProjection };
 
-            Assert.False(VfxOpenGlRenderer.ShouldProjectToGround(terrain));
-            Assert.True(VfxOpenGlRenderer.ShouldProjectToGround(ground));
-            Assert.False(VfxOpenGlRenderer.ShouldProjectToGround(projection));
+            Assert.False(terrain.DrawsAsProjection);
+            Assert.False(ground.DrawsAsProjection);
+            Assert.True(projection.DrawsAsProjection);
             Assert.True(projection.IsVisual);
         }
 
@@ -3641,7 +3641,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             {
                 BirthRotation = VfxCurve3.Const(new Vector3(-90f, -90f, 0f))
             };
-            Assert.False(VfxOpenGlRenderer.ShouldProjectToGround(groundRotation));
+            Assert.False(groundRotation.DrawsAsProjection);
             Assert.True(VfxOpenGlRenderer.ShouldUseSoftParticles(groundRotation, hasSceneDepth: true));
         }
 
@@ -3699,7 +3699,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
-        public void GroundProjectionRequiresTheAuthoredGroundLayerFlag()
+        public void GroundLayerFlagKeepsTiltedMeshesOnTheMeshDrawPath()
         {
             VfxEmitterDefinition tiltedMesh = CreateEmitter(
                 Vector3.One,
@@ -3710,8 +3710,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 BirthRotation = VfxCurve3.Const(new Vector3(-90f, 0f, 0f))
             };
 
-            Assert.False(VfxOpenGlRenderer.ShouldProjectToGround(tiltedMesh));
-            Assert.True(VfxOpenGlRenderer.ShouldProjectToGround(tiltedMesh with { IsGroundLayer = true }));
+            Assert.True(tiltedMesh.DrawsAsMesh);
+            Assert.True((tiltedMesh with { IsGroundLayer = true }).DrawsAsMesh);
         }
 
         [Fact]
@@ -5773,6 +5773,25 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.Equal(0.25f, geometry.Vertices[8], precision: 5);
             Assert.Equal(0.25f, geometry.Vertices[9], precision: 5);
             Assert.Equal(0.25f, geometry.Vertices[10], precision: 5);
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void SegmentBeamCapsTotalBirthsEvenAfterItsRibsExpire(bool single)
+        {
+            var emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                IsMeshPrimitive = false, PrimitiveKind = VfxPrimitiveKind.CameraSegmentBeam,
+                IsSingleParticle = single, Rate = VfxCurveF.Const(1000), ParticleLifetime = VfxCurveF.Const(0.025f),
+                Beam = new VfxBeamDefinition(0, 0, 3, VfxCurve3.Const(Vector3.One), VfxCurve4.Const(Vector4.One), false, Vector3.Zero, Vector3.Zero)
+            };
+            var runtime = new VfxPlaybackRuntime(7);
+            runtime.SetSystem(new VfxSystemDefinition(1, "segments", "segments", new[] { emitter }), Vector3.Zero);
+            runtime.Update(0.01f);
+            Assert.Equal(3, runtime.LiveParticleCount);
+            for (int step = 0; step < 6; step++) runtime.Update(0.01f);
+            Assert.Equal(0, runtime.LiveParticleCount);
         }
 
         [Fact]

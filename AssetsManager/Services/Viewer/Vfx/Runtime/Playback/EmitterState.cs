@@ -62,6 +62,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             internal float FinishedAt = -1f;
             internal bool BurstDone;                // for isSingleParticle
             internal bool InitialEmissionDone;
+            internal ushort Spawned;
             internal readonly List<Particle> Particles = new();
 
             private VfxPlaybackRuntime _owner;
@@ -149,6 +150,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             // Mesh-primitive emitters (0 = billboard)
             public uint MeshVao, MeshVbo, MeshEbo;
             public int MeshVertexCount, MeshIndexCount;
+            internal float MeshDepth;
             public float[] MeshInterleaved;
             /// <summary>True when the uploaded mesh carries a valid four-weight skinning layout.</summary>
             public bool MeshHasSkinning;
@@ -178,6 +180,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             public Matrix4x4 BirthFrame;
             public float Age, Life;
             public uint Serial;
+            public ushort Ordinal;
             public Vector3 TrailTiling;
             public float TrailBirthDistance;
             public Vector3 BirthSize;

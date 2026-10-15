@@ -51,7 +51,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             float u,
             float v,
             bool transpose,
-            int alphaVertexIndex = -1)
+            int alphaVertexIndex = -1,
+            bool segment = false)
         {
             ArgumentNullException.ThrowIfNull(state);
             ArgumentNullException.ThrowIfNull(vertex);
@@ -71,6 +72,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 instances[instanceOffset + 21],
                 instances[instanceOffset + 22]);
             float baseTurn = instances[instanceOffset + 23];
+            if (segment) { baseScale = Vector2.One; baseTurn = 0f; }
             Vector2 baseUv = Transform(
                 raw,
                 definition.UvTransformCenter,
@@ -115,7 +117,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 multUv = Swap(multUv);
             }
 
-            if (definition.UvMode == 2)
+            if (definition.UvMode == 2 && !segment)
             {
                 // QUAD_VS_FixedAlphaUV addresses the logical indexed vertex, before
                 // triangle expansion; alpha ignores the colour layer's UV transform.
@@ -151,6 +153,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                     definition.ColorLookUpScales.Y, definition.ColorLookUpOffsets.Y, age01, speed, birthRandom));
             vertex[vertexOffset + LookupOffset] = lookup.X;
             vertex[vertexOffset + LookupOffset + 1] = lookup.Y;
+            if (segment)
+            {
+                vertex[vertexOffset + MultUvOffset] = lookup.X;
+                vertex[vertexOffset + MultUvOffset + 1] = lookup.Y;
+                vertex[vertexOffset + MultCellOffset] = vertex[vertexOffset + MultCellOffset + 1] = 0f;
+            }
         }
 
         internal static Vector2 Transform(

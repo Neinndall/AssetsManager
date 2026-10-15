@@ -30,6 +30,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
         bool IsLooping,
         float? StopAt)
     {
+        public Vector3? Target { get; init; }
+
         public static VfxRigSettings ForPreset(VfxRigPreset preset)
             => new(
                 preset,
@@ -227,11 +229,15 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                 default:
                 {
                     Vector3 origin = new(0f, settings.Height, 0f);
-                    Matrix4x4 transform = Matrix4x4.CreateTranslation(origin);
+                    Vector3 target = settings.Target ?? new Vector3(0f, 0f, TargetReach);
+                    Vector3 facing = new(target.X, 0f, target.Z);
+                    facing = facing.LengthSquared() > 0 ? Vector3.Normalize(facing) : Vector3.UnitZ;
+                    Matrix4x4 transform = new(facing.Z, 0, -facing.X, 0, 0, 1, 0, 0,
+                        facing.X, 0, facing.Z, 0, origin.X, origin.Y, origin.Z, 1);
                     bool isStopped = settings.StopAt is { } stopAt && phase >= stopAt;
                     return new VfxRigStep(transform, origin, Vector3.Zero, isStopped, phase, totalSpan)
                     {
-                        Target = origin + new Vector3(TargetReach, 0f, 0f)
+                        Target = origin + target
                     };
                 }
             }

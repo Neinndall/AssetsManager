@@ -10,7 +10,7 @@ namespace AssetsManager.Views.Controls.Viewer
     {
         private void OnModelPropertyChanged(object sender, PropertyChangedEventArgs e)
         {
-            if (e.PropertyName is nameof(StudioModel.IsProjectFilesVisible) or nameof(StudioModel.RootPath))
+            if (e.PropertyName is nameof(StudioModel.IsProjectFilesVisible) or nameof(StudioModel.ProjectFolders))
                 UpdateProjectFiles();
             if (e.PropertyName == nameof(StudioWorkspaceTab.IsAnimationSyncEnabled))
             {

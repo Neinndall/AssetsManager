@@ -240,6 +240,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 if (d.Trail?.MaxAddedPerFrame is > 0)
                     requestedCount = Math.Min(requestedCount, d.Trail.MaxAddedPerFrame);
                 requestedCount = Math.Min(requestedCount, 1000);
+                if (d.PrimitiveKind == VfxPrimitiveKind.CameraSegmentBeam && d.Beam?.Segments is > 0)
+                    requestedCount = Math.Min(requestedCount, Math.Max(0, d.Beam.Segments - s.Spawned));
                 if (requestedCount <= 0) return -1;
 
                 // LTK advances a trail odometer only when an emission batch is actually due,

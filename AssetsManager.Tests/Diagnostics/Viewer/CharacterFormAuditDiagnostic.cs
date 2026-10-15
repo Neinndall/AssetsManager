@@ -71,6 +71,9 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                     var gear = tree.Objects.GetValueOrDefault(form.PathHash);
                     var gearData = gear?.Properties.GetValueOrDefault(0x639b0013u) as BinTreeStruct;
                     var gearMesh = gearData?.Properties.GetValueOrDefault(Hash("skinMeshProperties")) as BinTreeStruct;
+                    Console.WriteLine($"  show={form.ShowSubmeshHashes.Count} hide={form.HideSubmeshHashes.Count} " +
+                        $"ownerMeshDifferences=[{string.Join(",", (gearMesh?.Properties.Values ?? Enumerable.Empty<BinTreeProperty>()).Where(property =>
+                            mesh?.Properties.TryGetValue(property.NameHash, out var original) != true || !property.Equals(original)).Select(property => Name(property.NameHash)))}]");
                     PrintMesh($"gear {form.GearIndex}", gearMesh, Name);
                     var metadata = SknMaterialTextureResolver.ReadMetadata(
                         new[] { tree }, new[] { tree }, binEntryResolver: Name,
@@ -113,10 +116,12 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
             Console.WriteLine($"[Preview Forms] {path} authored={bundle.CharacterForms.Count}");
             foreach (var option in CharacterFormSemantics.FormOptions(bundle.CharacterForms, bundle.OwnerSceneContext, model))
             {
+                VfxOwnerSceneContext playbackOwner = bundle.CreateCharacterPlaybackView(option.Definition).OwnerSceneContext;
                 var hidden = CharacterFormSemantics.HiddenSubmeshes(bundle.OwnerSceneContext.InitialHiddenSubmeshHashes,
                     option.Definition, model.Parts, bundle.OwnerSceneContext.SubmeshConditions);
                 Console.WriteLine($"label={option.Label} gear={option.Definition.GearIndex} path={option.Definition.PathHash:x8} " +
-                    $"visible=[{string.Join(",", model.Parts.Where(part => !hidden.Contains(LeagueToolkit.Hashing.Fnv1a.HashLower(part.Name))).Select(part => part.Name))}]");
+                    $"visible=[{string.Join(",", model.Parts.Where(part => !hidden.Contains(LeagueToolkit.Hashing.Fnv1a.HashLower(part.Name))).Select(part => part.Name))}] " +
+                    $"ownerMesh={playbackOwner?.MeshPath} ownerSkeleton={playbackOwner?.SkeletonPath}");
             }
         }
         private static void PrintMesh(string label, BinTreeStruct mesh, Func<uint, string> name)

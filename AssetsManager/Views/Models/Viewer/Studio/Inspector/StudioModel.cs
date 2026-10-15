@@ -2,6 +2,9 @@ using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Collections.Generic;
+using System.Linq;
+using AssetsManager.Utils.Framework;
 
 namespace AssetsManager.Views.Models.Viewer
 {
@@ -41,6 +44,21 @@ namespace AssetsManager.Views.Models.Viewer
         private bool _viewportToolbarVisible;
 
         public ObservableCollection<object> BrowserRoots { get; } = new();
+        public ObservableRangeCollection<string> ProjectFolders { get; } = new();
+
+        internal void SetProjectFolders(IEnumerable<string> paths)
+        {
+            ProjectFolders.ReplaceRange(paths);
+            string root = ProjectFolders.FirstOrDefault() ?? string.Empty;
+            bool rootChanged = !string.Equals(RootPath, root, StringComparison.OrdinalIgnoreCase);
+            RootPath = root;
+            OnPropertyChanged(nameof(ProjectFolders));
+            if (!rootChanged)
+            {
+                OnPropertyChanged(nameof(ProjectName));
+                OnPropertyChanged(nameof(ProjectPath));
+            }
+        }
         public ObservableCollection<StudioWorkspaceTab> WorkspaceTabs { get; } = new();
         public ObservableCollection<StudioSkinItem> DetectedSkins { get; } = new();
         public ObservableCollection<string> LogMessages { get; } = new();
@@ -175,11 +193,12 @@ namespace AssetsManager.Views.Models.Viewer
                 if (string.IsNullOrWhiteSpace(_rootPath)) return "No project";
                 string trimmed = _rootPath.TrimEnd(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar);
                 string name = System.IO.Path.GetFileName(trimmed);
-                return string.IsNullOrWhiteSpace(name) ? trimmed : name;
+                string title = string.IsNullOrWhiteSpace(name) ? trimmed : name;
+                return ProjectFolders.Count > 1 ? $"{title} +{ProjectFolders.Count - 1}" : title;
             }
         }
 
-        public string ProjectPath => _rootPath ?? string.Empty;
+        public string ProjectPath => ProjectFolders.Count > 0 ? string.Join(Environment.NewLine, ProjectFolders) : _rootPath ?? string.Empty;
         public bool HasProject => !string.IsNullOrWhiteSpace(_rootPath);
         public bool HasWorkspaceTabs => WorkspaceTabs.Count > 0;
 

@@ -41,7 +41,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
             using var context = new HiddenWglContext();
             using GL gl = GL.GetApi(context.GetProcAddress);
             using var renderer = new VfxOpenGlRenderer();
-            renderer.Initialize(gl, InstalledSkins.Settings(install));
+            renderer.Initialize(gl, fallback ? null : InstalledSkins.Settings(install));
             uint target = Texture(gl, 64, 64, new byte[64 * 64 * 4]);
             uint framebuffer = gl.GenFramebuffer();
             gl.BindFramebuffer(FramebufferTarget.Framebuffer, framebuffer);
@@ -59,12 +59,12 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
                     "white.tex", Vector2.One, 1, false, mesh, PrimitiveKind: primitive,
                     RenderState: VfxEmitterRenderState.Default with { DisableBackfaceCull = true },
                     PaletteDefinition: fallback ? new VfxPaletteDefinition(0, VfxCurve3.Const(Vector3.Zero)) : null,
-                    Beam: new VfxBeamDefinition(0, 0, 1, VfxCurve3.Const(Vector3.One),
+                    Beam: new VfxBeamDefinition(0, 0, 2, VfxCurve3.Const(Vector3.One),
                         VfxCurve4.Const(Vector4.One), false, Vector3.Zero, Vector3.Zero),
                     Trail: new VfxTrailDefinition(VfxCurve3.Const(Vector3.One), 0, 0, 0, 0));
                 Vector4 authored = new(0.6f * alpha, 0.4f * alpha, 0.2f * alpha, alpha);
                 Vector4 prepared = VfxColorSemantics.PremultiplyForAddOrSubtract(authored, mode, false);
-                int count = trail ? 2 : 1;
+                int count = trail || primitive == VfxPrimitiveKind.CameraSegmentBeam ? 2 : 1;
                 var instances = new float[count * VfxPlaybackRuntime.InstanceStride];
                 var emitter = new VfxPlaybackRuntime.EmitterState
                 {
@@ -85,9 +85,15 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
                     instances[at + 8] = prepared.W;
                     instances[at + 21] = instances[at + 22] = instances[at + 31] = instances[at + 32] = 1;
                     instances[at + 36] = instances[at + 40] = instances[at + 44] = 1;
+                    if (emitter.Def.PrimitiveKind == VfxPrimitiveKind.CameraSegmentBeam)
+                    {
+                        instances[at] = emitter.SystemOrigin.X;
+                        instances[at + 1] = emitter.SystemOrigin.Y;
+                        instances[at + 2] = emitter.SystemOrigin.Z;
+                    }
                     emitter.Particles.Add(new VfxPlaybackRuntime.Particle
                     {
-                        Serial = (uint)index, Life = 1, BirthFrame = Matrix4x4.Identity,
+                        Serial = (uint)index, Ordinal = (ushort)index, Life = 1, BirthFrame = Matrix4x4.Identity,
                         TrailTiling = new Vector3(2, 1, 0),
                         BirthRotation = primitive == VfxPrimitiveKind.ArbitraryTrail
                             ? new Vector3(0, 0, MathF.PI / 2) : Vector3.Zero
@@ -105,7 +111,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
                 gl.ClearColor(background.X, background.Y, background.Z, background.W);
                 gl.Clear(ClearBufferMask.ColorBufferBit);
                 renderer.Render(new[] { new VfxRenderQueueEntry(emitter, 0, 0) }, Matrix4x4.Identity, Matrix4x4.Identity);
-                Assert.Equal(fallback ? "Palette with no rows." : null, renderer.GameParticleFallback(emitter, mesh));
+                Assert.Equal(fallback ? "ShaderCache.dx11.wad.client was not found in the configured game installs." : null, renderer.GameParticleFallback(emitter, mesh));
                 var pixel = new byte[4];
                 gl.ReadPixels(32, 32, 1, 1, PixelFormat.Rgba, PixelType.UnsignedByte, pixel.AsSpan());
                 Vector4 expected = Compose(mode, authored, background);
@@ -133,7 +139,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
             using var context = new HiddenWglContext();
             using GL gl = GL.GetApi(context.GetProcAddress);
             using var renderer = new VfxOpenGlRenderer();
-            renderer.Initialize(gl, InstalledSkins.Settings(install));
+            renderer.Initialize(gl, fallback ? null : InstalledSkins.Settings(install));
             uint target = Texture(gl, 64, 64, new byte[64 * 64 * 4]);
             uint framebuffer = gl.GenFramebuffer();
             gl.BindFramebuffer(FramebufferTarget.Framebuffer, framebuffer);
@@ -174,7 +180,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
                 gl.ClearColor(0, 0, 0, 0);
                 gl.Clear(ClearBufferMask.ColorBufferBit);
                 renderer.Render(new[] { new VfxRenderQueueEntry(emitter, 0, 0) }, Matrix4x4.Identity, Matrix4x4.Identity);
-                Assert.Equal(fallback ? "Palette with no rows." : null, renderer.GameParticleFallback(emitter, false));
+                Assert.Equal(fallback ? "ShaderCache.dx11.wad.client was not found in the configured game installs." : null, renderer.GameParticleFallback(emitter, false));
                 var pixel = new byte[4];
                 gl.ReadPixels(32, 32, 1, 1, PixelFormat.Rgba, PixelType.UnsignedByte, pixel.AsSpan());
                 // LTK's stable tie draws red first, then blue, with authored alpha blending.

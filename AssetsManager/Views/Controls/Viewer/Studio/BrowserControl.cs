@@ -236,7 +236,7 @@ namespace AssetsManager.Views.Controls.Viewer
                             !string.IsNullOrWhiteSpace(e.TextureMultPath) ||
                             !string.IsNullOrWhiteSpace(e.ParticleColorTexturePath) ||
                             !string.IsNullOrWhiteSpace(e.PaletteDefinition?.PaletteTexturePath)),
-                        MeshCount = playableEmitters.Count(e => e.IsMeshPrimitive)
+                        MeshCount = playableEmitters.Count(e => e.DrawsAsMesh)
                     };
                     _model.Systems.Add(item);
                 }
@@ -303,51 +303,37 @@ namespace AssetsManager.Views.Controls.Viewer
         internal static bool HasPlayableEmitters(VfxSystemDefinition definition)
             => definition?.Emitters.Any(emitter => !emitter.Disabled) == true;
 
-        internal void SearchQuery_TextChanged(object sender, TextChangedEventArgs e)
+        internal void SearchQuery_TextChanged(object sender, TextChangedEventArgs e) => RefreshProjectBrowserSearch();
+
+        private void RefreshProjectBrowserSearch()
         {
-            string query = _model.SearchQuery?.Trim() ?? "";
-
-            var animView = CollectionViewSource.GetDefaultView(_model.DetectedAnimations);
-            if (animView != null)
+            string query = _model.SearchQuery?.Trim() ?? string.Empty;
+            bool Matches(object item) => item switch
             {
-                if (string.IsNullOrWhiteSpace(query))
-                {
-                    animView.Filter = null;
-                }
-                else
-                {
-                    animView.Filter = obj =>
-                    {
-                        if (obj is AnimationClipCatalogItem item)
-                        {
-                            return item.DisplayName.Contains(query, StringComparison.OrdinalIgnoreCase)
-                                || item.Name.Contains(query, StringComparison.OrdinalIgnoreCase)
-                                || (!string.IsNullOrEmpty(item.VfxSummary) && item.VfxSummary.Contains(query, StringComparison.OrdinalIgnoreCase));
-                        }
-                        return false;
-                    };
-                }
-            }
-
-            var view = CollectionViewSource.GetDefaultView(_model.Systems);
-            if (view != null)
+                StudioBrowserFolder folder => folder.Title.Contains(query, StringComparison.OrdinalIgnoreCase) || folder.Children.Any(Matches),
+                StudioSkinItem skin => (skin.OwnerName ?? string.Empty).Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                    skin.Title.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                    (skin.DisplayName ?? string.Empty).Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                    skin.Sections.Any(section => section.Items.SourceCollection.Cast<object>().Any(Matches)) || skin.SpellItems.Any(Matches),
+                VfxSystemDiagnosticItem system => system.Name.Contains(query, StringComparison.OrdinalIgnoreCase),
+                AnimationClipCatalogItem clip => clip.DisplayName.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                    clip.Name.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                    (clip.VfxSummary ?? string.Empty).Contains(query, StringComparison.OrdinalIgnoreCase),
+                StudioSpellBrowserItem spell => spell.Name.Contains(query, StringComparison.OrdinalIgnoreCase),
+                MapBrowserNode map => map.Title.Contains(query, StringComparison.OrdinalIgnoreCase) || map.Children.Any(child => Matches(child)),
+                _ => false
+            };
+            Predicate<object> filter = string.IsNullOrEmpty(query) ? null : Matches;
+            CollectionViewSource.GetDefaultView(_model.DetectedAnimations).Filter = filter;
+            CollectionViewSource.GetDefaultView(_model.Systems).Filter = filter;
+            void FilterChildren(StudioBrowserFolder folder, bool ancestorMatches)
             {
-                if (string.IsNullOrWhiteSpace(query))
-                {
-                    view.Filter = null;
-                }
-                else
-                {
-                    view.Filter = obj =>
-                    {
-                        if (obj is VfxSystemDiagnosticItem item)
-                        {
-                            return item.Name.Contains(query, StringComparison.OrdinalIgnoreCase);
-                        }
-                        return false;
-                    };
-                }
+                bool showAll = ancestorMatches || folder.Title.Contains(query, StringComparison.OrdinalIgnoreCase);
+                foreach (StudioBrowserFolder child in folder.Children.OfType<StudioBrowserFolder>()) FilterChildren(child, showAll);
+                CollectionViewSource.GetDefaultView(folder.Children).Filter = showAll ? null : filter;
             }
+            foreach (StudioBrowserFolder root in _model.BrowserRoots.OfType<StudioBrowserFolder>()) FilterChildren(root, false);
+            CollectionViewSource.GetDefaultView(_model.BrowserRoots).Filter = filter;
         }
     }
 }

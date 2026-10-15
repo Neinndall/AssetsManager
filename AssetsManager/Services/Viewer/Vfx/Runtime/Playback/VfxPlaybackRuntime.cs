@@ -95,7 +95,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 es.BasePos = nextBasePos;
                 es.SystemOrigin = nextOrigin + (_definition?.HudLayer == true ? _definition.Transform?.Translation ?? Vector3.Zero : Vector3.Zero);
                 es.SystemOrientation = systemOrientation;
-                es.SystemTarget = Vector3.Transform(new Vector3(600f, 0f, 0f), worldTransform);
+                es.SystemTarget = Vector3.Transform(new Vector3(0f, 0f, 600f), worldTransform);
                 es.PlacementRight = VectorMathUtils.NormalizeOr(Vector3.TransformNormal(Vector3.UnitX, placement), Vector3.UnitX);
                 es.PlacementUp = VectorMathUtils.NormalizeOr(Vector3.TransformNormal(Vector3.UnitY, placement), Vector3.UnitY);
                 es.PlacementForward = VectorMathUtils.NormalizeOr(Vector3.TransformNormal(Vector3.UnitZ, placement), Vector3.UnitZ);
@@ -274,6 +274,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 s.FinishedAt = -1f;
                 s.BurstDone = false;
                 s.InitialEmissionDone = false;
+                s.Spawned = 0;
                 s.SharedRandomRolled = false;
                 s.RenderTime = 0f;
                 s.InvalidateInstances();

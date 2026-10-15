@@ -17,9 +17,10 @@ namespace AssetsManager.Views.Controls.Viewer
                 {
                     _projectFiles = new BrowseProjectControl { LogService = LogService };
                     _projectFiles.CloseRequested += OnProjectFilesCloseRequested;
+                    _projectFiles.RemoveFolderRequested += RemoveProjectFolder;
                     ProjectFilesHost.Content = _projectFiles;
                 }
-                _projectFiles.SetProject(_model.RootPath);
+                _projectFiles.SetProjects(_model.ProjectFolders);
                 ProjectFilesRow.MinHeight = 150;
                 ProjectFilesRow.Height = new GridLength(_projectFilesHeight);
             }
@@ -28,7 +29,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 if (ProjectFilesRow.ActualHeight >= 150) _projectFilesHeight = ProjectFilesRow.ActualHeight;
                 ProjectFilesRow.MinHeight = 0;
                 ProjectFilesRow.Height = new GridLength(0);
-                _projectFiles?.SetProject(_model.RootPath);
+                _projectFiles?.SetProjects(_model.ProjectFolders);
             }
         }
 
@@ -38,6 +39,7 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             if (_projectFiles == null) return;
             _projectFiles.CloseRequested -= OnProjectFilesCloseRequested;
+            _projectFiles.RemoveFolderRequested -= RemoveProjectFolder;
             _projectFiles.Clear();
             ProjectFilesHost.Content = null;
             _projectFiles = null;

@@ -84,12 +84,14 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
         [InlineData(VfxPrimitiveKind.CameraQuad, " ")]
         [InlineData(VfxPrimitiveKind.Mesh, null)]
         [InlineData(VfxPrimitiveKind.AttachedMesh, null)]
-        public void PaletteWithoutTextureFallsBackInsteadOfSamplingNativeWhite(
+        public void PaletteProgramSelectionDoesNotDependOnTheAuthoredTexturePath(
             VfxPrimitiveKind primitive, string texturePath)
         {
             using var context = new HiddenWglContext();
             using GL gl = GL.GetApi(context.GetProcAddress);
-            using var runtime = new GameShaderRuntime(gl, false, new AssetsManager.Utils.AppSettings());
+            string install = InstalledSkins.FindInstall();
+            Assert.NotNull(install);
+            using var runtime = new GameShaderRuntime(gl, false, InstalledSkins.Settings(install));
             bool mesh = primitive != VfxPrimitiveKind.CameraQuad;
             var emitter = Emitter() with
             {
@@ -99,10 +101,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
                     32, VfxCurve3.Const(new Vector3(6f, 0f, 0f)), texturePath)
             };
 
-            Assert.Equal("Palette without a texture.", runtime.ParticleProgramFallback(emitter, mesh));
-            Assert.Equal(0, runtime.GetParticlePassCount(emitter, mesh));
-            Assert.Equal(0u, runtime.UseParticleProgram(emitter, mesh, 0));
-            Assert.Equal((false, false), runtime.ParticleSceneInputs(emitter, mesh));
+            Assert.Null(runtime.ParticleProgramFallback(emitter, mesh));
+            Assert.True(runtime.GetParticlePassCount(emitter, mesh) > 0);
         }
 
         [Theory]

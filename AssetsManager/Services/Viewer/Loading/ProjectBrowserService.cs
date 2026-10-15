@@ -13,6 +13,34 @@ namespace AssetsManager.Services.Viewer.Loading
     {
         internal const int SearchLimit = 1000;
 
+        internal static string FindRoot(IEnumerable<string> roots, string path)
+            => roots.Where(root => IsWithinRoot(root, path)).OrderByDescending(root => root.Length).FirstOrDefault();
+
+        internal static ProjectBrowserResult Search(IReadOnlyList<string> roots, string query, CancellationToken token)
+        {
+            string search = query.Trim();
+            var files = new List<ProjectBrowserFile>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var options = new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true,
+                AttributesToSkip = FileAttributes.ReparsePoint, ReturnSpecialDirectories = false };
+            token.ThrowIfCancellationRequested();
+            foreach (string root in roots)
+                foreach (FileSystemInfo item in new DirectoryInfo(root).EnumerateFileSystemInfos("*", options))
+                {
+                    token.ThrowIfCancellationRequested();
+                    string relative = Path.GetRelativePath(root, item.FullName);
+                    if (!relative.Contains(search, StringComparison.OrdinalIgnoreCase) || !seen.Add(item.FullName)) continue;
+                    if (files.Count == SearchLimit) return SearchResult(files, truncated: true);
+                    files.Add(new(item.FullName, relative, item is DirectoryInfo));
+                }
+            token.ThrowIfCancellationRequested();
+            return SearchResult(files, truncated: false);
+        }
+
+        private static ProjectBrowserResult SearchResult(IEnumerable<ProjectBrowserFile> files, bool truncated)
+            => new(files.OrderByDescending(item => item.IsDirectory)
+                .ThenBy(item => item.FullPath, StringComparer.OrdinalIgnoreCase).ToArray(), truncated);
+
         internal static IReadOnlyList<string> ReadFolders(string root, string folder, CancellationToken token)
         {
             token.ThrowIfCancellationRequested();
@@ -42,26 +70,24 @@ namespace AssetsManager.Services.Viewer.Loading
             token.ThrowIfCancellationRequested();
             if (!IsWithinRoot(root, folder)) throw new ArgumentException("The folder must belong to the project.", nameof(folder));
             bool searching = !string.IsNullOrWhiteSpace(query);
+            if (searching) return Search(new[] { root }, query, token);
             var options = new EnumerationOptions
             {
-                RecurseSubdirectories = searching,
+                RecurseSubdirectories = false,
                 IgnoreInaccessible = true,
                 AttributesToSkip = FileAttributes.ReparsePoint,
                 ReturnSpecialDirectories = false
             };
             var files = new List<ProjectBrowserFile>();
-            bool truncated = false;
-            foreach (FileSystemInfo item in new DirectoryInfo(searching ? root : folder).EnumerateFileSystemInfos("*", options))
+            foreach (FileSystemInfo item in new DirectoryInfo(folder).EnumerateFileSystemInfos("*", options))
             {
                 token.ThrowIfCancellationRequested();
                 string relative = Path.GetRelativePath(root, item.FullName);
-                if (searching && !relative.Contains(query.Trim(), StringComparison.OrdinalIgnoreCase)) continue;
-                if (searching && files.Count == SearchLimit) { truncated = true; break; }
                 files.Add(new ProjectBrowserFile(item.FullName, relative, item is DirectoryInfo));
             }
             token.ThrowIfCancellationRequested();
             return new(files.OrderByDescending(item => item.IsDirectory)
-                .ThenBy(item => item.RelativePath, StringComparer.OrdinalIgnoreCase).ToArray(), truncated);
+                .ThenBy(item => item.RelativePath, StringComparer.OrdinalIgnoreCase).ToArray(), false);
         }
     }
 }

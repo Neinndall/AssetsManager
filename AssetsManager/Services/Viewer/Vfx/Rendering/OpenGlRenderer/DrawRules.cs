@@ -29,6 +29,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             if (definition is null || instanceCount <= 0) return 0;
 
             int used = Math.Max(0, alreadyUsed);
+            if (definition.PrimitiveKind == VfxPrimitiveKind.CameraSegmentBeam && definition.DrawsAsBeam)
+            {
+                int ribs = Math.Min(instanceCount, BeamsPerEmitter * 2);
+                return ribs <= BeamsPerEmitter * 2 - used ? ribs : 0;
+            }
             if (definition.DrawsAsTrail)
             {
                 if (used >= VfxTrailGeometry.TrailPointsPerEmitter) return 0;
@@ -42,7 +47,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
 
             int limit = definition.PrimitiveKind == VfxPrimitiveKind.AttachedMesh
                 ? AttachedMeshesPerEmitter
-                : definition.IsMeshPrimitive
+                : definition.DrawsAsMesh
                     ? MeshesPerEmitter
                     : definition.DrawsAsBeam
                         ? BeamsPerEmitter
@@ -117,9 +122,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
 
         internal static bool ShouldUseColorRamp(VfxEmitterDefinition definition, bool hasColorRampTexture)
             => VfxGeometryUtils.ShouldUseColorRamp(definition, hasColorRampTexture);
-
-        internal static bool ShouldProjectToGround(VfxEmitterDefinition definition)
-            => VfxGeometryUtils.ShouldProjectToGround(definition);
 
         internal static bool ShouldUseSoftParticles(VfxEmitterDefinition definition, bool hasSceneDepth)
             => VfxGeometryUtils.ShouldUseSoftParticles(definition, hasSceneDepth);

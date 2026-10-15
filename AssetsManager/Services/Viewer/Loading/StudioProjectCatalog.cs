@@ -122,6 +122,7 @@ internal static class StudioProjectCatalog
                 }
                 var entry = new StudioSkinItem
                 {
+                    ResourceRoot = Path.GetFullPath(root),
                     DisplayName = Path.GetRelativePath(root, path),
                     BinPath = Path.GetFullPath(path),
                     SkinIndex = index,
