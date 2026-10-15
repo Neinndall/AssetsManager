@@ -966,6 +966,32 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
             SknMaterialTextureResolution resolution = SknResolver.Resolve(tree, new[] { "test_tx_cm" });
 
             Assert.Equal(new[] { "Body", "Bead_1", "EyesA" }, resolution.SubmeshRenderOrder);
+            Assert.True(resolution.DefaultMaterialDefinition.HasSubmeshRenderOrder);
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void Resolve_PropagatesSubmeshOrderToAuthoredAndTextureOnlyBindings(bool ordered)
+        {
+            const string materialPath = "Characters/Test/Skins/Skin1/Materials/Head";
+            BinTree tree = CreateSkinTree("Base.tex",
+                CreateOverride("Head", new BinTreeObjectLink(Fnv1a.HashLower("Material"), Fnv1a.HashLower(materialPath))),
+                material: CreateMaterial(materialPath),
+                materialOverride2: CreateOverride("Eye_Base", CreateTextureLink("texture", "Face.tex")));
+            if (ordered)
+            {
+                var skin = tree.Objects.Values.First(obj => obj.ClassHash == Fnv1a.HashLower("SkinCharacterDataProperties"));
+                var mesh = (BinTreeStruct)skin.Properties[Fnv1a.HashLower("skinMeshProperties")];
+                mesh.Properties[Fnv1a.HashLower("submeshRenderOrder")] =
+                    new BinTreeString(Fnv1a.HashLower("submeshRenderOrder"), "Eye_Base");
+            }
+            var resolution = SknResolver.Resolve(tree, new[] { "base", "face" });
+            Assert.Equal(ordered, resolution.DefaultMaterialDefinition.HasSubmeshRenderOrder);
+            Assert.Equal(ModelMaterialBindingKind.Authored, resolution.ResolveMaterialDefinition("Head").BindingKind);
+            Assert.Equal(ordered, resolution.ResolveMaterialDefinition("Head").HasSubmeshRenderOrder);
+            Assert.Equal(ModelMaterialBindingKind.TextureOnly, resolution.ResolveMaterialDefinition("Eye_Base").BindingKind);
+            Assert.Equal(ordered, resolution.ResolveMaterialDefinition("Eye_Base").HasSubmeshRenderOrder);
         }
 
         [Fact]

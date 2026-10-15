@@ -669,6 +669,13 @@ namespace AssetsManager.Services.Viewer.Resolvers
                     GameShaderProgramResolver.CreateDefaultSkinnedProgram(textureFallback, emissiveTextureKey));
             }
 
+            if (metadata.SubmeshRenderOrder is { Count: > 0 })
+            {
+                defaultMaterialDefinition = defaultMaterialDefinition with { HasSubmeshRenderOrder = true };
+                foreach (string submesh in materialDefinitions.Keys.ToArray())
+                    materialDefinitions[submesh] = materialDefinitions[submesh] with { HasSubmeshRenderOrder = true };
+            }
+
             return new SknMaterialTextureResolution(
                 defaultMaterialDefinition,
                 materialDefinitions)

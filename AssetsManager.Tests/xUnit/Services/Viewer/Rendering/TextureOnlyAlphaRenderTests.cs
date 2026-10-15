@@ -20,6 +20,43 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
         private const int TextureSize = 64;
         private static readonly byte[] Face = { 220, 210, 235 };
 
+        [Theory]
+        [InlineData(true, true, true, ModelMaterialBlendMode.Normal, true)]
+        [InlineData(false, true, true, ModelMaterialBlendMode.Normal, false)]
+        [InlineData(true, false, true, ModelMaterialBlendMode.Normal, false)]
+        [InlineData(true, true, false, ModelMaterialBlendMode.Normal, false)]
+        [InlineData(true, true, true, ModelMaterialBlendMode.Additive, false)]
+        [InlineData(true, true, true, ModelMaterialBlendMode.Modulate, false)]
+        public void OrderedSkinSurfacesPrecedeFacialLayersWithoutPromotingOtherTransparency(
+            bool ordered, bool depthWrite, bool depthTest, ModelMaterialBlendMode blend, bool inOrder)
+        {
+            var material = ModelMaterialDefinition.TextureOnly("head") with
+            {
+                BindingKind = ModelMaterialBindingKind.Authored,
+                HasSubmeshRenderOrder = ordered,
+                RenderState = ModelMaterialRenderState.TextureOnly with
+                {
+                    Blending = blend, DepthWrite = depthWrite, DepthTest = depthTest
+                }
+            };
+            Assert.Equal(inOrder, material.BlendsInDrawOrder);
+            Assert.Equal(!inOrder, material.DrawsInTransparentQueue);
+
+            var pass = GameMaterialPassState.Default with
+            {
+                BlendEnabled = true,
+                SourceColor = blend == ModelMaterialBlendMode.Modulate ? MapBlendFactor.OneMinusSourceColor : MapBlendFactor.SourceAlpha,
+                DestinationColor = blend == ModelMaterialBlendMode.Additive ? MapBlendFactor.One
+                    : blend == ModelMaterialBlendMode.Modulate ? MapBlendFactor.Zero : MapBlendFactor.OneMinusSourceAlpha,
+                DepthEnabled = depthTest,
+                WriteMask = depthWrite ? 31u : 15u
+            };
+            Assert.Equal(inOrder, material.BlendsPassInDrawOrder(pass));
+            // A later glow pass keeps its own queue even when the base surface writes depth.
+            Assert.False(material.BlendsPassInDrawOrder(pass with { DestinationColor = MapBlendFactor.One }));
+            Assert.False(material.BlendsPassInDrawOrder(pass with { WriteMask = 15u }));
+        }
+
         [Fact]
         public void MaterialLessSubmeshesBlendTheirTextureAlphaAndWriteDepth()
         {

@@ -46,8 +46,18 @@ namespace AssetsManager.Views.Models.Viewer
             RenderState.Blending != ModelMaterialBlendMode.Opaque ||
             AlphaCutoff > 0f;
 
-        // A material-less submesh blends in the character's own draw order rather than the sorted transparent queue.
-        internal bool BlendsInDrawOrder => BindingKind == ModelMaterialBindingKind.TextureOnly;
+        internal bool HasSubmeshRenderOrder { get; init; }
+
+        // Depth-writing skin surfaces must precede their facial layers even when they use authored alpha blending.
+        internal bool BlendsInDrawOrder => BindingKind == ModelMaterialBindingKind.TextureOnly ||
+            (HasSubmeshRenderOrder && RenderState.DepthWrite && RenderState.DepthTest &&
+             RenderState.Blending == ModelMaterialBlendMode.Normal);
+
+        internal bool BlendsPassInDrawOrder(GameMaterialPassState state) =>
+            BindingKind == ModelMaterialBindingKind.TextureOnly ||
+            (HasSubmeshRenderOrder && state is { BlendEnabled: true, DepthEnabled: true } && (state.WriteMask & 16u) != 0 &&
+             (state.SourceColor == MapBlendFactor.SourceAlpha || state.SourceColor == MapBlendFactor.One) &&
+             state.DestinationColor == MapBlendFactor.OneMinusSourceAlpha);
 
         internal bool DrawsInTransparentQueue =>
             RenderState.Blending != ModelMaterialBlendMode.Opaque &&

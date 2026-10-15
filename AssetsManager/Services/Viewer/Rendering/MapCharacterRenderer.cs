@@ -460,7 +460,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                 {
                     GameMaterialPassState state = _gameShaderRuntime.GetSkinnedPassState(command.Range.Material, pass);
                     DrawCommand layered = command with { PassIndex = pass, Order = order++ };
-                    (state.BlendEnabled && !command.Range.Material.BlendsInDrawOrder ? _transparent : _opaque).Add(layered);
+                    (state.BlendEnabled && !command.Range.Material.BlendsPassInDrawOrder(state) ? _transparent : _opaque).Add(layered);
                 }
             }
             _opaque.Sort((left, right) => ComparePassOrder(

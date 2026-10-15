@@ -16,7 +16,7 @@ Changes
 
 Bug Fixes
   - 3D Studio / Corrected default particle importance and preserved authored simulation flags across playback and seeking.
-  - 3D Studio / Fixed facial layers revealing the background through the skin, including Chibi Gwen's eyes.
+  - 3D Studio / Fixed facial layers revealing the background through textured and custom-material skins, including Chibi Gwen's eyes.
   - Image Comparison / Fixed Onion Skin adjustment becoming unresponsive after leaving Timeline mode.
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
