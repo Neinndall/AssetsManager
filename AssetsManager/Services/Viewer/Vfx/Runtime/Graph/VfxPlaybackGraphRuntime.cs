@@ -58,6 +58,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         private Matrix4x4 _orientationRootTransform;
         private float _sourceTime;
         private Func<string, Matrix4x4?> _jointTransformProvider;
+        private Func<string, Matrix4x4?> _hostJointTransformProvider;
         private IReadOnlyDictionary<VfxEmitterDefinition, IVfxEmissionSurfaceSampler> _emissionSurfaces = EmptyEmissionSurfaces;
         private IReadOnlyDictionary<string, IVfxMeshJointProvider> _meshJoints = EmptyMeshJoints;
         private readonly Dictionary<string, IVfxMeshJointProvider> _loadedMeshJoints = new(StringComparer.Ordinal);
@@ -209,6 +210,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         /// </summary>
         internal void SetJointTransformProvider(Func<string, Matrix4x4?> provider)
             => _jointTransformProvider = provider;
+
+        /// <summary>Supplies fallback host joints; the session owns replay after the binding changes.</summary>
+        internal void SetHostJointTransformProvider(Func<string, Matrix4x4?> provider)
+            => _hostJointTransformProvider = provider;
 
         /// <summary>
         /// Shares one loaded emission-surface catalog across the full child lineage. The caller

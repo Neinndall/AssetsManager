@@ -35,10 +35,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
 
             foreach (VfxPlaybackGraphRuntime graph in _graphs)
             {
+                graph.SetHostJointTransformProvider(jointProvider);
                 if (_spellSteps.ContainsKey(graph))
                 {
-                    // Ability projectile/impact rigs are independent scene rigs in LTK; they do
-                    // not inherit the owner's live joint table even while the champion animates.
+                    // Independent spell rigs may use host joints for bone children without
+                    // attaching the spell's own placement to the character.
                     graph.SetJointTransformProvider(null);
                     continue;
                 }

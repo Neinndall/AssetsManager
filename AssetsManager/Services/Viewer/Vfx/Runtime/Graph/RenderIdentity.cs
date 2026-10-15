@@ -18,7 +18,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             // spawned yet. Their visible writers must participate in the preview's fallback.
             foreach (var claim in _stencilDefinitions)
             {
-                if (claim.NeedsOwner && _jointTransformProvider == null) continue;
+                if (claim.NeedsOwner && _jointTransformProvider == null && _hostJointTransformProvider == null) continue;
                 scene.Add(claim.Definition, shaded && RootIsVisible(claim.Root) && !claim.Definition.Disabled &&
                     VfxRenderPhaseSemantics.Resolve(claim.Definition, claim.Hud).Draws);
             }
@@ -75,9 +75,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             int depth,
             int rootSourceOrder,
             bool needsOwner,
-            ref int nextRank)
+            ref int nextRank,
+            HashSet<uint> ancestors = null)
         {
             if (definition is null || depth > MaximumGraphDepth) return;
+            ancestors ??= new HashSet<uint>();
+            if (!ancestors.Add(definition.PathHash)) return;
 
             string renderPath = path ?? string.Empty;
             int[] localOrder = Enumerable.Range(0, definition.Emitters.Count).ToArray();
@@ -95,7 +98,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                         depth == 0 ? sourceOrder : rootSourceOrder, definition.HudLayer, needsOwner));
             }
 
-            if (depth >= MaximumGraphDepth) return;
+            if (depth >= MaximumGraphDepth)
+            {
+                ancestors.Remove(definition.PathHash);
+                return;
+            }
             for (int sourceOrder = 0; sourceOrder < definition.Emitters.Count; sourceOrder++)
             {
                 VfxEmitterDefinition emitter = definition.Emitters[sourceOrder];
@@ -119,9 +126,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                     int childRoot = depth == 0 ? sourceOrder : rootSourceOrder;
                     bool childNeedsOwner = needsOwner ||
                         (childSet.Bones is { Count: > 0 } && !emitter.MeshIsSkinned);
-                    CollectRenderRanks(childDefinition, childPath, depth + 1, childRoot, childNeedsOwner, ref nextRank);
+                    CollectRenderRanks(childDefinition, childPath, depth + 1, childRoot, childNeedsOwner, ref nextRank, ancestors);
                 }
             }
+            ancestors.Remove(definition.PathHash);
         }
 
         private void AssignRenderIdentity(VfxPlaybackRuntime runtime, string path)

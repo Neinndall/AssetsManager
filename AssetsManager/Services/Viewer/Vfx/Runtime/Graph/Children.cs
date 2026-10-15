@@ -194,6 +194,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 _resourceMap);
             if (definition is null) return;
 
+            for (var ancestor = parentRuntime; ancestor != null; ancestor = _parents.GetValueOrDefault(ancestor))
+                if (ancestor.Definition.PathHash == definition.PathHash) return;
+
             int particleCapacity = ChildCapacityOf(definition);
             if (LiveChildSystemCount >= MaximumActiveChildSystems ||
                 _heldChildParticleCapacity + particleCapacity > MaximumChildParticleCapacityBudget)
@@ -322,7 +325,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                     : null;
             }
 
-            return _jointTransformProvider?.Invoke(boneName);
+            return (_jointTransformProvider ?? _hostJointTransformProvider)?.Invoke(boneName);
         }
 
         private static Matrix4x4 ReRootOnJoint(

@@ -11,6 +11,7 @@ Improvements
   - 3D Studio / Aligned Project Browser header icons and grouped thumbnail and Explorer controls with color-only hover feedback.
 
 Bug Fixes
+  - 3D Studio / Fixed child effects missing from linked or shared particle files and bone-based children on preview characters.
   - 3D Studio / Fixed ground-layer particle placement and palette handling, including palette colors on projected effects.
   - 3D Studio / Fixed beam segment emission limits, replay resets and child effect targets.
 
