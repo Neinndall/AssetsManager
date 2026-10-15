@@ -35,6 +35,7 @@ namespace AssetsManager.Views.Controls.Viewer
         private readonly List<VfxRenderSession> _retiredSceneActorSessions = new();
         private readonly List<IPreparedParticlePass> _preparedParticlePasses = new();
         private readonly List<IDisposable> _preparedParticleBatches = new();
+        private VfxParticleShadowScene _particleShadows;
         private StudioSceneActorRuntime _pendingActorAdoption;
         private bool _isSceneFocusHandover;
         private bool _isSynchronizingSceneActorSelection;
@@ -704,6 +705,9 @@ namespace AssetsManager.Views.Controls.Viewer
             int width,
             int height)
         {
+            session.SetEffectsQuality((VfxEffectsQuality)(AppSettings?.StudioParameters?.EffectsQuality ?? 3));
+            session.SetFlexChannels(_model.IsRawSystemsMode ? new Vector3(_model.VfxFlex0, _model.VfxFlex1, _model.VfxFlex2) : Vector3.Zero);
+            if (_model.IsRawSystemsMode) _model.VfxFlexMask = session.FlexChannelMask;
             session.SetSun(sun);
             session.SetViewportSize(width, height);
             session.SetTerrainDepth(_frameTerrainDepth, _frameTerrainWidth, _frameTerrainHeight);

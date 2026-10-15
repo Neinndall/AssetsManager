@@ -84,7 +84,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                     HasAssetRemapping: HasElements(o.Properties, F_assetRemappingTable)),
                 (systemFlags & AnalyticDragMotionFlag) != 0 ? VfxDragMotion.Analytic : VfxDragMotion.Stepped,
                 buildUpTime,
-                HudLayer: hudLayer);
+                HudLayer: hudLayer, Flags: unchecked((uint)systemFlags));
         }
 
     }

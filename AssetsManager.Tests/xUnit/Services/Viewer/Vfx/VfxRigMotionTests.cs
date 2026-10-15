@@ -426,7 +426,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 EmitterLifetime = 0.01f,
                 ParticleLifetime = VfxCurveF.Const(0.01f)
             };
-            var definition = new VfxSystemDefinition(7, "short-flight", "short-flight", new[] { emitter });
+            var definition = new VfxSystemDefinition(7, "short-flight", "short-flight", new[] { emitter }, Flags: 8);
             var model = new VfxSystemModel
             {
                 Name = definition.Name,

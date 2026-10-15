@@ -19,9 +19,14 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             foreach (var claim in _stencilDefinitions)
             {
                 if (claim.NeedsOwner && _jointTransformProvider == null && _hostJointTransformProvider == null) continue;
-                scene.Add(claim.Definition, shaded && RootIsVisible(claim.Root) && !claim.Definition.Disabled &&
-                    VfxRenderPhaseSemantics.Resolve(claim.Definition, claim.Hud).Draws);
+                var effective = VfxQuality.Apply(claim.Definition, EffectsQuality);
+                scene.Add(effective, shaded && RootIsVisible(claim.Root) && !effective.Disabled &&
+                    VfxRenderPhaseSemantics.Resolve(effective, claim.Hud).Draws);
             }
+            foreach (var runtime in _runtimes)
+                foreach (var emitter in runtime.Emitters)
+                    scene.Add(emitter.Def, shaded && emitter.IsVisible && !emitter.Def.Disabled &&
+                        VfxRenderPhaseSemantics.Resolve(emitter.Def, emitter.HudLayer).Draws);
         }
 
         private VfxPlaybackRuntime CreateRuntime(
@@ -43,6 +48,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             runtime.SetTransform(
                 effectiveLocalTransform * _rootTransform,
                 effectiveLocalTransform * _orientationRootTransform);
+            runtime.SetEffectsQuality(EffectsQuality);
+            runtime.BindFlexChannels(_flexChannels);
             runtime.SetEmissionSurfaces(_emissionSurfaces, replayCurrentTime: false);
             runtime.SetPinnedBirthChance(_pinnedBirthChance);
             if (particleCapacity.HasValue)
@@ -62,6 +69,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
 
         private void BuildRenderRanks(VfxSystemDefinition rootDefinition)
         {
+            FlexChannelMask = 0;
             _renderRanks.Clear();
             _renderRoots.Clear();
             _stencilDefinitions.Clear();
@@ -91,6 +99,15 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 right));
             foreach (int sourceOrder in localOrder)
             {
+                if (definition.Emitters[sourceOrder].Flex is { } flex)
+                {
+                    int?[] channels = [flex.Rate?.Channel, flex.Lifetime?.Channel, flex.Velocity?.Channel,
+                        flex.RotationalVelocity?.Channel, flex.UvScroll?.Channel, flex.UvScrollMult?.Channel,
+                        flex.UvOffset?.Channel, flex.BirthScale?.Channel, flex.InstanceScale?.Channel,
+                        flex.BirthTranslation?.Channel, flex.EmitOffsetScale?.Channel];
+                    foreach (int? channel in channels)
+                        if (channel is >= 0 and < 3) FlexChannelMask |= 1 << channel.Value;
+                }
                 _renderRanks[(renderPath, sourceOrder)] = nextRank++;
                 _renderRoots[(renderPath, sourceOrder)] = depth == 0 ? sourceOrder : rootSourceOrder;
                 if ((definition.Emitters[sourceOrder].RenderState?.StencilMode ?? 0) != 0)
@@ -105,7 +122,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             }
             for (int sourceOrder = 0; sourceOrder < definition.Emitters.Count; sourceOrder++)
             {
-                VfxEmitterDefinition emitter = definition.Emitters[sourceOrder];
+                VfxEmitterDefinition emitter = VfxQuality.Apply(definition.Emitters[sourceOrder], EffectsQuality);
                 VfxChildParticleSetDefinition childSet = emitter.ChildParticleSet;
                 if (emitter.Disabled || childSet is null || childSet.Children.Count == 0) continue;
 

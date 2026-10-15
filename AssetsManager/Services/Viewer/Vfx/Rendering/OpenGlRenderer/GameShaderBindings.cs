@@ -54,7 +54,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             emitter.InstanceCount > 0 && emitter.IsVisible && (!emitter.Def.DrawsAsMesh || emitter.MeshVao != 0);
 
         private int ParticlePassCount(VfxPlaybackRuntime.EmitterState emitter, bool mesh, bool wireframe) =>
-            wireframe || emitter.Def.DrawsAsProjection || !HasParticleDraw(emitter) || !HasGameParticleResources(emitter)
+            _drawingShadows || (emitter.Def.SliceRange > 0f && !emitter.Def.HasResolvedCustomMaterial) || wireframe || emitter.Def.DrawsAsProjection || !HasParticleDraw(emitter) || !HasGameParticleResources(emitter)
                 ? 0 : _gameShaders?.GetParticlePassCount(emitter.Def, mesh) ?? 0;
 
         private bool ParticlePassTransparent(VfxPlaybackRuntime.EmitterState emitter, int pass, bool wireframe) =>
@@ -75,7 +75,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         private bool UseGameParticle(VfxPlaybackRuntime.EmitterState emitter, bool mesh, int pass, bool wireframe)
         {
             // LTK keeps the stock material while a named base or palette sampler is unavailable.
-            uint program = wireframe || !HasGameParticleResources(emitter)
+            uint program = _drawingShadows || (emitter.Def.SliceRange > 0f && !emitter.Def.HasResolvedCustomMaterial) || wireframe || !HasGameParticleResources(emitter)
                 ? 0 : _gameShaders?.UseParticleProgram(emitter.Def, mesh, pass) ?? 0;
             if (program == 0)
             {

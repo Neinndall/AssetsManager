@@ -97,6 +97,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         internal readonly int ErosionFeatherOut;
         internal readonly int ErosionMixer;
         internal readonly int ErosionSliceWidth;
+        internal readonly int ShadowPass, SliceRange, HasSliceRamp;
         internal readonly int ErosionTex;
         internal readonly int FlipU;
         internal readonly int FlipUMult;
@@ -211,6 +212,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             ErosionFeatherOut = gl.GetUniformLocation(program, "uErosionFeatherOut");
             ErosionMixer = gl.GetUniformLocation(program, "uErosionMixer");
             ErosionSliceWidth = gl.GetUniformLocation(program, "uErosionSliceWidth");
+            ShadowPass = gl.GetUniformLocation(program, "uShadowPass");
+            SliceRange = gl.GetUniformLocation(program, "uSliceRange");
+            HasSliceRamp = gl.GetUniformLocation(program, "uHasSliceRamp");
             ErosionTex = gl.GetUniformLocation(program, "uErosionTex");
             FlipU = gl.GetUniformLocation(program, "uFlipU");
             FlipUMult = gl.GetUniformLocation(program, "uFlipUMult");

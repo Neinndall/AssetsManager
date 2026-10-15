@@ -111,7 +111,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         [Fact]
         public void ChildSystemsUseTheirOwnEmissionCycle()
         {
-            var child = new VfxSystemDefinition(2, "child", "child", new[] { ParseEmitter(2f, 0.5f) });
+            var child = new VfxSystemDefinition(2, "child", "child", new[] { ParseEmitter(2f, 0.5f) }, Flags: 8);
             var parentEmitter = ParseEmitter(null, null) with
             {
                 Rate = VfxCurveF.Const(1f),
@@ -120,7 +120,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                     new[] { new VfxChildSystemReference("child", 2, 0) },
                     false, VfxCurveF.Zero, VfxCurve3.Const(Vector3.Zero), 0)
             };
-            var parent = new VfxSystemDefinition(1, "parent", "parent", new[] { parentEmitter });
+            var parent = new VfxSystemDefinition(1, "parent", "parent", new[] { parentEmitter }, Flags: 8);
             var graph = new VfxPlaybackGraphRuntime(parent, Matrix4x4.Identity, 7,
                 new Dictionary<uint, VfxSystemDefinition> { [1] = parent, [2] = child },
                 new Dictionary<uint, uint>(),
@@ -157,7 +157,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         private static VfxPlaybackRuntime CreateRuntime(VfxEmitterDefinition emitter)
         {
             var runtime = new VfxPlaybackRuntime(7);
-            runtime.SetSystem(new VfxSystemDefinition(1, "periodic", "periodic", new[] { emitter }), Vector3.Zero);
+            runtime.SetSystem(new VfxSystemDefinition(1, "periodic", "periodic", new[] { emitter }, Flags: 8), Vector3.Zero);
             return runtime;
         }
 

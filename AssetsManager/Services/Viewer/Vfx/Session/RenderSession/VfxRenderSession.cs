@@ -97,6 +97,34 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
         private Matrix4x4 _worldTransform = Matrix4x4.Identity;
         private VfxOwnerSceneContext _ownerSceneContext;
         private float? _pinnedBirthChance;
+        public VfxEffectsQuality EffectsQuality { get; private set; } = VfxEffectsQuality.VeryHigh;
+        private Vector3 _flexChannels;
+        public int FlexChannelMask => _graphs.Aggregate(0, (mask, graph) => mask | graph.FlexChannelMask);
+
+        public void SetEffectsQuality(VfxEffectsQuality quality)
+        {
+            if (!Enum.IsDefined(quality)) throw new ArgumentOutOfRangeException(nameof(quality));
+            if (EffectsQuality == quality) return;
+            EffectsQuality = quality;
+            foreach (var graph in _graphs) graph.SetEffectsQuality(quality);
+            ReplayAfterLineageResourceChange();
+        }
+
+        public void SetFlexChannels(Vector3 channels)
+        {
+            if (!float.IsFinite(channels.X) || !float.IsFinite(channels.Y) || !float.IsFinite(channels.Z)) return;
+            if (_flexChannels == channels) return;
+            _flexChannels = channels;
+            foreach (var graph in _graphs) graph.SetFlexChannels(channels.X, channels.Y, channels.Z);
+            ReplayAfterLineageResourceChange();
+        }
+
+        private void ApplySimulationInputs(VfxPlaybackGraphRuntime graph)
+        {
+            graph.SetEffectsQuality(EffectsQuality);
+            graph.SetFlexChannels(_flexChannels.X, _flexChannels.Y, _flexChannels.Z);
+            graph.Reset();
+        }
         private bool _isPlaying;
         private bool _usesStandaloneRig;
         private bool _ready;
@@ -371,7 +399,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
         private void ReplayAfterLineageResourceChange()
         {
             ClearCheckpoints();
-            if (_activeSystem is null || _activeSystem.CurrentTime <= 0d) return;
+            if (_activeSystem is null || _activeSystem.CurrentTime <= 0d)
+            {
+                foreach (var graph in _graphs) graph.Reset();
+                return;
+            }
 
             double target = _activeSystem.CurrentTime;
             ResetSimulationToStart();

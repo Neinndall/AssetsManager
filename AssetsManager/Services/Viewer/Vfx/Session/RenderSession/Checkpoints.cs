@@ -14,8 +14,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             while (_activeSystem.CurrentTime < target)
             {
                 double previous = _activeSystem.CurrentTime;
-                // LTK plays one variable step per rendered frame. Only seek/replay advances in
-                // fixed 1/60 s slices; checkpoints themselves never subdivide the physics step.
+                // Seek input is quantized to 60 Hz. Each graph applies its own quality and flags.
                 double next = fixedSeekSteps
                     ? Math.Min(target, previous + SeekStep)
                     : target;
@@ -41,7 +40,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                     ApplyBoneTransforms((name, hash) => _boneTransformSampler(next, name, hash));
                 else if (_boneTransformProvider != null)
                     ApplyBoneTransforms(_boneTransformProvider);
-                foreach (var graph in _graphs) graph.Update((float)(next - previous));
+                _prepareGraphStep ??= PrepareGraphStep;
+                foreach (var graph in _graphs) graph.Update((float)(next - previous), next, _prepareGraphStep);
                 KillGraphsAt(next);
                 TryCaptureCheckpoint(next);
             }

@@ -229,7 +229,7 @@ public sealed class VfxEmissionContractTests
             ParticleLifetime = VfxCurveF.Const(0.05f)
         };
         var runtime = new VfxPlaybackRuntime(7);
-        runtime.SetSystem(new VfxSystemDefinition(1, "test", "test", new[] { growing, expiringFill }), Vector3.Zero);
+        runtime.SetSystem(new VfxSystemDefinition(1, "test", "test", new[] { growing, expiringFill }, Flags: 8), Vector3.Zero);
 
         runtime.SetParticleCapacity(1000);
         runtime.Update(0.01f);
@@ -539,7 +539,7 @@ public sealed class VfxEmissionContractTests
     private static VfxPlaybackRuntime Create(VfxEmitterDefinition emitter)
     {
         var runtime = new VfxPlaybackRuntime(7);
-        runtime.SetSystem(new VfxSystemDefinition(1, "test", "test", new[] { emitter }), Vector3.Zero);
+        runtime.SetSystem(new VfxSystemDefinition(1, "test", "test", new[] { emitter }, Flags: 8), Vector3.Zero);
         return runtime;
     }
 

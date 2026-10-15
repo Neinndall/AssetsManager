@@ -14,7 +14,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         {
             if (!es.Def.IsVisual) return;
             bool native = UseGameParticle(es, false, passIndex, useWireframe);
-            bool isDistortion = es.Def.DrawsAsDistortion && !useWireframe;
+            _particleUniforms.Uniform1(_particleUniforms.ShadowPass, _drawingShadows ? 1 : 0);
+            _particleUniforms.Uniform1(_particleUniforms.SliceRange, es.Def.SliceRange);
+            _particleUniforms.Uniform1(_particleUniforms.HasSliceRamp, es.ColorGradientTexture != 0 ? 1 : 0);
+            bool isDistortion = !_drawingShadows && es.Def.DrawsAsDistortion && !useWireframe;
             // The game draws the scene behind a distorting emitter at any strength, so it always needs the frame.
             bool warpsFrame = isDistortion;
             if (warpsFrame && _capture.ColorTexture == 0) return;

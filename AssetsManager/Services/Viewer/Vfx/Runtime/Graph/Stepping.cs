@@ -6,14 +6,19 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
     public sealed partial class VfxPlaybackGraphRuntime
     {
         public void Update(float deltaTime)
+            => Update(deltaTime, 0d, null);
+
+        internal void Update(float deltaTime, double frameEndTime, Action<VfxPlaybackGraphRuntime, double> prepare)
         {
             if (deltaTime <= 0f || !float.IsFinite(deltaTime)) return;
-            // Source.time is the driver's global simulation clock and does not rewind at a
-            // rig-loop replay. The root runtime's CurrentTime is the local age of this pass.
-            _sourceTime += deltaTime;
-            // Match LTK's variable driver: one graph step per advance. Seek/replay supplies
-            // repeated 1/60 s advances from the session instead of being subdivided here.
-            UpdateStep(deltaTime);
+            var steps = _stepper.Advance(deltaTime, Root.Definition.Flags, EffectsQuality);
+            for (int at = 0; at < steps.Count; at++)
+            {
+                float dt = steps[at];
+                prepare?.Invoke(this, frameEndTime - _stepper.Bank - (steps.Count - at - 1) * (double)dt);
+                _sourceTime += dt;
+                UpdateStep(dt);
+            }
         }
 
         private void UpdateStep(float deltaTime)

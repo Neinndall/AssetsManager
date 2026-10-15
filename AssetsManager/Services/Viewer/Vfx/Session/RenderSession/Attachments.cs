@@ -23,7 +23,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             if (sourceChanged) ReplayAfterLineageResourceChange();
         }
 
-        private void ApplyBoneTransforms(Func<string, uint, Matrix4x4?> boneTransformProvider)
+        private void ApplyBoneTransforms(Func<string, uint, Matrix4x4?> boneTransformProvider,
+            VfxPlaybackGraphRuntime onlyGraph = null, double? sampleTime = null)
         {
             if (_graphs.Count == 0) return;
 
@@ -35,6 +36,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
 
             foreach (VfxPlaybackGraphRuntime graph in _graphs)
             {
+                if (onlyGraph != null && !ReferenceEquals(onlyGraph, graph)) continue;
                 graph.SetHostJointTransformProvider(jointProvider);
                 if (_spellSteps.ContainsKey(graph))
                 {
@@ -66,7 +68,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                             CurrentSkinScale);
                         if (attachment.IsDetachable && attachment.HasBoneTransform)
                             boneTransform = attachment.BoneTransform;
-                        if (attachment.IsDetachable && _activeSystem?.CurrentTime >= attachment.StartTime)
+                        if (attachment.IsDetachable && (sampleTime ?? _activeSystem?.CurrentTime) >= attachment.StartTime)
                         {
                             attachment.BoneTransform = boneTransform;
                             attachment.HasBoneTransform = true;

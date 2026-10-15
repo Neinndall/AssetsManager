@@ -27,7 +27,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             // Retiring it at its first step hid every such particle.
             if (life < 0f)
                 life = float.PositiveInfinity;
+            if (float.IsFinite(life)) life = FlexBirth(life, d.Flex?.Lifetime, d.ParticleLifetime, emitterT);
             var vel = BirthVector(d.BirthVelocity, emitterT);
+            vel = FlexBirth(vel, d.Flex?.Velocity, d.BirthVelocity, emitterT);
             var birthAcceleration = BirthVector(d.BirthAcceleration, emitterT);
             var birthRotation = d.IsSimpleEmitter
                 ? d.BirthRotation?.SampleBirth(emitterT, _rng, sharedRoll) ?? Vector3.Zero : BirthVector(d.BirthRotation, emitterT);
@@ -40,6 +42,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 Vector2 bias = d.LegacyScaleBias ?? Vector2.One;
                 birthScale = new Vector3(scalar * bias.X, scalar * bias.Y, scalar);
             }
+            if (!d.IsSimpleEmitter) rotVel = FlexBirth(rotVel, d.Flex?.RotationalVelocity, d.BirthRotationalVelocity, emitterT);
+            birthScale *= FlexScale(d.Flex?.BirthScale);
             if (UsesUniformScale(d))
                 birthScale = new Vector3(birthScale.X);
             var rotationalAcceleration = BirthVector(d.BirthRotationalAcceleration, emitterT);
@@ -60,13 +64,16 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 : Vector3.Zero;
 
             Vector3 rawOffset = Vector3.TransformNormal(localOffset, Matrix4x4.Transpose(spawnRotation));
+            localOffset *= FlexScale(d.Flex?.EmitOffsetScale);
+            Vector3 flexTranslation = d.Flex?.BirthTranslation is { } translation
+                ? translation.Value.Sample(emitterT) * FlexChannel(translation.Channel) : Vector3.Zero;
             byte symmetry = d.OffsetLifeScalingSymmetryMode;
             if ((symmetry & 1) != 0) rawOffset.X = MathF.Abs(rawOffset.X);
             if ((symmetry & 2) != 0) rawOffset.Y = MathF.Abs(rawOffset.Y);
             if ((symmetry & 4) != 0) rawOffset.Z = MathF.Abs(rawOffset.Z);
             life = MathF.Max(0f, life + Vector3.Dot(rawOffset, d.OffsetLifetimeScaling));
 
-            if (d.EmissionMesh is { } emissionMesh && _emissionSurfaces.TryGetValue(d, out IVfxEmissionSurfaceSampler loaded)
+            if (d.EmissionMesh is { } emissionMesh && _emissionSurfaces.TryGetValue(_definition.Emitters[s.SourceOrder], out IVfxEmissionSurfaceSampler loaded)
                 && loaded is VfxEmitterEmissionSampler combined && combined.Mesh is { } meshSampler
                 && meshSampler.TrySample(SimulationTime, _rng, out VfxSurfaceBirth meshBirth))
             {
@@ -81,7 +88,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             bool onEmissionSurface = false;
             VfxSurfaceBirth surfaceBirth = default;
             if (d.EmissionSurface is not null &&
-                _emissionSurfaces.TryGetValue(d, out IVfxEmissionSurfaceSampler surfaceSampler))
+                _emissionSurfaces.TryGetValue(_definition.Emitters[s.SourceOrder], out IVfxEmissionSurfaceSampler surfaceSampler))
             {
                 IVfxEmissionSurfaceSampler sampler = surfaceSampler is VfxEmitterEmissionSampler pair ? pair.Surface : surfaceSampler;
                 onEmissionSurface = sampler?.TrySample(SimulationTime, _rng, out surfaceBirth) == true;
@@ -115,7 +122,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
 
             var particle = new Particle
             {
-                LocalPosition = (d.IsEmitterSpace ? Vector3.Zero : d.EmitterPosition.Sample(emitterT)) + localOffset,
+                LocalPosition = (d.IsEmitterSpace ? Vector3.Zero : d.EmitterPosition.Sample(emitterT)) + localOffset + flexTranslation,
                 BirthAnchor = anchor,
                 BirthAcceleration = birthAcceleration,
                 Vel = vel,
@@ -141,10 +148,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 FrameRate = (d.FrameRate ?? 0f) *
                     (d.IsSimpleEmitter ? 1f : d.BirthFrameRate?.SampleBirth(emitterT, _rng, sharedRoll) ?? 1f),
                 BirthUvOffset = birthUvOffset,
-                BirthUvScrollRate = birthUvScrollRate,
+                BirthUvScrollRate = birthUvScrollRate + FlexUv(d.Flex?.UvScroll, emitterT, sharedRoll),
+                FlexUvOffset = d.Flex?.UvOffset?.Value.SampleBirth(emitterT, _rng, sharedRoll) ?? Vector2.Zero,
+                FlexUvChannel = d.Flex?.UvOffset?.Channel ?? 0,
                 BirthUvRotateRate = birthUvRotateRate,
                 TextureMultBirthUvOffset = textureMultBirthUvOffset,
-                TextureMultBirthUvScrollRate = textureMultBirthUvScrollRate,
+                TextureMultBirthUvScrollRate = textureMultBirthUvScrollRate + FlexUv(d.Flex?.UvScrollMult, emitterT, sharedRoll),
                 TextureMultBirthUvRotateRate = textureMultBirthUvRotateRate,
                 LingerFrom = -1f
             };

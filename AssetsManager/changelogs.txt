@@ -5,12 +5,17 @@ AssetsManager - League of Legends | v4.1.0.2
 HOTFIX UPDATE
 
 New Features
+  - Viewer Settings / Choose VFX quality, with High selected by default.
+  - 3D Studio / Preview particle shadows on the ground and authored slice effects.
+  - 3D Studio / Adjust available flex channels in the Inspector and replay their effect on particles.
 
 Improvements
+  - 3D Studio / VFX quality now controls particle density, simulation timing, trail smoothing, soft particles and distortion.
 
 Changes
 
 Bug Fixes
+  - 3D Studio / Corrected default particle importance and preserved authored simulation flags across playback and seeking.
   - 3D Studio / Fixed facial layers revealing the background through the skin, including Chibi Gwen's eyes.
   - Image Comparison / Fixed Onion Skin adjustment becoming unresponsive after leaving Timeline mode.
 

@@ -56,7 +56,30 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         private int _heldChildParticleCapacity;
         private Matrix4x4 _rootTransform;
         private Matrix4x4 _orientationRootTransform;
+        internal int FlexChannelMask { get; private set; }
         private float _sourceTime;
+        private readonly VfxSimulationStepper _stepper = new();
+        private readonly float[] _flexChannels = new float[3];
+        public VfxEffectsQuality EffectsQuality { get; private set; } = VfxEffectsQuality.VeryHigh;
+
+        public void SetEffectsQuality(VfxEffectsQuality quality)
+        {
+            if (!Enum.IsDefined(quality)) throw new ArgumentOutOfRangeException(nameof(quality));
+            if (EffectsQuality == quality) return;
+            EffectsQuality = quality;
+            foreach (var runtime in _runtimes.Concat(_pendingChildren)) runtime.SetEffectsQuality(quality);
+            BuildRenderRanks(Root.Definition);
+            foreach (var runtime in _runtimes.Concat(_pendingChildren)) AssignRenderIdentity(runtime, _paths[runtime]);
+            _stepper.Bank = 0;
+        }
+
+        public void SetFlexChannels(float x, float y, float z)
+        {
+            if (!float.IsFinite(x) || !float.IsFinite(y) || !float.IsFinite(z)) throw new ArgumentOutOfRangeException(nameof(x));
+            _flexChannels[0] = x; _flexChannels[1] = y; _flexChannels[2] = z;
+            foreach (var runtime in _runtimes.Concat(_pendingChildren))
+                foreach (var emitter in runtime.Emitters) emitter.InvalidateInstances();
+        }
         private Func<string, Matrix4x4?> _jointTransformProvider;
         private Func<string, Matrix4x4?> _hostJointTransformProvider;
         private IReadOnlyDictionary<VfxEmitterDefinition, IVfxEmissionSurfaceSampler> _emissionSurfaces = EmptyEmissionSurfaces;
@@ -114,6 +137,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             Matrix4x4 RootTransform,
             Matrix4x4 OrientationRootTransform,
             float SourceTime,
+            double StepBank,
             RuntimeSnapshot[] Runtimes,
             CarriedSnapshot[] CarriedChildren,
             DeathSeenSnapshot[] DeathSeen,
@@ -318,6 +342,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             ClearChildRuns();
             RebindRootCallbacks();
             _sourceTime = 0f;
+            _stepper.Bank = 0;
             Root.Reset();
             Root.WarmUp();
             SyncRenderTimes();

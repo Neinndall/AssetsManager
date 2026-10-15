@@ -346,6 +346,9 @@ namespace AssetsManager.Views.Controls.Viewer
             _vfxRenderer = null;
             RunReleaseStep(nameof(VfxRenderSession), () => vfxRenderer?.Dispose(), gpuBound: true);
 
+            var particleShadows = _particleShadows;
+            _particleShadows = null;
+            RunReleaseStep(nameof(VfxParticleShadowScene), () => particleShadows?.Dispose(), gpuBound: true);
             var previewSurfaceRenderer = _previewSurfaceRenderer;
             _previewSurfaceRenderer = null;
             RunReleaseStep(nameof(PreviewSurfaceRenderer), () => previewSurfaceRenderer?.Dispose(), gpuBound: true);

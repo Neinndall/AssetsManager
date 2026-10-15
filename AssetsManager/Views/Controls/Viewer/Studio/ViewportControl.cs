@@ -386,9 +386,25 @@ namespace AssetsManager.Views.Controls.Viewer
                     : null;
             }
 
+            _frameTerrainDepth = 0;
+
             // A MAP scene owns the world backdrop. In Character-backdrop mode the selected Skin remains
             // the subject and is composited into the same depth/particle/post-processing frame.
-            _frameTerrainDepth = 0;
+            if (_mapSceneRuntime == null)
+            {
+                if (!snapshot)
+                {
+                    AdvanceCurrentVfxPlayback(dt);
+                    UpdateChampionPoseForFrame();
+                    AdvanceSceneActors(dt);
+                }
+                if (_vfxRenderer != null && ShouldRenderCharacterVfx() && IsFocusedActorVisible && !_championAwaitingFirstPose)
+                    PrepareParticleSession(_vfxRenderer, null, viewProj, view, width, height);
+                PrepareSceneActorParticles(null, viewProj, view, width, height);
+                _particleShadows ??= new VfxParticleShadowScene(_gl);
+                _particleShadows.Render(_preparedParticlePasses, view);
+                if (_previewSurfaceRenderer != null) _previewSurfaceRenderer.Shadows = _particleShadows;
+            }
             if (_mapSceneRuntime != null)
             {
                 if (!snapshot)
@@ -449,6 +465,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 // particle colour, then all colour/wire draws land before any renderer captures the
                 // frame used by distortion.
                 MapSunData sun = EffectiveMapSun();
+                if (_mapParticleRenderer != null) _mapParticleRenderer.EffectsQuality = (VfxEffectsQuality)(AppSettings?.StudioParameters?.EffectsQuality ?? 3);
                 _mapParticleRenderer?.SetSun(sun);
                 _mapParticleRenderer?.SetTerrainDepth(_frameTerrainDepth, _frameTerrainWidth, _frameTerrainHeight);
                 bool mapParticlesPrepared = _mapSceneRuntime.ShowParticles &&
@@ -480,12 +497,6 @@ namespace AssetsManager.Views.Controls.Viewer
 
             if (!characterBackdrop)
             {
-                if (!snapshot)
-                {
-                    AdvanceCurrentVfxPlayback(dt);
-                    UpdateChampionPoseForFrame();
-                    AdvanceSceneActors(dt);
-                }
                 RenderChampionMesh(viewProj, view, proj, eye);
                 RenderSceneActorMeshes(viewProj, view, proj, eye);
                 if (!snapshot) UpdateCharacterArmatureOverlay(viewProj);
@@ -494,9 +505,6 @@ namespace AssetsManager.Views.Controls.Viewer
             // Without a MAP, every Character session still shares one particle pass after all meshes.
             if (_mapSceneRuntime == null)
             {
-                if (_vfxRenderer != null && ShouldRenderCharacterVfx() && IsFocusedActorVisible && !_championAwaitingFirstPose)
-                    PrepareParticleSession(_vfxRenderer, null, viewProj, view, width, height);
-                PrepareSceneActorParticles(null, viewProj, view, width, height);
                 RenderPreparedParticlePasses();
             }
             _model.LiveParticleCount = (_vfxRenderer?.LiveParticleCount ?? 0) + SceneActorParticleCount();

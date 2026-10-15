@@ -20,6 +20,20 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         private int[] _newbornStarts = Array.Empty<int>();
         private readonly int _seed;
         private VfxSystemDefinition _definition;
+        private readonly VfxSimulationStepper _stepper = new();
+        internal float[] FlexChannels { get; private set; } = new float[3];
+        public VfxEffectsQuality EffectsQuality { get; private set; } = VfxEffectsQuality.VeryHigh;
+
+        internal void BindFlexChannels(float[] channels) => FlexChannels = channels;
+
+        public void SetEffectsQuality(VfxEffectsQuality quality)
+        {
+            if (!Enum.IsDefined(quality)) throw new ArgumentOutOfRangeException(nameof(quality));
+            EffectsQuality = quality;
+            _stepper.Bank = 0;
+            foreach (var state in _emitters)
+                state.Def = VfxQuality.Apply(_definition.Emitters[state.SourceOrder], quality);
+        }
         private static readonly IReadOnlyDictionary<VfxEmitterDefinition, IVfxEmissionSurfaceSampler> EmptyEmissionSurfaces =
             new Dictionary<VfxEmitterDefinition, IVfxEmissionSurfaceSampler>(ReferenceEqualityComparer.Instance);
         private IReadOnlyDictionary<VfxEmitterDefinition, IVfxEmissionSurfaceSampler> _emissionSurfaces = EmptyEmissionSurfaces;
@@ -201,7 +215,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 var e = system.Emitters[emitterIndex];
                 var emitterState = new EmitterState
                 {
-                    Def = e,
+                    Def = VfxQuality.Apply(e, EffectsQuality),
                     DefinitionTransform = system.HudLayer ? Matrix4x4.Identity : system.Transform ?? Matrix4x4.Identity,
                     HudLayer = system.HudLayer,
                     SourceOrder = emitterIndex,
@@ -254,6 +268,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
 
         private void ResetRunState()
         {
+            _stepper.Bank = 0;
             _isKilled = false;
             IsStopped = false;
             CurrentTime = 0f;
@@ -339,10 +354,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         {
             if (_isKilled || dt <= 0f || !float.IsFinite(dt)) return;
             WarmUp();
-            // The driver owns timestep policy. LTK's variable stepper advances the runtime once
-            // with the frame duration it receives; seek/replay obtains fixed steps by calling it
-            // repeatedly with 1/60 s, not by subdividing again inside the particle runtime.
-            UpdateStep(dt);
+            foreach (float step in _stepper.Advance(dt, _definition?.Flags ?? 0xd4, EffectsQuality))
+                UpdateStep(step);
         }
 
         public void Kill()
@@ -359,7 +372,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         internal void UpdateAtTime(float dt, float driverTime)
         {
             _driverTime = driverTime;
-            try { Update(dt); }
+            try { WarmUp(); UpdateStep(dt); }
             finally { _driverTime = null; }
         }
 

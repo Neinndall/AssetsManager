@@ -56,6 +56,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                     system.OwnerSceneContext,
                     SampleEmissionBoneTransform);
                 _graph.SetPinnedBirthChance(_pinnedBirthChance);
+                ApplySimulationInputs(_graph);
                 _graphs.Add(_graph);
                 _graphPlacements[_graph] = Matrix4x4.Identity;
                 ApplyRigTransform();
@@ -135,6 +136,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                     ownerSceneContext,
                     SampleEmissionBoneTransform);
                 graph.SetStartDelay((float)Math.Max(0d, step.StartTime));
+                ApplySimulationInputs(graph);
                 _graphs.Add(graph);
                 _graphPlacements[graph] = Matrix4x4.Identity;
                 _spellSteps[graph] = step;
@@ -252,6 +254,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                     ownerSceneContext,
                     SampleEmissionBoneTransform);
 
+                ApplySimulationInputs(idleGraph);
                 _graphs.Add(idleGraph);
                 _graphPlacements[idleGraph] = Matrix4x4.Identity;
                 _graphAttachments[idleGraph] = new GraphAttachmentInfo
@@ -317,7 +320,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
 
                     eventGraph.SetStartDelay(startSeconds);
 
-                    _graphs.Add(eventGraph);
+                    ApplySimulationInputs(eventGraph);
+                _graphs.Add(eventGraph);
                     _graphPlacements[eventGraph] = Matrix4x4.Identity;
 
                     _graphAttachments[eventGraph] = new GraphAttachmentInfo

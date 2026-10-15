@@ -724,7 +724,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                     new[] { new Vector4(1f, 1f, 1f, 0f), Vector4.One })
             };
             var simulator = new VfxPlaybackRuntime(7);
-            simulator.SetSystem(new VfxSystemDefinition(1, "color", "color", new[] { emitter }), Vector3.Zero);
+            simulator.SetSystem(new VfxSystemDefinition(1, "color", "color", new[] { emitter }, Flags: 8), Vector3.Zero);
 
             for (int i = 0; i < 5; i++) simulator.Update(0.1f);
 
@@ -1000,7 +1000,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 Trail = new VfxTrailDefinition(VfxCurve3.Const(Vector3.Zero), 0, 0, 2, 10000f)
             };
             var simulator = new VfxPlaybackRuntime(7);
-            simulator.SetSystem(new VfxSystemDefinition(1, "trail", "trail", new[] { emitter }), Vector3.Zero);
+            simulator.SetSystem(new VfxSystemDefinition(1, "trail", "trail", new[] { emitter }, Flags: 8), Vector3.Zero);
 
             simulator.Update(0.1f);
 
@@ -1079,7 +1079,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 TextureMultParticleUvRotate = VfxCurveF.Const(40f)
             };
             var simulator = new VfxPlaybackRuntime(7);
-            simulator.SetSystem(new VfxSystemDefinition(1, "uv", "uv", new[] { emitter }), Vector3.Zero);
+            simulator.SetSystem(new VfxSystemDefinition(1, "uv", "uv", new[] { emitter }, Flags: 8), Vector3.Zero);
 
             simulator.Update(0.1f);
             simulator.Update(0.1f);
@@ -1109,7 +1109,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                     new[] { Vector2.Zero, new Vector2(4f, 0f) })
             };
             var simulator = new VfxPlaybackRuntime(7);
-            simulator.SetSystem(new VfxSystemDefinition(1, "integrated-uv", "integrated-uv", new[] { emitter }), Vector3.Zero);
+            simulator.SetSystem(new VfxSystemDefinition(1, "integrated-uv", "integrated-uv", new[] { emitter }, Flags: 8), Vector3.Zero);
 
             for (int step = 0; step < 5; step++) simulator.Update(0.1f);
 
@@ -1800,7 +1800,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 Rate = VfxCurveF.Zero,
                 EmitterLifetime = null
             };
-            var child = new VfxSystemDefinition(2, "child", "child", new[] { childEmitter });
+            var child = new VfxSystemDefinition(2, "child", "child", new[] { childEmitter }, Flags: 8);
             VfxEmitterDefinition parentEmitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
             {
                 ParticleLifetime = VfxCurveF.Const(0.05f),
@@ -1808,7 +1808,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                     new[] { new VfxChildSystemReference("child", 2, 0) }, true,
                     VfxCurveF.Zero, VfxCurve3.Const(Vector3.Zero), 0)
             };
-            var parent = new VfxSystemDefinition(1, "parent", "parent", new[] { parentEmitter });
+            var parent = new VfxSystemDefinition(1, "parent", "parent", new[] { parentEmitter }, Flags: 8);
             var graph = CreateGraph(parent, child);
 
             graph.Update(0.1f);
@@ -1945,7 +1945,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 EmitterLifetime = 10f,
                 ParticleLifetime = VfxCurveF.Const(1f)
             };
-            var child = new VfxSystemDefinition(2, "child", "child", new[] { childEmitter });
+            var child = new VfxSystemDefinition(2, "child", "child", new[] { childEmitter }, Flags: 8);
             VfxEmitterDefinition parentEmitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
             {
                 ParticleLifetime = VfxCurveF.Const(0.15f),
@@ -1957,7 +1957,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                     VfxCurve3.Const(Vector3.Zero),
                     0)
             };
-            var parent = new VfxSystemDefinition(1, "parent", "parent", new[] { parentEmitter });
+            var parent = new VfxSystemDefinition(1, "parent", "parent", new[] { parentEmitter }, Flags: 8);
             var graph = new VfxPlaybackGraphRuntime(
                 parent,
                 Matrix4x4.Identity,
@@ -2530,7 +2530,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                     Array.Empty<uint>(),
                     Array.Empty<uint>())
             };
-            var child = new VfxSystemDefinition(2, "child", "child", new[] { childEmitter });
+            var child = new VfxSystemDefinition(2, "child", "child", new[] { childEmitter }, Flags: 8);
             VfxEmitterDefinition parentEmitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
             {
                 ChildParticleSet = new VfxChildParticleSetDefinition(
@@ -2540,7 +2540,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                     VfxCurve3.Const(Vector3.Zero),
                     0)
             };
-            var parent = new VfxSystemDefinition(1, "parent", "parent", new[] { parentEmitter });
+            var parent = new VfxSystemDefinition(1, "parent", "parent", new[] { parentEmitter }, Flags: 8);
             VfxPlaybackGraphRuntime graph = CreateGraph(parent, child);
             graph.SetEmissionSurfaces(new Dictionary<VfxEmitterDefinition, IVfxEmissionSurfaceSampler>
             {
@@ -2941,7 +2941,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 AccelerationOverLife = VfxCurve3.Const(Vector3.UnitX)
             };
             var runtime = new VfxPlaybackRuntime(7);
-            runtime.SetSystem(new VfxSystemDefinition(1, "timing", "timing", new[] { emitter }), Vector3.Zero);
+            runtime.SetSystem(new VfxSystemDefinition(1, "timing", "timing", new[] { emitter }, Flags: 8), Vector3.Zero);
 
             runtime.Update(0.01f); // birth step
             runtime.Update(0.2f);  // one variable driver step, not two 0.1 s substeps
@@ -2961,7 +2961,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 ParticleLifetime = VfxCurveF.Const(10f),
                 AccelerationOverLife = VfxCurve3.Const(Vector3.UnitX)
             };
-            var definition = new VfxSystemDefinition(1, "timing-session", "timing-session", new[] { emitter });
+            var definition = new VfxSystemDefinition(1, "timing-session", "timing-session", new[] { emitter }, Flags: 8);
             var model = new VfxSystemModel
             {
                 Name = "timing-session",
@@ -3053,7 +3053,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 EmitterLifetime = 1f
             };
             var runtime = new VfxPlaybackRuntime(7);
-            runtime.SetSystem(new VfxSystemDefinition(1, "serial", "serial", new[] { emitter }), Vector3.Zero);
+            runtime.SetSystem(new VfxSystemDefinition(1, "serial", "serial", new[] { emitter }, Flags: 8), Vector3.Zero);
 
             runtime.Update(0.1f);
             VfxPlaybackRuntime.EmitterState state = Assert.Single(runtime.Emitters);
@@ -3686,7 +3686,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 BirthRotationalVelocity = VfxCurve3.Const(new Vector3(40f, 50f, 60f))
             };
             var runtime = new VfxPlaybackRuntime(7);
-            runtime.SetSystem(new VfxSystemDefinition(1, "rotation", "rotation", new[] { emitter }), Vector3.Zero);
+            runtime.SetSystem(new VfxSystemDefinition(1, "rotation", "rotation", new[] { emitter }, Flags: 8), Vector3.Zero);
 
             for (int step = 0; step < 4; step++)
                 runtime.Update(0.0625f);
@@ -3726,7 +3726,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 ParticleLifetime = VfxCurveF.Const(2f)
             };
             var runtime = new VfxPlaybackRuntime(7);
-            runtime.SetSystem(new VfxSystemDefinition(1, "ranges", "ranges", new[] { emitter }), Vector3.Zero);
+            runtime.SetSystem(new VfxSystemDefinition(1, "ranges", "ranges", new[] { emitter }, Flags: 8), Vector3.Zero);
 
             runtime.Update(1f);
 

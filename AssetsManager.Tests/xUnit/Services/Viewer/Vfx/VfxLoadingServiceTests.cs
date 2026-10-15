@@ -1442,7 +1442,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                     EmissionSurface = new VfxEmissionSurfaceDefinition(VfxEmissionSurfaceKind.Mesh,
                         "surface.skn", "surface.skl", Array.Empty<uint>(), Array.Empty<uint>(), UseNormal: false)
                 };
-                var definition = new VfxSystemDefinition(1, "surface", "surface", new[] { emitter });
+                var definition = new VfxSystemDefinition(1, "surface", "surface", new[] { emitter }, Flags: 8);
                 var systems = new Dictionary<uint, VfxSystemDefinition> { [1] = definition };
                 var resources = new Dictionary<uint, uint>();
                 using var service = new VfxLoadingService();

@@ -482,6 +482,12 @@ namespace AssetsManager.Utils
         private bool _transparentBackground;
         private bool _enableFxaa = true;
         private string _antiAliasingMode = "Fxaa";
+        private int _effectsQuality = 3;
+        public int EffectsQuality
+        {
+            get => _effectsQuality;
+            set { if (value is >= 0 and <= 4) SetProperty(ref _effectsQuality, value); }
+        }
 
         public event PropertyChangedEventHandler PropertyChanged;
 

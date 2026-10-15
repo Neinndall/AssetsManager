@@ -44,6 +44,14 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         private Func<VfxPlaybackRuntime.EmitterState, int> _particlePassCountSelector;
         private Func<VfxPlaybackRuntime.EmitterState, int, bool> _particleTransparencySelector;
         private bool _drawingWireframe;
+        private bool _drawingShadows;
+
+        internal void RenderShadows(IReadOnlyList<VfxRenderQueueEntry> queue, Matrix4x4 lightViewProjection, Matrix4x4 eyeView)
+        {
+            _drawingShadows = true;
+            try { Render(queue, lightViewProjection, eyeView); }
+            finally { _drawingShadows = false; }
+        }
         private readonly HashSet<uint> _ownerHiddenSubmeshes = new();
         private AssetsManager.Services.Viewer.Rendering.GameShaders.GameShaderRuntime.DrawElementsDelegate _drawElements = null!;
         private const int Stride = VfxPlaybackRuntime.InstanceStride;
@@ -418,7 +426,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _gl.Disable(EnableCap.CullFace);
             _gl.Disable(EnableCap.PolygonOffsetFill);
             _gl.Disable(EnableCap.StencilTest);
-            _gl.ColorMask(true, true, true, true);
+            _gl.ColorMask(!_drawingShadows, !_drawingShadows, !_drawingShadows, !_drawingShadows);
             _gl.Enable(EnableCap.Blend);
             _gl.BlendEquation(GLEnum.FuncAdd);
 
@@ -460,11 +468,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 int passIndex = draw.PassIndex;
                 if (es.InstanceCount == 0) continue;
                 if (!es.IsVisible || es.Def.Disabled) continue;
-                if (!VfxRenderPhaseSemantics.Resolve(es.Def, es.HudLayer).Draws) continue;
+                if (_drawingShadows ? !VfxRenderPhaseSemantics.CastsShadow(es.Def) : !VfxRenderPhaseSemantics.Resolve(es.Def, es.HudLayer).Draws) continue;
                 if (useWireframe)
                     _gl.Disable(EnableCap.CullFace);
 
-                _gl.ColorMask(true, true, true, true);
+                _gl.ColorMask(!_drawingShadows, !_drawingShadows, !_drawingShadows, !_drawingShadows);
                 ApplyEmitterStencilState(es.Def, stencilScene, useWireframe);
                 // Never synthesize an AttachedMesh proxy. Render only geometry that was
                 // resolved from the real owner scene and filtered by authored submesh masks.

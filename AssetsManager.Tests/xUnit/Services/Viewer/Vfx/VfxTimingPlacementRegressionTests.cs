@@ -485,7 +485,7 @@ public sealed class VfxTimingPlacementRegressionTests
     private static VfxPlaybackRuntime Create(VfxEmitterDefinition emitter, Matrix4x4? definitionTransform = null)
     {
         var runtime = new VfxPlaybackRuntime(7);
-        runtime.SetSystem(new VfxSystemDefinition(1, "test", "test", new[] { emitter }, Transform: definitionTransform), Vector3.Zero);
+        runtime.SetSystem(new VfxSystemDefinition(1, "test", "test", new[] { emitter }, Transform: definitionTransform, Flags: 8), Vector3.Zero);
         return runtime;
     }
 

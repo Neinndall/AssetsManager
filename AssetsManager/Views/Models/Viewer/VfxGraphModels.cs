@@ -65,7 +65,8 @@ namespace AssetsManager.Views.Models.Viewer
         VfxDragMotion DragMotion = VfxDragMotion.Stepped,
         float BuildUpTime = 0f,
         IReadOnlyDictionary<uint, uint> ResourceMap = null,
-        bool HudLayer = false);
+        bool HudLayer = false,
+        uint Flags = 0xd4);
 
     /// <summary>One emitter inside a system, with curves sampled on emitter phase or particle age according to their role.</summary>
     public sealed record VfxEmitterDefinition(
@@ -170,7 +171,7 @@ namespace AssetsManager.Views.Models.Viewer
         VfxSoftParticleDefinition SoftParticle = null,
         VfxReflectionDefinition Reflection = null,
         Vector3? RayTargetOffset = null,
-        byte Importance = 0,
+        byte Importance = VfxAuthoredDefaults.Importance,
         byte ColorblindVisibility = 0,
         VfxCullReason Culled = VfxCullReason.None,
         VfxCurve3? BirthScale1 = null,
@@ -227,7 +228,11 @@ namespace AssetsManager.Views.Models.Viewer
         Vector3 OffsetLifetimeScaling = default,
         byte OffsetLifeScalingSymmetryMode = 0,
         Vector3? PostRotateOrientation = null,
-        bool IsHudLayer = false)
+        bool IsHudLayer = false,
+        bool DoesCastShadow = false,
+        float SliceRange = 0f,
+        VfxFlexDefinition Flex = null,
+        VfxEffectsQuality EffectsQuality = VfxEffectsQuality.VeryHigh)
     {
         /// <summary>LTK drawKind.ts: this emitter reaches the quad renderer.</summary>
         public bool DrawsAsProjection => PrimitiveKind == VfxPrimitiveKind.PlanarProjection;
@@ -920,7 +925,7 @@ namespace AssetsManager.Views.Models.Viewer
         public const byte ColorLookUpTypeX = 1;
         public const byte ColorLookUpTypeY = 0;
         public const byte MeshRenderFlags = 1;
-        public const byte Importance = 1;
+        public const byte Importance = 2;
         public const byte ColorblindVisibility = 0;
         public const byte RenderPhaseOverride = 7;
         public const byte StencilMode = 0;

@@ -314,6 +314,19 @@
                     </ComboBox>
                 </Grid>
 
+                <Grid Margin="0,0,0,24">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                        <TextBlock Text="VFX Quality" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" FontSize="13"/>
+                        <TextBlock Text="Set particle detail, simulation quality and particle shadows" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,2,0,0"/>
+                    </StackPanel>
+                    <ComboBox Grid.Column="1" Width="100" Height="30" VerticalAlignment="Center" Style="{StaticResource ModernComboBox}"
+                              SelectedIndex="{Binding Settings.StudioParameters.EffectsQuality, Mode=TwoWay}">
+                        <ComboBoxItem Content="Very Low"/><ComboBoxItem Content="Low"/><ComboBoxItem Content="Medium"/>
+                        <ComboBoxItem Content="High"/><ComboBoxItem Content="Very High"/>
+                    </ComboBox>
+                </Grid>
+
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>

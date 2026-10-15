@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using AssetsManager.Services.Viewer.Rendering;
 using AssetsManager.Services.Viewer.Vfx.Rendering;
 using AssetsManager.Services.Viewer.Vfx.Runtime;
 using AssetsManager.Services.Viewer.Vfx.Semantics;
@@ -11,6 +12,15 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
     public sealed partial class VfxRenderSession
     {
         private VfxStencilScene _preparedStencilScene;
+        private bool _preparedSoftDepth;
+        public void CapturePreparedSceneDepth()
+            => _renderer.CaptureScene(_viewportWidth, _viewportHeight, false, _preparedSoftDepth);
+        bool IPreparedParticlePass.HasPreparedShadowCasters => _preparedShaded && _renderQueue.Exists(e =>
+            e.Emitter.IsVisible && !e.Emitter.Def.Disabled && e.Emitter.InstanceCount > 0 && VfxRenderPhaseSemantics.CastsShadow(e.Emitter.Def));
+        void IPreparedParticlePass.RenderPreparedShadowPass(Matrix4x4 lightViewProjection, Matrix4x4 eyeView)
+        {
+            if (_preparedShaded) _renderer.RenderShadows(_renderQueue, lightViewProjection, eyeView);
+        }
         public void Render(
             Matrix4x4 viewProjection,
             Matrix4x4 view,
@@ -20,6 +30,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             if (!PrepareRenderFrame(viewProjection, view, viewMode, wireOverlay)) return;
 
             using IDisposable renderBatch = BeginPreparedRenderBatch();
+            CapturePreparedSceneDepth();
             CapturePreparedEarlyDistortionFrame();
             RenderPreparedEarlyDistortionPass();
             RenderPreparedColorPass();
@@ -89,6 +100,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                 }
             }
 
+            _preparedSoftDepth = needsSoftParticles;
             _renderer.CaptureScene(
                 _viewportWidth,
                 _viewportHeight,

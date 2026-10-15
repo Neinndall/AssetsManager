@@ -1,6 +1,7 @@
 using System;
 using System.Numerics;
 using AssetsManager.Views.Models.Viewer;
+using AssetsManager.Services.Viewer.Vfx.Semantics;
 
 namespace AssetsManager.Services.Viewer.Vfx.Runtime
 {
@@ -215,7 +216,15 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                     float speed = context.Dt > 0f ? context.SystemDelta.Length() / context.Dt : 0f;
                     rate = Math.Clamp(speed * function.X + function.Y, 0f, MathF.Max(0f, d.MaximumRateByVelocity ?? 300f));
                 }
-                else rate = MathF.Max(0f, BirthScalar(d.Rate, emitterT));
+                else
+                {
+                    float baseRate = BirthScalar(d.Rate, emitterT);
+                    float flexRate = FlexTerm(d.Flex?.Rate, emitterT);
+                    float scale = VfxQuality.RateScale(d.EffectsQuality, d.Importance);
+                    rate = d.IsSimpleEmitter ? baseRate * scale + flexRate : (baseRate + flexRate) * scale;
+                }
+                if (d.RateByVelocityFunction is not null) rate *= VfxQuality.RateScale(d.EffectsQuality, d.Importance);
+                rate = MathF.Max(0f, rate);
                 if (!float.IsFinite(rate)) rate = 0f;
                 float emittingUntil = end is { } lifetime ? MathF.Min(s.Age, lifetime) : s.Age;
                 float cycleStart = d.EmissionPeriod?.Length is { } length
