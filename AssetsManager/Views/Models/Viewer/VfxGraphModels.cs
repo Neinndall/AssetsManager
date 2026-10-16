@@ -232,7 +232,8 @@ namespace AssetsManager.Views.Models.Viewer
         bool DoesCastShadow = false,
         float SliceRange = 0f,
         VfxFlexDefinition Flex = null,
-        VfxEffectsQuality EffectsQuality = VfxEffectsQuality.VeryHigh)
+        VfxEffectsQuality EffectsQuality = VfxEffectsQuality.VeryHigh,
+        VfxShimmerDefinition Shimmer = null)
     {
         /// <summary>LTK drawKind.ts: this emitter reaches the quad renderer.</summary>
         public bool DrawsAsProjection => PrimitiveKind == VfxPrimitiveKind.PlanarProjection;
@@ -356,6 +357,11 @@ namespace AssetsManager.Views.Models.Viewer
 
     /// <summary>Riot's screen-space particle distortion stage (heat haze/refraction).</summary>
     public sealed record VfxDistortionDefinition(float Strength, int Mode, string NormalMapTexturePath);
+
+    /// <summary>Component source and constant-driver timing for the Shimmer playback path.</summary>
+    public sealed record VfxShimmerDefinition(
+        uint SourceList, int SourceIndex, float StartDelay, float Duration, float Lifetime,
+        float Rate, int Burst, float Spread, bool Looping, float LoopDelay);
 
     /// <summary>The authored emission window on the system clock; either field may be absent.</summary>
     public sealed record VfxEmissionPeriod(float? Length, float? Active)

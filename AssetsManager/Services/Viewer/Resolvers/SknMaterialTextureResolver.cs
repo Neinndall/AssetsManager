@@ -1368,6 +1368,36 @@ namespace AssetsManager.Services.Viewer.Resolvers
             if (material == null)
                 return ModelMaterialDefinition.Missing;
 
+            return ResolveMaterialPreview(material, trees, out sourceBlendFactor, out destinationBlendFactor,
+                wadChunkPathResolver, binEntryResolver);
+        }
+
+        internal static ModelMaterialDefinition ResolveEmbeddedMaterialPreview(
+            BinTreeStruct embedded,
+            IEnumerable<BinTree> trees,
+            out VfxCustomMaterialBlendFactor sourceBlendFactor,
+            out VfxCustomMaterialBlendFactor destinationBlendFactor,
+            Func<ulong, string> wadChunkPathResolver = null,
+            Func<uint, string> binEntryResolver = null)
+        {
+            // Inline materials have no entry hash; the material reader consumes their fields directly.
+            var obj = new BinTreeObject(0, embedded.ClassHash, embedded.Properties.Values);
+            var material = ReadMaterialDefinition(obj, wadChunkPathResolver, binEntryResolver) with
+            {
+                Program = new MapMaterialParser(wadChunkPathResolver, binEntryResolver).ParseProgram(obj, trees)
+            };
+            return ResolveMaterialPreview(material, trees, out sourceBlendFactor, out destinationBlendFactor,
+                wadChunkPathResolver, binEntryResolver);
+        }
+
+        private static ModelMaterialDefinition ResolveMaterialPreview(
+            SknMaterialDefinition material,
+            IEnumerable<BinTree> trees,
+            out VfxCustomMaterialBlendFactor sourceBlendFactor,
+            out VfxCustomMaterialBlendFactor destinationBlendFactor,
+            Func<ulong, string> wadChunkPathResolver,
+            Func<uint, string> binEntryResolver)
+        {
             sourceBlendFactor = ResolveVfxBlendFactor(
                 material.Pass?.SourceColorBlendFactor,
                 VfxCustomMaterialBlendFactor.One);

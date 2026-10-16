@@ -25,6 +25,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             internal int RenderRank { get; set; }
             public bool IsVisible { get; set; } = true;
             public Vector3 BasePos;                 // world spawn origin (placement + emitterPosition)
+            internal System.Collections.Generic.List<double> ShimmerBirths;
             /// <summary>The spawn origin where the previous step ended, which a step's births spread from.</summary>
             public Vector3 SystemOrigin, SystemTarget;
             /// <summary>The system's world turn without scale, which turns a beam's local-space end offsets.</summary>

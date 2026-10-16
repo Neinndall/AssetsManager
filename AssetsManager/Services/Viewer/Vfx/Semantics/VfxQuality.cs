@@ -25,6 +25,7 @@ public static class VfxQuality
 
     internal static VfxEmitterDefinition Apply(VfxEmitterDefinition source, VfxEffectsQuality quality)
     {
+        if (source.Shimmer != null) return source;
         VfxCullReason culled = source.Culled;
         if (culled is VfxCullReason.None or VfxCullReason.Importance or VfxCullReason.Colorblind or VfxCullReason.Never)
             culled = Culled(quality, source.Importance) ? VfxCullReason.Importance

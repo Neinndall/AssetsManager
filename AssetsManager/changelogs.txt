@@ -17,6 +17,7 @@ Improvements
 Changes
 
 Bug Fixes
+  - 3D Studio / Fixed missing Shimmer mesh effects when enabling map decorations.
   - VFX Studio / Closing a map preview during loading no longer leaves temporary effect files behind.
   - 3D Studio / Fixed missile detection when the character BIN is not linked, including player and enemy variants.
   - 3D Studio / Corrected missile target heights and orbit sizes, and kept speed adjustments from replacing authored movement.

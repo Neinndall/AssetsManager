@@ -2659,7 +2659,13 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.Equal(new Vector3(2f, 2f, 2f), parsedEmitter.BirthScale.Constant);
             Assert.Equal(new Vector3(10f, 20f, 30f), parsedEmitter.EmitterPosition.Constant);
             Assert.NotNull(parsedEmitter.BirthRotation);
-            Assert.Equal(new Vector3(0f, 90f * (System.MathF.PI / 180f), 0f), parsedEmitter.BirthRotation.Value.Constant);
+            // Emitter definitions keep degrees; spawning converts them to radians once.
+            Assert.Equal(new Vector3(0f, 90f, 0f), parsedEmitter.BirthRotation.Value.Constant);
+            var runtime = new AssetsManager.Services.Viewer.Vfx.Runtime.VfxPlaybackRuntime(7);
+            runtime.SetSystem(parsedSystem, Vector3.Zero);
+            runtime.Seek(0.1f);
+            Assert.InRange(Assert.Single(runtime.Emitters[0].Particles).BirthRotation.Y,
+                System.MathF.PI / 2f - 0.0001f, System.MathF.PI / 2f + 0.0001f);
             Assert.False(parsedEmitter.Disabled);
         }
 

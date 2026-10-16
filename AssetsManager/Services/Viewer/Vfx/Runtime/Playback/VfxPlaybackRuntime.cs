@@ -295,6 +295,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 s.InvalidateInstances();
             }
             LiveParticleCount = 0;
+            foreach (var state in _emitters)
+            {
+                if (state.Def.Shimmer == null) continue;
+                RebuildShimmerParticles(state, Math.Max(0, _particleCapacity - LiveParticleCount));
+                LiveParticleCount += state.Particles.Count;
+            }
         }
 
         /// <summary>

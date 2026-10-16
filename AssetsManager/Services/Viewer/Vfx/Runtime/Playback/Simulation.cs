@@ -31,7 +31,13 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             for (int index = 0; index < _emitters.Count; index++)
             {
                 EmitterState emitter = _emitters[index];
-                _stepContexts[index] = IntegrateEmitter(emitter, dt, systemDelta);
+                if (emitter.Def.Shimmer != null && !IsStopped)
+                {
+                    emitter.Age += dt;
+                    emitter.Particles.Clear();
+                    _stepContexts[index] = default;
+                }
+                else _stepContexts[index] = IntegrateEmitter(emitter, dt, systemDelta);
                 availableParticleSlots -= emitter.Particles.Count;
             }
             availableParticleSlots = Math.Max(0, availableParticleSlots);
@@ -39,6 +45,15 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             Array.Fill(_newbornStarts, -1);
             for (int index = 0; index < _emitters.Count; index++)
             {
+                if (_emitters[index].Def.Shimmer != null)
+                {
+                    if (!IsStopped)
+                    {
+                        RebuildShimmerParticles(_emitters[index], availableParticleSlots);
+                        availableParticleSlots -= _emitters[index].Particles.Count;
+                    }
+                    continue;
+                }
                 _newbornStarts[index] = EmitEmitter(
                     _emitters[index],
                     _stepContexts[index],
@@ -77,6 +92,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         private void SettleEmitter(EmitterState state, float dt)
         {
             VfxEmitterDefinition definition = state.Def;
+            if (definition.Shimmer != null) return;
             byte kind = definition.IsSimpleEmitter ? (byte)0 : definition.ParticleLingerType;
             if (kind > 2 || (!IsStopped && kind != 2)) return;
             bool finished = !definition.IsSimpleEmitter && definition.IsSingleParticle && !definition.OverridesMaterials

@@ -48,9 +48,19 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             {
                 if (Get(o.Properties, listHash) is not BinTreeContainer c) continue;
                 bool simple = listHash == EmitterLists[1];
-                foreach (var el in c.Elements)
+                for (int index = 0; index < c.Elements.Count; index++)
+                {
+                    var el = c.Elements[index];
                     if (el is BinTreeStruct s && s.ClassHash == EmitterClass)
-                        emitters.Add(ParseEmitter(s, simple, hudLayer));
+                    {
+                        if (s.Properties.GetValueOrDefault(VfxParsingHash.Fnv1a("VfxComponents")) is BinTreeStruct)
+                        {
+                            var component = ParseShimmerEmitter(s, index, listHash);
+                            if (component != null) emitters.Add(component);
+                        }
+                        else emitters.Add(ParseEmitter(s, simple, hudLayer));
+                    }
+                }
             }
             if (Get(o.Properties, F_shimmerEmitterDefinitionData) is BinTreeContainer shimmerContainer)
             {
