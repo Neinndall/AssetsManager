@@ -46,16 +46,12 @@ internal static class VfxSystemRigResolver
         if (bundle?.MissileSpells.TryGetValue(system.PathHash, out var catalog) == true)
             foreach (var spell in catalog)
                 if (VfxSpellFlightPath.CanSimulateForRig(spell.Missile))
-                    return (VfxRigSettings.ForPreset(VfxRigPreset.Missile) with
-                    {
-                        FlightSpeed = spell.Missile.Speed is > 0f ? spell.Missile.Speed.Value : VfxSpellFlightPath.FallbackSpeed,
-                        Missile = spell.Missile,
-                        SpellName = spell.ScriptName
-                    }, $"Spell missile effect ({spell.ScriptName}) resolved through the active skin.");
+                    return (SpellRig(spell, spell.ScriptName),
+                        $"Spell missile effect ({spell.ScriptName}) resolved through the active skin.");
 
         bool projectile = false;
         bool impact = false;
-        VfxSpellMissilePreview matchedMissile = null;
+        VfxSpellPreview matchedSpell = null;
         string matchedSpellName = null;
 
         foreach ((uint spellHash, VfxSpellPreview spell) in bundle?.SpellPreviews ?? new System.Collections.Generic.Dictionary<uint, VfxSpellPreview>())
@@ -72,9 +68,9 @@ internal static class VfxSystemRigResolver
                 if (isSpellMissile)
                 {
                     projectile = true;
-                    if (matchedMissile == null && VfxSpellFlightPath.CanSimulateForRig(spell.Missile))
+                    if (matchedSpell == null && VfxSpellFlightPath.CanSimulateForRig(spell.Missile))
                     {
-                        matchedMissile = spell.Missile;
+                        matchedSpell = spell;
                         matchedSpellName = !string.IsNullOrWhiteSpace(spell.ScriptName)
                             ? spell.ScriptName
                             : $"0x{spellHash:x8}";
@@ -87,19 +83,13 @@ internal static class VfxSystemRigResolver
 
         Vector3? beamTarget = BeamReach(system) is { } reach ? new Vector3(0f, 0f, reach) : null;
 
-        if (projectile && impact && matchedMissile == null)
+        if (projectile && impact && matchedSpell == null)
             return (VfxRigSettings.ForPreset(VfxRigPreset.Still) with { Target = beamTarget }, "Shared projectile and impact effect; no unique motion.");
         if (projectile)
         {
-            float speed = matchedMissile?.Speed is > 0f && float.IsFinite(matchedMissile.Speed.Value)
-                ? matchedMissile.Speed.Value
-                : (matchedMissile != null ? VfxSpellFlightPath.FallbackSpeed : VfxRigMotion.FlightSpeed);
-            VfxRigSettings missileSettings = VfxRigSettings.ForPreset(VfxRigPreset.Missile) with
-            {
-                FlightSpeed = speed,
-                Missile = matchedMissile,
-                SpellName = matchedSpellName
-            };
+            VfxRigSettings missileSettings = matchedSpell != null
+                ? SpellRig(matchedSpell, matchedSpellName)
+                : VfxRigSettings.ForPreset(VfxRigPreset.Missile);
             string reason = matchedSpellName != null
                 ? $"Spell missile effect ({matchedSpellName}) resolved through the active skin."
                 : "Spell missile effect resolved through the active skin.";
@@ -117,5 +107,28 @@ internal static class VfxSystemRigResolver
             => bundle != null && VfxSpellPreviewComposer.ResolveEffect(key, name, bundle, resolveSystemPath)
                 .System?.PathHash == system.PathHash;
     }
+
+    private static VfxRigSettings SpellRig(VfxSpellPreview spell, string name)
+    {
+        VfxSpellMissilePreview missile = spell.Missile;
+        float speed = Positive(missile.Speed) ?? VfxSpellFlightPath.FallbackSpeed;
+        if (missile.MovementKind is VfxSpellMissileMovementKind.FixedSpeed or VfxSpellMissileMovementKind.FixedSpeedSpline)
+        {
+            speed = Positive(missile.Speed) ?? Positive(spell.MissileSpeed) ?? VfxSpellFlightPath.FallbackSpeed;
+            // Keep the written movement intact for other consumers and use a resolved copy only for this rig.
+            if (missile.Speed != speed) missile = missile with { Speed = speed };
+        }
+        return VfxRigSettings.ForPreset(VfxRigPreset.Missile) with
+        {
+            FlightRange = spell.CastRange is > 0f and <= 100000f && float.IsFinite(spell.CastRange.Value)
+                ? spell.CastRange.Value : VfxRigMotion.FlightRange,
+            FlightSpeed = speed,
+            Missile = missile,
+            SpellName = name
+        };
+    }
+
+    private static float? Positive(float? value)
+        => value is > 0f && float.IsFinite(value.Value) ? value : null;
 
 }

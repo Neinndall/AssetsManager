@@ -63,6 +63,7 @@ internal static class VfxSpellPreviewReader
         string animationName = ReadString(spell.Properties, "mAnimationName", "mSpell", issues);
         uint missileEffectKey = ReadHash(spell.Properties, "mMissileEffectKey", "mSpell", issues);
         string missileEffectName = ReadString(spell.Properties, "mMissileEffectName", "mSpell", issues);
+        float? missileSpeed = ReadF32(spell.Properties, "missileSpeed", "mSpell", issues);
         uint missileEffectPlayerKey = ReadOptionalHash(spell.Properties, "mMissileEffectPlayerKey");
         string missileEffectPlayerName = ReadOptionalString(spell.Properties, "mMissileEffectPlayerName");
         uint missileEffectEnemyKey = ReadOptionalHash(spell.Properties, "mMissileEffectEnemyKey");
@@ -113,6 +114,7 @@ internal static class VfxSpellPreviewReader
             issues)
         {
             ScriptName = scriptName,
+            MissileSpeed = missileSpeed,
             MissileEffectPlayerKey = missileEffectPlayerKey,
             MissileEffectPlayerName = missileEffectPlayerName,
             MissileEffectEnemyKey = missileEffectEnemyKey,

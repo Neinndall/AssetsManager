@@ -324,6 +324,8 @@ namespace AssetsManager.Views.Models.Viewer
         string MissileEffectName,
         IReadOnlyList<VfxSpellIssue> Issues)
     {
+        /// <summary>SpellDataResource.missileSpeed, kept separate from the movement's authored speed.</summary>
+        public float? MissileSpeed { get; init; }
         public uint MissileEffectPlayerKey { get; init; }
         public string MissileEffectPlayerName { get; init; }
         public uint MissileEffectEnemyKey { get; init; }

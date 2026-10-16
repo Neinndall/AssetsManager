@@ -10,6 +10,7 @@ New Features
   - 3D Studio / Adjust available flex channels in the Inspector and replay their effect on particles.
 
 Improvements
+  - 3D Studio / Standalone spell projectiles now use the spell's cast range and fallback missile speed.
   - 3D Studio / VFX quality now controls particle density, simulation timing, trail smoothing, soft particles and distortion.
   - 3D Studio / Spell missiles and standalone projectile effects now follow their authored flight paths, height arcs, circular orbits and 3D pitch orientation.
   - 3D Studio / Reused missile trajectories for smoother playback and seeking.
@@ -17,6 +18,7 @@ Improvements
 Changes
 
 Bug Fixes
+  - 3D Studio / Fixed standalone projectile targets changing after restarting or seeking backward.
   - 3D Studio / Fixed missing Shimmer mesh effects when enabling map decorations.
   - VFX Studio / Closing a map preview during loading no longer leaves temporary effect files behind.
   - 3D Studio / Fixed missile detection when the character BIN is not linked, including player and enemy variants.

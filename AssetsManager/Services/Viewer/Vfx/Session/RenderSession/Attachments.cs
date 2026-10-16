@@ -49,6 +49,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                 // boneToSpawnAt children use the same live skeleton as clip/idle attachments.
                 graph.SetJointTransformProvider(jointProvider);
 
+                // The standalone rig already placed and aimed this graph. Reapplying its transform
+                // here would replace the rig target with the runtime's default forward target.
+                if (_usesStandaloneRig) continue;
+
                 if (_graphAttachments.TryGetValue(graph, out var attachment) && boneTransformProvider != null)
                 {
                     Matrix4x4? boneMatrix = ResolveAttachmentBone(
