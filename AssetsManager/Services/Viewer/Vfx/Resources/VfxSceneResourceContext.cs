@@ -35,7 +35,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
         private readonly SemaphoreSlim _materializeGate = new(1, 1);
         private readonly object _materializedCandidatesGate = new();
         private readonly HashSet<string> _materializedCandidates = new(StringComparer.OrdinalIgnoreCase);
-        private int _disposeState;
+        private bool _disposed;
 
         private VfxSceneResourceContext(
             MapAssetResolver assetResolver,
@@ -427,23 +427,23 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
 
         private void ThrowIfDisposed()
         {
-            if (Volatile.Read(ref _disposeState) != 0)
+            if (Volatile.Read(ref _disposed))
                 throw new ObjectDisposedException(nameof(VfxSceneResourceContext));
         }
 
         public void Dispose()
         {
-            if (Interlocked.CompareExchange(ref _disposeState, 1, 0) != 0) return;
+            if (Volatile.Read(ref _disposed)) return;
+            Volatile.Write(ref _disposed, true);
             TryDisposeResources();
         }
 
         private void TryDisposeResources()
         {
             // A pending copy must finish before cleanup, or its continuation can recreate the directory.
-            if (Volatile.Read(ref _disposeState) != 1 || !_materializeGate.Wait(0)) return;
+            if (!Volatile.Read(ref _disposed) || !_materializeGate.Wait(0)) return;
             try
             {
-                if (Interlocked.CompareExchange(ref _disposeState, 2, 1) != 1) return;
                 _loadingService.Dispose();
                 try
                 {

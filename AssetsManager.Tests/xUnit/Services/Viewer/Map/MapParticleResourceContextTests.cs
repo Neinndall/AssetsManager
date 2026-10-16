@@ -313,7 +313,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
                 {
                     queued = context.EnsureMaterializedAsync(new Dictionary<uint, VfxSystemDefinition>(), null, root);
                     if (cancel) cancellation.Cancel();
-                    context.Dispose();
+                    await Task.WhenAll(Task.Run(context.Dispose), Task.Run(context.Dispose));
                 }
 
                 var elapsed = Stopwatch.StartNew();
