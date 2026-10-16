@@ -11,10 +11,14 @@ New Features
 
 Improvements
   - 3D Studio / VFX quality now controls particle density, simulation timing, trail smoothing, soft particles and distortion.
+  - 3D Studio / Spell missiles and standalone projectile effects now follow their authored flight paths, height arcs, circular orbits and 3D pitch orientation.
+  - 3D Studio / Reused missile trajectories for smoother playback and seeking.
 
 Changes
 
 Bug Fixes
+  - 3D Studio / Fixed missile detection when the character BIN is not linked, including player and enemy variants.
+  - 3D Studio / Corrected missile target heights and orbit sizes, and kept speed adjustments from replacing authored movement.
   - 3D Studio / Corrected default particle importance and preserved authored simulation flags across playback and seeking.
   - 3D Studio / Fixed facial layers revealing the background through textured and custom-material skins, including Chibi Gwen's eyes.
   - Image Comparison / Fixed Onion Skin adjustment becoming unresponsive after leaving Timeline mode.

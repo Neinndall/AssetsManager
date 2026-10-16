@@ -1,252 +1,743 @@
 using System;
+using System.Collections.Generic;
 using System.Numerics;
 using AssetsManager.Views.Models.Viewer;
 
 namespace AssetsManager.Services.Viewer.Vfx.Composition;
 
 /// <summary>
-/// Where a spell missile is at each moment of its flight, from its authored movement component:
-/// a straight line at fixed speed or time, a straight line under acceleration, or a Hermite spline.
+/// Where a spell missile is at each moment of its flight, simulated at a fixed 120 Hz step
+/// from its authored movement component, height solver, and vertical facing.
 /// </summary>
 public sealed class VfxSpellFlightPath
 {
-    private const int SplineSamples = 64;
-    private const double MaxFlightSeconds = 30d;
+    public const double FlightStep = 1d / 120d;
+    public const double LongestFlight = 30d;
+    public const float FallbackSpeed = 1800f;
 
-    private readonly Vector3 _from;
-    private readonly Vector3 _to;
-    private readonly Func<double, float> _progressAt;
-    private readonly Vector3 _tangent0;
-    private readonly Vector3 _tangent1;
-    private readonly bool _spline;
-    private readonly float[] _arcLengths;
-    private float _gravity;
-    private float _sineAmplitude;
-    private float _sinePeriods;
+    private const double ArcStep = 1d / 128d;
+    private const double BlendExponent = 0.75d;
+    private const float GroundHeight = 0f;
+    private const float GroundClearance = 4f;
+
+    private readonly Vector3[] _positions;
+    private readonly Vector3[] _velocities;
 
     private VfxSpellFlightPath(
-        Vector3 from,
-        Vector3 to,
+        Vector3[] positions,
+        Vector3[] velocities,
         double duration,
-        Func<double, float> progressAt,
-        Vector3 tangent0 = default,
-        Vector3 tangent1 = default,
-        bool spline = false,
-        float[] arcLengths = null)
+        double? arrival,
+        Vector3 start,
+        Vector3 end)
     {
-        _from = from;
-        _to = to;
+        _positions = positions;
+        _velocities = velocities;
         Duration = duration;
-        _progressAt = progressAt;
-        _tangent0 = tangent0;
-        _tangent1 = tangent1;
-        _spline = spline;
-        _arcLengths = arcLengths;
+        Arrival = arrival;
+        Start = start;
+        End = end;
     }
 
-    /// <summary>Seconds from launch to arrival.</summary>
+    /// <summary>Seconds from launch to arrival, or <see cref="LongestFlight"/> for an unbounded loop.</summary>
     public double Duration { get; }
 
-    /// <summary>The flight's start, which a spline's start offset moves away from the launch bone.</summary>
-    public Vector3 Start => _from;
+    /// <summary>Seconds until the movement completes, or null if it runs past <see cref="LongestFlight"/>.</summary>
+    public double? Arrival { get; }
 
-    /// <summary>Where the flight lands, which a height solver may move down to the target's height.</summary>
-    public Vector3 End => _to;
+    /// <summary>The launch point, before the movement's first step applies any spline offset.</summary>
+    public Vector3 Start { get; }
+
+    /// <summary>The resolved target, or the centre for a circling movement.</summary>
+    public Vector3 End { get; }
 
     /// <summary>Position and travel direction <paramref name="elapsed"/> seconds after launch.</summary>
     public (Vector3 Position, Vector3 Direction) Sample(double elapsed)
-    {
-        double time = Math.Clamp(elapsed, 0d, Duration);
-        float progress = Duration > 0d ? _progressAt(time) : 1f;
-        Vector3 lift = Vector3.UnitY * HeightAt(time);
-        if (!_spline)
-            return (Vector3.Lerp(_from, _to, progress) + lift, _to - _from);
+        => (PositionAt(elapsed), DirectionAt(elapsed));
 
-        float u = _arcLengths != null ? ParameterAtArcFraction(progress) : progress;
-        return (Hermite(u) + lift, HermiteDerivative(u));
+    /// <summary>Interpolated position <paramref name="elapsed"/> seconds into the flight.</summary>
+    public Vector3 PositionAt(double elapsed)
+    {
+        int last = _positions.Length - 1;
+        if (last <= 0) return _positions.Length == 1 ? _positions[0] : Start;
+        double at = Math.Clamp(elapsed / FlightStep, 0d, last);
+        int low = (int)Math.Floor(at);
+        int high = Math.Min(low + 1, last);
+        float share = (float)(at - low);
+        return Vector3.Lerp(_positions[low], _positions[high], share);
+    }
+
+    /// <summary>Normalized 3D travel direction <paramref name="elapsed"/> seconds into the flight.</summary>
+    public Vector3 DirectionAt(double elapsed)
+    {
+        int last = _velocities.Length - 1;
+        if (last < 0) return Vector3.UnitZ;
+        int at = Math.Clamp((int)Math.Floor(Math.Max(0d, elapsed) / FlightStep + .5d), 0, last);
+        return UnitOrForward(_velocities[at]);
+    }
+
+    internal static bool IsCircle(VfxSpellMissileMovementKind kind)
+        => kind is VfxSpellMissileMovementKind.Circle or VfxSpellMissileMovementKind.SyncCircle;
+
+    /// <summary>
+    /// Returns true if <paramref name="missile"/> can be simulated by the standalone system rig
+    /// (with schema defaults applied for omitted speeds), matching LTK's <c>flightOf(spec) !== null</c>.
+    /// </summary>
+    internal static bool CanSimulateForRig(VfxSpellMissilePreview missile)
+    {
+        if (missile == null) return false;
+        return missile.MovementKind is
+            VfxSpellMissileMovementKind.FixedSpeed or
+            VfxSpellMissileMovementKind.FixedTime or
+            VfxSpellMissileMovementKind.Accelerating or
+            VfxSpellMissileMovementKind.DecelToLocation or
+            VfxSpellMissileMovementKind.FixedSpeedSpline or
+            VfxSpellMissileMovementKind.FixedTimeSpline or
+            VfxSpellMissileMovementKind.Physics or
+            VfxSpellMissileMovementKind.Circle or
+            VfxSpellMissileMovementKind.SyncCircle;
     }
 
     /// <summary>
-    /// Height the missile's height solver adds over its straight track: a ballistic arc under the authored gravity
-    /// that leaves and lands on the track's ends, or sine waves of the authored amplitude.
+    /// Returns true if <paramref name="missile"/> writes a positive speed or travel time for isolated spell preview.
     /// </summary>
-    private float HeightAt(double time)
+    internal static bool WritesPace(VfxSpellMissilePreview missile)
     {
-        if (!(Duration > 0d)) return 0f;
-        if (_gravity > 0f)
-            return (float)(0.5d * _gravity * time * (Duration - time));
-        if (_sineAmplitude != 0f && _sinePeriods != 0f)
-            return (float)(_sineAmplitude * Math.Sin(2d * Math.PI * _sinePeriods * time / Duration));
-        return 0f;
+        if (missile == null) return false;
+        return missile.MovementKind switch
+        {
+            VfxSpellMissileMovementKind.FixedSpeed or VfxSpellMissileMovementKind.FixedSpeedSpline =>
+                Positive(missile.Speed),
+            VfxSpellMissileMovementKind.FixedTime or VfxSpellMissileMovementKind.FixedTimeSpline =>
+                Positive(missile.Duration),
+            _ => CanSimulateForRig(missile)
+        };
     }
 
     /// <summary>
     /// Compiles the flight between <paramref name="from"/> (the launch point) and <paramref name="to"/>, or null when
-    /// the movement cannot be flown in isolation (orbits, wall following, cursor tracking) or never arrives in time.
+    /// the movement cannot be flown or never arrives in time.
     /// </summary>
-    internal static VfxSpellFlightPath Compile(VfxSpellMissilePreview missile, Vector3 from, Vector3 to)
+    internal static VfxSpellFlightPath Compile(
+        VfxSpellMissilePreview missile,
+        Vector3 from,
+        Vector3 to,
+        bool allowUnbounded = false)
     {
-        if (missile == null) return null;
-        // The preview's ground is the character's feet plane, y = 0.
-        if (missile.LandsOnTargetHeight)
-            to = new Vector3(to.X, missile.TargetHeight is { } augment && float.IsFinite(augment) ? augment : 0f, to.Z);
-        Vector3 forward = new(to.X - from.X, 0f, to.Z - from.Z);
-        if (forward.LengthSquared() <= 1e-8f) forward = Vector3.UnitZ;
-        else forward = Vector3.Normalize(forward);
-        // Game space is left-handed with +Y up: the caster's right is up x forward.
-        Vector3 right = Vector3.Cross(Vector3.UnitY, forward);
-        Vector3 Local(Vector3 value) => right * value.X + Vector3.UnitY * value.Y + forward * value.Z;
+        if (!CanSimulateForRig(missile)) return null;
+        if (!allowUnbounded && !WritesPace(missile)) return null;
 
-        VfxSpellFlightPath path = missile.MovementKind switch
+        VfxSpellMissileHeightKind heightKind = ResolveHeightKind(missile);
+        VfxSpellMissileFacingKind facingKind = missile.FacingKind switch
         {
-            VfxSpellMissileMovementKind.FixedSpeed when Positive(missile.Speed) =>
-                Linear(from, to, Vector3.Distance(from, to) / missile.Speed.Value),
-            VfxSpellMissileMovementKind.FixedTime when Positive(missile.Duration) =>
-                Linear(from, to, missile.Duration.Value),
-            VfxSpellMissileMovementKind.Accelerating => Accelerating(missile, from, to),
-            VfxSpellMissileMovementKind.FixedSpeedSpline when Positive(missile.Speed) =>
-                Spline(missile, from + Local(missile.SplineStartOffset), to, Local, missile.Speed.Value, null),
-            VfxSpellMissileMovementKind.FixedTimeSpline when Positive(missile.Duration) =>
-                Spline(missile, from + Local(missile.SplineStartOffset), to, Local, null, missile.Duration.Value),
-            _ => null
+            VfxSpellMissileFacingKind.MatchVelocity => VfxSpellMissileFacingKind.MatchVelocity,
+            VfxSpellMissileFacingKind.FaceTarget => VfxSpellMissileFacingKind.FaceTarget,
+            _ => VfxSpellMissileFacingKind.None
         };
-        if (path != null)
+
+        float targetY = ResolveTargetY(missile, from.Y);
+        Vector3 start = from;
+        Vector3 target = new(to.X, targetY, to.Z);
+        if (start.X == target.X && start.Z == target.Z)
+            target.Z += 5f;
+
+        IMovementStepper stepper = CreateStepper(missile, start, target);
+        if (stepper == null) return null;
+
+        int most = (int)Math.Ceiling(LongestFlight / FlightStep);
+        var positions = new List<Vector3>(most + 1) { start };
+        var velocities = new List<Vector3>(most + 1) { stepper.InitialVelocity };
+        Vector3 position = start;
+        double? arrival = null;
+
+        for (int step = 1; step <= most; step++)
         {
-            path._gravity = float.IsFinite(missile.Gravity) ? missile.Gravity : 0f;
-            path._sineAmplitude = float.IsFinite(missile.SineAmplitude) ? missile.SineAmplitude : 0f;
-            path._sinePeriods = float.IsFinite(missile.SinePeriods) ? missile.SinePeriods : 0f;
+            double now = step * FlightStep;
+            MovementTick tick = stepper.Step(position, now, FlightStep);
+            Vector3 next = position + tick.Displacement;
+
+            if (heightKind != VfxSpellMissileHeightKind.None)
+            {
+                float fraction = tick.Fraction ?? TravelFraction(start, next, target, tick.Arrived);
+                next.Y = SolveHeight(missile, heightKind, start, target, position, next, tick.Velocity, fraction);
+            }
+
+            Vector3 velocity = tick.Velocity;
+            if (facingKind == VfxSpellMissileFacingKind.MatchVelocity)
+                velocity.Y = (float)((next.Y - position.Y) / FlightStep);
+            else if (facingKind == VfxSpellMissileFacingKind.FaceTarget)
+                velocity.Y = tick.Speed * UnitOrForward(target - next).Y;
+
+            position = next;
+            positions.Add(position);
+            velocities.Add(velocity);
+
+            if (tick.Arrived)
+            {
+                arrival = now;
+                break;
+            }
         }
-        return path;
-    }
 
-    private static VfxSpellFlightPath Linear(Vector3 from, Vector3 to, double duration)
-    {
-        if (!Valid(duration)) return null;
-        return new VfxSpellFlightPath(from, to, duration, time => (float)(time / duration));
-    }
+        if (!allowUnbounded && !arrival.HasValue)
+            return null;
 
-    /// <summary>Speed starts at mInitialSpeed and changes by mAcceleration per second, held within mMinSpeed..mMaxSpeed.</summary>
-    private static VfxSpellFlightPath Accelerating(VfxSpellMissilePreview missile, Vector3 from, Vector3 to)
-    {
-        double acceleration = missile.Acceleration ?? 0d;
-        double min = Math.Max(0d, missile.MinSpeed ?? 0d);
-        double max = missile.MaxSpeed is > 0f ? missile.MaxSpeed.Value : double.PositiveInfinity;
-        if (!double.IsFinite(acceleration) || max < min) return null;
-
-        double initial = Math.Clamp(missile.InitialSpeed ?? 0d, min, max);
-        double length = Vector3.Distance(from, to);
-        // Speed changes until it reaches the bound it moves toward, then holds there.
-        double bound = acceleration > 0d ? max : acceleration < 0d ? min : initial;
-        double rampTime = acceleration != 0d && double.IsFinite(bound) ? (bound - initial) / acceleration : double.PositiveInfinity;
-        double rampLength = double.IsFinite(rampTime) ? initial * rampTime + 0.5d * acceleration * rampTime * rampTime : double.PositiveInfinity;
-
-        double DistanceAt(double time) => time <= rampTime
-            ? initial * time + 0.5d * acceleration * time * time
-            : rampLength + bound * (time - rampTime);
-
-        double duration;
-        if (length <= rampLength)
+        if (velocities.Count >= 2 &&
+            stepper.InitialVelocity == Vector3.Zero)
         {
-            duration = acceleration == 0d
-                ? (initial > 0d ? length / initial : double.NaN)
-                : (-initial + Math.Sqrt(Math.Max(0d, initial * initial + 2d * acceleration * length))) / acceleration;
-        }
-        else
-        {
-            duration = bound > 0d ? rampTime + (length - rampLength) / bound : double.NaN;
+            velocities[0] = velocities[1];
         }
 
-        if (!Valid(duration)) return null;
+        double duration = arrival ?? LongestFlight;
         return new VfxSpellFlightPath(
-            from,
-            to,
+            positions.ToArray(),
+            velocities.ToArray(),
             duration,
-            time => length > 0d ? (float)Math.Clamp(DistanceAt(time) / length, 0d, 1d) : 1f);
+            arrival,
+            start,
+            target);
     }
 
-    /// <summary>
-    /// A cubic Hermite curve from the offset start to the target. Its control points are the end tangents in the
-    /// caster's frame (x right, z forward), measured in units of the start-to-target distance.
-    /// </summary>
-    private static VfxSpellFlightPath Spline(
+    private static VfxSpellMissileHeightKind ResolveHeightKind(VfxSpellMissilePreview missile)
+    {
+        if (missile.HeightKind is not VfxSpellMissileHeightKind.None and not VfxSpellMissileHeightKind.Unsupported)
+            return missile.HeightKind;
+        if (missile.HeightKind == VfxSpellMissileHeightKind.Unsupported)
+            return VfxSpellMissileHeightKind.None;
+        if (missile.Gravity > 0f && float.IsFinite(missile.Gravity))
+            return VfxSpellMissileHeightKind.Gravity;
+        if (missile.LandsOnTargetHeight)
+            return VfxSpellMissileHeightKind.BlendedLinear;
+        if (missile.SineAmplitude != 0f && missile.SinePeriods != 0f &&
+            float.IsFinite(missile.SineAmplitude) && float.IsFinite(missile.SinePeriods))
+            return VfxSpellMissileHeightKind.Sinusoidal;
+        return VfxSpellMissileHeightKind.None;
+    }
+
+    private static float ResolveTargetY(VfxSpellMissilePreview missile, float launchY)
+    {
+        float initialOffset = FiniteOr(missile.InitialTargetHeight, 0f);
+        float targetAugment = FiniteOr(missile.TargetHeight, 0f);
+        return initialOffset + (missile.HeightOffsetAtEnd == true ? launchY + targetAugment : GroundHeight);
+    }
+
+    private static float TravelFraction(Vector3 start, Vector3 next, Vector3 target, bool arrived)
+    {
+        float whole = Flat(target - start);
+        if (arrived || whole <= 0f) return 1f;
+        return Math.Clamp(Flat(next - start) / whole, 0f, 1f);
+    }
+
+    private static float SolveHeight(
+        VfxSpellMissilePreview missile,
+        VfxSpellMissileHeightKind kind,
+        Vector3 start,
+        Vector3 target,
+        Vector3 position,
+        Vector3 next,
+        Vector3 velocity,
+        float t)
+    {
+        switch (kind)
+        {
+            case VfxSpellMissileHeightKind.BlendedLinear:
+            {
+                float y = start.Y + (target.Y - start.Y) * (float)Math.Pow(t, BlendExponent);
+                return y < GroundHeight ? GroundHeight + GroundClearance : y;
+            }
+            case VfxSpellMissileHeightKind.Gravity:
+            {
+                float gravity = FiniteOr(missile.HeightSolverGravity, FiniteOr(missile.Gravity, 0f));
+                float across = Flat(target - start);
+                if (across <= 0f) return next.Y;
+                float flatSpeed = Flat(velocity);
+                double total = across / (flatSpeed + 1e-5d);
+                double time = total * t;
+                double rise = (target.Y - start.Y) / total + 0.5d * gravity * total;
+                return (float)(start.Y + rise * time - 0.5d * gravity * time * time);
+            }
+            case VfxSpellMissileHeightKind.FollowTerrain:
+            {
+                float heightOffset = FiniteOr(missile.HeightOffset, 0f);
+                float maxSlope = FiniteOr(missile.MaxSlope, 10f);
+                float most = Flat(next - position) * maxSlope;
+                return position.Y + Math.Clamp(GroundHeight + heightOffset - position.Y, -most, most);
+            }
+            case VfxSpellMissileHeightKind.Sinusoidal:
+            {
+                float amplitude = FiniteOr(missile.SineAmplitudeRaw, FiniteOr(missile.SineAmplitude, 0f));
+                float rawPeriods = FiniteOr(missile.SinePeriodsRaw, FiniteOr(missile.SinePeriods, 0f));
+                float periods = rawPeriods != 0f ? rawPeriods : 1f;
+                float verticalOffset = FiniteOr(missile.SineVerticalOffset, 0f);
+                float phase = FiniteOr(missile.SinePhaseShift, 0f);
+                double wave = Math.Sin((periods * t + phase) * Math.PI * 2d) * amplitude;
+                return (float)(wave + verticalOffset + (1f - t) * start.Y + t * target.Y);
+            }
+            case VfxSpellMissileHeightKind.CurveTheDifference:
+            {
+                float lifted = FiniteOr(missile.CurveInitialTargetHeightOffset, 0f);
+                return (1f - t) * (t * lifted + (1f - t) * start.Y) + t * (t * target.Y + (1f - t) * start.Y);
+            }
+            default:
+                return next.Y;
+        }
+    }
+
+    private readonly record struct MovementTick(
+        Vector3 Displacement,
+        Vector3 Velocity,
+        float Speed,
+        bool Arrived,
+        float? Fraction = null);
+
+    private interface IMovementStepper
+    {
+        Vector3 InitialVelocity { get; }
+        MovementTick Step(Vector3 position, double now, double dt);
+    }
+
+    private static IMovementStepper CreateStepper(
         VfxSpellMissilePreview missile,
         Vector3 start,
-        Vector3 to,
-        Func<Vector3, Vector3> local,
-        float? speed,
-        float? travelTime)
+        Vector3 target)
     {
-        float span = Vector3.Distance(start, to);
-        Vector3 tangent0 = local(missile.SplineControlPoint1) * span;
-        Vector3 tangent1 = local(missile.SplineControlPoint2) * span;
-
-        if (travelTime.HasValue)
+        switch (missile.MovementKind)
         {
-            double duration = travelTime.Value;
-            if (!Valid(duration)) return null;
-            return new VfxSpellFlightPath(start, to, duration, time => (float)(time / duration), tangent0, tangent1, spline: true);
+            case VfxSpellMissileMovementKind.FixedSpeed:
+            {
+                float speed = PositiveOr(missile.Speed, FallbackSpeed);
+                return new FixedSpeedStepper(speed, start, target);
+            }
+            case VfxSpellMissileMovementKind.FixedTime:
+            {
+                float travelTime = PositiveOr(missile.Duration, 0f);
+                return new FixedTimeStepper(travelTime, start, target);
+            }
+            case VfxSpellMissileMovementKind.Accelerating:
+            case VfxSpellMissileMovementKind.DecelToLocation:
+            {
+                bool brakes = missile.MovementKind == VfxSpellMissileMovementKind.DecelToLocation;
+                return AcceleratingStepper.TryCreate(missile, start, target, brakes);
+            }
+            case VfxSpellMissileMovementKind.FixedSpeedSpline:
+            {
+                float speed = PositiveOr(missile.Speed, FallbackSpeed);
+                var stepper = new SplineStepper(missile, start, target, speed, null);
+                return stepper;
+            }
+            case VfxSpellMissileMovementKind.FixedTimeSpline:
+            {
+                float travelTime = PositiveOr(missile.Duration, 0f);
+                var stepper = new SplineStepper(missile, start, target, null, travelTime);
+                return stepper;
+            }
+            case VfxSpellMissileMovementKind.Physics:
+                return new PhysicsStepper(
+                    NonNegativeOr(missile.InitialSpeed, 0f),
+                    FiniteOr(missile.Drag, 1f),
+                    NonNegativeOr(missile.Lifetime, 0f),
+                    start,
+                    target);
+            case VfxSpellMissileMovementKind.Circle:
+                return new CircleStepper(
+                    FiniteOr(missile.AngularVelocity, 0f),
+                    FiniteOr(missile.LinearVelocity, 0f),
+                    FiniteOr(missile.RadialVelocity, 0f),
+                    NonNegativeOr(missile.Lifetime, 0f),
+                    start,
+                    target);
+            case VfxSpellMissileMovementKind.SyncCircle:
+                return new SyncCircleStepper(
+                    FiniteOr(missile.AngularVelocity, 0f),
+                    NonNegativeOr(missile.Lifetime, 0f),
+                    missile.SyncCircleAxis ?? 1,
+                    start,
+                    target);
+            default:
+                return null;
+        }
+    }
+
+    private sealed class FixedSpeedStepper : IMovementStepper
+    {
+        private readonly float _speed;
+        private readonly Vector3 _target;
+
+        public FixedSpeedStepper(float speed, Vector3 start, Vector3 target)
+        {
+            _speed = speed;
+            _target = target;
+            InitialVelocity = HorizontalLength(target - start, speed);
         }
 
-        // Fixed speed: equal distance per second along the curve.
-        var shape = new VfxSpellFlightPath(start, to, 1d, time => (float)time, tangent0, tangent1, spline: true);
-        var arcLengths = new float[SplineSamples + 1];
-        Vector3 previous = shape.Hermite(0f);
-        for (int index = 1; index <= SplineSamples; index++)
+        public Vector3 InitialVelocity { get; }
+
+        public MovementTick Step(Vector3 position, double now, double dt)
         {
-            Vector3 point = shape.Hermite(index / (float)SplineSamples);
-            arcLengths[index] = arcLengths[index - 1] + Vector3.Distance(previous, point);
-            previous = point;
+            Vector3 velocity = HorizontalLength(_target - position, _speed);
+            return Landing(position, _target, velocity, velocity * (float)dt, _speed);
+        }
+    }
+
+    private sealed class FixedTimeStepper : IMovementStepper
+    {
+        private readonly double _travelTime;
+        private readonly Vector3 _target;
+        private float _speed;
+
+        public FixedTimeStepper(float travelTime, Vector3 start, Vector3 target)
+        {
+            _travelTime = travelTime;
+            _target = target;
+            _speed = travelTime > 0f ? Flat(target - start) / travelTime : 0f;
+            InitialVelocity = HorizontalLength(target - start, _speed);
         }
 
-        double fixedDuration = arcLengths[SplineSamples] / speed.Value;
-        if (!Valid(fixedDuration)) return null;
-        return new VfxSpellFlightPath(
-            start,
-            to,
-            fixedDuration,
-            time => (float)(time / fixedDuration),
-            tangent0,
-            tangent1,
-            spline: true,
-            arcLengths);
+        public Vector3 InitialVelocity { get; }
+
+        public MovementTick Step(Vector3 position, double now, double dt)
+        {
+            double remaining = _travelTime - (now - dt);
+            if (remaining >= 1e-9d) _speed = (float)(Flat(_target - position) / remaining);
+            Vector3 velocity = HorizontalLength(_target - position, _speed);
+            bool arrived = now + 1e-9d >= _travelTime;
+            Vector3 displacement = arrived ? _target - position : velocity * (float)Math.Min(remaining, dt);
+            return new MovementTick(displacement, velocity, _speed, arrived);
+        }
     }
 
-    private float ParameterAtArcFraction(float fraction)
+    private sealed class AcceleratingStepper : IMovementStepper
     {
-        float total = _arcLengths[^1];
-        if (total <= 0f) return fraction;
-        float target = Math.Clamp(fraction, 0f, 1f) * total;
-        int index = Array.BinarySearch(_arcLengths, target);
-        if (index >= 0) return index / (float)SplineSamples;
-        index = ~index;
-        if (index <= 0) return 0f;
-        if (index > SplineSamples) return 1f;
-        float low = _arcLengths[index - 1], high = _arcLengths[index];
-        float blend = high > low ? (target - low) / (high - low) : 0f;
-        return (index - 1 + blend) / SplineSamples;
+        private readonly Vector3 _target;
+        private readonly double _least;
+        private readonly double _most;
+        private readonly double _rate;
+        private readonly bool _brakes;
+        private double _speed;
+        private Vector3 _velocity;
+
+        private AcceleratingStepper(
+            Vector3 start,
+            Vector3 target,
+            double initialSpeed,
+            double rate,
+            double least,
+            double most,
+            bool brakes)
+        {
+            _target = target;
+            _least = least;
+            _most = most;
+            _rate = rate;
+            _brakes = brakes;
+            _speed = initialSpeed;
+            _velocity = HorizontalLength(target - start, (float)initialSpeed);
+            InitialVelocity = _velocity;
+        }
+
+        public Vector3 InitialVelocity { get; }
+
+        public static AcceleratingStepper TryCreate(
+            VfxSpellMissilePreview missile,
+            Vector3 start,
+            Vector3 target,
+            bool brakes)
+        {
+            double accel = missile.Acceleration ?? 0d;
+            double least = missile.MinSpeed ?? 0d;
+            double most = missile.MaxSpeed ?? 0d;
+            if (!double.IsFinite(accel)) return null;
+            double initial = missile.InitialSpeed ?? 0d;
+            double rate = brakes ? Math.Abs(accel) : accel;
+            return new AcceleratingStepper(start, target, initial, rate, least, most, brakes);
+        }
+
+        public MovementTick Step(Vector3 position, double now, double dt)
+        {
+            float remaining = Flat(_target - position);
+            double brakeDivisor = 2d * _rate != 0d ? 2d * _rate : 1d;
+            if (_brakes && (_speed * _speed) / brakeDivisor >= remaining)
+            {
+                Vector3 ahead = HorizontalLength(_target - position, 1f);
+                double travel = Math.Max(_speed * dt - 0.5d * _rate * dt * dt, 0d);
+                _speed = Math.Max(_speed - _rate * dt, 0d);
+                _velocity = ahead * (float)_speed;
+                return Landing(position, _target, _velocity, ahead * (float)travel, (float)_speed, _speed <= 0d);
+            }
+
+            Vector3 along = UnitOrForward(_velocity);
+            double held = Math.Min(Math.Max(_speed, _least), _most);
+            bool pinned = (_rate < 0d && _speed == _least) || (_rate > 0d && _speed == _most);
+            Vector3 displacement;
+            if (pinned || _rate == 0d)
+            {
+                displacement = _velocity * (float)dt;
+            }
+            else if (held + _rate * dt > _least && held + _rate * dt < _most)
+            {
+                displacement = _velocity * (float)dt + along * (float)(0.5d * _rate * dt * dt);
+            }
+            else
+            {
+                double limit = _rate > 0d ? _most : _least;
+                double until = (limit - held) / _rate;
+                Vector3 ramp = _velocity * (float)until + along * (float)(0.5d * _rate * until * until);
+                displacement = ramp + along * (float)((dt - until) * limit);
+            }
+
+            if (remaining > 0.001f)
+            {
+                if (_rate != 0d) _speed = Math.Min(Math.Max(_speed + _rate * dt, _least), _most);
+                _velocity = HorizontalLength(_target - position, (float)_speed);
+            }
+
+            return Landing(position, _target, _velocity, displacement, (float)_speed);
+        }
     }
 
-    private Vector3 Hermite(float u)
+    private sealed class PhysicsStepper : IMovementStepper
     {
-        float u2 = u * u, u3 = u2 * u;
-        return (2f * u3 - 3f * u2 + 1f) * _from +
-               (u3 - 2f * u2 + u) * _tangent0 +
-               (-2f * u3 + 3f * u2) * _to +
-               (u3 - u2) * _tangent1;
+        private readonly float _initialSpeed;
+        private readonly double _reach;
+        private readonly float _lifetime;
+        private readonly Vector3 _start;
+        private readonly Vector3 _direction;
+
+        public PhysicsStepper(float initialSpeed, float drag, float lifetime, Vector3 start, Vector3 target)
+        {
+            _initialSpeed = initialSpeed;
+            _reach = drag != 0f ? 1d / drag : 1e6d;
+            _lifetime = lifetime;
+            _start = start;
+            _direction = UnitOrForward(target - start);
+            InitialVelocity = _direction * initialSpeed;
+        }
+
+        public Vector3 InitialVelocity { get; }
+
+        private Vector3 PositionAt(double time)
+        {
+            float along = (float)(_initialSpeed * _reach * (1d - Math.Exp(-time / _reach)));
+            return new Vector3(_start.X + _direction.X * along, _start.Y, _start.Z + _direction.Z * along);
+        }
+
+        public MovementTick Step(Vector3 position, double now, double dt)
+        {
+            Vector3 displacement = PositionAt(now) - position;
+            // Differencing rounded world positions amplifies float error as drag slows the missile.
+            double distance = _initialSpeed * _reach * (Math.Exp(-(now-dt)/_reach)-Math.Exp(-now/_reach));
+            Vector3 velocity = _direction * (float)(distance/dt);
+            velocity.Y = displacement.Y / (float)dt;
+            return new MovementTick(displacement, velocity, Flat(velocity), now > _lifetime);
+        }
     }
 
-    private Vector3 HermiteDerivative(float u)
+    private sealed class CircleStepper : IMovementStepper
     {
-        float u2 = u * u;
-        Vector3 derivative = (6f * u2 - 6f * u) * _from +
-                             (3f * u2 - 4f * u + 1f) * _tangent0 +
-                             (-6f * u2 + 6f * u) * _to +
-                             (3f * u2 - 2f * u) * _tangent1;
-        return derivative.LengthSquared() > 1e-8f ? derivative : _to - _from;
+        private readonly float _angularVelocity;
+        private readonly float _linearVelocity;
+        private readonly float _radialVelocity;
+        private readonly float _lifetime;
+        private readonly Vector3 _center;
+        private double _radius;
+        private double _angle;
+
+        public CircleStepper(
+            float angularVelocity,
+            float linearVelocity,
+            float radialVelocity,
+            float lifetime,
+            Vector3 start,
+            Vector3 center)
+        {
+            _angularVelocity = angularVelocity;
+            _linearVelocity = linearVelocity;
+            _radialVelocity = radialVelocity;
+            _lifetime = lifetime;
+            _center = center;
+            _radius = Math.Sqrt((start.X - center.X) * (start.X - center.X) + (start.Z - center.Z) * (start.Z - center.Z));
+            _angle = Math.Atan2(start.Z - center.Z, start.X - center.X);
+        }
+
+        public Vector3 InitialVelocity => Vector3.Zero;
+
+        public MovementTick Step(Vector3 position, double now, double dt)
+        {
+            double turn = _angularVelocity != 0f
+                ? _angularVelocity
+                : _radius > 0d
+                    ? _linearVelocity / _radius
+                    : 0d;
+            _angle += turn * dt;
+            Vector3 next = new(
+                (float)(_center.X + _radius * Math.Cos(_angle)),
+                _center.Y,
+                (float)(_center.Z + _radius * Math.Sin(_angle)));
+            _radius += _radialVelocity * dt;
+            Vector3 displacement = next - position;
+            float speed = (float)Math.Abs(turn * _radius);
+            if (speed == 0f) speed = _linearVelocity;
+            return new MovementTick(
+                displacement,
+                displacement * (float)(1d / dt),
+                speed,
+                _lifetime > 0f && now > _lifetime);
+        }
+    }
+
+    private sealed class SyncCircleStepper : IMovementStepper
+    {
+        private readonly float _angularVelocity;
+        private readonly float _lifetime;
+        private readonly byte _axis;
+        private readonly Vector3 _center;
+        private readonly double _radius;
+        private readonly double _firstAngle;
+
+        public SyncCircleStepper(
+            float angularVelocity,
+            float lifetime,
+            byte axis,
+            Vector3 start,
+            Vector3 center)
+        {
+            _angularVelocity = angularVelocity;
+            _lifetime = lifetime;
+            _axis = axis;
+            _center = center;
+            _radius = Math.Sqrt((start.X - center.X) * (start.X - center.X) + (start.Z - center.Z) * (start.Z - center.Z));
+            _firstAngle = Math.Atan2(start.Z - center.Z, start.X - center.X);
+        }
+
+        public Vector3 InitialVelocity => Vector3.Zero;
+
+        private Vector3 PositionAt(double time)
+        {
+            double angle = _firstAngle + _angularVelocity * time;
+            float cos = (float)(_radius * Math.Cos(angle));
+            float sin = (float)(_radius * Math.Sin(angle));
+            if (_axis == 0) return new Vector3(_center.X, _center.Y + cos, _center.Z + sin);
+            if (_axis == 2) return new Vector3(_center.X + cos, _center.Y + sin, _center.Z);
+            return new Vector3(_center.X + cos, _center.Y, _center.Z + sin);
+        }
+
+        public MovementTick Step(Vector3 position, double now, double dt)
+        {
+            Vector3 displacement = PositionAt(now) - position;
+            return new MovementTick(
+                displacement,
+                displacement * (float)(1d / dt),
+                (float)Math.Abs(_angularVelocity * _radius),
+                _lifetime > 0f && now > _lifetime);
+        }
+    }
+
+    private sealed class SplineStepper : IMovementStepper
+    {
+        private readonly Vector3 _origin, _forward, _right, _offset, _end, _t0, _t1;
+        private readonly float _distance;
+        private readonly float? _speed, _travelTime;
+        private double _t;
+
+        public SplineStepper(VfxSpellMissilePreview missile, Vector3 start, Vector3 target, float? speed, float? travelTime)
+        {
+            _origin = missile.SplineFromMissile ? start : new Vector3(start.X, GroundHeight, start.Z);
+            _forward = HorizontalLength(target - _origin, 1f);
+            _right = new Vector3(_forward.Z, 0f, -_forward.X);
+            Vector3 relative = target - _origin;
+            _end = new Vector3(Vector3.Dot(relative, _right), relative.Y, Vector3.Dot(relative, _forward));
+            _offset = missile.SplineStartOffset;
+            _distance = Flat(_end - _offset);
+            _t0 = missile.SplineControlPoint1 * _distance;
+            _t1 = missile.SplineControlPoint2 * _distance;
+            _speed = speed;
+            _travelTime = travelTime;
+            InitialVelocity = WorldDirection(Tangent(0f));
+        }
+
+        public Vector3 InitialVelocity { get; }
+
+        private Vector3 Local(float t)
+        {
+            float t2 = t * t, t3 = t2 * t;
+            return (2f*t3-3f*t2+1f)*_offset + (t3-2f*t2+t)*_t0 +
+                (3f*t2-2f*t3)*_end + (t3-t2)*_t1;
+        }
+
+        private Vector3 Tangent(float t)
+            => (6f*t*t-6f*t)*(_offset-_end) + (3f*t*t-4f*t+1f)*_t0 + (3f*t*t-2f*t)*_t1;
+
+        private Vector3 World(Vector3 p)
+            => new(_origin.X+p.X*_right.X+p.Z*_forward.X, _origin.Y+p.Y, _origin.Z+p.X*_right.Z+p.Z*_forward.Z);
+
+        private Vector3 WorldDirection(Vector3 p)
+            => UnitOrForward(new(p.X*_right.X+p.Z*_forward.X, p.Y, p.X*_right.Z+p.Z*_forward.Z));
+
+        public MovementTick Step(Vector3 position, double now, double dt)
+        {
+            if (_travelTime.HasValue)
+                _t = _travelTime.Value > 0f ? _t + dt / _travelTime.Value : 1d;
+            else
+            {
+                double left = dt * (_speed ?? 0f);
+                while (left > 0d && _t < 1d)
+                {
+                    double piece = Flat(Tangent((float)_t)) * ArcStep;
+                    if (piece <= 0d) break;
+                    if (piece >= left) { _t += ArcStep * left / piece; left = 0d; }
+                    else { _t += ArcStep; left -= piece; }
+                }
+            }
+            bool arrived = _t >= 1d;
+            float at = (float)Math.Min(_t,1d);
+            float speed = _speed ?? (_travelTime is > 0f ? _distance / _travelTime.Value : 0f);
+            return new(World(Local(at))-position, WorldDirection(Tangent(at)), speed, arrived, at);
+        }
+    }
+
+    private static MovementTick Landing(
+        Vector3 position,
+        Vector3 target,
+        Vector3 velocity,
+        Vector3 displacement,
+        float speed,
+        bool stopped = false)
+    {
+        Vector3 next = position + displacement;
+        Vector3 toTarget = target - position;
+        bool passed =
+            (position.X == target.X && position.Z == target.Z) ||
+            (FlatDot(velocity, toTarget) > 0f && FlatDot(velocity, target - next) <= 0f);
+        bool arrived = passed || stopped || Flat(target - next) <= 1e-2f;
+        return new MovementTick(arrived ? toTarget : displacement, velocity, speed, arrived);
+    }
+
+    private static Vector3 HorizontalLength(Vector3 vector, float length)
+    {
+        float across = Flat(vector);
+        return across == 0f ? Vector3.Zero : vector * (length / across);
+    }
+
+    private static float Flat(Vector3 vector)
+        => MathF.Sqrt(vector.X * vector.X + vector.Z * vector.Z);
+
+    private static float FlatDot(Vector3 a, Vector3 b)
+        => a.X * b.X + a.Z * b.Z;
+
+    private static Vector3 UnitOrForward(Vector3 vector)
+    {
+        float length = vector.Length();
+        return length <= 1e-8f ? Vector3.UnitZ : vector / length;
     }
 
     private static bool Positive(float? value) => value is > 0f && float.IsFinite(value.Value);
 
-    private static bool Valid(double duration) =>
-        double.IsFinite(duration) && duration >= 0d && duration <= MaxFlightSeconds;
+    private static float PositiveOr(float? value, float fallback)
+        => value is > 0f && float.IsFinite(value.Value) ? value.Value : fallback;
+
+    private static float NonNegativeOr(float? value, float fallback)
+        => value is >= 0f && float.IsFinite(value.Value) ? value.Value : fallback;
+
+    private static float FiniteOr(float? value, float fallback)
+        => value is { } v && float.IsFinite(v) ? v : fallback;
 }

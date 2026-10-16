@@ -66,6 +66,25 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void FlightTransformPitchesLocalYAlongClimbingDirectionAndKeepsLocalXLevel()
+        {
+            Matrix4x4 climbing = VfxRigMotion.FlightTransform(Vector3.Zero, new Vector3(0f, 1f, 1f));
+            Vector3 localX = Vector3.TransformNormal(Vector3.UnitX, climbing);
+            Vector3 localY = Vector3.TransformNormal(Vector3.UnitY, climbing);
+            float invSqrt2 = MathF.Sqrt(0.5f);
+
+            Assert.Equal(-1f, localX.X, precision: 3);
+            Assert.Equal(0f, localX.Y, precision: 3);
+            Assert.Equal(0f, localX.Z, precision: 3);
+            Assert.Equal(0f, localY.X, precision: 3);
+            Assert.Equal(invSqrt2, localY.Y, precision: 3);
+            Assert.Equal(invSqrt2, localY.Z, precision: 3);
+
+            Matrix4x4 straightUp = VfxRigMotion.FlightTransform(Vector3.Zero, new Vector3(0f, 2f, 0f));
+            Assert.Equal(Matrix4x4.Identity, straightUp);
+        }
+
+        [Fact]
         public void MissileSessionSpawnsBelowFlightAndCarriesUpwardBirthVelocity()
         {
             VfxEmitterDefinition emitter = CreateEmitter(Vector3.One) with

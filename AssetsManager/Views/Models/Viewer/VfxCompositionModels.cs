@@ -231,8 +231,31 @@ namespace AssetsManager.Views.Models.Viewer
         FixedSpeed,
         FixedTime,
         Accelerating,
+        DecelToLocation,
         FixedSpeedSpline,
         FixedTimeSpline,
+        Physics,
+        Circle,
+        SyncCircle,
+        Unsupported
+    }
+
+    public enum VfxSpellMissileHeightKind
+    {
+        None,
+        BlendedLinear,
+        Gravity,
+        FollowTerrain,
+        Sinusoidal,
+        CurveTheDifference,
+        Unsupported
+    }
+
+    public enum VfxSpellMissileFacingKind
+    {
+        None,
+        MatchVelocity,
+        FaceTarget,
         Unsupported
     }
 
@@ -246,14 +269,25 @@ namespace AssetsManager.Views.Models.Viewer
         float? TargetHeight,
         float? InitialTargetHeight)
     {
+        public bool? HeightOffsetAtEnd { get; init; }
         public float? Acceleration { get; init; }
         public float? MinSpeed { get; init; }
         public float? MaxSpeed { get; init; }
         public float? InitialSpeed { get; init; }
+        public float? Drag { get; init; }
+        public float? Lifetime { get; init; }
+        public float? AngularVelocity { get; init; }
+        public float? LinearVelocity { get; init; }
+        public float? RadialVelocity { get; init; }
+        public byte? SyncCircleAxis { get; init; }
+
         /// <summary>HermiteSplineInfo, in the caster's frame (x right, z forward).</summary>
         public Vector3 SplineStartOffset { get; init; }
-        public Vector3 SplineControlPoint1 { get; init; }
-        public Vector3 SplineControlPoint2 { get; init; }
+        public Vector3 SplineControlPoint1 { get; init; } = new(-1f, 0f, 0f);
+        public Vector3 SplineControlPoint2 { get; init; } = new(1f, 0f, 0f);
+        public bool SplineFromMissile { get; init; }
+
+        public VfxSpellMissileHeightKind HeightKind { get; init; }
         /// <summary>
         /// Gravity and BlendedLinear height solvers carry the missile from its launch height down to the target's,
         /// the ground plus mTargetHeightAugment; without one the missile keeps its launch height.
@@ -261,9 +295,19 @@ namespace AssetsManager.Views.Models.Viewer
         public bool LandsOnTargetHeight { get; init; }
         /// <summary>GravityHeightSolver: a ballistic arc over the flight's straight height change.</summary>
         public float Gravity { get; init; }
+        public float? HeightSolverGravity { get; init; }
+        public float? HeightOffset { get; init; }
+        public float? MaxSlope { get; init; }
         /// <summary>SinusoidalHeightSolver: height waves of this amplitude over the flight.</summary>
         public float SineAmplitude { get; init; }
         public float SinePeriods { get; init; }
+        public float? SineAmplitudeRaw { get; init; }
+        public float? SinePeriodsRaw { get; init; }
+        public float? SineVerticalOffset { get; init; }
+        public float? SinePhaseShift { get; init; }
+        public float? CurveInitialTargetHeightOffset { get; init; }
+
+        public VfxSpellMissileFacingKind FacingKind { get; init; }
     }
 
     /// <summary>The subset of SpellDataResource consumed by the isolated ability preview.</summary>
@@ -280,6 +324,10 @@ namespace AssetsManager.Views.Models.Viewer
         string MissileEffectName,
         IReadOnlyList<VfxSpellIssue> Issues)
     {
+        public uint MissileEffectPlayerKey { get; init; }
+        public string MissileEffectPlayerName { get; init; }
+        public uint MissileEffectEnemyKey { get; init; }
+        public string MissileEffectEnemyName { get; init; }
         public bool HasSpellData { get; init; } = true;
         public bool HasBuffData { get; init; }
         internal string ScriptName { get; init; }

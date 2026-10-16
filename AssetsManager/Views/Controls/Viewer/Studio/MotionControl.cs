@@ -70,6 +70,10 @@ namespace AssetsManager.Views.Controls.Viewer
                 StudioInspectorView.RigDistanceValueText.Text = $"{Math.Round(settings.FlightRange)} u";
                 StudioInspectorView.RigSpeedSlider.Value = settings.FlightSpeed;
                 StudioInspectorView.RigSpeedValueText.Text = $"{Math.Round(settings.FlightSpeed)} u/s";
+                StudioInspectorView.RigSpeedPanel.Visibility = settings.CanTuneFlightSpeed ? Visibility.Visible : Visibility.Collapsed;
+                StudioInspectorView.RigFlightSourceText.Text = settings.Missile == null ? string.Empty
+                    : $"{settings.SpellName ?? "Missile"} / {settings.Missile.MovementKind}";
+                StudioInspectorView.RigFlightSourceText.Visibility = settings.Missile == null ? Visibility.Collapsed : Visibility.Visible;
 
                 StudioInspectorView.RigOrbitPanel.Visibility = settings.MotionKind == VfxRigMotionKind.Orbit
                     ? Visibility.Visible
@@ -103,7 +107,7 @@ namespace AssetsManager.Views.Controls.Viewer
         internal void RigSpeedSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
             if (_isUpdatingRigControls || _vfxRenderer == null) return;
-            ApplyRigTuning(_vfxRenderer.RigSettings with { FlightSpeed = (float)e.NewValue });
+            ApplyRigTuning(_vfxRenderer.RigSettings.WithFlightSpeed((float)e.NewValue));
         }
 
         internal void RigRadiusSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)

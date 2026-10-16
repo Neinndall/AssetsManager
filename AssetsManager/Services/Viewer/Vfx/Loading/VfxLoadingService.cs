@@ -27,7 +27,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
     /// <summary>
     /// Loads a model's complete effect catalog and prepares every referenced emitter resource.
     /// </summary>
-    public sealed class VfxLoadingService : IDisposable
+    public sealed partial class VfxLoadingService : IDisposable
     {
         private readonly VfxResourceResolver _resources = new();
         private const string ShaderDefinitionsPath = "data/shaders/shaders.bin";
@@ -72,6 +72,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
             public Dictionary<uint, VfxSystemDefinition> Systems { get; private set; } = new();
             public Dictionary<uint, uint> ResourceMap { get; private set; } = new();
             internal Dictionary<uint, VfxSpellPreview> SpellPreviews { get; private set; } = new();
+            internal Dictionary<uint, IReadOnlyList<VfxSpellPreview>> MissileSpells { get; private set; } = new();
             public Dictionary<uint, AnimationClipDefinition> EventSequences { get; private set; } = new();
             public List<AnimationClipDefinition> Clips { get; private set; } = new();
             public List<AnimationGraphDefinition> AnimationGraphs { get; private set; } = new();
@@ -93,6 +94,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                 PrimaryBinPath = source.PrimaryBinPath;
                 Systems = source.Systems;
                 SpellPreviews = source.SpellPreviews;
+                MissileSpells = source.MissileSpells;
                 EventSequences = source.EventSequences;
                 Clips = source.Clips;
                 AnimationGraphs = source.AnimationGraphs;
@@ -213,6 +215,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                 var characterFormDocuments = new List<CharacterFormDocumentData>();
                 var loadedTrees = new List<BinTree>();
                 var documents = new Dictionary<string, VfxBinDocument>(StringComparer.OrdinalIgnoreCase);
+                var documentTrees = new Dictionary<string, BinTree>(StringComparer.OrdinalIgnoreCase);
                 var childSkins = new Dictionary<uint, string>();
                 var requestedSkins = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 // VFX custom materials link CustomShaderDefs the global shader BIN declares; without it a
@@ -270,6 +273,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                         if (!File.Exists(currentBinPath)) continue;
                         BinTree tree = VfxGraphParser.ParseTree(File.ReadAllBytes(currentBinPath));
                         loadedTrees.Add(tree);
+                        documentTrees[Path.GetFullPath(currentBinPath)] = tree;
                         foreach (BinTreeObject spell in tree.Objects.Values.Where(item =>
                                      !childLookupOnly && item.ClassHash == SpellObjectClass))
                             bundle.SpellPreviews.TryAdd(spell.PathHash, VfxSpellPreviewReader.Read(spell));
@@ -351,6 +355,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                         log?.LogError(ex, $"Error scanning bin dependency file: {currentBinPath}");
                     }
                 }
+
+                LoadMissileSpells(bundle, documentTrees, wadRoot, searchFolder, log, cancellationToken);
 
                 // A system's custom material may be declared by any BIN it links rather than its own.
                 foreach (uint systemHash in bundle.Systems.Keys.ToArray())

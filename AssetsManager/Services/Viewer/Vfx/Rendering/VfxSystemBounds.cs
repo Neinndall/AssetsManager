@@ -28,6 +28,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         private const float CameraMargin = 1.15f;
         private const float ShapeTick = 8f;
         private const int RingSegments = 24;
+        private const int FlightStops = 16;
 
         internal static VfxDefinitionBounds Calculate(
             VfxSystemDefinition system,
@@ -51,13 +52,13 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             IReadOnlyList<Vector3> rigStops = RigStops(rigSettings);
             foreach (Vector3 stop in rigStops)
             {
-                Vector3 stood = stop + Vector3.UnitY * rigSettings.Height;
+                Vector3 stood = stop;
                 if (system.HudLayer) stood += system.Transform?.Translation ?? Vector3.Zero;
                 Grow(ref min, ref max, stood - new Vector3(StandingReach));
                 Grow(ref min, ref max, stood + new Vector3(StandingReach));
             }
 
-            Vector3 rootOrigin = rigStops[0] + Vector3.UnitY * rigSettings.Height;
+            Vector3 rootOrigin = rigStops[0];
             if (system.HudLayer) rootOrigin += system.Transform?.Translation ?? Vector3.Zero;
             foreach (VfxEmitterDefinition emitter in system.Emitters)
             {
@@ -98,7 +99,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             VfxRigSettings rigSettings)
         {
             ArgumentNullException.ThrowIfNull(system);
-            Vector3 origin = RigStops(rigSettings)[0];
+            Vector3 origin = VfxRigMotion.OriginAt(rigSettings with { Height = 0f }, 0d);
+            origin.Y = 0f;
             return origin + (system.HudLayer ? system.Transform?.Translation ?? Vector3.Zero : Vector3.Zero);
         }
 
@@ -121,22 +123,30 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         }
 
         private static IReadOnlyList<Vector3> RigStops(VfxRigSettings settings)
-            => settings.MotionKind switch
+        {
+            switch (settings.MotionKind)
             {
-                VfxRigMotionKind.Path => new[]
+                case VfxRigMotionKind.Path:
                 {
-                    new Vector3(-settings.FlightRange * 0.5f, 0f, 0f),
-                    new Vector3(settings.FlightRange * 0.5f, 0f, 0f)
-                },
-                VfxRigMotionKind.Orbit => new[]
-                {
-                    new Vector3(settings.OrbitRadius, 0f, 0f),
-                    new Vector3(-settings.OrbitRadius, 0f, 0f),
-                    new Vector3(0f, 0f, settings.OrbitRadius),
-                    new Vector3(0f, 0f, -settings.OrbitRadius)
-                },
-                _ => new[] { Vector3.Zero }
-            };
+                    double flight = VfxRigMotion.FlightDuration(settings);
+                    if (flight <= 0d) flight = Composition.VfxSpellFlightPath.LongestFlight;
+                    var stops = new Vector3[FlightStops + 1];
+                    for (int at = 0; at <= FlightStops; at++)
+                        stops[at] = VfxRigMotion.OriginAt(settings, flight * at / FlightStops);
+                    return stops;
+                }
+                case VfxRigMotionKind.Orbit:
+                    return new[]
+                    {
+                        new Vector3(settings.OrbitRadius, settings.Height, 0f),
+                        new Vector3(-settings.OrbitRadius, settings.Height, 0f),
+                        new Vector3(0f, settings.Height, settings.OrbitRadius),
+                        new Vector3(0f, settings.Height, -settings.OrbitRadius)
+                    };
+                default:
+                    return new[] { new Vector3(0f, settings.Height, 0f) };
+            }
+        }
 
         private static void GrowEmitter(
             ref Vector3 min,

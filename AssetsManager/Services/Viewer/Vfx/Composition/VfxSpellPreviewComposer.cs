@@ -181,8 +181,9 @@ internal static class VfxSpellPreviewComposer
         Vector3 from,
         Vector3 to)
     {
-        if (missile == null || !VectorMathUtils.IsFinite(from) || !VectorMathUtils.IsFinite(to) || from.Y != to.Y ||
-            OutsidePreviewBounds(from) || OutsidePreviewBounds(to))
+        if (missile == null || !VectorMathUtils.IsFinite(from) || !VectorMathUtils.IsFinite(to) ||
+            OutsidePreviewBounds(from) || OutsidePreviewBounds(to) ||
+            !VfxSpellFlightPath.WritesPace(missile))
         {
             return null;
         }
@@ -190,7 +191,7 @@ internal static class VfxSpellPreviewComposer
         double delay = missile.StartDelay ?? 0d;
         if (!double.IsFinite(delay) || delay < 0d) return null;
         VfxSpellFlightPath path = VfxSpellFlightPath.Compile(missile, from, to);
-        if (path == null || path.Duration + delay > 30d) return null;
+        if (path == null || path.Duration <= 0d || path.Duration + delay > VfxSpellFlightPath.LongestFlight) return null;
         return (delay, path);
     }
 

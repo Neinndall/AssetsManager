@@ -57,9 +57,9 @@ namespace AssetsManager.Views.Controls.Viewer
             StandaloneRunMemory remembered = RecallStandaloneRun(systemItem);
             int playbackSeed = remembered?.Seed ?? StandalonePlaybackSeed;
             float playbackSpeed = remembered?.Speed ?? 1f;
-            var inferredRig = VfxSystemRigResolver.Resolve(def, _activeBundle, VfxLoadingService == null ? null : VfxLoadingService.ResolveBinEntryPath);
+            var inferredRig = VfxSystemRigResolver.ResolveSettings(def, _activeBundle, VfxLoadingService == null ? null : VfxLoadingService.ResolveBinEntryPath);
             VfxRigSettings rigSettings =
-                (remembered?.RigSettings ?? VfxRigSettings.ForPreset(inferredRig.Preset)) with
+                (remembered?.RigSettings ?? inferredRig.Settings) with
                 {
                     IsLooping = _model.IsPreviewLoopEnabled
                 };
@@ -112,7 +112,7 @@ namespace AssetsManager.Views.Controls.Viewer
             UpdateRigControlValues();
             SetPlaybackSpeed(playbackSpeed);
 
-            double rigDuration = _vfxRenderer?.RigDuration ?? VfxRigMotion.RunLength(_model.RigPreset, def);
+            double rigDuration = _vfxRenderer?.RigDuration ?? VfxRigMotion.RunLength(rigSettings, def);
             double timelineMax = ResolveTimelineDuration(rigDuration);
             ResetPreviewLoopRange(timelineMax);
 

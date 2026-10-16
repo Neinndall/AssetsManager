@@ -50,6 +50,34 @@ public sealed class VfxSystemRigResolverTests
     }
 
     [Fact]
+    public void ResolveSettingsAttachesSpellMissileSpecAndMatchesPlayerOrEnemyKeys()
+    {
+        var system = System("PlayerMissile");
+        var bundle = Bundle(system);
+        var missile = new VfxSpellMissilePreview(
+            VfxSpellMissileMovementKind.FixedSpeed,
+            2400f,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null);
+        bundle.SpellPreviews.Add(1, Spell() with
+        {
+            MissileEffectPlayerKey = 77,
+            Missile = missile,
+            ScriptName = "EzrealQ"
+        });
+
+        var resolved = VfxSystemRigResolver.ResolveSettings(system, bundle);
+        Assert.Equal(VfxRigPreset.Missile, resolved.Settings.Preset);
+        Assert.Same(missile, resolved.Settings.Missile);
+        Assert.Equal("EzrealQ", resolved.Settings.SpellName);
+        Assert.Equal(2400f, resolved.Settings.FlightSpeed);
+    }
+
+    [Fact]
     public void ConflictingImpactAndProjectileUsesRemainStationary()
     {
         var system = System("Shared");
@@ -79,7 +107,7 @@ public sealed class VfxSystemRigResolverTests
     public void RibbonWithoutItsOwnMotionGetsAMovingAnchorPreview()
     {
         var system = System("Ribbon", Trail());
-        Assert.Equal(VfxRigPreset.Trail, VfxSystemRigResolver.Resolve(system, Bundle(system)).Preset);
+        Assert.Equal(VfxRigPreset.Missile, VfxSystemRigResolver.Resolve(system, Bundle(system)).Preset);
     }
 
     [Theory]
@@ -89,7 +117,7 @@ public sealed class VfxSystemRigResolverTests
     [InlineData("velocity")]
     [InlineData("animated-origin")]
     [InlineData("no-ribbon")]
-    public void OtherRibbonUsesDoNotImplyExternalMotion(string variant)
+    public void TrailFallbackRespectsVisibilityAndKeepsAuthoredParticleMotion(string variant)
     {
         var emitter = Trail();
         emitter = variant switch
@@ -102,7 +130,8 @@ public sealed class VfxSystemRigResolverTests
             _ => emitter with { Trail = null }
         };
         var system = System("Ribbon", emitter);
-        Assert.Equal(VfxRigPreset.Still, VfxSystemRigResolver.Resolve(system, Bundle(system)).Preset);
+        var expected = variant is "local" or "velocity" or "animated-origin" ? VfxRigPreset.Missile : VfxRigPreset.Still;
+        Assert.Equal(expected, VfxSystemRigResolver.Resolve(system, Bundle(system)).Preset);
     }
 
     private static VfxSystemDefinition System(string name, params VfxEmitterDefinition[] emitters)

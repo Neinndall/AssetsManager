@@ -1,5 +1,8 @@
 using System;
 using System.Numerics;
+using System.Collections.Generic;
+using System.Runtime.CompilerServices;
+using AssetsManager.Services.Viewer.Vfx.Composition;
 using AssetsManager.Services.Viewer.Vfx.Runtime;
 using AssetsManager.Views.Models.Viewer;
 
@@ -31,6 +34,18 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
         float? StopAt)
     {
         public Vector3? Target { get; init; }
+        public VfxSpellMissilePreview Missile { get; init; }
+        public string SpellName { get; init; }
+
+        public bool CanTuneFlightSpeed => Missile == null || Missile.MovementKind is
+            VfxSpellMissileMovementKind.FixedSpeed or VfxSpellMissileMovementKind.FixedSpeedSpline;
+
+        public VfxRigSettings WithFlightSpeed(float speed)
+            => !CanTuneFlightSpeed ? this : this with
+            {
+                FlightSpeed = speed,
+                Missile = Missile == null ? null : Missile with { Speed = speed }
+            };
 
         public static VfxRigSettings ForPreset(VfxRigPreset preset)
             => new(
@@ -86,6 +101,72 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
         public const float OrbitPeriod = 3.0f;                  // 3 seconds per revolution
         public const float TargetReach = ChampionHeight * 3f;   // 600 engine units
 
+        private static readonly ConditionalWeakTable<VfxSpellMissilePreview, Dictionary<(float Range, float Height), VfxSpellFlightPath>> RigTracks = new();
+
+        internal static VfxSpellFlightPath CompileRigTrack(VfxRigSettings settings)
+        {
+            if (settings.MotionKind != VfxRigMotionKind.Path || settings.Missile == null)
+                return null;
+
+            var tracks = RigTracks.GetValue(settings.Missile, static _ => new());
+            var key = (settings.FlightRange, settings.Height);
+            lock (tracks)
+            {
+                if (tracks.TryGetValue(key, out var cached)) return cached;
+                // Slider tuning must not retain every old range/height combination for the whole session.
+                if (tracks.Count >= 8) tracks.Clear();
+                float span = MathF.Max(0f, settings.FlightRange);
+                bool circle = VfxSpellFlightPath.IsCircle(settings.Missile.MovementKind);
+                Vector3 from = new(circle ? span : -span * .5f, settings.Height, 0f);
+                Vector3 to = circle ? Vector3.Zero : new Vector3(span * .5f, 0f, 0f);
+                var track = VfxSpellFlightPath.Compile(settings.Missile, from, to, allowUnbounded: true);
+                tracks.Add(key, track);
+                return track;
+            }
+        }
+
+        public static double FlightDuration(VfxRigSettings settings)
+        {
+            if (settings.MotionKind != VfxRigMotionKind.Path)
+                return 0d;
+
+            if (CompileRigTrack(settings) is { } track)
+                return track.Arrival ?? 0d;
+
+            return settings.FlightSpeed > 0f
+                ? settings.FlightRange / settings.FlightSpeed
+                : 0d;
+        }
+
+        public static Vector3 OriginAt(VfxRigSettings settings, double elapsed)
+        {
+            switch (settings.MotionKind)
+            {
+                case VfxRigMotionKind.Path:
+                {
+                    if (CompileRigTrack(settings) is { } track)
+                        return track.PositionAt(elapsed);
+
+                    double flightTime = FlightDuration(settings);
+                    float progress = flightTime > 0d ? (float)Math.Clamp(elapsed / flightTime, 0d, 1d) : 1f;
+                    Vector3 from = new(-settings.FlightRange * 0.5f, settings.Height, 0f);
+                    Vector3 to = new(settings.FlightRange * 0.5f, settings.Height, 0f);
+                    return Vector3.Lerp(from, to, progress);
+                }
+                case VfxRigMotionKind.Orbit:
+                {
+                    float turn = settings.OrbitPeriod > 0f
+                        ? (float)(elapsed / settings.OrbitPeriod) * MathF.PI * 2f
+                        : 0f;
+                    return new Vector3(
+                        MathF.Cos(turn) * settings.OrbitRadius,
+                        settings.Height,
+                        MathF.Sin(turn) * settings.OrbitRadius);
+                }
+                default:
+                    return new Vector3(0f, settings.Height, 0f);
+            }
+        }
 
         public static double RunLength(
             VfxRigPreset preset,
@@ -108,12 +189,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             double span = VfxDurationCalculator.SystemSpan(system);
             if (settings.MotionKind == VfxRigMotionKind.Path)
             {
-                double flight = settings.FlightSpeed > 0f
-                    ? settings.FlightRange / settings.FlightSpeed
-                    : 0d;
+                double flight = FlightDuration(settings);
                 return flight > 0d
                     ? flight + VfxDurationCalculator.LingerTail(system, flight)
-                    : span;
+                    : Math.Max(span, VfxDurationCalculator.LingerTail(system, 0d));
             }
 
             return settings.MotionKind == VfxRigMotionKind.Orbit
@@ -160,6 +239,31 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             {
                 case VfxRigMotionKind.Path:
                 {
+                    if (CompileRigTrack(settings) is { } track)
+                    {
+                        float trackFlightTime = (float)(track.Arrival ?? 0d);
+                        totalSpan = Math.Max(totalSpan, trackFlightTime);
+                        phase = settings.IsLooping && totalSpan > 0f
+                            ? (float)(time % totalSpan)
+                            : (float)Math.Max(0d, time);
+                        bool stopped =
+                            (settings.StopAt is { } stop && phase >= stop) ||
+                            (track.Arrival.HasValue && phase >= trackFlightTime);
+
+                        (Vector3 trackOrigin, Vector3 trackDirection) = track.Sample(phase);
+                        Matrix4x4 trackTransform = FlightTransform(trackOrigin, trackDirection);
+                        Vector3 trackMoved = lastOrigin.HasValue &&
+                                             phase >= 0.001f &&
+                                             (!settings.IsLooping || phase < totalSpan - 0.05f)
+                            ? trackOrigin - lastOrigin.Value
+                            : Vector3.Zero;
+
+                        return new VfxRigStep(trackTransform, trackOrigin, trackMoved, stopped, phase, totalSpan)
+                        {
+                            Target = track.End
+                        };
+                    }
+
                     float flightTime = settings.FlightSpeed > 0f
                         ? settings.FlightRange / settings.FlightSpeed
                         : 0f;
@@ -260,22 +364,49 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                 ? (float)Math.Clamp((time - startTime) / span, 0d, 1d)
                 : 1f;
             Vector3 origin = Vector3.Lerp(from, to, progress);
-            return FlightTransform(origin, to - from);
+            return FlightTransform(origin, new Vector3(to.X - from.X, 0f, to.Z - from.Z));
         }
 
+        /// <summary>
+        /// The basis a missile flies on: local +Y along <paramref name="direction"/>, local +X level and to its left,
+        /// and local +Z square to both (up for level flight), matching <c>VfxProxy_SetOrientationFromDirection</c>
+        /// and LTK's <c>flightInto</c>.
+        /// </summary>
         internal static Matrix4x4 FlightTransform(Vector3 origin, Vector3 direction)
         {
-            // Missile systems author travel on local +Y and height on local +Z.
-            Vector3 forward = new(direction.X, 0f, direction.Z);
-            if (forward.LengthSquared() == 0f) forward = Vector3.UnitZ;
-            else forward = Vector3.Normalize(forward);
+            float across = MathF.Sqrt(direction.X * direction.X + direction.Z * direction.Z);
+            float length = MathF.Sqrt(across * across + direction.Y * direction.Y);
+            if (length == 0f)
+            {
+                return new Matrix4x4(
+                    -1f, 0f, 0f, 0f,
+                     0f, 0f, 1f, 0f,
+                     0f, 1f, 0f, 0f,
+                    origin.X, origin.Y, origin.Z, 1f);
+            }
 
-            Vector3 side = Vector3.Cross(forward, Vector3.UnitY);
+            if (across == 0f && direction.Y > 0f)
+            {
+                return new Matrix4x4(
+                    1f, 0f, 0f, 0f,
+                    0f, 1f, 0f, 0f,
+                    0f, 0f, 1f, 0f,
+                    origin.X, origin.Y, origin.Z, 1f);
+            }
+
+            float dx = direction.X / length;
+            float dy = direction.Y / length;
+            float dz = direction.Z / length;
+            float lx = across == 0f ? -1f : -direction.Z / across;
+            float lz = across == 0f ? 0f : direction.X / across;
+            float ux = -dy * lz;
+            float uy = lz * dx - lx * dz;
+            float uz = lx * dy;
 
             return new Matrix4x4(
-                side.X, side.Y, side.Z, 0f,
-                forward.X, forward.Y, forward.Z, 0f,
-                0f, 1f, 0f, 0f,
+                lx, 0f, lz, 0f,
+                dx, dy, dz, 0f,
+                ux, uy, uz, 0f,
                 origin.X, origin.Y, origin.Z, 1f);
         }
     }

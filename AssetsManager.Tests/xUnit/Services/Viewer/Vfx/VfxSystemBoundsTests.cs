@@ -30,6 +30,34 @@ public sealed class VfxSystemBoundsTests
     }
 
     [Fact]
+    public void ArcingMissileRigFramesPeakHeightAcrossFlightStops()
+    {
+        var missile = new VfxSpellMissilePreview(
+            VfxSpellMissileMovementKind.FixedSpeed,
+            1200f,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null)
+        {
+            HeightKind = VfxSpellMissileHeightKind.Gravity,
+            HeightSolverGravity = 4000f,
+            HeightOffsetAtEnd = true
+        };
+        VfxRigSettings settings = VfxRigSettings.ForPreset(VfxRigPreset.Missile) with
+        {
+            Missile = missile
+        };
+
+        VfxDefinitionBounds bounds = VfxSystemBounds.Calculate(System(), settings);
+
+        // Midpoint of 1s flight under g=4000 rises by g*T^2/8 = 500 above launch height 100 -> 600 + StandingReach(100) = 700.
+        Assert.Equal(700f, bounds.Max.Y, precision: 0);
+    }
+
+    [Fact]
     public void RootEmitterShapeAndTranslationExpandDefinitionBounds()
     {
         VfxEmitterDefinition emitter = Emitter() with
