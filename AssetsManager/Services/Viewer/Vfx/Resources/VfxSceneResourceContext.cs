@@ -35,7 +35,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
         private readonly SemaphoreSlim _materializeGate = new(1, 1);
         private readonly object _materializedCandidatesGate = new();
         private readonly HashSet<string> _materializedCandidates = new(StringComparer.OrdinalIgnoreCase);
-        private bool _disposed;
+        private int _disposeState;
 
         private VfxSceneResourceContext(
             MapAssetResolver assetResolver,
@@ -118,10 +118,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
             {
                 ThrowIfDisposed();
                 await MaterializeAsync(systems, ownerSceneContext, projectRoot, cancellationToken).ConfigureAwait(false);
+                ThrowIfDisposed();
             }
             finally
             {
                 _materializeGate.Release();
+                TryDisposeResources();
             }
         }
 
@@ -425,25 +427,39 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
 
         private void ThrowIfDisposed()
         {
-            if (_disposed)
+            if (Volatile.Read(ref _disposeState) != 0)
                 throw new ObjectDisposedException(nameof(VfxSceneResourceContext));
         }
 
         public void Dispose()
         {
-            if (_disposed) return;
-            _disposed = true;
-            _loadingService.Dispose();
+            if (Interlocked.CompareExchange(ref _disposeState, 1, 0) != 0) return;
+            TryDisposeResources();
+        }
+
+        private void TryDisposeResources()
+        {
+            // A pending copy must finish before cleanup, or its continuation can recreate the directory.
+            if (Volatile.Read(ref _disposeState) != 1 || !_materializeGate.Wait(0)) return;
             try
             {
-                if (Directory.Exists(SearchDirectory))
-                    Directory.Delete(SearchDirectory, recursive: true);
+                if (Interlocked.CompareExchange(ref _disposeState, 2, 1) != 1) return;
+                _loadingService.Dispose();
+                try
+                {
+                    if (Directory.Exists(SearchDirectory))
+                        Directory.Delete(SearchDirectory, recursive: true);
+                }
+                catch (IOException)
+                {
+                }
+                catch (UnauthorizedAccessException)
+                {
+                }
             }
-            catch (IOException)
+            finally
             {
-            }
-            catch (UnauthorizedAccessException)
-            {
+                _materializeGate.Release();
             }
         }
 

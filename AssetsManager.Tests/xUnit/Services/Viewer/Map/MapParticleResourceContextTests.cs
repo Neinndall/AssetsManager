@@ -1,8 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Numerics;
+using System.Threading;
 using System.Threading.Tasks;
 using AssetsManager.Services.Viewer.Runtime;
 using AssetsManager.Services.Viewer.Resolvers;
@@ -272,6 +275,89 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
             {
                 if (Directory.Exists(root))
                     Directory.Delete(root, recursive: true);
+            }
+        }
+
+        [Theory]
+        [InlineData(false, false)]
+        [InlineData(true, false)]
+        [InlineData(true, true)]
+        public async Task ClosingDuringMaterializationCannotRecreateItsTemporaryDirectory(bool close, bool cancel)
+        {
+            string root = Path.Combine(Path.GetTempPath(), "AssetsManagerTests", Guid.NewGuid().ToString("N"));
+            string source = Path.Combine(root, "assets", "copy.dds");
+            Directory.CreateDirectory(Path.GetDirectoryName(source));
+            byte[] payload = new byte[8 * 1024 * 1024];
+            payload[0] = 71;
+            await File.WriteAllBytesAsync(source, payload);
+            VfxSceneResourceContext context = null;
+            try
+            {
+                context = await VfxSceneResourceContext.CreateAsync(
+                    new Dictionary<uint, VfxSystemDefinition>(), root, new MapAssetResolver(null, null), null, null);
+                using var cancellation = new CancellationTokenSource();
+                var pump = new HeldIoContext();
+                SynchronizationContext previous = SynchronizationContext.Current;
+                Task copy;
+                SynchronizationContext.SetSynchronizationContext(pump);
+                try
+                {
+                    copy = context.EnsureMaterializedAsync(Catalog(Emitter("assets/copy.dds", null)).Systems,
+                        null, root, cancellation.Token);
+                }
+                finally { SynchronizationContext.SetSynchronizationContext(previous); }
+                Assert.True(pump.Ready.Wait(TimeSpan.FromSeconds(5)), "A real async file operation must reach the held continuation.");
+                Assert.False(copy.IsCompleted);
+                Task queued = null;
+                if (close)
+                {
+                    queued = context.EnsureMaterializedAsync(new Dictionary<uint, VfxSystemDefinition>(), null, root);
+                    if (cancel) cancellation.Cancel();
+                    context.Dispose();
+                }
+
+                var elapsed = Stopwatch.StartNew();
+                while (!copy.IsCompleted || queued is { IsCompleted: false })
+                {
+                    Assert.True(elapsed.Elapsed < TimeSpan.FromSeconds(10), "Materialization and queued waiters must finish.");
+                    if (!pump.RunOne()) await Task.Delay(1);
+                }
+                if (cancel) await Assert.ThrowsAnyAsync<OperationCanceledException>(() => copy);
+                else if (close) await Assert.ThrowsAsync<ObjectDisposedException>(() => copy);
+                else
+                {
+                    await copy;
+                    Assert.Equal(payload, await File.ReadAllBytesAsync(Path.Combine(context.SearchDirectory, "assets", "copy.dds")));
+                }
+                if (queued != null) await Assert.ThrowsAsync<ObjectDisposedException>(() => queued);
+                context.Dispose();
+                context.Dispose();
+                Assert.False(Directory.Exists(context.SearchDirectory));
+            }
+            finally
+            {
+                context?.Dispose();
+                if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+            }
+        }
+
+        private sealed class HeldIoContext : SynchronizationContext
+        {
+            private readonly ConcurrentQueue<(SendOrPostCallback Callback, object State)> _pending = new();
+            internal ManualResetEventSlim Ready { get; } = new();
+            public override void Post(SendOrPostCallback callback, object state)
+            {
+                _pending.Enqueue((callback, state));
+                Ready.Set();
+            }
+            internal bool RunOne()
+            {
+                if (!_pending.TryDequeue(out var work)) return false;
+                SynchronizationContext previous = Current;
+                SetSynchronizationContext(this);
+                try { work.Callback(work.State); }
+                finally { SetSynchronizationContext(previous); }
+                return true;
             }
         }
 
