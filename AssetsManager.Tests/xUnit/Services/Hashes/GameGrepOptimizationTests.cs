@@ -72,6 +72,13 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
         [InlineData("maps/mapgeometry/example/example.mapgeo", "data/maps/mapgeometry/example/example.mapgeo")]
         [InlineData("maps/mapgeometry/example/example.materials.bin", "data/maps/mapgeometry/example/example.materials.bin")]
         [InlineData("assets/shaders/test.ps", "assets/shaders/test.ps")]
+        [InlineData("LEVELS/Map12/Scripts/Example.luabin64", "levels/map12/scripts/example.luabin64")]
+        [InlineData("UX/Shared/Example.tex", "ux/shared/example.tex")]
+        [InlineData("UIAutoAtlas/Menu/atlas_0.tex", "uiautoatlas/menu/atlas_0.tex")]
+        [InlineData("Common/Shared/Example.bin", "common/shared/example.bin")]
+        [InlineData("Global/Shared/Example.bin", "global/shared/example.bin")]
+        [InlineData("DATA_SOON/Shared/Example.bin", "data/shared/example.bin")]
+        [InlineData(@"ASSETS\UI\Example.tex", "assets/ui/example.tex")]
         [InlineData("shaders/test.ps", "assets/shaders/generated/shaders/test.ps-dx11_2")]
         public void BinReferencesPreservePathsAndExpandTheirActualExtensions(string reference, string expected)
         {

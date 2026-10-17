@@ -101,7 +101,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             {
                 string text = Encoding.Latin1.GetString(data.Array, data.Offset, data.Count);
                 var seenPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                foreach (Match match in Regex.Matches(text, @"(?:ASSETS|DATA|Characters|Shaders|Maps|Gameplay|ClientStates|Patching|Loadouts)/", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))
+                foreach (Match match in Regex.Matches(text, @"(?:ASSETS|Common|DATA(?:_SOON)?|Characters|Shaders|Maps|Gameplay|ClientStates|Patching|Loadouts|Global|LEVELS|UX|UIAutoAtlas)[/\\]", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     int offset = match.Index;
@@ -113,6 +113,8 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                     path = NormalizePath(path);
                     if (!seenPaths.Add(path)) continue;
                     CheckBinPath(path);
+                    if (path.StartsWith("data_soon/", StringComparison.Ordinal))
+                        CheckBinPath("data/" + path[10..]);
 
                     if (path.StartsWith("characters/", StringComparison.OrdinalIgnoreCase))
                     {

@@ -25,15 +25,27 @@ internal static class GameLearnedLinksDiagnostic
     {
         string local = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AssetsManager");
         var hashFile = new HashFile(HashGuessDomain.Game, Path.Combine(local, "hashes", "hashes.game.txt"));
-        var known = hashFile.Load();
+        var known = hashFile.Load().ToDictionary(pair => pair.Key, pair => pair.Value);
+        string resolvedFile = args.FirstOrDefault(a => a.StartsWith("--resolved=", StringComparison.Ordinal))?[11..];
+        if (resolvedFile != null)
+            foreach (string line in File.ReadLines(resolvedFile))
+            {
+                int separator = line.IndexOf(' ');
+                if (separator <= 0) continue;
+                ulong hash = ulong.Parse(line.AsSpan(0, separator), NumberStyles.HexNumber, CultureInfo.InvariantCulture);
+                string path = AssetsManager.Utils.PathUtils.NormalizePath(line[(separator + 1)..]);
+                if (XxHash64Ext.Hash(path) != hash) throw new InvalidDataException("Additional resolved path does not match its XXH64 hash.");
+                known[hash] = path;
+            }
         var unknown = File.ReadLines(Path.Combine(local, "hash_lab", "unknowns.game.txt"))
             .Select(l => ulong.Parse(l.Trim(), NumberStyles.HexNumber, CultureInfo.InvariantCulture)).ToHashSet();
+        unknown.ExceptWith(known.Keys);
         var visited = new HashSet<(ulong, ulong)>();
         var index = new GameBinLinkTemplateIndex();
         var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong>(unknown),
             m => Console.WriteLine($"MATCH {m.Hash:x16} {m.Path}"));
         var names = new Dictionary<ulong, string>();
-        foreach (string catalog in new[] { "hashes.binhashes.txt", "hashes.binentries.txt", "hashes.binhashes.xxh3.txt" })
+        foreach (string catalog in new[] { "hashes.binhashes.txt", "hashes.binentries.txt", "hashes.bin.xxh364.txt", "hashes.binhashes.xxh3.txt" })
         foreach (string line in File.Exists(Path.Combine(local, "hashes", catalog))
                      ? File.ReadLines(Path.Combine(local, "hashes", catalog)) : Array.Empty<string>())
         {
@@ -43,7 +55,8 @@ internal static class GameLearnedLinksDiagnostic
         }
         string Resolve(uint h) => names.GetValueOrDefault(h, h.ToString("x8"));
         string ResolveWide(ulong h) => names.GetValueOrDefault(h, h.ToString("x16"));
-        var guesser = new GameHashGuesser(hashFile, null, Resolve, ResolveWide);
+        var guesser = new GameHashGuesser(resolvedFile == null ? hashFile : new HashFile(HashGuessDomain.Game, known.Values),
+            null, Resolve, ResolveWide);
         bool grep = args.Contains("--grep");
         bool atlas = args.Contains("--atlas");
         bool animationStructure = args.Contains("--animation-structure");

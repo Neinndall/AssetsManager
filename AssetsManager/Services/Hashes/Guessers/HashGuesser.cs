@@ -240,8 +240,18 @@ namespace AssetsManager.Services.Hashes.Guessers
             int checkedCount = 0;
 
             IReadOnlyList<string> formats = BuildNumberFormats(paths, effectiveDigits);
+            if (formats.Count == 0) return 0;
             string formatSpecifier = effectiveDigits.HasValue ? $"D{effectiveDigits.Value}" : null;
             Span<char> numSpan = stackalloc char[16];
+            Span<byte> prefixBytes = stackalloc byte[1024];
+            Span<byte> suffixBytes = stackalloc byte[1024];
+            Span<byte> numberBytes = stackalloc byte[16];
+            var numbers = new byte[Math.Min(numberLimit, 256)][];
+            for (int value = 0; value < numbers.Length; value++)
+            {
+                if (value.TryFormat(numSpan, out int length, formatSpecifier, CultureInfo.InvariantCulture))
+                    numbers[value] = Encoding.UTF8.GetBytes(numSpan[..length].ToString());
+            }
 
             foreach (string format in ProgressIterator(formats, value => value, cancellationToken))
             {
@@ -251,23 +261,43 @@ namespace AssetsManager.Services.Hashes.Guessers
 
                 ReadOnlySpan<char> formatPrefix = format.AsSpan(0, marker);
                 ReadOnlySpan<char> formatSuffix = format.AsSpan(marker + 8);
-
                 int limit = effectiveDigits == 2 && unpaddedFormatsAlreadyChecked?.Contains(format) == true
                     ? Math.Min(numberLimit, 10) : numberLimit;
+                // Short deduplicated padding passes do not amortize encoding the shared parts.
+                int prefixLength = limit >= 32 ? Encoding.UTF8.GetByteCount(formatPrefix) : 0;
+                int suffixLength = limit >= 32 ? Encoding.UTF8.GetByteCount(formatSuffix) : 0;
+                bool cachedParts = limit >= 32 && prefixLength <= prefixBytes.Length && suffixLength <= suffixBytes.Length;
+                if (cachedParts)
+                {
+                    Encoding.UTF8.GetBytes(formatPrefix, prefixBytes);
+                    Encoding.UTF8.GetBytes(formatSuffix, suffixBytes);
+                }
+
                 for (int value = 0; value < limit; value++)
                 {
+                    if (cachedParts && value < numbers.Length)
+                    {
+                        if (numbers[value] == null) continue;
+                        engine.CheckNormalizedUtf8Parts(prefixBytes[..prefixLength], numbers[value], suffixBytes[..suffixLength],
+                            HashGuessStrategy.NumberVariant, source);
+                        checkedCount++;
+                        continue;
+                    }
                     bool formatted = formatSpecifier != null
                         ? value.TryFormat(numSpan, out int charsWritten, formatSpecifier, CultureInfo.InvariantCulture)
                         : value.TryFormat(numSpan, out charsWritten, default, CultureInfo.InvariantCulture);
 
                     if (!formatted) continue;
 
-                    engine.CheckNormalizedParts(
-                        formatPrefix,
-                        numSpan[..charsWritten],
-                        formatSuffix,
-                        HashGuessStrategy.NumberVariant,
-                        source);
+                    if (cachedParts)
+                    {
+                        int byteCount = Encoding.UTF8.GetBytes(numSpan[..charsWritten], numberBytes);
+                        engine.CheckNormalizedUtf8Parts(prefixBytes[..prefixLength], numberBytes[..byteCount], suffixBytes[..suffixLength],
+                            HashGuessStrategy.NumberVariant, source);
+                    }
+                    else
+                        engine.CheckNormalizedParts(formatPrefix, numSpan[..charsWritten], formatSuffix,
+                            HashGuessStrategy.NumberVariant, source);
 
                     checkedCount++;
                 }

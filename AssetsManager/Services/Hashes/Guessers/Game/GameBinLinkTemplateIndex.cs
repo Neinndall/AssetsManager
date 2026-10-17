@@ -50,6 +50,10 @@ internal sealed class GameBinLinkTemplateIndex
             {
                 if (p is BinTreeString text && IsIdentifier(text.Value))
                     identifiers.Add(new Identifier(new IdentifierKey(type, p.NameHash, 0), text.Value));
+                else if (p is BinTreeString pathText && IsPathIdentifier(pathText.Value))
+                    identifiers.Add(new Identifier(new IdentifierKey(type, p.NameHash, 3), PathUtils.NormalizePath(pathText.Value)));
+                else if (p is BinTreeHash hash)
+                    AddNamed(identifiers, new IdentifierKey(type, p.NameHash, 0), resolveName?.Invoke(hash.Value));
                 else if (p is BinTreeHash64 name)
                     AddNamed(identifiers, new IdentifierKey(type, p.NameHash, 0), resolveWideName?.Invoke(name.Value));
             }
@@ -57,10 +61,15 @@ internal sealed class GameBinLinkTemplateIndex
             {
                 bool unresolved = engine.UnknownHashes.Contains(link.Value);
                 bool resolved = known.TryGetValue(link.Value, out string path);
+                if (!resolved && engine.Matches.TryGetValue(link.Value, out var match))
+                {
+                    resolved = true;
+                    path = match.Path;
+                }
                 if (!unresolved && !resolved) continue;
                 foreach (var identifier in identifiers)
                 {
-                    for (int variant = 0; variant < 5; variant++)
+                    for (int variant = 0; variant < (identifier.Key.Kind == 3 ? 1 : 5); variant++)
                     {
                         cancellationToken.ThrowIfCancellationRequested();
                         string value = Transform(identifier.Value, variant);
@@ -92,6 +101,7 @@ internal sealed class GameBinLinkTemplateIndex
                         string name = pair.Key switch
                         {
                             BinTreeHash hash => resolveName?.Invoke(hash.Value),
+                            BinTreeHash64 hash => resolveWideName?.Invoke(hash.Value),
                             BinTreeString text => text.Value,
                             _ => null
                         };
@@ -152,7 +162,7 @@ internal sealed class GameBinLinkTemplateIndex
     private static bool TryLearn(string path, string value, out Template template)
     {
         template = default;
-        int start = path.LastIndexOf('/') + 1;
+        int start = value.Contains('/') ? 0 : path.LastIndexOf('/') + 1;
         int at = path.IndexOf(value, start, StringComparison.Ordinal);
         if (at < start || (at > start && char.IsAsciiLetterOrDigit(path[at - 1])) ||
             (at + value.Length < path.Length && char.IsAsciiLetterOrDigit(path[at + value.Length]))) return false;
@@ -170,6 +180,9 @@ internal sealed class GameBinLinkTemplateIndex
         !(name.Length is 8 or 16 && name.All(char.IsAsciiHexDigit));
     private static bool IsIdentifier(string value) => value.Length is >= 3 and <= 128 &&
         value.All(c => char.IsAsciiLetterOrDigit(c) || c is '_' or '-');
+    private static bool IsPathIdentifier(string value) => value.Length is >= 3 and <= 512 &&
+        value.IndexOfAny('/', '\\') >= 0 &&
+        value.All(c => char.IsAsciiLetterOrDigit(c) || c is '/' or '\\' or '_' or '-' or '.');
     private static string Transform(string value, int variant) => variant switch
     {
         1 => CamelBoundary.Replace(value, "$1_$2").ToLowerInvariant(),

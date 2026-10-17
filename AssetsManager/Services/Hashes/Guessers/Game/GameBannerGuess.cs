@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Hashes;
+using AssetsManager.Utils;
 using AssetsManager.Views.Models.Hashes;
 
 namespace AssetsManager.Services.Hashes.Guessers.Game
@@ -15,22 +16,47 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
         private const int EsportsBannerDoubleCandidateBudget = 2_000_000;
         private const int EsportsBannerInsertionCandidateBudget = 750_000;
         private const int EsportsBannerDoubleWordLimit = 96;
+        private const string EsportsBannerPathPrefix = "assets/esports/sponsoredbanners/";
+        private static readonly string[] EsportsBannerFallbackWords =
+            { "portuguesa", "msi", "2026", "hepsiburada", "kitkat", "tsl" };
+
+        internal static IReadOnlyList<string> BuildEsportsBannerWordlist(IEnumerable<string> paths)
+        {
+            var counts = new Dictionary<string, int>(StringComparer.Ordinal);
+            foreach (string value in paths)
+            {
+                string path = PathUtils.NormalizePath(value);
+                if (!path.StartsWith(EsportsBannerPathPrefix, StringComparison.Ordinal)) continue;
+                string relative = path[EsportsBannerPathPrefix.Length..];
+                int extension = relative.LastIndexOf('.');
+                if (extension > relative.LastIndexOf('/')) relative = relative[..extension];
+                foreach (string word in relative.Split(new[] { '/', '_', '-', '.' }, StringSplitOptions.RemoveEmptyEntries))
+                {
+                    if (word.Length is < 1 or > 32 || !word.All(char.IsLetterOrDigit)) continue;
+                    counts[word] = counts.GetValueOrDefault(word) + 1;
+                }
+            }
+            foreach (string word in EsportsBannerFallbackWords) counts.TryAdd(word, 0);
+            return counts.OrderByDescending(pair => pair.Value).ThenBy(pair => pair.Key, StringComparer.Ordinal)
+                .Select(pair => pair.Key).ToArray();
+        }
 
         internal int GuessEsportsBanners(
             HashGuessEngine engine,
             IProgress<HashGuessProgress> progress,
             CancellationToken cancellationToken)
         {
-            const string bannerPathPrefix = "assets/esports/sponsoredbanners/";
+            cancellationToken.ThrowIfCancellationRequested();
+            if (engine.RemainingUnknownCount == 0) return 0;
             IReadOnlyList<string> paths = Corpus.GetOrCreate(
                 "esports-banner-paths",
                 values => values
-                    .Where(path => path.StartsWith(bannerPathPrefix, StringComparison.OrdinalIgnoreCase))
+                    .Where(path => path.StartsWith(EsportsBannerPathPrefix, StringComparison.OrdinalIgnoreCase))
                     .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
                     .ToList());
             IReadOnlyList<string> wordlist = Corpus.GetOrCreate(
                 "esports-banner-wordlist",
-                _ => HashGuessEngine.BuildBasenameWordlist(paths, minimumLength: 2, maximumLength: 32));
+                _ => BuildEsportsBannerWordlist(paths));
             IReadOnlyList<string> compoundWords = Corpus.GetOrCreate(
                 "esports-banner-compound-wordlist",
                 _ =>
@@ -42,14 +68,17 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                         int extension = basename.LastIndexOf('.');
                         string stem = extension > 0 ? basename[..extension] : basename;
                         string[] tokens = stem
-                            .Split(new[] { '_', '-' }, StringSplitOptions.RemoveEmptyEntries)
+                            .Split(new[] { '_', '-', '.' }, StringSplitOptions.RemoveEmptyEntries)
                             .Where(IsBannerToken)
                             .ToArray();
 
-                        for (int index = 0; index + 1 < tokens.Length; index++)
+                        for (int length = 2; length <= 4; length++)
+                        for (int index = 0; index + length <= tokens.Length; index++)
                         {
-                            AddWord($"{tokens[index]}_{tokens[index + 1]}");
-                            AddWord($"{tokens[index]}-{tokens[index + 1]}");
+                            var words = tokens.Skip(index).Take(length);
+                            AddWord(string.Join('_', words));
+                            AddWord(string.Join('-', words));
+                            AddWord(string.Concat(words));
                         }
                     }
 
@@ -72,7 +101,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                         value.Split(new[] { '-', '_' }, StringSplitOptions.RemoveEmptyEntries).All(IsBannerToken);
 
                     bool IsBannerToken(string value) =>
-                        value.Length >= 2 &&
+                        value.Length >= 1 &&
                         value.Length <= 32 &&
                         value.All(char.IsLetterOrDigit);
                 });
@@ -107,10 +136,29 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             if (paths.Count == 0 || engine.RemainingUnknownCount == 0) return 0;
 
             int checkedCandidates = 0;
+            const string buildListStage = "GAME Banner: whole filenames build-list";
+            progress?.Report(engine.CreateProgress(buildListStage, checkedCandidates));
+            string[] names = paths.Select(GetBasename).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
+            foreach (string directory in paths.Select(path => path[..(path.LastIndexOf('/') + 1)])
+                         .Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal))
+            {
+                if (checkedCandidates >= EsportsBannerSingleCandidateBudget || engine.RemainingUnknownCount == 0) break;
+                foreach (string name in names)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (checkedCandidates >= EsportsBannerSingleCandidateBudget || engine.RemainingUnknownCount == 0) break;
+                    engine.CheckPrefixSuffix(directory, name, HashGuessStrategy.BannerVariant, buildListStage);
+                    checkedCandidates++;
+                }
+            }
+            int buildListCount = checkedCandidates;
+            int compoundBudget = EsportsBannerCompoundCandidateBudget;
             var passes = new[]
             {
-                (Words: wordlist, OldCount: 1, NewCount: 1, Budget: EsportsBannerSingleCandidateBudget, Source: "GAME Banner: vocabulary"),
+                (Words: wordlist, OldCount: 1, NewCount: 1, Budget: EsportsBannerSingleCandidateBudget - buildListCount, Source: "GAME Banner: vocabulary"),
                 (Words: compoundWords, OldCount: 2, NewCount: 1, Budget: EsportsBannerCompoundCandidateBudget, Source: "GAME Banner: compound names"),
+                (Words: compoundWords, OldCount: 3, NewCount: 1, Budget: EsportsBannerCompoundCandidateBudget, Source: "GAME Banner: three-word names"),
+                (Words: compoundWords, OldCount: 4, NewCount: 1, Budget: EsportsBannerCompoundCandidateBudget, Source: "GAME Banner: four-word names"),
                 (Words: compoundWords, OldCount: 1, NewCount: 1, Budget: EsportsBannerCompoundCandidateBudget, Source: "GAME Banner: compound variants"),
                 (Words: doubleWords, OldCount: 2, NewCount: 2, Budget: EsportsBannerDoubleCandidateBudget, Source: "GAME Banner: double-word variants")
             };
@@ -119,17 +167,20 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                 if (engine.RemainingUnknownCount == 0) return checkedCandidates;
                 int progressOffset = checkedCandidates;
                 progress?.Report(engine.CreateProgress(pass.Source, progressOffset));
-                checkedCandidates += _SubstituteBasenameWords(
+                bool compoundPass = pass.OldCount >= 2 && pass.NewCount == 1;
+                int count = _SubstituteBasenameWords(
                     engine,
                     paths,
                     pass.Words,
                     pass.OldCount,
                     pass.NewCount,
                     cancellationToken,
-                    pass.Budget,
+                    compoundPass ? compoundBudget : pass.Budget,
                     pass.Source,
                     count => progress?.Report(engine.CreateProgress(pass.Source, progressOffset + count)),
                     HashGuessStrategy.BannerVariant);
+                checkedCandidates += count;
+                if (compoundPass) compoundBudget -= count;
             }
             if (engine.RemainingUnknownCount == 0) return checkedCandidates;
 
@@ -139,7 +190,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             checkedCandidates += _AddBasenameWord(
                 engine,
                 paths,
-                wordlist.Take(EsportsBannerDoubleWordLimit),
+                wordlist,
                 cancellationToken,
                 EsportsBannerInsertionCandidateBudget,
                 insertionStage,

@@ -5,12 +5,36 @@ using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Hashes.Guessers;
 using AssetsManager.Services.Hashes.Guessers.Game;
 using AssetsManager.Views.Models.Hashes;
+using LeagueToolkit.Hashing;
 using Xunit;
 
 namespace AssetsManager.Tests.xUnit.Services.Hashes
 {
     public class GameNumberScreenshotTests
     {
+        [Theory]
+        [InlineData(12, null)]
+        [InlineData(12, 2)]
+        [InlineData(1100, null)]
+        [InlineData(1100, 2)]
+        [InlineData(12, 17)]
+        public void CachedNumericEncodingPreservesCandidatesAndCounters(int directoryLength, int? digits)
+        {
+            string number = digits == 17 ? new string('0', 15) + "09" : "09";
+            string seed = "assets/" + new string('é', directoryLength) + "/icon" + number + "_雪.tex";
+            var guesser = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[] { seed }));
+            string[] expected = guesser.SubstituteNumbers(300, digits).Select(candidate => candidate.Path).ToArray();
+            // The numeric formatter deliberately keeps its existing 16-character limit.
+            if (digits > 16) expected = System.Array.Empty<string>();
+            var engine = new HashGuessEngine(HashGuessDomain.Game,
+                expected.Select(path => XxHash64Ext.Hash(path)).Append(42UL).ToHashSet());
+            int checkedCount = guesser.SubstituteNumbers(engine, CancellationToken.None, maximum: 300, digits: digits);
+            Assert.Equal(expected.Length, checkedCount);
+            Assert.Equal(expected.Length, engine.CheckedCandidates);
+            Assert.Equal(expected.Order(), engine.Matches.Values.Select(match => match.Path).Order());
+            Assert.Contains(42UL, engine.UnknownHashes);
+        }
+
         [Fact]
         public void TwoDigitPassRecoversTheTwelveHistoricalTextureHashes()
         {
