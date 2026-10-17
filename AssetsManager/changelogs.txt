@@ -10,6 +10,7 @@ New Features
   - 3D Studio / Adjust available flex channels in the Inspector and replay their effect on particles.
 
 Improvements
+  - Hash Guessing Lab / Finds more GAME material textures from modern BIN names and shared sampler roles.
   - 3D Studio / Standalone spell projectiles now use the spell's cast range and fallback missile speed.
   - 3D Studio / VFX quality now controls particle density, simulation timing, trail smoothing, soft particles and distortion.
   - 3D Studio / Spell missiles and standalone projectile effects now follow their authored flight paths, height arcs, circular orbits and 3D pitch orientation.
