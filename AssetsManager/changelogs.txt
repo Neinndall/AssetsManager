@@ -1,8 +1,23 @@
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
+AssetsManager - League of Legends | v4.1.0.3
+
+HOTFIX UPDATE
+
+New Features
+
+Improvements
+
+Changes
+
+Bug Fixes
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
 AssetsManager - League of Legends | v4.1.0.2
 
 HOTFIX UPDATE
+Adding new features to the VFX engine, along with improvements and fixes.
 
 New Features
   - Viewer Settings / Choose VFX quality, with High selected by default.
@@ -19,8 +34,6 @@ Improvements
   - 3D Studio / VFX quality now controls particle density, simulation timing, trail smoothing, soft particles and distortion.
   - 3D Studio / Spell missiles and standalone projectile effects now follow their authored flight paths, height arcs, circular orbits and 3D pitch orientation.
   - 3D Studio / Reused missile trajectories for smoother playback and seeking.
-
-Changes
 
 Bug Fixes
   - 3D Studio / Fixed rectangular camera-facing particles deforming when rotated.
