@@ -23,6 +23,7 @@ Improvements
 Changes
 
 Bug Fixes
+  - 3D Studio / Fixed rectangular camera-facing particles deforming when rotated.
   - 3D Studio / Fixed standalone projectile targets changing after restarting or seeking backward.
   - 3D Studio / Fixed missing Shimmer mesh effects when enabling map decorations.
   - VFX Studio / Closing a map preview during loading no longer leaves temporary effect files behind.
