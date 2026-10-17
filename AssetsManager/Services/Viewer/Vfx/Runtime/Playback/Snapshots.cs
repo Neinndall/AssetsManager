@@ -31,6 +31,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
 
         internal sealed record Snapshot(
             float CurrentTime,
+            double StepBank,
             uint InitialRandomState,
             uint RandomState,
             uint ParticleSerial,
@@ -86,6 +87,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
 
             return new Snapshot(
                 CurrentTime,
+                _stepper.Bank,
                 _initialRandomState,
                 _rng.State,
                 _particleSerial,
@@ -109,6 +111,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 throw new InvalidOperationException("VFX snapshot emitter layout no longer matches the runtime definition.");
 
             CurrentTime = snapshot.CurrentTime;
+            _stepper.Bank = snapshot.StepBank;
             _initialRandomState = snapshot.InitialRandomState;
             _rng = VfxLtkRandom.FromState(snapshot.RandomState);
             _particleSerial = snapshot.ParticleSerial;

@@ -501,7 +501,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 OffsetLifeScalingSymmetryMode: (byte)(GetU8(p, F_offsetLifeScalingSymmetryMode) ?? 0),
                 PostRotateOrientation: !isSimpleEmitter && GetBool(p, F_hasPostRotateOrientation)
                     ? AsVec3(Get(p, F_postRotateOrientationAxis)) ?? Vector3.Zero : null,
-                IsHudLayer: hudLayer);
+                IsHudLayer: hudLayer,
+                DoesCastShadow: GetBool(p, VfxParsingHash.Fnv1a("doesCastShadow")),
+                SliceRange: MathF.Max(0f, GetF32(p, VfxParsingHash.Fnv1a("sliceTechniqueRange")) ?? 0f),
+                Flex: ReadFlex(p));
             definition = definition with { TextureMultEmitterUvScrollRate = definition.EmitterUvScrollRate,
                 IsGroundLayer = definition.RenderState.RenderPhase == 5 ||
                 (definition.RenderState.RenderPhase == 7 && !hudLayer && definition.IsGroundLayer) };

@@ -1799,6 +1799,100 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
         }
 
         [Fact]
+        public void BannerVocabularyKeepsYearsShortTokensAndRelativeDirectoryWords()
+        {
+            var words = GameHashGuesser.BuildEsportsBannerWordlist(new[]
+            {
+                @"ASSETS\Esports\SponsoredBanners\Region\2026\r_1_sponsor-brand.tex",
+                "assets/esports/sponsoredbanners/region/2026/r_1_sponsor-brand.dds",
+                "assets/characters/outsider/forbidden_word.tex"
+            });
+            Assert.Equal(new[] { "1", "2026", "brand", "hepsiburada", "kitkat", "msi", "portuguesa", "r", "region", "sponsor", "tsl" },
+                words.Order(StringComparer.Ordinal));
+            Assert.Equal(words.Count, words.Distinct(StringComparer.Ordinal).Count());
+        }
+
+        [Theory]
+        [InlineData("portuguesa")]
+        [InlineData("msi")]
+        [InlineData("2026")]
+        [InlineData("hepsiburada")]
+        [InlineData("kitkat")]
+        [InlineData("tsl")]
+        public void BannerFallbackVocabularyWorksWithoutKnownExamples(string word)
+        {
+            const string root = "assets/esports/sponsoredbanners/secret/";
+            string expected = root + "lpl_" + word + ".tex";
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[] { root + "lpl.tex" }));
+            var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong> { XxHash64Ext.Hash(expected), 42 });
+            game.GuessEsportsBanners(engine, null, CancellationToken.None);
+            Assert.Equal(expected, Assert.Single(engine.Matches).Value.Path);
+            Assert.Equal(HashGuessStrategy.BannerVariant, Assert.Single(engine.Matches).Value.Strategy);
+        }
+
+        [Theory]
+        [InlineData("r/seed.tex", "r")]
+        [InlineData("archive/2026.tex", "2026")]
+        public void BannerInsertionUsesShortAndNumericVocabulary(string evidence, string token)
+        {
+            const string root = "assets/esports/sponsoredbanners/";
+            string expected = root + "secret/lpl_" + token + ".tex";
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
+            {
+                root + evidence, root + "secret/lpl.tex"
+            }));
+            var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong> { XxHash64Ext.Hash(expected), 42 });
+            int count = game.GuessEsportsBanners(engine, null, CancellationToken.None);
+            Assert.Equal(expected, Assert.Single(engine.Matches).Value.Path);
+            Assert.Equal(count, engine.CheckedCandidates);
+            Assert.Contains(42UL, engine.UnknownHashes);
+        }
+
+        [Theory]
+        [InlineData("old_label_name")]
+        [InlineData("old_label_name_extra")]
+        public void BannerBuildListCanReplaceLongNamesWithAnAttestedCompound(string oldName)
+        {
+            const string root = "assets/esports/sponsoredbanners/secret/";
+            const string expected = root + "lec_new_brand.tex";
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
+            {
+                root + "lec_" + oldName + ".tex", root + "new_brand.tex"
+            }));
+            var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong> { XxHash64Ext.Hash(expected), 42 });
+            int count = game.GuessEsportsBanners(engine, null, CancellationToken.None);
+            Assert.Equal(expected, Assert.Single(engine.Matches).Value.Path);
+            Assert.Equal(count, engine.CheckedCandidates);
+        }
+
+        [Fact]
+        public void BannerInsertionDoesNotTruncateRareWordsAfterTheFirstNinetySix()
+        {
+            const string root = "assets/esports/sponsoredbanners/";
+            const string expected = root + "secret/alpha_zzzz.tex";
+            var paths = Enumerable.Range(0, 100).Select(index => root + "words/popular" + index + ".tex")
+                .Concat(new[] { root + "words/zzzz.tex", root + "secret/alpha.tex" });
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, paths));
+            var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong> { XxHash64Ext.Hash(expected), 42 });
+            game.GuessEsportsBanners(engine, null, CancellationToken.None);
+            Assert.Equal(expected, Assert.Single(engine.Matches).Value.Path);
+        }
+
+        [Fact]
+        public void BannerBuildListPreservesCompleteNamesAcrossKnownBannerDirectories()
+        {
+            const string expected = "assets/esports/sponsoredbanners/secret/sponsor_long_special_name_2026.tex";
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
+            {
+                "assets/esports/sponsoredbanners/sponsor_long_special_name_2026.tex",
+                "assets/esports/sponsoredbanners/secret/other.tex"
+            }));
+            var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong> { XxHash64Ext.Hash(expected), 42 });
+            game.GuessEsportsBanners(engine, null, CancellationToken.None);
+            Assert.Equal("GAME Banner: whole filenames build-list", Assert.Single(engine.Matches).Value.SourceWadPath);
+        }
+
+        [Fact]
         public void CommonCheckHelpersAndWordAdditionPreserveCdtbCoverage()
         {
             var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[] { "assets/known.bin" }));

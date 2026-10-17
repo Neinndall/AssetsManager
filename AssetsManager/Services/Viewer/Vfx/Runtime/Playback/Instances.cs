@@ -134,7 +134,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 buf[k++] = sizeZ;
                 VfxEmitterRenderState renderState = d.RenderState ?? VfxEmitterRenderState.Default;
                 Vector2 uvRamp = VfxUvSemantics.BirthRamp(
-                    p.BirthUvOffset + p.BirthUvScrollRate * p.Age,
+                    p.BirthUvOffset + p.BirthUvScrollRate * p.Age + p.FlexUvOffset * FlexChannel(p.FlexUvChannel),
                     renderState.ClampUvScroll);
                 Vector2 uvOffset = VfxUvSemantics.Periodic(
                     uvRamp + IntegratedUv(d.ParticleUvScrollRate, p),

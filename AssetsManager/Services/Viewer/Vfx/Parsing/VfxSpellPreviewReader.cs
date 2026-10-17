@@ -21,12 +21,21 @@ internal static class VfxSpellPreviewReader
     private static readonly uint FixedSpeedMovementClass = Fnv1a.HashLower("FixedSpeedMovement");
     private static readonly uint FixedTimeMovementClass = Fnv1a.HashLower("FixedTimeMovement");
     private static readonly uint AcceleratingMovementClass = Fnv1a.HashLower("AcceleratingMovement");
+    private static readonly uint DecelToLocationMovementClass = Fnv1a.HashLower("DecelToLocationMovement");
     private static readonly uint FixedSpeedSplineMovementClass = Fnv1a.HashLower("FixedSpeedSplineMovement");
     private static readonly uint FixedTimeSplineMovementClass = Fnv1a.HashLower("FixedTimeSplineMovement");
+    private static readonly uint PhysicsMovementClass = Fnv1a.HashLower("PhysicsMovement");
+    private static readonly uint CircleMovementClass = Fnv1a.HashLower("CircleMovement");
+    private static readonly uint SyncCircleMovementClass = Fnv1a.HashLower("SyncCircleMovement");
     private static readonly uint HermiteSplineInfoClass = Fnv1a.HashLower("HermiteSplineInfo");
-    private static readonly uint GravityHeightSolverClass = Fnv1a.HashLower("GravityHeightSolver");
-    private static readonly uint SinusoidalHeightSolverClass = Fnv1a.HashLower("SinusoidalHeightSolver");
     private static readonly uint BlendedLinearHeightSolverClass = Fnv1a.HashLower("BlendedLinearHeightSolver");
+    private static readonly uint GravityHeightSolverClass = Fnv1a.HashLower("GravityHeightSolver");
+    private static readonly uint FollowTerrainHeightSolverClass = Fnv1a.HashLower("FollowTerrainHeightSolver");
+    private static readonly uint SinusoidalHeightSolverClass = Fnv1a.HashLower("SinusoidalHeightSolver");
+    private static readonly uint CurveTheDifferenceHeightSolverClass = Fnv1a.HashLower("CurveTheDifferenceHeightSolver");
+    // League's schema spells the class with the typo `Veritcal`.
+    private static readonly uint VerticalFacingMatchVelocityClass = Fnv1a.HashLower("VeritcalFacingMatchVelocity");
+    private static readonly uint VerticalFacingFaceTargetClass = Fnv1a.HashLower("VerticalFacingFaceTarget");
     private const uint RankValuesClass = 0x0a0eddc9;
 
     internal static VfxSpellPreview Read(BinTreeObject spellObject)
@@ -54,6 +63,11 @@ internal static class VfxSpellPreviewReader
         string animationName = ReadString(spell.Properties, "mAnimationName", "mSpell", issues);
         uint missileEffectKey = ReadHash(spell.Properties, "mMissileEffectKey", "mSpell", issues);
         string missileEffectName = ReadString(spell.Properties, "mMissileEffectName", "mSpell", issues);
+        float? missileSpeed = ReadF32(spell.Properties, "missileSpeed", "mSpell", issues);
+        uint missileEffectPlayerKey = ReadOptionalHash(spell.Properties, "mMissileEffectPlayerKey");
+        string missileEffectPlayerName = ReadOptionalString(spell.Properties, "mMissileEffectPlayerName");
+        uint missileEffectEnemyKey = ReadOptionalHash(spell.Properties, "mMissileEffectEnemyKey");
+        string missileEffectEnemyName = ReadOptionalString(spell.Properties, "mMissileEffectEnemyName");
 
         float? displayRange = ReadRankOne(spell.Properties, "castRangeDisplayOverride", "mSpell", issues);
         float? valueRange = ReadNestedRankOne(spell.Properties, "castRangeValues", "mSpell", issues);
@@ -97,7 +111,15 @@ internal static class VfxSpellPreviewReader
             missile,
             missileEffectKey,
             missileEffectName,
-            issues) { ScriptName = scriptName };
+            issues)
+        {
+            ScriptName = scriptName,
+            MissileSpeed = missileSpeed,
+            MissileEffectPlayerKey = missileEffectPlayerKey,
+            MissileEffectPlayerName = missileEffectPlayerName,
+            MissileEffectEnemyKey = missileEffectEnemyKey,
+            MissileEffectEnemyName = missileEffectEnemyName
+        };
     }
 
     internal static VfxSpellAvailability AvailabilityOf(VfxSpellPreview preview, bool includeImpact = true)
@@ -128,10 +150,7 @@ internal static class VfxSpellPreviewReader
     internal static bool CanCompileFlight(VfxSpellMissilePreview missile, float distance)
     {
         if (missile == null || !float.IsFinite(distance) || distance < 0f) return false;
-        float delay = missile.StartDelay ?? 0f;
-        if (!float.IsFinite(delay) || delay < 0f) return false;
-        VfxSpellFlightPath path = VfxSpellFlightPath.Compile(missile, Vector3.Zero, new Vector3(0f, 0f, distance));
-        return path != null && path.Duration + delay <= 30d;
+        return VfxSpellPreviewComposer.CompileFlight(missile, Vector3.Zero, new Vector3(0f, 0f, distance)) != null;
     }
 
     private static VfxSpellMissilePreview ReadMissile(
@@ -148,8 +167,14 @@ internal static class VfxSpellPreviewReader
         string targetBone = null;
         float? targetHeight = null;
         float? initialTargetHeight = null;
+        bool? heightOffsetAtEnd = null;
         float? acceleration = null, minSpeed = null, maxSpeed = null, initialSpeed = null;
-        Vector3 splineOffset = Vector3.Zero, splinePoint1 = Vector3.Zero, splinePoint2 = Vector3.Zero;
+        float? drag = null, lifetime = null, angularVelocity = null, linearVelocity = null, radialVelocity = null;
+        byte? syncCircleAxis = null;
+        Vector3 splineOffset = Vector3.Zero;
+        Vector3 splinePoint1 = new(-1f, 0f, 0f);
+        Vector3 splinePoint2 = new(1f, 0f, 0f);
+        bool splineFromMissile = false;
 
         if (TryAnyStruct(missile.Properties, "movementComponent", movementPath, issues, out BinTreeStruct movement))
         {
@@ -163,9 +188,11 @@ internal static class VfxSpellPreviewReader
                 kind = VfxSpellMissileMovementKind.FixedTime;
                 duration = ReadF32(movement.Properties, "mTravelTime", movementPath, issues);
             }
-            else if (movement.ClassHash == AcceleratingMovementClass)
+            else if (movement.ClassHash == AcceleratingMovementClass || movement.ClassHash == DecelToLocationMovementClass)
             {
-                kind = VfxSpellMissileMovementKind.Accelerating;
+                kind = movement.ClassHash == AcceleratingMovementClass
+                    ? VfxSpellMissileMovementKind.Accelerating
+                    : VfxSpellMissileMovementKind.DecelToLocation;
                 acceleration = ReadF32(movement.Properties, "mAcceleration", movementPath, issues);
                 minSpeed = ReadF32(movement.Properties, "mMinSpeed", movementPath, issues);
                 maxSpeed = ReadF32(movement.Properties, "mMaxSpeed", movementPath, issues);
@@ -180,10 +207,33 @@ internal static class VfxSpellPreviewReader
                 const string splinePath = movementPath + ".mSplineInfo";
                 if (TryExpectedStruct(movement.Properties, "mSplineInfo", splinePath, HermiteSplineInfoClass, issues, out BinTreeStruct spline))
                 {
-                    splineOffset = ReadVector3(spline.Properties, "mStartPositionOffset", splinePath, issues);
-                    splinePoint1 = ReadVector3(spline.Properties, "mControlPoint1", splinePath, issues);
-                    splinePoint2 = ReadVector3(spline.Properties, "mControlPoint2", splinePath, issues);
+                    splineOffset = ReadVector3OrDefault(spline.Properties, "mStartPositionOffset", splinePath, Vector3.Zero, issues);
+                    splinePoint1 = ReadVector3OrDefault(spline.Properties, "mControlPoint1", splinePath, new Vector3(-1f, 0f, 0f), issues);
+                    splinePoint2 = ReadVector3OrDefault(spline.Properties, "mControlPoint2", splinePath, new Vector3(1f, 0f, 0f), issues);
+                    splineFromMissile = ReadBool(spline.Properties, "mUseMissilePositionAsOrigin", splinePath, issues) ?? false;
                 }
+            }
+            else if (movement.ClassHash == PhysicsMovementClass)
+            {
+                kind = VfxSpellMissileMovementKind.Physics;
+                initialSpeed = ReadF32(movement.Properties, "mInitialSpeed", movementPath, issues);
+                drag = ReadF32(movement.Properties, "mDrag", movementPath, issues);
+                lifetime = ReadF32(movement.Properties, "mLifetime", movementPath, issues);
+            }
+            else if (movement.ClassHash == CircleMovementClass)
+            {
+                kind = VfxSpellMissileMovementKind.Circle;
+                angularVelocity = ReadF32(movement.Properties, "mAngularVelocity", movementPath, issues);
+                linearVelocity = ReadF32(movement.Properties, "mLinearVelocity", movementPath, issues);
+                radialVelocity = ReadF32(movement.Properties, "mRadialVelocity", movementPath, issues);
+                lifetime = ReadF32(movement.Properties, "mLifetime", movementPath, issues);
+            }
+            else if (movement.ClassHash == SyncCircleMovementClass)
+            {
+                kind = VfxSpellMissileMovementKind.SyncCircle;
+                angularVelocity = ReadF32(movement.Properties, "mAngularVelocity", movementPath, issues);
+                lifetime = ReadF32(movement.Properties, "mLifetime", movementPath, issues);
+                syncCircleAxis = ReadU8(movement.Properties, "mAxisOfRotation", movementPath, issues);
             }
             else
             {
@@ -195,13 +245,13 @@ internal static class VfxSpellPreviewReader
             targetBone = ReadString(movement.Properties, "mTargetBoneName", movementPath, issues);
             targetHeight = ReadF32(movement.Properties, "mTargetHeightAugment", movementPath, issues);
             initialTargetHeight = ReadF32(movement.Properties, "mOffsetInitialTargetHeight", movementPath, issues);
+            heightOffsetAtEnd = ReadBool(movement.Properties, "mUseHeightOffsetAtEnd", movementPath, issues);
             MarkUnsupported(
                 movement.Properties,
                 movementPath,
                 issues,
                 "mStartBoneSkinOverrides",
                 "mTracksTarget",
-                "mUseHeightOffsetAtEnd",
                 "mVisualsTrackHiddenTargets",
                 "AddBonusAttackRangeToCastRange",
                 "mInferDirectionFromFacingIfNeeded",
@@ -209,28 +259,71 @@ internal static class VfxSpellPreviewReader
                 "mUseGroundHeightAtTarget");
         }
 
+        VfxSpellMissileHeightKind heightKind = VfxSpellMissileHeightKind.None;
         float gravity = 0f, sineAmplitude = 0f, sinePeriods = 0f;
+        float? heightSolverGravity = null, heightOffset = null, maxSlope = null;
+        float? sineAmplitudeRaw = null, sinePeriodsRaw = null, sineVerticalOffset = null, sinePhaseShift = null;
+        float? curveInitialTargetHeightOffset = null;
         bool landsOnTargetHeight = false;
         const string heightPath = root + ".heightSolver";
         if (TryAnyStruct(missile.Properties, "heightSolver", heightPath, issues, out BinTreeStruct height))
         {
-            if (height.ClassHash == GravityHeightSolverClass)
+            if (height.ClassHash == BlendedLinearHeightSolverClass)
             {
+                heightKind = VfxSpellMissileHeightKind.BlendedLinear;
                 landsOnTargetHeight = true;
-                gravity = ReadF32(height.Properties, "mGravity", heightPath, issues) ?? 0f;
             }
-            else if (height.ClassHash == BlendedLinearHeightSolverClass)
+            else if (height.ClassHash == GravityHeightSolverClass)
             {
+                heightKind = VfxSpellMissileHeightKind.Gravity;
                 landsOnTargetHeight = true;
+                heightSolverGravity = ReadF32(height.Properties, "mGravity", heightPath, issues);
+                gravity = heightSolverGravity ?? 0f;
+            }
+            else if (height.ClassHash == FollowTerrainHeightSolverClass)
+            {
+                heightKind = VfxSpellMissileHeightKind.FollowTerrain;
+                heightOffset = ReadF32(height.Properties, "mHeightOffset", heightPath, issues);
+                maxSlope = ReadF32(height.Properties, "mMaxSlope", heightPath, issues);
             }
             else if (height.ClassHash == SinusoidalHeightSolverClass)
             {
-                sineAmplitude = ReadF32(height.Properties, "mAmplitude", heightPath, issues) ?? 0f;
-                sinePeriods = ReadF32(height.Properties, "mNumberOfPeriods", heightPath, issues) ?? 0f;
+                heightKind = VfxSpellMissileHeightKind.Sinusoidal;
+                sineAmplitudeRaw = ReadF32(height.Properties, "mAmplitude", heightPath, issues);
+                sinePeriodsRaw = ReadF32(height.Properties, "mNumberOfPeriods", heightPath, issues);
+                sineVerticalOffset = ReadF32(height.Properties, "mVerticalOffset", heightPath, issues);
+                sinePhaseShift = ReadF32(height.Properties, "PhaseShift", heightPath, issues);
+                sineAmplitude = sineAmplitudeRaw ?? 0f;
+                sinePeriods = sinePeriodsRaw ?? 0f;
+            }
+            else if (height.ClassHash == CurveTheDifferenceHeightSolverClass)
+            {
+                heightKind = VfxSpellMissileHeightKind.CurveTheDifference;
+                curveInitialTargetHeightOffset = ReadF32(height.Properties, "mInitialTargetHeightOffset", heightPath, issues);
             }
             else
             {
+                heightKind = VfxSpellMissileHeightKind.Unsupported;
                 Issue(issues, heightPath, VfxSpellIssueKind.Unsupported);
+            }
+        }
+
+        VfxSpellMissileFacingKind facingKind = VfxSpellMissileFacingKind.None;
+        const string facingPath = root + ".verticalFacing";
+        if (TryAnyStruct(missile.Properties, "verticalFacing", facingPath, issues, out BinTreeStruct facing))
+        {
+            if (facing.ClassHash == VerticalFacingMatchVelocityClass)
+            {
+                facingKind = VfxSpellMissileFacingKind.MatchVelocity;
+            }
+            else if (facing.ClassHash == VerticalFacingFaceTargetClass)
+            {
+                facingKind = VfxSpellMissileFacingKind.FaceTarget;
+            }
+            else
+            {
+                facingKind = VfxSpellMissileFacingKind.Unsupported;
+                Issue(issues, facingPath, VfxSpellIssueKind.Unsupported);
             }
         }
 
@@ -238,7 +331,6 @@ internal static class VfxSpellPreviewReader
             missile.Properties,
             root,
             issues,
-            "verticalFacing",
             "behaviors",
             "missileGroupSpawners",
             "visibilityComponent",
@@ -254,17 +346,35 @@ internal static class VfxSpellPreviewReader
             targetHeight,
             initialTargetHeight)
         {
+            HeightOffsetAtEnd = heightOffsetAtEnd,
             Acceleration = acceleration,
             MinSpeed = minSpeed,
             MaxSpeed = maxSpeed,
             InitialSpeed = initialSpeed,
+            Drag = drag,
+            Lifetime = lifetime,
+            AngularVelocity = angularVelocity,
+            LinearVelocity = linearVelocity,
+            RadialVelocity = radialVelocity,
+            SyncCircleAxis = syncCircleAxis,
             SplineStartOffset = splineOffset,
             SplineControlPoint1 = splinePoint1,
             SplineControlPoint2 = splinePoint2,
+            SplineFromMissile = splineFromMissile,
+            HeightKind = heightKind,
             LandsOnTargetHeight = landsOnTargetHeight,
             Gravity = gravity,
+            HeightSolverGravity = heightSolverGravity,
+            HeightOffset = heightOffset,
+            MaxSlope = maxSlope,
             SineAmplitude = sineAmplitude,
-            SinePeriods = sinePeriods
+            SinePeriods = sinePeriods,
+            SineAmplitudeRaw = sineAmplitudeRaw,
+            SinePeriodsRaw = sinePeriodsRaw,
+            SineVerticalOffset = sineVerticalOffset,
+            SinePhaseShift = sinePhaseShift,
+            CurveInitialTargetHeightOffset = curveInitialTargetHeightOffset,
+            FacingKind = facingKind
         };
     }
 
@@ -321,18 +431,31 @@ internal static class VfxSpellPreviewReader
         return null;
     }
 
-    private static Vector3 ReadVector3(
+    private static Vector3 ReadVector3OrDefault(
+        IReadOnlyDictionary<uint, BinTreeProperty> properties,
+        string field,
+        string parent,
+        Vector3 fallback,
+        ICollection<VfxSpellIssue> issues)
+    {
+        if (!TryProperty(properties, field, out BinTreeProperty property)) return fallback;
+        if (Unwrap(property) is BinTreeVector3 value &&
+            float.IsFinite(value.Value.X) && float.IsFinite(value.Value.Y) && float.IsFinite(value.Value.Z))
+            return value.Value;
+        Issue(issues, $"{parent}.{field}", VfxSpellIssueKind.Invalid);
+        return fallback;
+    }
+
+    private static byte? ReadU8(
         IReadOnlyDictionary<uint, BinTreeProperty> properties,
         string field,
         string parent,
         ICollection<VfxSpellIssue> issues)
     {
-        if (!TryProperty(properties, field, out BinTreeProperty property)) return Vector3.Zero;
-        if (Unwrap(property) is BinTreeVector3 value &&
-            float.IsFinite(value.Value.X) && float.IsFinite(value.Value.Y) && float.IsFinite(value.Value.Z))
-            return value.Value;
+        if (!TryProperty(properties, field, out BinTreeProperty property)) return null;
+        if (Unwrap(property) is BinTreeU8 value) return value.Value;
         Issue(issues, $"{parent}.{field}", VfxSpellIssueKind.Invalid);
-        return Vector3.Zero;
+        return null;
     }
 
     private static bool? ReadBool(
@@ -369,6 +492,22 @@ internal static class VfxSpellPreviewReader
         if (Unwrap(property) is BinTreeHash value) return value.Value;
         Issue(issues, $"{parent}.{field}", VfxSpellIssueKind.Invalid);
         return 0u;
+    }
+
+    private static string ReadOptionalString(
+        IReadOnlyDictionary<uint, BinTreeProperty> properties,
+        string field)
+    {
+        if (!TryProperty(properties, field, out BinTreeProperty property)) return null;
+        return Unwrap(property) is BinTreeString value ? value.Value : null;
+    }
+
+    private static uint ReadOptionalHash(
+        IReadOnlyDictionary<uint, BinTreeProperty> properties,
+        string field)
+    {
+        if (!TryProperty(properties, field, out BinTreeProperty property)) return 0u;
+        return Unwrap(property) is BinTreeHash value ? value.Value : 0u;
     }
 
     private static float? ReadRankOne(

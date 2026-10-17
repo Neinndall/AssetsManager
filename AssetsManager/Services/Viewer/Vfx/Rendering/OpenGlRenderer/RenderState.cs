@@ -53,6 +53,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 else _gl.Disable(EnableCap.DepthTest);
             }
 
+            if (_drawingShadows)
+            {
+                _gl.Enable(EnableCap.DepthTest);
+                _gl.DepthMask(true);
+            }
+
             // Three.js ShaderMaterial defaults to LessEqualDepth, and LTK never overrides it
             // for VFX materials. Keep equal-depth fragments eligible instead of inheriting
             // OpenGL's default LESS from the surrounding viewer.
@@ -95,6 +101,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
 
         private void ApplyEmitterBlendState(VfxEmitterDefinition definition, bool distortion = false)
         {
+            if (_drawingShadows) { _gl.Disable(EnableCap.Blend); return; }
             if (definition.HasResolvedCustomMaterial)
             {
                 ApplyCustomMaterialBlend(definition);

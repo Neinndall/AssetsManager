@@ -23,6 +23,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             else
                 multiplier = LifeVector(definition.ScaleOverLife, ParticleAge01(particle.Age, particle.Life),
                     particle.Serial, state.RenderTime, Vector3.One);
+            float channel = definition.Flex?.InstanceScale is { } flex ? state.FlexChannel(flex.Channel) : 0f;
+            if (channel > 1e-5f) multiplier *= channel;
             return UsesUniformScale(definition) ? new Vector3(multiplier.X) : multiplier;
         }
 

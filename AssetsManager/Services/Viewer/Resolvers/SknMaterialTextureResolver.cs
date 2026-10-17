@@ -27,9 +27,8 @@ namespace AssetsManager.Services.Viewer.Resolvers
         internal string EmissiveTexturePath { get; init; }
 
         /// <summary>
-        /// The draw rank of each submesh, in mesh order. The submeshes skinMeshProperties.submeshRenderOrder names
-        /// take the slots they hold in the mesh in the authored order (Yunara skin10 draws its chick eyes over the
-        /// beads they sit on), and every other submesh keeps its own slot.
+        /// The draw rank of each submesh, in mesh order. Explicitly ordered submeshes draw after unlisted geometry
+        /// so facial overlays blend over the body.
         /// </summary>
         internal int[] DrawRanks(IReadOnlyList<string> submeshNames)
         {
@@ -41,10 +40,10 @@ namespace AssetsManager.Services.Viewer.Resolvers
             for (int at = 0; at < SubmeshRenderOrder.Count; at++)
                 authored.TryAdd(SubmeshRenderOrder[at], at);
 
-            int[] listed = ranks.Where(at => authored.ContainsKey(submeshNames[at] ?? string.Empty)).ToArray();
-            int[] byAuthoredOrder = listed.OrderBy(at => authored[submeshNames[at]]).ToArray();
-            for (int slot = 0; slot < listed.Length; slot++)
-                ranks[byAuthoredOrder[slot]] = listed[slot];
+            int[] ordered = ranks.OrderBy(at => authored.TryGetValue(submeshNames[at] ?? string.Empty, out int order)
+                ? order : -1).ToArray();
+            for (int slot = 0; slot < ordered.Length; slot++)
+                ranks[ordered[slot]] = slot;
             return ranks;
         }
 
@@ -668,6 +667,13 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 materialDefinitions[submesh] = ModelMaterialDefinition.TextureOnly(
                     textureFallback,
                     GameShaderProgramResolver.CreateDefaultSkinnedProgram(textureFallback, emissiveTextureKey));
+            }
+
+            if (metadata.SubmeshRenderOrder is { Count: > 0 })
+            {
+                defaultMaterialDefinition = defaultMaterialDefinition with { HasSubmeshRenderOrder = true };
+                foreach (string submesh in materialDefinitions.Keys.ToArray())
+                    materialDefinitions[submesh] = materialDefinitions[submesh] with { HasSubmeshRenderOrder = true };
             }
 
             return new SknMaterialTextureResolution(
@@ -1362,6 +1368,36 @@ namespace AssetsManager.Services.Viewer.Resolvers
             if (material == null)
                 return ModelMaterialDefinition.Missing;
 
+            return ResolveMaterialPreview(material, trees, out sourceBlendFactor, out destinationBlendFactor,
+                wadChunkPathResolver, binEntryResolver);
+        }
+
+        internal static ModelMaterialDefinition ResolveEmbeddedMaterialPreview(
+            BinTreeStruct embedded,
+            IEnumerable<BinTree> trees,
+            out VfxCustomMaterialBlendFactor sourceBlendFactor,
+            out VfxCustomMaterialBlendFactor destinationBlendFactor,
+            Func<ulong, string> wadChunkPathResolver = null,
+            Func<uint, string> binEntryResolver = null)
+        {
+            // Inline materials have no entry hash; the material reader consumes their fields directly.
+            var obj = new BinTreeObject(0, embedded.ClassHash, embedded.Properties.Values);
+            var material = ReadMaterialDefinition(obj, wadChunkPathResolver, binEntryResolver) with
+            {
+                Program = new MapMaterialParser(wadChunkPathResolver, binEntryResolver).ParseProgram(obj, trees)
+            };
+            return ResolveMaterialPreview(material, trees, out sourceBlendFactor, out destinationBlendFactor,
+                wadChunkPathResolver, binEntryResolver);
+        }
+
+        private static ModelMaterialDefinition ResolveMaterialPreview(
+            SknMaterialDefinition material,
+            IEnumerable<BinTree> trees,
+            out VfxCustomMaterialBlendFactor sourceBlendFactor,
+            out VfxCustomMaterialBlendFactor destinationBlendFactor,
+            Func<ulong, string> wadChunkPathResolver,
+            Func<uint, string> binEntryResolver)
+        {
             sourceBlendFactor = ResolveVfxBlendFactor(
                 material.Pass?.SourceColorBlendFactor,
                 VfxCustomMaterialBlendFactor.One);

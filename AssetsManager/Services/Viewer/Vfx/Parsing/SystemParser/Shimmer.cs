@@ -12,7 +12,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
 {
     internal static partial class VfxSystemParser
     {
-        private static VfxEmitterDefinition ParseShimmerEmitter(BinTreeStruct s, int index)
+        private static VfxEmitterDefinition ParseShimmerEmitter(BinTreeStruct s, int index, uint sourceList = 0)
         {
             var p = s.Properties;
             string name = GetString(p, F_emitterName) ?? $"[{index}]";
@@ -44,12 +44,57 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             Vector3 offset = offsetValue is null ? Vector3.Zero : new Vector3(offsetValue[0], offsetValue[1], offsetValue[2]);
             float[] rotationValue = DriverValue(ShimmerRotationFieldHashes, 3);
             Vector3 rotation = rotationValue is null ? Vector3.Zero : new Vector3(rotationValue[0], rotationValue[1], rotationValue[2]);
-            Vector3 rotationRad = rotation * (MathF.PI / 180f);
+            VfxShimmerDefinition shimmer = null;
+            Vector3 velocity = Vector3.Zero, acceleration = Vector3.Zero;
+            Vector3 keyedScale = Vector3.One;
+            Vector4 keyedColor = Vector4.One;
+            bool uniformScale = false;
+            if (components != null)
+            {
+                BinTreeStruct Node(BinTreeProperty value, string field) =>
+                    (value as BinTreeStruct)?.Properties.GetValueOrDefault(VfxParsingHash.Fnv1a(field)) as BinTreeStruct;
+                BinTreeProperty Field(BinTreeProperty value, string field) =>
+                    (value as BinTreeStruct)?.Properties.GetValueOrDefault(VfxParsingHash.Fnv1a(field));
+                float Scalar(BinTreeProperty value, string field, float fallback) =>
+                    Field(value, field) is { } held ? VfxShimmerDriverEvaluator.Evaluate(held, 1)?[0] ?? fallback : fallback;
+                Vector3 Vector(BinTreeProperty value, string field, Vector3 fallback) =>
+                    Field(value, field) is { } held ? VfxShimmerDriverEvaluator.Vector3Value(held) ?? fallback : fallback;
+                Vector4 Color(BinTreeProperty value, string field, Vector4 fallback) =>
+                    Field(value, field) is { } held ? VfxShimmerDriverEvaluator.Vector4Value(held) ?? fallback : fallback;
+                var lifetime = Node(components, "LifetimeComponent");
+                var behavior = Node(lifetime, "LifetimeBehavior");
+                var spawn = Node(lifetime, "SpawnBehavior");
+                bool hasSpawns = Field(spawn, "EmissionRate") != null ||
+                    (spawn?.Properties.ContainsKey(0x10498eed) ?? false);
+                float burstValue = spawn?.Properties.GetValueOrDefault(0x10498eedu) is { } burst
+                    ? VfxShimmerDriverEvaluator.Evaluate(burst, 1)?[0] ?? 0f : hasSpawns ? 0f : 1f;
+                shimmer = new VfxShimmerDefinition(sourceList == 0 ? F_shimmerEmitterDefinitionData : sourceList, index,
+                    MathF.Max(0, Scalar(behavior, "startDelay", 0)), Scalar(behavior, "EmitterDuration", -1),
+                    Scalar(behavior, "particleLifetime", -1), MathF.Max(0, Scalar(spawn, "EmissionRate", 0)),
+                    float.IsFinite(burstValue) ? (int)Math.Clamp(Math.Floor((double)burstValue + 0.5), 0, int.MaxValue) : 0,
+                    MathF.Max(0, Scalar(spawn, "SpawnDuration", 0)),
+                    behavior?.ClassHash == 0xdbb4f634, MathF.Max(0, Scalar(behavior, "LoopDelay", 0)));
+                var modifiers = Field(physics, "Modifiers") as BinTreeContainer;
+                BinTreeStruct Writer(string field) => modifiers?.Elements.OfType<BinTreeStruct>()
+                    .FirstOrDefault(m => m.Properties.ContainsKey(VfxParsingHash.Fnv1a(field)));
+                scale = Vector(Writer("InitialScale"), "InitialScale", Vector3.One);
+                keyedScale = Vector(Writer("KeyedScale"), "KeyedScale", Vector3.One);
+                rotation = Vector(Writer("InitialRotation"), "InitialRotation", Vector3.Zero);
+                velocity = Vector(Writer("InitialVelocity"), "InitialVelocity", Vector3.Zero);
+                foreach (string field in new[] { "InitialAcceleration", "Acceleration", "WorldAcceleration", "LocalAcceleration" })
+                    acceleration += Vector(Writer(field), field, Vector3.Zero);
+                uniformScale = Field(Writer("IsUniform"), "IsUniform") is BinTreeBool { Value: true } or BinTreeBitBool { Value: true };
+                if (uniformScale) { scale = new Vector3(scale.X); keyedScale = new Vector3(keyedScale.X); }
+                var colors = Node(render, "Color");
+                color = Color(colors, "InitialColor", color);
+                keyedColor = Color(colors, "ColorOverLife", Vector4.One);
+                offset = Vector3.Zero;
+            }
 
             return new VfxEmitterDefinition(
                 Name: name,
                 Rate: VfxCurveF.Const(1f),
-                ParticleLifetime: VfxCurveF.Const(1000f),
+                ParticleLifetime: VfxCurveF.Const(shimmer is null ? 1000f : shimmer.Lifetime <= 0 ? -1f : shimmer.Lifetime),
                 EmitterLifetime: null,
                 ParticleLinger: 0f,
                 TimeBeforeFirstEmission: 0f,
@@ -57,10 +102,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 Disabled: disabled,
                 BlendMode: 0,
                 BirthScale: VfxCurve3.Const(scale),
-                ScaleOverLife: null,
+                ScaleOverLife: shimmer is null ? null : VfxCurve3.Const(keyedScale),
                 BirthColor: VfxCurve4.Const(color),
-                ColorOverLife: null,
-                BirthVelocity: null,
+                ColorOverLife: shimmer is null ? null : VfxCurve4.Const(keyedColor),
+                BirthVelocity: shimmer is null ? null : VfxCurve3.Const(velocity),
                 Acceleration: null,
                 BirthRotationalVelocity: null,
                 EmitterPosition: VfxCurve3.Const(offset),
@@ -71,7 +116,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 IsMeshPrimitive: true,
                 MeshPath: meshPath,
                 PrimitiveKind: VfxPrimitiveKind.Mesh,
-                BirthRotation: VfxCurve3.Const(rotationRad));
+                BirthRotation: VfxCurve3.Const(rotation),
+                BirthAcceleration: shimmer is null ? null : VfxCurve3.Const(acceleration),
+                IsUniformScale: uniformScale,
+                Shimmer: shimmer);
         }
 
         private static string FindFirstAsset(BinTreeProperty prop, string[] extensions, int depth = 0)

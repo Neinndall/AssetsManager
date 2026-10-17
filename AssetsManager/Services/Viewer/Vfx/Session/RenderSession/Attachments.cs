@@ -23,7 +23,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             if (sourceChanged) ReplayAfterLineageResourceChange();
         }
 
-        private void ApplyBoneTransforms(Func<string, uint, Matrix4x4?> boneTransformProvider)
+        private void ApplyBoneTransforms(Func<string, uint, Matrix4x4?> boneTransformProvider,
+            VfxPlaybackGraphRuntime onlyGraph = null, double? sampleTime = null)
         {
             if (_graphs.Count == 0) return;
 
@@ -35,6 +36,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
 
             foreach (VfxPlaybackGraphRuntime graph in _graphs)
             {
+                if (onlyGraph != null && !ReferenceEquals(onlyGraph, graph)) continue;
                 graph.SetHostJointTransformProvider(jointProvider);
                 if (_spellSteps.ContainsKey(graph))
                 {
@@ -46,6 +48,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
 
                 // boneToSpawnAt children use the same live skeleton as clip/idle attachments.
                 graph.SetJointTransformProvider(jointProvider);
+
+                // The standalone rig already placed and aimed this graph. Reapplying its transform
+                // here would replace the rig target with the runtime's default forward target.
+                if (_usesStandaloneRig) continue;
 
                 if (_graphAttachments.TryGetValue(graph, out var attachment) && boneTransformProvider != null)
                 {
@@ -66,7 +72,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                             CurrentSkinScale);
                         if (attachment.IsDetachable && attachment.HasBoneTransform)
                             boneTransform = attachment.BoneTransform;
-                        if (attachment.IsDetachable && _activeSystem?.CurrentTime >= attachment.StartTime)
+                        if (attachment.IsDetachable && (sampleTime ?? _activeSystem?.CurrentTime) >= attachment.StartTime)
                         {
                             attachment.BoneTransform = boneTransform;
                             attachment.HasBoneTransform = true;

@@ -91,6 +91,22 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             for (int index = 0; index < system.Emitters.Count; index++)
             {
                 VfxEmitterDefinition emitter = system.Emitters[index];
+                if (emitter.Shimmer is { } component &&
+                    tree.Objects.TryGetValue(system.PathHash, out var rawSystem) &&
+                    rawSystem.Properties.GetValueOrDefault(component.SourceList) is BinTreeContainer list &&
+                    component.SourceIndex >= 0 && component.SourceIndex < list.Elements.Count &&
+                    list.Elements[component.SourceIndex] is BinTreeStruct rawEmitter &&
+                    rawEmitter.Properties.GetValueOrDefault(VfxParsingHash.Fnv1a("VfxComponents")) is BinTreeStruct components &&
+                    FindEmbeddedMaterial(components.Properties.GetValueOrDefault(VfxParsingHash.Fnv1a("RenderComponent"))) is { } embedded)
+                {
+                    var trees = shaderTrees == null ? new[] { tree } : new[] { tree }.Concat(shaderTrees).ToArray();
+                    var material = SknMaterialTextureResolver.ResolveEmbeddedMaterialPreview(embedded, trees,
+                        out var sourceBlend, out var destinationBlend, wadChunkPathResolver, binEntryResolver);
+                    emitters ??= system.Emitters.ToArray();
+                    emitters[index] = emitter with { CustomMaterial = material, TexturePath = material.BaseTextureName,
+                        CustomMaterialSourceBlendFactor = sourceBlend, CustomMaterialDestinationBlendFactor = destinationBlend };
+                    continue;
+                }
                 if (emitter.CustomMaterialPathHash == 0) continue;
 
                 emitters ??= system.Emitters.ToArray();
@@ -98,6 +114,22 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             }
 
             return emitters is null ? system : system with { Emitters = emitters };
+        }
+
+        private static BinTreeStruct FindEmbeddedMaterial(BinTreeProperty value, int depth = 0)
+        {
+            if (value == null || depth > 24) return null;
+            if (value is BinTreeOptional optional) return FindEmbeddedMaterial(optional.Value, depth + 1);
+            if (value is BinTreeStruct node)
+            {
+                if (node.ClassHash == VfxParsingHash.Fnv1a("StaticMaterialDef")) return node;
+                foreach (var field in node.Properties.Values)
+                    if (FindEmbeddedMaterial(field, depth + 1) is { } found) return found;
+            }
+            else if (value is BinTreeContainer container)
+                foreach (var item in container.Elements)
+                    if (FindEmbeddedMaterial(item, depth + 1) is { } found) return found;
+            return null;
         }
 
         /// <summary>

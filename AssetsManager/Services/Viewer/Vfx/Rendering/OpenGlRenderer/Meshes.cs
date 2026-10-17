@@ -103,12 +103,16 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             float beamStretch = 0f;
             if (beamMesh && !VfxBeamGeometry.TryMeshPlacement(es, out beamPosition, out beamBasis, out beamStretch)) return;
             Vector4 beamTint = beamMesh ? VfxBeamGeometry.DistanceColor(es) : Vector4.One;
-            bool isDistortion = es.Def.DrawsAsDistortion && !wireframePass;
+            bool isDistortion = !_drawingShadows && es.Def.DrawsAsDistortion && !wireframePass;
             // The game draws the scene behind a distorting emitter at any strength, so it always needs the frame.
             bool warpsFrame = isDistortion;
             if (warpsFrame && _capture.ColorTexture == 0) return;
             EnsureMeshProgram();
             bool native = UseGameParticle(es, true, passIndex, wireframePass);
+            _meshUniforms.Uniform1(_meshUniforms.ShadowPass, _drawingShadows ? 1 : 0);
+            _meshUniforms.Uniform1(_meshUniforms.SliceRange, es.Def.SliceRange);
+            _meshUniforms.Uniform1(_meshUniforms.HasSliceRamp, es.ColorGradientTexture != 0 ? 1 : 0);
+
             _meshUniforms.Uniform1(_meshUniforms.WireframePass, wireframePass ? 1 : 0);
             _meshUniforms.Uniform4(
                 _meshUniforms.WireframeColor,

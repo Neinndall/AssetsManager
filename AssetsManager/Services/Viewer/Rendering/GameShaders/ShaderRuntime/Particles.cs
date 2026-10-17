@@ -22,7 +22,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             int slot = mesh ? 1 : 0;
             if (materials[slot] == null)
                 materials[slot] = new ParticleMaterial(emitter.HasResolvedCustomMaterial
-                    ? emitter.CustomMaterial.Program : GameParticleProgramResolver.Create(emitter, mesh),
+                    ? emitter.CustomMaterial.Program : emitter.SliceRange > 0f ? null : GameParticleProgramResolver.Create(emitter, mesh),
                     GameParticleProgramResolver.BorderedTextures(emitter));
             var material = materials[slot];
             return (material.Program == null ? null : GetOrCreate(material, material.Program, mesh,
@@ -49,6 +49,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             var (cache, material) = ParticleEntry(emitter, mesh);
             if (material.Program == null)
                 return emitter.HasResolvedCustomMaterial ? "Custom material without a program."
+                    : emitter.SliceRange > 0f ? "Slice particles use the stock shader."
                     : !mesh && emitter.Reflection is not null ? "Reflective quad (stock by design)."
                     : !mesh && emitter.UvMode is 1 or 2 ? $"UvMode {emitter.UvMode} quad (stock by design)."
                     : "No native program for this emitter.";

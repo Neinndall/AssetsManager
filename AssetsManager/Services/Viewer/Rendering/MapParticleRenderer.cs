@@ -37,6 +37,13 @@ namespace AssetsManager.Services.Viewer.Rendering
         private float _preparedWireOpacity;
         private bool _ready;
         private VfxStencilScene _preparedStencilScene;
+        internal VfxEffectsQuality EffectsQuality { get; set; } = VfxEffectsQuality.VeryHigh;
+        bool IPreparedParticlePass.HasPreparedShadowCasters => _preparedShaded && _queue.Exists(e =>
+            e.Emitter.IsVisible && !e.Emitter.Def.Disabled && e.Emitter.InstanceCount > 0 && VfxRenderPhaseSemantics.CastsShadow(e.Emitter.Def));
+        void IPreparedParticlePass.RenderPreparedShadowPass(Matrix4x4 lightViewProjection, Matrix4x4 eyeView)
+        {
+            if (_preparedShaded) _renderer.RenderShadows(_queue, lightViewProjection, eyeView);
+        }
         internal bool CacheDrawBindings { set => _renderer.CacheDrawBindings = value; }
         internal (int Programs, int UniformBuffers) LastDrawBindingCounts => _renderer.LastDrawBindingCounts;
 
@@ -99,6 +106,13 @@ namespace AssetsManager.Services.Viewer.Rendering
             {
                 VfxPlaybackGraphRuntime graph = mapRuntime?.Graph;
                 if (graph == null) continue;
+                if (graph.EffectsQuality != EffectsQuality)
+                {
+                    float time = graph.Root.CurrentTime;
+                    graph.SetEffectsQuality(EffectsQuality);
+                    graph.Reset();
+                    for (float t = 0; t < time; t += 1f / 60f) graph.Update(MathF.Min(1f / 60f, time - t));
+                }
                 _graphs.Add(graph);
                 foreach (VfxPlaybackRuntime runtime in graph.Runtimes)
                 {

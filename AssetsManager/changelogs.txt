@@ -1,5 +1,40 @@
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
+AssetsManager - League of Legends | v4.1.0.2
+
+HOTFIX UPDATE
+
+New Features
+  - Viewer Settings / Choose VFX quality, with High selected by default.
+  - 3D Studio / Preview particle shadows on the ground and authored slice effects.
+  - 3D Studio / Adjust available flex channels in the Inspector and replay their effect on particles.
+
+Improvements
+  - Hash Guessing Lab / Esports banners now use complete names, years, short tokens, longer compound names and fallback sponsor vocabulary.
+  - Hash Guessing Lab / Reduces repeated work and memory allocations in numeric searches.
+  - Hash Guessing Lab / GAME Custom searches now reuse names discovered earlier in the same session.
+  - Hash Guessing Lab / Covers more BIN path conventions and identifiers when learning GAME paths.
+  - Hash Guessing Lab / Finds more GAME material textures from modern BIN names and shared sampler roles.
+  - 3D Studio / Standalone spell projectiles now use the spell's cast range and fallback missile speed.
+  - 3D Studio / VFX quality now controls particle density, simulation timing, trail smoothing, soft particles and distortion.
+  - 3D Studio / Spell missiles and standalone projectile effects now follow their authored flight paths, height arcs, circular orbits and 3D pitch orientation.
+  - 3D Studio / Reused missile trajectories for smoother playback and seeking.
+
+Changes
+
+Bug Fixes
+  - 3D Studio / Fixed rectangular camera-facing particles deforming when rotated.
+  - 3D Studio / Fixed standalone projectile targets changing after restarting or seeking backward.
+  - 3D Studio / Fixed missing Shimmer mesh effects when enabling map decorations.
+  - VFX Studio / Closing a map preview during loading no longer leaves temporary effect files behind.
+  - 3D Studio / Fixed missile detection when the character BIN is not linked, including player and enemy variants.
+  - 3D Studio / Corrected missile target heights and orbit sizes, and kept speed adjustments from replacing authored movement.
+  - 3D Studio / Corrected default particle importance and preserved authored simulation flags across playback and seeking.
+  - 3D Studio / Fixed facial layers revealing the background through textured and custom-material skins, including Chibi Gwen's eyes.
+  - Image Comparison / Fixed Onion Skin adjustment becoming unresponsive after leaving Timeline mode.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
 AssetsManager - League of Legends | v4.1.0.1
 
 HOTFIX UPDATE

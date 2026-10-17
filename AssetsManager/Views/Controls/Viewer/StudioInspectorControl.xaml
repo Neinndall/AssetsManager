@@ -378,6 +378,8 @@
                                         <ComboBoxItem Content="Missile" Tag="Missile"/>
                                         <ComboBoxItem Content="Trail" Tag="Trail"/>
                                     </ComboBox>
+                                    <TextBlock x:Name="RigFlightSourceText" FontSize="10" Margin="0,0,0,8"
+                                               Foreground="{StaticResource TextMuted}" TextWrapping="Wrap" Visibility="Collapsed"/>
                                     <StackPanel>
                                         <Grid Margin="0,0,0,3">
                                             <TextBlock Text="Height" FontSize="10.5" Foreground="{StaticResource TextSecondary}"/>
@@ -397,6 +399,7 @@
                                             <Slider x:Name="RigDistanceSlider" Minimum="200" Maximum="4000" TickFrequency="50"
                                                     IsSnapToTickEnabled="True" Value="1200" Style="{StaticResource HUDSliderStyle}"
                                                     ValueChanged="RigDistanceSlider_ValueChanged"/>
+                                            <StackPanel x:Name="RigSpeedPanel">
                                             <Grid Margin="0,5,0,3">
                                                 <TextBlock Text="Speed" FontSize="10.5" Foreground="{StaticResource TextSecondary}"/>
                                                 <TextBlock x:Name="RigSpeedValueText" Text="1600 u/s" HorizontalAlignment="Right"
@@ -405,6 +408,7 @@
                                             <Slider x:Name="RigSpeedSlider" Minimum="100" Maximum="5000" TickFrequency="50"
                                                     IsSnapToTickEnabled="True" Value="1600" Style="{StaticResource HUDSliderStyle}"
                                                     ValueChanged="RigSpeedSlider_ValueChanged"/>
+                                            </StackPanel>
                                         </StackPanel>
 
                                         <StackPanel x:Name="RigOrbitPanel" Margin="0,7,0,0">
@@ -426,6 +430,14 @@
                                                     ValueChanged="RigPeriodSlider_ValueChanged"/>
                                         </StackPanel>
 
+                                        <StackPanel Margin="0,9,0,0" Visibility="{Binding HasVfxFlex, Converter={StaticResource BoolToVisibilityConverter}}">
+                                            <TextBlock Text="Flex channels" FontSize="10.5" Foreground="{StaticResource TextSecondary}"/>
+                                            <UniformGrid Columns="3" Margin="0,4,0,0">
+                                                <TextBox Visibility="{Binding HasVfxFlex0, Converter={StaticResource BoolToVisibilityConverter}}" ToolTip="Flex channel 0" Text="{Binding VfxFlex0, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"/>
+                                                <TextBox Visibility="{Binding HasVfxFlex1, Converter={StaticResource BoolToVisibilityConverter}}" ToolTip="Flex channel 1" Text="{Binding VfxFlex1, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"/>
+                                                <TextBox Visibility="{Binding HasVfxFlex2, Converter={StaticResource BoolToVisibilityConverter}}" ToolTip="Flex channel 2" Text="{Binding VfxFlex2, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"/>
+                                            </UniformGrid>
+                                        </StackPanel>
                                         <Grid Margin="0,9,0,0">
                                             <TextBlock Text="Seed" FontSize="10.5" Foreground="{StaticResource TextSecondary}"
                                                        VerticalAlignment="Center"/>

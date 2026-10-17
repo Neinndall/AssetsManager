@@ -7,6 +7,32 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
 {
     public sealed partial class VfxRenderSession
     {
+        private System.Action<VfxPlaybackGraphRuntime, double> _prepareGraphStep;
+
+        private void PrepareGraphStep(VfxPlaybackGraphRuntime graph, double time)
+        {
+            if (_spellSteps.TryGetValue(graph, out var spell))
+            {
+                Matrix4x4 placement = SpellTransformAt(spell, time);
+                _graphPlacements[graph] = placement;
+                Matrix4x4 world = RootAuthoredWorld(graph);
+                graph.SetTransform(placement * world, Matrix4x4.CreateTranslation(placement.Translation) * world);
+                graph.SetTarget(Vector3.Transform(spell.To, world));
+                graph.IsStopped = time >= spell.StopTime;
+            }
+            else if (_graphAttachments.Count == 0 && _spellSteps.Count == 0 && _activeSystem != null)
+            {
+                var step = VfxRigMotion.Evaluate(EffectiveRigSettings(), time, RigDuration);
+                _graphPlacements[graph] = step.Transform;
+                Matrix4x4 world = RootAuthoredWorld(graph);
+                graph.SetTransform(step.Transform * world, Matrix4x4.CreateTranslation(step.Origin) * world);
+                graph.SetTarget(Vector3.Transform(step.Target, world));
+                graph.IsStopped = step.IsStopped;
+            }
+            if (_boneTransformSampler != null)
+                ApplyBoneTransforms((name, hash) => _boneTransformSampler(time, name, hash), graph, time);
+        }
+
         public void ApplyRigTransform()
         {
             if (_graphs.Count == 0 || _graphAttachments.Count > 0 || _spellSteps.Count > 0 || _activeSystem == null) return;

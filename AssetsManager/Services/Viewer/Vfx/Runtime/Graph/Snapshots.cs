@@ -77,6 +77,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 _rootTransform,
                 _orientationRootTransform,
                 _sourceTime,
+                _stepper.Bank,
                 saved,
                 carried.ToArray(),
                 deathSeen.ToArray(),
@@ -112,6 +113,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             _rootTransform = snapshot.RootTransform;
             _orientationRootTransform = snapshot.OrientationRootTransform;
             _sourceTime = snapshot.SourceTime;
+            _stepper.Bank = snapshot.StepBank;
 
             RuntimeSnapshot rootSaved = snapshot.Runtimes[0];
             if (!ReferenceEquals(rootSaved.Definition, Root.Definition) &&
@@ -210,6 +212,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             RegisterChildCapacity(runtime, saved.ParticleCapacity);
             if (saved.LooseStopAfterSeconds.HasValue)
                 _looseChildStopAfter[runtime] = saved.LooseStopAfterSeconds.Value;
+            runtime.SetEffectsQuality(EffectsQuality);
+            runtime.BindFlexChannels(_flexChannels);
             runtime.RestoreSnapshot(saved.State);
             return runtime;
         }

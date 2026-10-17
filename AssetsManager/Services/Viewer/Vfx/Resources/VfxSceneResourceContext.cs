@@ -118,10 +118,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
             {
                 ThrowIfDisposed();
                 await MaterializeAsync(systems, ownerSceneContext, projectRoot, cancellationToken).ConfigureAwait(false);
+                ThrowIfDisposed();
             }
             finally
             {
                 _materializeGate.Release();
+                TryDisposeResources();
             }
         }
 
@@ -425,25 +427,39 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
 
         private void ThrowIfDisposed()
         {
-            if (_disposed)
+            if (Volatile.Read(ref _disposed))
                 throw new ObjectDisposedException(nameof(VfxSceneResourceContext));
         }
 
         public void Dispose()
         {
-            if (_disposed) return;
-            _disposed = true;
-            _loadingService.Dispose();
+            if (Volatile.Read(ref _disposed)) return;
+            Volatile.Write(ref _disposed, true);
+            TryDisposeResources();
+        }
+
+        private void TryDisposeResources()
+        {
+            // A pending copy must finish before cleanup, or its continuation can recreate the directory.
+            if (!Volatile.Read(ref _disposed) || !_materializeGate.Wait(0)) return;
             try
             {
-                if (Directory.Exists(SearchDirectory))
-                    Directory.Delete(SearchDirectory, recursive: true);
+                _loadingService.Dispose();
+                try
+                {
+                    if (Directory.Exists(SearchDirectory))
+                        Directory.Delete(SearchDirectory, recursive: true);
+                }
+                catch (IOException)
+                {
+                }
+                catch (UnauthorizedAccessException)
+                {
+                }
             }
-            catch (IOException)
+            finally
             {
-            }
-            catch (UnauthorizedAccessException)
-            {
+                _materializeGate.Release();
             }
         }
 

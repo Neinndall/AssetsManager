@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using AssetsManager.Services.Viewer.Vfx.Loading;
+using AssetsManager.Services.Viewer.Vfx.Composition;
 using AssetsManager.Services.Viewer.Vfx.Semantics;
 using AssetsManager.Services.Viewer.Vfx.Session;
 using AssetsManager.Views.Models.Viewer;
@@ -12,6 +13,97 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx;
 
 public sealed class VfxSystemRigResolverTests
 {
+    public static IEnumerable<object[]> SpellSpeeds()
+    {
+        foreach (bool catalog in new[] { false, true })
+        foreach (var kind in new[] { VfxSpellMissileMovementKind.FixedSpeed, VfxSpellMissileMovementKind.FixedSpeedSpline })
+        foreach (var speeds in new (float? Movement, float? Spell, float Expected)[]
+        {
+            (null, 2000f, 2000f), (2400f, 2000f, 2400f), (0f, 2000f, 2000f),
+            (-1f, 2000f, 2000f), (null, null, 1800f), (null, 0f, 1800f),
+            (null, -1f, 1800f), (null, float.NaN, 1800f), (float.PositiveInfinity, 2000f, 2000f)
+        })
+            yield return new object[] { catalog, kind, speeds.Movement, speeds.Spell, speeds.Expected };
+    }
+
+    [Theory, MemberData(nameof(SpellSpeeds))]
+    public void AutomaticSpellRigUsesCastRangeAndEffectiveSpeedWithoutChangingAuthoredValues(
+        bool catalog, VfxSpellMissileMovementKind kind, float? movementSpeed, float? spellSpeed, float expected)
+    {
+        var system = System("Projectile");
+        var bundle = Bundle(system);
+        // A straight Hermite spline has a known length, so speed can be checked independently of its sampler.
+        var missile = new VfxSpellMissilePreview(kind, movementSpeed, null, null, null, null, null, null)
+        {
+            SplineControlPoint1 = Vector3.UnitZ, SplineControlPoint2 = Vector3.UnitZ,
+            SplineFromMissile = true, HeightOffsetAtEnd = true
+        };
+        var spell = Spell() with
+        {
+            MissileEffectKey = 77, CastRange = 600f, MissileSpeed = spellSpeed,
+            Missile = missile, ScriptName = "HeroQ"
+        };
+        if (catalog) bundle.MissileSpells.Add(system.PathHash, new[] { spell });
+        else bundle.SpellPreviews.Add(1, spell);
+
+        var rig = VfxSystemRigResolver.ResolveSettings(system, bundle).Settings;
+
+        Assert.Equal(600f, rig.FlightRange);
+        Assert.Equal(expected, rig.FlightSpeed);
+        Assert.Equal(expected, rig.Missile.Speed);
+        Assert.Equal(kind, rig.Missile.MovementKind);
+        Assert.Equal("HeroQ", rig.SpellName);
+        Assert.Equal(movementSpeed, spell.Missile.Speed);
+        Assert.Equal(spellSpeed, spell.MissileSpeed);
+        var track = VfxRigMotion.CompileRigTrack(rig);
+        Assert.NotNull(track);
+        Assert.Equal(-300f, track.Start.X, 3);
+        Assert.Equal(300f, track.End.X, 3);
+        Assert.InRange(Math.Abs(track.Duration - 600d / expected), 0, VfxSpellFlightPath.FlightStep + 1e-5);
+    }
+
+    [Theory]
+    [InlineData(null, 1200f)]
+    [InlineData(0f, 1200f)]
+    [InlineData(-1f, 1200f)]
+    [InlineData(100001f, 1200f)]
+    [InlineData(float.NaN, 1200f)]
+    [InlineData(float.PositiveInfinity, 1200f)]
+    [InlineData(100000f, 100000f)]
+    public void AutomaticSpellRigOnlyUsesFinitePositivePreviewRanges(float? range, float expected)
+    {
+        var system = System("Projectile");
+        var bundle = Bundle(system);
+        bundle.MissileSpells.Add(system.PathHash, new[] { Spell() with
+        {
+            CastRange = range,
+            Missile = new(VfxSpellMissileMovementKind.FixedSpeed, 2000f, null, null, null, null, null, null)
+        } });
+        Assert.Equal(expected, VfxSystemRigResolver.ResolveSettings(system, bundle).Settings.FlightRange);
+    }
+
+    [Theory]
+    [InlineData(VfxSpellMissileMovementKind.FixedTime)]
+    [InlineData(VfxSpellMissileMovementKind.Accelerating)]
+    [InlineData(VfxSpellMissileMovementKind.Circle)]
+    public void SpellFallbackSpeedDoesNotReplaceOtherAuthoredMovement(VfxSpellMissileMovementKind kind)
+    {
+        var system = System("Projectile");
+        var bundle = Bundle(system);
+        var missile = new VfxSpellMissilePreview(kind, null, 2f, null, null, null, null, null)
+        { InitialSpeed = 100f, Acceleration = 300f, AngularVelocity = 1f, Lifetime = 2f };
+        bundle.MissileSpells.Add(system.PathHash, new[] { Spell() with
+        { CastRange = 600f, MissileSpeed = 2000f, Missile = missile } });
+
+        var rig = VfxSystemRigResolver.ResolveSettings(system, bundle).Settings;
+        Assert.Equal(600f, rig.FlightRange);
+        Assert.Same(missile, rig.Missile);
+        if (kind == VfxSpellMissileMovementKind.FixedTime)
+            Assert.InRange(Math.Abs(VfxRigMotion.FlightDuration(rig) - 2d), 0, VfxSpellFlightPath.FlightStep + 1e-5);
+        if (kind == VfxSpellMissileMovementKind.Circle)
+            Assert.Equal(600f, VfxRigMotion.OriginAt(rig, 0).X);
+    }
+
     [Fact]
     public void AuthoredProjectileRoleWinsOverAnUnrelatedSystemNameAndTrailGeometry()
     {
@@ -50,6 +142,34 @@ public sealed class VfxSystemRigResolverTests
     }
 
     [Fact]
+    public void ResolveSettingsAttachesSpellMissileSpecAndMatchesPlayerOrEnemyKeys()
+    {
+        var system = System("PlayerMissile");
+        var bundle = Bundle(system);
+        var missile = new VfxSpellMissilePreview(
+            VfxSpellMissileMovementKind.FixedSpeed,
+            2400f,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null);
+        bundle.SpellPreviews.Add(1, Spell() with
+        {
+            MissileEffectPlayerKey = 77,
+            Missile = missile,
+            ScriptName = "EzrealQ"
+        });
+
+        var resolved = VfxSystemRigResolver.ResolveSettings(system, bundle);
+        Assert.Equal(VfxRigPreset.Missile, resolved.Settings.Preset);
+        Assert.Same(missile, resolved.Settings.Missile);
+        Assert.Equal("EzrealQ", resolved.Settings.SpellName);
+        Assert.Equal(2400f, resolved.Settings.FlightSpeed);
+    }
+
+    [Fact]
     public void ConflictingImpactAndProjectileUsesRemainStationary()
     {
         var system = System("Shared");
@@ -79,7 +199,7 @@ public sealed class VfxSystemRigResolverTests
     public void RibbonWithoutItsOwnMotionGetsAMovingAnchorPreview()
     {
         var system = System("Ribbon", Trail());
-        Assert.Equal(VfxRigPreset.Trail, VfxSystemRigResolver.Resolve(system, Bundle(system)).Preset);
+        Assert.Equal(VfxRigPreset.Missile, VfxSystemRigResolver.Resolve(system, Bundle(system)).Preset);
     }
 
     [Theory]
@@ -89,7 +209,7 @@ public sealed class VfxSystemRigResolverTests
     [InlineData("velocity")]
     [InlineData("animated-origin")]
     [InlineData("no-ribbon")]
-    public void OtherRibbonUsesDoNotImplyExternalMotion(string variant)
+    public void TrailFallbackRespectsVisibilityAndKeepsAuthoredParticleMotion(string variant)
     {
         var emitter = Trail();
         emitter = variant switch
@@ -102,7 +222,8 @@ public sealed class VfxSystemRigResolverTests
             _ => emitter with { Trail = null }
         };
         var system = System("Ribbon", emitter);
-        Assert.Equal(VfxRigPreset.Still, VfxSystemRigResolver.Resolve(system, Bundle(system)).Preset);
+        var expected = variant is "local" or "velocity" or "animated-origin" ? VfxRigPreset.Missile : VfxRigPreset.Still;
+        Assert.Equal(expected, VfxSystemRigResolver.Resolve(system, Bundle(system)).Preset);
     }
 
     private static VfxSystemDefinition System(string name, params VfxEmitterDefinition[] emitters)

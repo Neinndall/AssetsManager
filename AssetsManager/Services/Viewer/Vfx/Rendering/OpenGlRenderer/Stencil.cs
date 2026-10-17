@@ -8,7 +8,7 @@ public sealed partial class VfxOpenGlRenderer
 {
     private void ApplyEmitterStencilState(VfxEmitterDefinition emitter, VfxStencilScene scene, bool wireframe)
     {
-        if (wireframe || !scene.TryGetState(emitter, out var descriptor, out byte reference))
+        if (_drawingShadows || wireframe || !scene.TryGetState(emitter, out var descriptor, out byte reference))
         {
             _gl.Disable(EnableCap.StencilTest);
             return;

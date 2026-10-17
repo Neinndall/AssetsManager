@@ -5,12 +5,15 @@ using AssetsManager.Services.Viewer.Vfx.Semantics;
 namespace AssetsManager.Services.Viewer.Rendering
 {
     /// <summary>
-    /// A particle renderer whose frame was already prepared (soft-depth grab done). The Studio drives
+    /// A particle renderer with prepared geometry; scene depth is captured after opaque draws. Studio drives
     /// every participant through early distortion, under colour, late distortion and over colour,
     /// keeping captures and draws in the same global order across independent owners.
     /// </summary>
     internal interface IPreparedParticlePass
     {
+        bool HasPreparedShadowCasters => false;
+        void CapturePreparedSceneDepth() { }
+        void RenderPreparedShadowPass(System.Numerics.Matrix4x4 lightViewProjection, System.Numerics.Matrix4x4 eyeView) { }
         void PrepareStencilScene(VfxStencilScene scene) { }
         IDisposable BeginPreparedRenderBatch();
         void CapturePreparedEarlyDistortionFrame() { }
@@ -38,6 +41,8 @@ namespace AssetsManager.Services.Viewer.Rendering
                     pass.PrepareStencilScene(stencilScene);
                 foreach (IPreparedParticlePass pass in passes)
                     batches.Add(pass.BeginPreparedRenderBatch());
+                foreach (IPreparedParticlePass pass in passes)
+                    pass.CapturePreparedSceneDepth();
                 foreach (IPreparedParticlePass pass in passes)
                     pass.CapturePreparedEarlyDistortionFrame();
                 foreach (IPreparedParticlePass pass in passes)

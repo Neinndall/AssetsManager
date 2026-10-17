@@ -320,6 +320,12 @@ void main(){
         vec3 planeU = uLegacyOrientation == 2 ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 1.0, 0.0);
         vec3 planeV = uLegacyOrientation == 3 ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 0.0, -1.0);
         world = aCenter + planeU * (rc.y * aSize.y) + planeV * (rc.x * aSize.x);
+    } else if (uArbitraryQuad == 0 && uDirectionOriented == 0) {
+        // Scale before roll so non-square camera quads retain their authored shape.
+        vec2 sized = geometryCorner * aSize;
+        vec2 offset = vec2(sized.x * c - sized.y * s, sized.x * s + sized.y * c);
+        if (uPrimitiveKind == 0) offset *= 2.0;
+        world = aCenter + right * offset.x + up * offset.y;
     } else {
         world = aCenter + right * (rc.x * aSize.x) + up * (rc.y * aSize.y);
     }
@@ -497,6 +503,9 @@ uniform int uMeshSkinned;
 uniform vec4 uReflectionColor;
 uniform int uWireframePass;
 uniform vec4 uWireframeColor;
+uniform int uShadowPass;
+uniform float uSliceRange;
+uniform int uHasSliceRamp;
 uniform int uUseCustomMaterial;
 uniform vec4 uMaterialTint;
 uniform vec2 uMaterialRepeat;
@@ -541,6 +550,11 @@ void main(){
         vec2 uv = vec2(customAddress(held.x, uMaterialAddressU), customAddress(held.y, uMaterialAddressV));
         float coverage = customCoverage(held.x, uMaterialAddressU) * customCoverage(held.y, uMaterialAddressV);
         vec4 texel = uHasTex != 0 ? texture(uTex, uv) * coverage : vec4(1.0);
+        if (uShadowPass != 0) {
+            if (texel.a * (uColor * vMeshColor).a < 0.025) discard;
+            fragColor = vec4(1.0);
+            return;
+        }
         vec4 color = texel * uColor * vMeshColor * uMaterialTint;
         if (color.a < uAlphaCutoff) discard;
         if (uMaterialPremultiplied != 0) color.rgb *= color.a;
@@ -549,7 +563,7 @@ void main(){
     }
     vec2 vUv = atlasUv(vLocalUv, vCell, uTexDiv, uTexSize, uAddressMode);
     vec2 vUvMult = atlasUv(vLocalUvMult, vCellMult, uTexDivMult, uTexSizeMult, uAddressModeMult);
-    if (uIsDistortion != 0) {
+    if (uIsDistortion != 0 && uSliceRange <= 0.0) {
         fragColor = distortedScene(vUv, atlasUvRaw(vLocalUv, vCell, uTexDiv), uColor * vMeshColor);
         return;
     }
@@ -558,6 +572,35 @@ void main(){
         : vec4(1.0);
     if (uHasTex != 0 && uUvMode == 2)
         texel.a = sampleAddressed(uTex, vCornerUv, uAddressMode).a;
+    if (uShadowPass != 0 || uSliceRange > 0.0) {
+        vec2 lookup = vec2(colorLookUpDriver(uColorLookUpTypeX) * uColorLookUpScales.x,
+            colorLookUpDriver(uColorLookUpTypeY) * uColorLookUpScales.y);
+        if (uColorLookUpTypeX != 0) lookup.x += uColorLookUpOffsets.x;
+        if (uColorLookUpTypeY != 0) lookup.y += uColorLookUpOffsets.y;
+        if (uAttachedMesh != 0) lookup = vec2(0.0);
+        if (uShadowPass != 0) {
+            float coverage = texel.a * (uColor * vMeshColor).a;
+            if (uHasColor != 0) coverage *= texture(uColorMap, lookup).a;
+            if (uHasErosion != 0) {
+                vec4 erosionTexel = uHasErosionMap != 0 ? sampleAddressed(uErosionTex,
+                    atlasUvRaw(vLocalUv, vCell, uTexDiv), uErosionAddressMode) : uErosionDefault;
+                float erosion = clamp(dot(erosionTexel, uErosionMixer), 0.0, 1.0);
+                float upper = clamp((uErosionDrive - erosion + uErosionSliceWidth) / max(0.0001, uErosionFeatherIn), 0.0, 1.0);
+                float lower = clamp((uErosionDrive - erosion) / max(0.0001, uErosionFeatherOut), 0.0, 1.0);
+                coverage *= upper - lower;
+            }
+            if (coverage < 0.025) discard;
+            fragColor = vec4(1.0);
+            return;
+        }
+        vec4 ramp = uHasSliceRamp != 0 ? texture(uColorMap, lookup) : vec4(1.0);
+        float gap = (ramp.a - texel.r) / uSliceRange;
+        vec3 rgb = ramp.rgb * (uColor * vMeshColor).rgb;
+        vec4 sliced = vec4(rgb, clamp((1.0 - gap * gap) * texel.a, 0.0, 1.0));
+        if (sliced.a < uAlphaCutoff) discard;
+        fragColor = sliced;
+        return;
+    }
     if (uHasPalette != 0) {
         float paletteCoverage = texel.a;
         float paletteIndex = dot(texel, uPaletteMixMask);
@@ -706,6 +749,9 @@ uniform vec4 uSoftParticleControl;
 uniform vec4 uDepthProjection;
 uniform int uWireframePass;
 uniform vec4 uWireframeColor;
+uniform int uShadowPass;
+uniform float uSliceRange;
+uniform int uHasSliceRamp;
 uniform int uUseCustomMaterial;
 uniform vec4 uMaterialTint;
 uniform vec2 uMaterialRepeat;
@@ -755,6 +801,11 @@ void main(){
         vec2 uv = vec2(customAddress(held.x, uMaterialAddressU), customAddress(held.y, uMaterialAddressV));
         float coverage = customCoverage(held.x, uMaterialAddressU) * customCoverage(held.y, uMaterialAddressV);
         vec4 texel = uHasTex != 0 ? texture(uTex, uv) * coverage : vec4(1.0);
+        if (uShadowPass != 0) {
+            if (texel.a * (vColor).a < 0.025) discard;
+            fragColor = vec4(1.0);
+            return;
+        }
         vec4 color = texel * vColor * uMaterialTint;
         if (color.a < uAlphaCutoff) discard;
         if (uMaterialPremultiplied != 0) color.rgb *= color.a;
@@ -763,11 +814,11 @@ void main(){
     }
     vec2 vUv = atlasUv(vLocalUv, vCell, uTexDiv, uTexSize, uAddressMode);
     vec2 vUvMult = atlasUv(vLocalUvMult, vCellMult, uTexDivMult, uTexSizeMult, uAddressModeMult);
-    if (uIsDistortion != 0) {
+    if (uIsDistortion != 0 && uSliceRange <= 0.0) {
         fragColor = distortedScene(vUv, atlasUvRaw(vLocalUv, vCell, uTexDiv), vColor);
         return;
     }
-    if (uUvMode == 1 && uPrimitiveKind != 8 && uPrimitiveKind != 10)
+    if (uUvMode == 1 && uSliceRange <= 0.0 && uShadowPass == 0 && uPrimitiveKind != 8 && uPrimitiveKind != 10)
         vUv = vScreenUv.xy / vScreenUv.z;
     vec4 t;
     if (uHasTex != 0) {
@@ -780,6 +831,35 @@ void main(){
     }
     if (uHasTex != 0 && uUvMode == 2)
         t.a = sampleAddressed(uTex, vCornerUv, uAddressMode).a;
+    if (uShadowPass != 0 || uSliceRange > 0.0) {
+        bool ribbon = uPrimitiveKind == 5 || uPrimitiveKind == 6 || uPrimitiveKind == 8 || uPrimitiveKind == 10;
+        vec2 lookup = ribbon ? vRibbonLookup : vec2(colorLookUpDriver(uColorLookUpTypeX) * uColorLookUpScales.x,
+            colorLookUpDriver(uColorLookUpTypeY) * uColorLookUpScales.y);
+        if (!ribbon && uColorLookUpTypeX != 0) lookup.x += uColorLookUpOffsets.x;
+        if (!ribbon && uColorLookUpTypeY != 0) lookup.y += uColorLookUpOffsets.y;
+        if (uShadowPass != 0) {
+            float coverage = t.a * (vColor).a;
+            if (uHasColor != 0) coverage *= texture(uColorMap, lookup).a;
+            if (uHasErosion != 0) {
+                vec4 erosionTexel = uHasErosionMap != 0 ? sampleAddressed(uErosionTex,
+                    atlasUvRaw(vLocalUv, vCell, uTexDiv), uErosionAddressMode) : uErosionDefault;
+                float erosion = clamp(dot(erosionTexel, vErosionMixer), 0.0, 1.0);
+                float upper = clamp((vErosionDrive - erosion + uErosionSliceWidth) / max(0.0001, uErosionFeatherIn), 0.0, 1.0);
+                float lower = clamp((vErosionDrive - erosion) / max(0.0001, uErosionFeatherOut), 0.0, 1.0);
+                coverage *= upper - lower;
+            }
+            if (coverage < 0.025) discard;
+            fragColor = vec4(1.0);
+            return;
+        }
+        vec4 ramp = uHasSliceRamp != 0 ? texture(uColorMap, lookup) : vec4(1.0);
+        float gap = (ramp.a - t.r) / uSliceRange;
+        vec3 rgb = ramp.rgb * (vColor).rgb * t.g;
+        vec4 sliced = vec4(rgb, clamp((1.0 - gap * gap) * t.a, 0.0, 1.0));
+        if (sliced.a < uAlphaCutoff) discard;
+        fragColor = sliced;
+        return;
+    }
     if (uHasPalette != 0) {
         float paletteCoverage = t.a;
         float paletteIndex = dot(t, uPaletteMixMask);

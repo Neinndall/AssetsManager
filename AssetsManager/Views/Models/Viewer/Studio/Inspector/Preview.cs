@@ -10,6 +10,20 @@ namespace AssetsManager.Views.Models.Viewer
         private StudioViewMode _previewViewMode = StudioViewMode.Lit;
         private bool _previewWireOverlay;
         private bool _previewShaders;
+        private float _vfxFlex0, _vfxFlex1, _vfxFlex2;
+        private int _vfxFlexMask;
+        public int VfxFlexMask
+        {
+            get => _vfxFlexMask;
+            set { if (_vfxFlexMask == value) return; _vfxFlexMask=value; OnPropertyChanged(nameof(HasVfxFlex)); OnPropertyChanged(nameof(HasVfxFlex0)); OnPropertyChanged(nameof(HasVfxFlex1)); OnPropertyChanged(nameof(HasVfxFlex2)); }
+        }
+        public bool HasVfxFlex => _vfxFlexMask != 0;
+        public bool HasVfxFlex0 => (_vfxFlexMask & 1) != 0;
+        public bool HasVfxFlex1 => (_vfxFlexMask & 2) != 0;
+        public bool HasVfxFlex2 => (_vfxFlexMask & 4) != 0;
+        public float VfxFlex0 { get => _vfxFlex0; set { if (_vfxFlex0 == value) return; _vfxFlex0 = value; OnPropertyChanged(); } }
+        public float VfxFlex1 { get => _vfxFlex1; set { if (_vfxFlex1 == value) return; _vfxFlex1 = value; OnPropertyChanged(); } }
+        public float VfxFlex2 { get => _vfxFlex2; set { if (_vfxFlex2 == value) return; _vfxFlex2 = value; OnPropertyChanged(); } }
         private StudioCameraPreset _previewCameraPreset = StudioCameraPreset.Orbit;
 
         public string BgMode

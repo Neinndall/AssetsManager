@@ -115,8 +115,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
 
         private Vector3 Position(VfxPlaybackRuntime.EmitterState state, ReadOnlySpan<float> instances, int orderedAt, int count, bool filtered)
         {
-            int first = filtered ? Math.Max(0, orderedAt - 3) : orderedAt;
-            int last = filtered ? Math.Min(count - 1, orderedAt + 3) : orderedAt;
+            int reach = Semantics.VfxQuality.SmoothingReach(state.Def.EffectsQuality);
+            int first = filtered ? Math.Max(0, orderedAt - reach) : orderedAt;
+            int last = filtered ? Math.Min(count - 1, orderedAt + reach) : orderedAt;
             Vector3 sum = default;
             for (int orderedIndex = first; orderedIndex <= last; orderedIndex++)
             {

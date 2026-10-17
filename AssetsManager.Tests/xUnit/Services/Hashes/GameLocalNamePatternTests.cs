@@ -17,6 +17,36 @@ public sealed class GameLocalNamePatternTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
+    public void UsesEarlierSessionMatchesWithoutPersistingTheCatalog(bool animations)
+    {
+        string directory = Path.Combine(Path.GetTempPath(), "assetsmanager-local-patterns-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        string folder = "assets/characters/example/" + (animations ? "animations/" : "particles/");
+        string extension = animations ? ".anm" : ".tex";
+        string seed = folder + "joke_loop" + extension;
+        string vocabulary = folder + "idle_sad" + extension;
+        string target = folder + "joke_sad_loop" + extension;
+        try
+        {
+            WadBakeEntry Entry(string path) => new(path, () => new MemoryStream(new byte[] { 1 }), WadChunkCompression.None);
+            WadBuilder.Bake(new[] { Entry(seed), Entry(vocabulary), Entry(target) },
+                Path.Combine(directory, "pending.wad.client"), new WadBakeSettings());
+            var known = new HashFile(HashGuessDomain.Game, new[] { seed });
+            var guesser = new GameHashGuesser(known);
+            var engine = new HashGuessEngine(HashGuessDomain.Game,
+                new HashSet<ulong> { XxHash64Ext.Hash(vocabulary), XxHash64Ext.Hash(target), 42 });
+            Assert.True(engine.Check(vocabulary, HashGuessStrategy.WordlistVariant, "earlier pass"));
+            guesser.GuessLocalNamePatterns(engine, directory, animations, CancellationToken.None, long.MaxValue, null);
+            Assert.Equal(target, engine.Matches[XxHash64Ext.Hash(target)].Path);
+            Assert.False(known.Load().ContainsKey(XxHash64Ext.Hash(vocabulary)));
+            Assert.Contains(42UL, engine.UnknownHashes);
+        }
+        finally { Directory.Delete(directory, true); }
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
     public void SelectedCustomMethodUsesOnlyPendingWadFamilies(bool animations)
     {
         string directory = Path.Combine(Path.GetTempPath(), "assetsmanager-local-patterns-" + Guid.NewGuid().ToString("N"));

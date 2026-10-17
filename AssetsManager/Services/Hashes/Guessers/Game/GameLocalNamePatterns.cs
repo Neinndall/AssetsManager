@@ -24,7 +24,9 @@ internal sealed partial class GameHashGuesser
                 foreach (ulong hash in wad.Chunks.Keys)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    if (known.TryGetValue(hash, out string path) && path.Contains('/') &&
+                    known.TryGetValue(hash, out string path);
+                    if (path == null && engine.Matches.TryGetValue(hash, out var match)) path = match.Path;
+                    if (path != null && path.Contains('/') &&
                         (animations ? path.EndsWith(".anm", StringComparison.Ordinal) :
                             path.EndsWith(".tex", StringComparison.Ordinal) || path.EndsWith(".dds", StringComparison.Ordinal)))
                         paths.Add(path);

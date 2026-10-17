@@ -178,7 +178,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
 
             if (emitter.PaletteDefinition is { PaletteCount: > 0 })
                 Add("PALETTIZE_TEXTURES");
-            if (emitter.SoftParticle is not null)
+            if (emitter.SoftParticle is not null && AssetsManager.Services.Viewer.Vfx.Semantics.VfxQuality.Distorts(emitter.EffectsQuality))
                 Add("SOFT_PARTICLES");
             if (emitter.Reflection is not null)
                 Add("REFLECTIVE");

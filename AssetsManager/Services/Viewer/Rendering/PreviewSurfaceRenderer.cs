@@ -24,6 +24,7 @@ namespace AssetsManager.Services.Viewer.Rendering
         private const TextureParameterName TextureAnisotropy = (TextureParameterName)0x84FE;
 
         private GL _gl;
+        internal AssetsManager.Services.Viewer.Vfx.Rendering.VfxParticleShadowScene Shadows { get; set; }
         private GridRenderer _gridRenderer;
 
         private uint _groundProgram;
@@ -62,12 +63,15 @@ layout(location = 0) in vec3 aPosition;
 layout(location = 1) in vec2 aUv;
 uniform mat4 uViewProjection;
 out vec2 vUv;
+out vec3 vSunWorld;
 void main() {
     gl_Position = uViewProjection * vec4(aPosition, 1.0);
     vUv = aUv;
+    vSunWorld = aPosition;
 }";
 
-        private const string GroundFragmentShader = @"
+        private const string GroundFragmentShader = AssetsManager.Services.Viewer.Vfx.Rendering.VfxParticleShadowScene.Receiver + @"
+in vec3 vSunWorld;
 in vec2 vUv;
 out vec4 fragColor;
 uniform sampler2D uTexture;
@@ -97,7 +101,7 @@ void main() {
         vec4 logo = textureGrad(uLogo, logoUv, logoDx, logoDy) * uLogoOpacity;
         color = vec4(logo.rgb + color.rgb * (1.0 - logo.a), logo.a + color.a * (1.0 - logo.a));
     }
-    fragColor = vec4(linearToSrgb(color.rgb), color.a);
+    fragColor = vec4(linearToSrgb(sunShadowed(color.rgb, vSunWorld)), color.a);
 }";
 
         private const string StageVertexShader = @"
@@ -110,9 +114,10 @@ void main() {
     gl_Position = uViewProjection * vec4(aPosition.x, uHeight, aPosition.y, 1.0);
 }";
 
-        private const string StageFragmentShader = @"
+        private const string StageFragmentShader = AssetsManager.Services.Viewer.Vfx.Rendering.VfxParticleShadowScene.Receiver + @"
 in vec2 vGround;
 out vec4 fragColor;
+uniform float uHeight;
 uniform int uMode;
 
 const vec3 GROUND_COLOR = vec3(0.105, 0.115, 0.135);
@@ -133,7 +138,7 @@ float gridMask(vec2 ground, float spacing) {
 
 void main() {
     if (uMode == 0) {
-        fragColor = vec4(GROUND_COLOR, 1.0);
+        fragColor = vec4(sunShadowed(GROUND_COLOR, vec3(vGround.x, uHeight, vGround.y)), 1.0);
         return;
     }
 
@@ -186,7 +191,12 @@ void main() {
         {
             if (!_ready) return;
             Prepare(showGrid, showGround, showStage);
-
+            _gl.GetInteger(GLEnum.ActiveTexture, out int active);
+            _gl.ActiveTexture(TextureUnit.Texture2);
+            _gl.GetInteger(GLEnum.TextureBinding2D, out int texture);
+            _gl.GetInteger(GLEnum.SamplerBinding, out int sampler);
+            try
+            {
             if (showGround)
                 RenderGround(viewProjection);
 
@@ -195,6 +205,12 @@ void main() {
 
             if (showGrid)
                 _gridRenderer?.Render(viewProjection);
+            }
+            finally
+            {
+                _gl.ActiveTexture(TextureUnit.Texture2); _gl.BindTexture(TextureTarget.Texture2D, (uint)texture);
+                _gl.BindSampler(2, (uint)sampler); _gl.ActiveTexture((TextureUnit)active);
+            }
         }
 
         internal void Prepare(bool showGrid, bool showGround, bool showStage)
@@ -309,6 +325,7 @@ void main() {
                 _gl.Disable(EnableCap.Blend);
                 _gl.Disable(EnableCap.CullFace);
                 _gl.UseProgram(_groundProgram);
+                Shadows?.Bind(_groundProgram);
                 _gl.UniformMatrix4(_groundViewProjection, 1, false, in viewProjection.M11);
                 _gl.Uniform1(_groundTextureUniform, 0);
                 _gl.Uniform1(_groundTextured, _groundTexture != 0 ? 1 : 0);
@@ -395,6 +412,7 @@ void main() {
                 _gl.DepthFunc(DepthFunction.Lequal);
                 _gl.Disable(EnableCap.CullFace);
                 _gl.UseProgram(_stageProgram);
+                Shadows?.Bind(_stageProgram);
                 _gl.UniformMatrix4(_stageViewProjection, 1, false, in viewProjection.M11);
                 _gl.BindVertexArray(_stageVao);
 

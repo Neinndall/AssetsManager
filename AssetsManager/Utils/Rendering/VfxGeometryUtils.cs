@@ -53,6 +53,7 @@ namespace AssetsManager.Utils.Rendering
         public static bool ShouldUseColorRamp(VfxEmitterDefinition definition, bool hasColorRampTexture)
         {
             if (!hasColorRampTexture || definition is null) return false;
+            if (definition.SliceRange > 0f) return true;
 
             bool mesh = definition.PrimitiveKind is VfxPrimitiveKind.Mesh or VfxPrimitiveKind.AttachedMesh;
             bool fixedAlphaUv = definition.UvMode == 2 && !mesh;
@@ -64,7 +65,7 @@ namespace AssetsManager.Utils.Rendering
 
         public static bool ShouldUseSoftParticles(VfxEmitterDefinition definition, bool hasSceneDepth)
         {
-            if (!hasSceneDepth || definition?.SoftParticle is null) return false;
+            if (!hasSceneDepth || definition?.SoftParticle is null || !AssetsManager.Services.Viewer.Vfx.Semantics.VfxQuality.Distorts(definition.EffectsQuality)) return false;
             if (definition.PrimitiveKind is VfxPrimitiveKind.AttachedMesh or VfxPrimitiveKind.PlanarProjection) return false;
 
             bool fixedAlphaUv = definition.UvMode == 2 &&

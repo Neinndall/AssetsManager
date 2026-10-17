@@ -395,8 +395,8 @@ namespace AssetsManager.Services.Viewer.Rendering
 
                 for (int passIndex = 0; passIndex < passCount; passIndex++)
                 {
-                    bool blended = _gameShaderRuntime.GetSkinnedPassState(material, passIndex)?.BlendEnabled == true &&
-                                   !material.BlendsInDrawOrder;
+                    GameMaterialPassState state = _gameShaderRuntime.GetSkinnedPassState(material, passIndex);
+                    bool blended = state?.BlendEnabled == true && !material.BlendsPassInDrawOrder(state);
                     float distance = blended ? GetRenderDistanceSquared(part, cameraPosition, world) : 0f;
                     (blended ? _transparentDraws : _opaqueDraws)
                         .Add(new PartDraw(part, resources, passIndex, distance, order++));

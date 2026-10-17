@@ -31,52 +31,104 @@ internal static class VfxSystemRigResolver
         VfxLoadingService.Bundle bundle,
         Func<uint, string> resolveSystemPath = null)
     {
+        (VfxRigSettings settings, string reason) = ResolveSettings(system, bundle, resolveSystemPath);
+        return (settings.Preset, reason);
+    }
+
+    internal static (VfxRigSettings Settings, string Reason) ResolveSettings(
+        VfxSystemDefinition system,
+        VfxLoadingService.Bundle bundle,
+        Func<uint, string> resolveSystemPath = null)
+    {
         if (system == null)
-            return (VfxRigPreset.Still, "No system definition.");
+            return (VfxRigSettings.ForPreset(VfxRigPreset.Still), "No system definition.");
+
+        if (bundle?.MissileSpells.TryGetValue(system.PathHash, out var catalog) == true)
+            foreach (var spell in catalog)
+                if (VfxSpellFlightPath.CanSimulateForRig(spell.Missile))
+                    return (SpellRig(spell, spell.ScriptName),
+                        $"Spell missile effect ({spell.ScriptName}) resolved through the active skin.");
 
         bool projectile = false;
         bool impact = false;
-        foreach (VfxSpellPreview spell in bundle?.SpellPreviews.Values ?? Enumerable.Empty<VfxSpellPreview>())
+        VfxSpellPreview matchedSpell = null;
+        string matchedSpellName = null;
+
+        foreach ((uint spellHash, VfxSpellPreview spell) in bundle?.SpellPreviews ?? new System.Collections.Generic.Dictionary<uint, VfxSpellPreview>())
         {
             if (spell == null) continue;
             // Cast timing and unsupported flight solvers do not invalidate an effect's authored role.
             if (spell.Issues?.Any(issue => issue.Kind == VfxSpellIssueKind.Invalid &&
                     issue.Path is "mSpell.mMissileEffectKey" or "mSpell.mMissileEffectName") != true)
-                projectile |= Matches(spell.MissileEffectKey, spell.MissileEffectName);
+            {
+                bool isSpellMissile =
+                    Matches(spell.MissileEffectKey, spell.MissileEffectName) ||
+                    Matches(spell.MissileEffectPlayerKey, spell.MissileEffectPlayerName) ||
+                    Matches(spell.MissileEffectEnemyKey, spell.MissileEffectEnemyName);
+                if (isSpellMissile)
+                {
+                    projectile = true;
+                    if (matchedSpell == null && VfxSpellFlightPath.CanSimulateForRig(spell.Missile))
+                    {
+                        matchedSpell = spell;
+                        matchedSpellName = !string.IsNullOrWhiteSpace(spell.ScriptName)
+                            ? spell.ScriptName
+                            : $"0x{spellHash:x8}";
+                    }
+                }
+            }
             if (spell.HaveHitEffect != false && !spell.HasInvalidHitEffectFields)
                 impact |= Matches(spell.HitEffectKey, spell.HitEffectName);
         }
 
-        if (projectile && impact)
-            return (VfxRigPreset.Still, "Shared projectile and impact effect; no unique motion.");
-        if (projectile)
-            return (VfxRigPreset.Missile, "Spell missile effect resolved through the active skin.");
-        if (impact)
-            return (VfxRigPreset.Still, "Spell impact effect resolved through the active skin.");
+        Vector3? beamTarget = BeamReach(system) is { } reach ? new Vector3(0f, 0f, reach) : null;
 
-        // A stationary particle ribbon needs its external anchor to move to leave a trail.
-        // Orbit is a preview of that movement, not an authored in-game trajectory.
-        if (system.Emitters?.Any(NeedsMovingAnchor) == true)
-            return (VfxRigPreset.Trail, "World-space ribbon without its own motion; moving-anchor preview.");
-        return (VfxRigPreset.Still, "No unambiguous external movement reference.");
+        if (projectile && impact && matchedSpell == null)
+            return (VfxRigSettings.ForPreset(VfxRigPreset.Still) with { Target = beamTarget }, "Shared projectile and impact effect; no unique motion.");
+        if (projectile)
+        {
+            VfxRigSettings missileSettings = matchedSpell != null
+                ? SpellRig(matchedSpell, matchedSpellName)
+                : VfxRigSettings.ForPreset(VfxRigPreset.Missile);
+            string reason = matchedSpellName != null
+                ? $"Spell missile effect ({matchedSpellName}) resolved through the active skin."
+                : "Spell missile effect resolved through the active skin.";
+            return (missileSettings, reason);
+        }
+        if (impact)
+            return (VfxRigSettings.ForPreset(VfxRigPreset.Still) with { Target = beamTarget }, "Spell impact effect resolved through the active skin.");
+
+        if (system.Emitters?.Any(emitter => !emitter.Disabled && emitter.Culled == VfxCullReason.None && emitter.DrawsAsTrail) == true)
+            return (VfxRigSettings.ForPreset(VfxRigPreset.Missile) with { FlightSpeed = VfxSpellFlightPath.FallbackSpeed },
+                "Trail without a resolved spell; straight missile preview.");
+        return (VfxRigSettings.ForPreset(VfxRigPreset.Still) with { Target = beamTarget }, "No unambiguous external movement reference.");
 
         bool Matches(uint key, string name)
             => bundle != null && VfxSpellPreviewComposer.ResolveEffect(key, name, bundle, resolveSystemPath)
                 .System?.PathHash == system.PathHash;
     }
 
-    private static bool NeedsMovingAnchor(VfxEmitterDefinition emitter)
-        => !emitter.Disabled && emitter.Culled == VfxCullReason.None && !emitter.IsEmitterSpace &&
-           !emitter.IsGroundLayer && !emitter.IsSingleParticle && emitter.DrawsAsTrail &&
-           emitter.PrimitiveKind is VfxPrimitiveKind.CameraTrail or VfxPrimitiveKind.ArbitraryTrail &&
-           emitter.Fields == null &&
-           IsZero(emitter.BirthVelocity) && IsZero(emitter.Acceleration) &&
-           IsZero(emitter.BirthAcceleration) && IsZero(emitter.VelocityOverLife) &&
-           IsZero(emitter.AccelerationOverLife) && IsZero(emitter.BirthOrbitalVelocity) &&
-           (emitter.EmitterPosition.Values == null ||
-            emitter.EmitterPosition.Values.All(value => value == emitter.EmitterPosition.Constant));
+    private static VfxRigSettings SpellRig(VfxSpellPreview spell, string name)
+    {
+        VfxSpellMissilePreview missile = spell.Missile;
+        float speed = Positive(missile.Speed) ?? VfxSpellFlightPath.FallbackSpeed;
+        if (missile.MovementKind is VfxSpellMissileMovementKind.FixedSpeed or VfxSpellMissileMovementKind.FixedSpeedSpline)
+        {
+            speed = Positive(missile.Speed) ?? Positive(spell.MissileSpeed) ?? VfxSpellFlightPath.FallbackSpeed;
+            // Keep the written movement intact for other consumers and use a resolved copy only for this rig.
+            if (missile.Speed != speed) missile = missile with { Speed = speed };
+        }
+        return VfxRigSettings.ForPreset(VfxRigPreset.Missile) with
+        {
+            FlightRange = spell.CastRange is > 0f and <= 100000f && float.IsFinite(spell.CastRange.Value)
+                ? spell.CastRange.Value : VfxRigMotion.FlightRange,
+            FlightSpeed = speed,
+            Missile = missile,
+            SpellName = name
+        };
+    }
 
-    private static bool IsZero(VfxCurve3? curve)
-        => !curve.HasValue || (curve.Value.Constant == System.Numerics.Vector3.Zero &&
-           (curve.Value.Values == null || curve.Value.Values.All(value => value == System.Numerics.Vector3.Zero)));
+    private static float? Positive(float? value)
+        => value is > 0f && float.IsFinite(value.Value) ? value : null;
+
 }

@@ -10,6 +10,15 @@ internal readonly record struct VfxRenderPhases(bool Under, bool Over, bool Earl
 
 internal static class VfxRenderPhaseSemantics
 {
+    internal static bool CastsShadow(VfxEmitterDefinition emitter)
+    {
+        if (!VfxQuality.Shadows(emitter.EffectsQuality) || emitter.IsGroundLayer || emitter.IsHudLayer || emitter.DrawsAsProjection) return false;
+        if (emitter.IsSimpleEmitter && emitter.PrimitiveKind is not (VfxPrimitiveKind.CameraQuad or VfxPrimitiveKind.ArbitraryQuad or VfxPrimitiveKind.Mesh or VfxPrimitiveKind.AttachedMesh)) return false;
+        if (emitter.Distortion is not null && !emitter.HasResolvedCustomMaterial) return false;
+        int phase = emitter.RenderState?.RenderPhase ?? 7;
+        return phase == 1 || phase == 7 && emitter.DoesCastShadow;
+    }
+
     internal static VfxRenderPhases Resolve(VfxEmitterDefinition emitter, bool hudLayer = false)
     {
         if (emitter is null) return default;
@@ -17,7 +26,7 @@ internal static class VfxRenderPhaseSemantics
             (VfxPrimitiveKind.CameraQuad or VfxPrimitiveKind.ArbitraryQuad or VfxPrimitiveKind.Mesh or
              VfxPrimitiveKind.PlanarProjection or VfxPrimitiveKind.AttachedMesh)) return default;
         hudLayer |= emitter.IsHudLayer;
-        bool warps = emitter.Distortion is not null && !emitter.HasResolvedCustomMaterial && !emitter.DrawsAsProjection;
+        bool warps = VfxQuality.Distorts(emitter.EffectsQuality) && emitter.Distortion is not null && !emitter.HasResolvedCustomMaterial && !emitter.DrawsAsProjection;
         int phase = emitter.RenderState?.RenderPhase ?? VfxAuthoredDefaults.RenderPhaseOverride;
         switch (phase)
         {
@@ -32,6 +41,7 @@ internal static class VfxRenderPhaseSemantics
         if (hudLayer) return new(false, true, false, false);
         if (emitter.IsGroundLayer) return new(true, false, false, false);
         int mode = emitter.Distortion?.Mode ?? 0;
+        if (!VfxQuality.Distorts(emitter.EffectsQuality) && emitter.Distortion is not null && !emitter.HasResolvedCustomMaterial && mode != 0) return default;
         if (warps && mode != 0) return new(false, false, (mode & 2) != 0, (mode & 1) != 0);
         return (emitter.RenderState?.RenderPass ?? 0) < 0
             ? new(true, false, false, false) : new(false, true, false, false);
