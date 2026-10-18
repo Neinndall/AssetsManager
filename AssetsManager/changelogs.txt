@@ -7,6 +7,9 @@ HOTFIX UPDATE
 New Features
 
 Improvements
+  - Hash Guessing Lab / Reduces repeated work in GAME GrepWad animation and material searches while preserving path coverage.
+  - Hash Guessing Lab / GAME Custom finds shared particle textures referenced by skin materials.
+  - Hash Guessing Lab / GAME Basic learns portrait form variants from known skins.
 
 Changes
 

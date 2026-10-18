@@ -164,7 +164,7 @@ namespace AssetsManager.Tests.Diagnostics
             }
             if (args.Length > 0 && string.Equals(args[0], "game-grep-full-profile", StringComparison.OrdinalIgnoreCase))
             {
-                GameGrepFullProfileDiagnostic.Run(args.Skip(1).ToArray());
+                await GameGrepFullProfileDiagnostic.Run(args.Skip(1).ToArray());
                 return;
             }
             if (args.Length > 0 && string.Equals(args[0], "anm-audit", StringComparison.OrdinalIgnoreCase))

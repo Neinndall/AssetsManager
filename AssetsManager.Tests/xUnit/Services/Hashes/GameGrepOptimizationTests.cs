@@ -251,6 +251,7 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
         [InlineData("example", "skin1", false)]
         [InlineData("jade_example", "skin01", false)]
         [InlineData("petexample", "summer", true)]
+        [InlineData("例示", "skin100", false)]
         [InlineData("éxample", "skin100", false)]
         public void OptimizedAnimationMatchingPreservesLegacyPathsAndOrder(string character, string skin, bool theme)
         {
@@ -300,6 +301,76 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
             Assert.Equal(new[] { path }, guesser.MatchAnimationVariants("win_01", "example", skin, remaining));
             Assert.Equal(new[] { 42UL }, remaining);
             Assert.Contains(path, GameHashGuesser.EnumerateAnimationNameVariants("example", skin, "win_01"));
+        }
+
+        [Fact]
+        public void AnimationNameIndexPreservesCharacterScopeThemesAndOrdering()
+        {
+            var guesser = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
+            {
+                "assets/characters/example/skins/skin1/animations/z_run.anm",
+                "data/characters/example/themes/summer/animations/a_idle.anm",
+                "assets/characters/example/skins/skin2/animations/z_run.anm",
+                "assets/characters/other/skins/base/animations/foreign.anm",
+                "assets/characters/example/skins/skin1/particles/excluded.anm",
+                "assets/characters/example/skins/skin1/animations/excluded.tex",
+                "assets/characters/example/skins/skin1/animations/nested/excluded.anm"
+            }));
+            Assert.Equal(new[] { "a_idle.anm", "z_run.anm" }, guesser.GetAnimationNames("EXAMPLE", CancellationToken.None));
+            Assert.Equal(new[] { "foreign.anm" }, guesser.GetAnimationNames("other", CancellationToken.None));
+            Assert.Empty(guesser.GetAnimationNames("missing", CancellationToken.None));
+        }
+
+        [Fact]
+        public void AnimationMatchingPreservesLongUnicodePaths()
+        {
+            string character = new string('界', 200), name = new string('雪', 600);
+            var guesser = new GameHashGuesser(new HashFile(HashGuessDomain.Game, Array.Empty<string>()));
+            string[] expected = GameHashGuesser.EnumerateAnimationNameVariants(character, "skin100", name).Distinct().ToArray();
+            var remaining = expected.Select(path => XxHash64Ext.Hash(path)).Append(42UL).ToHashSet();
+            Assert.Equal(expected, guesser.MatchAnimationVariants(name, character, "skin100", remaining));
+            Assert.Equal(new[] { 42UL }, remaining);
+        }
+
+        [Fact]
+        public void AnimationMatchingKeepsInterleavedEnumerationsIndependent()
+        {
+            const string assets = "assets/characters/example/skins/skin100/animations/";
+            const string data = "data/characters/example/skins/skin100/animations/";
+            var guesser = new GameHashGuesser(new HashFile(HashGuessDomain.Game, Array.Empty<string>()));
+            var firstTargets = new HashSet<ulong> { XxHash64Ext.Hash(assets + "run.anm"), XxHash64Ext.Hash(data + "run.anm") };
+            var secondTargets = new HashSet<ulong> { XxHash64Ext.Hash(assets + "cast.anm"), XxHash64Ext.Hash(data + "cast.anm") };
+            using var first = guesser.MatchAnimationVariants("run", "example", "skin100", firstTargets).GetEnumerator();
+            Assert.True(first.MoveNext());
+            Assert.Equal(assets + "run.anm", first.Current);
+            Assert.Equal(new[] { assets + "cast.anm", data + "cast.anm" },
+                guesser.MatchAnimationVariants("cast", "example", "skin100", secondTargets));
+            Assert.True(first.MoveNext());
+            Assert.Equal(data + "run.anm", first.Current);
+            Assert.False(first.MoveNext());
+            Assert.Empty(firstTargets);
+            Assert.Empty(secondTargets);
+        }
+
+        [Fact]
+        public void AnimationNameIndexIsRebuiltAfterCatalogChanges()
+        {
+            string directory = Path.Combine(Path.GetTempPath(), "assetsmanager-animation-index-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(directory);
+            string file = Path.Combine(directory, "hashes.game.txt");
+            const string first = "assets/characters/example/skins/base/animations/idle.anm";
+            const string second = "assets/characters/other/themes/summer/animations/run.anm";
+            try
+            {
+                File.WriteAllText(file, $"{XxHash64Ext.Hash(first):x16} {first}\n");
+                var guesser = new GameHashGuesser(new HashFile(HashGuessDomain.Game, file));
+                Assert.Equal(new[] { "idle.anm" }, guesser.GetAnimationNames("example", CancellationToken.None));
+                Assert.Empty(guesser.GetAnimationNames("other", CancellationToken.None));
+                File.AppendAllText(file, $"{XxHash64Ext.Hash(second):x16} {second}\n");
+                Assert.Equal(new[] { "run.anm" }, guesser.GetAnimationNames("other", CancellationToken.None));
+                Assert.Equal(new[] { "idle.anm" }, guesser.GetAnimationNames("example", CancellationToken.None));
+            }
+            finally { Directory.Delete(directory, true); }
         }
 
         [Fact]

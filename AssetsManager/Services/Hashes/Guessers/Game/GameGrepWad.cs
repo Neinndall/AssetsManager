@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
@@ -1287,6 +1288,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
 
                 string championSkinPrefix = $"{baseDir}{mChamp}_{mSkin}_";
                 string championPrefix = $"{baseDir}{mChamp}_";
+                var materialPaths = new MaterialTexturePathMatcher(championSkinPrefix, championPrefix, baseDir);
                 foreach (var (targetHash, matDescriptors, samplerStems) in targets)
                 {
                     if (!engine.UnknownHashes.Contains(targetHash)) continue;
@@ -1331,12 +1333,8 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                         cancellationToken.ThrowIfCancellationRequested();
                         string root = baseStem.EndsWith("_f1", StringComparison.OrdinalIgnoreCase) ? baseStem[..^3] : baseStem;
                         foreach (string stem in new[] { root, root + "_f1", root + "_f2", root + "_f3", root + "_f4", root + "_f1_f2", root + "_f2_f3", root + "_empowered", root + "_reset", "empowered_" + root })
-                        foreach (string descriptor in matDescriptors)
-                        foreach (string suffix in TextureMapSuffixes)
                         {
-                            if (TryMatch(championSkinPrefix, stem, descriptor, suffix, targetHash, out string candidate) ||
-                                TryMatch(championPrefix, stem, descriptor, suffix, targetHash, out candidate) ||
-                                TryMatch(baseDir, stem, descriptor, suffix, targetHash, out candidate))
+                            if (materialPaths.TryMatch(stem, matDescriptors, targetHash, out string candidate))
                             {
                                 Check(engine, candidate, HashGuessStrategy.BinEntry, sourceWadPath, sourceChunkHash);
                                 goto NextTarget;
@@ -1347,28 +1345,6 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                     NextTarget:;
                 }
 
-                static bool TryMatch(string prefix, string stem, string descriptor, string suffix, ulong targetHash, out string match)
-                {
-                    int length = prefix.Length + stem.Length + descriptor.Length + suffix.Length;
-                    Span<char> candidate = length <= 512 ? stackalloc char[length] : new char[length];
-                    int offset = 0;
-                    prefix.AsSpan().CopyTo(candidate);
-                    offset += prefix.Length;
-                    stem.AsSpan().CopyTo(candidate[offset..]);
-                    offset += stem.Length;
-                    descriptor.AsSpan().CopyTo(candidate[offset..]);
-                    offset += descriptor.Length;
-                    suffix.AsSpan().CopyTo(candidate[offset..]);
-
-                    if (XxHash64Ext.Hash(candidate) == targetHash)
-                    {
-                        match = candidate.ToString();
-                        return true;
-                    }
-
-                    match = null;
-                    return false;
-                }
             }
 
             // Phase 3: Resolve Skin Mesh Links (SkinCharacterDataProperties)
@@ -1644,6 +1620,64 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
         private static readonly uint SubmeshNameHash = Fnv1a.HashLower("submesh");
         private static readonly uint SamplerValuesHash = Fnv1a.HashLower("samplerValues");
         private static readonly uint TexturePathHash = Fnv1a.HashLower("texturePath");
+
+        // One material owns this matcher; only the fixed suffix vocabulary is shared globally.
+        private sealed class MaterialTexturePathMatcher
+        {
+            private static readonly byte[][] Suffixes = TextureMapSuffixes.Select(Encoding.UTF8.GetBytes).ToArray();
+            private readonly byte[][] _prefixes;
+            private readonly Dictionary<string, byte[]> _descriptors = new(StringComparer.Ordinal);
+
+            internal MaterialTexturePathMatcher(params string[] prefixes) =>
+                _prefixes = prefixes.Select(Encoding.UTF8.GetBytes).ToArray();
+
+            internal bool TryMatch(string stem, IEnumerable<string> descriptors, ulong target, out string match)
+            {
+                int length = Encoding.UTF8.GetByteCount(stem);
+                byte[] rented = null;
+                Span<byte> encodedStem = length <= 512 ? stackalloc byte[length]
+                    : (rented = ArrayPool<byte>.Shared.Rent(length)).AsSpan(0, length);
+                try
+                {
+                    Encoding.UTF8.GetBytes(stem, encodedStem);
+                    foreach (string descriptor in descriptors)
+                    {
+                        if (!_descriptors.TryGetValue(descriptor, out byte[] encodedDescriptor))
+                            _descriptors[descriptor] = encodedDescriptor = Encoding.UTF8.GetBytes(descriptor);
+                        foreach (byte[] suffix in Suffixes)
+                        foreach (byte[] prefix in _prefixes)
+                            if (TryMatchEncoded(prefix, encodedStem, encodedDescriptor, suffix, target, out match)) return true;
+                    }
+                    match = null;
+                    return false;
+                }
+                finally { if (rented != null) ArrayPool<byte>.Shared.Return(rented); }
+            }
+
+            private static bool TryMatchEncoded(ReadOnlySpan<byte> prefix, ReadOnlySpan<byte> stem,
+                ReadOnlySpan<byte> descriptor, ReadOnlySpan<byte> suffix, ulong target, out string match)
+            {
+                int length = prefix.Length + stem.Length + descriptor.Length + suffix.Length;
+                byte[] rented = null;
+                Span<byte> candidate = length <= 1024 ? stackalloc byte[length]
+                    : (rented = ArrayPool<byte>.Shared.Rent(length)).AsSpan(0, length);
+                try
+                {
+                    prefix.CopyTo(candidate);
+                    stem.CopyTo(candidate[prefix.Length..]);
+                    descriptor.CopyTo(candidate[(prefix.Length + stem.Length)..]);
+                    suffix.CopyTo(candidate[(prefix.Length + stem.Length + descriptor.Length)..]);
+                    if (XxHash64.HashToUInt64(candidate) == target)
+                    {
+                        match = Encoding.UTF8.GetString(candidate);
+                        return true;
+                    }
+                    match = null;
+                    return false;
+                }
+                finally { if (rented != null) ArrayPool<byte>.Shared.Return(rented); }
+            }
+        }
 
         /// <summary>
         /// Resolves skin textures from their material context. When a skin BIN links a
@@ -2448,12 +2482,14 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
 
             var attemptedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var (prefixes, suffixes) = GetDynamicAnimationAffixes(cancellationToken);
+            AnimationPathGroup[] groups = GetAnimationPathGroups(character, skin, includeThemeLayout);
+            var hashBuffer = new ulong[groups.Max(group => group.Prefixes.Length)];
 
             foreach (string name in EnumerateAnimationNameCandidates(character, links, remaining, cancellationToken))
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (!attemptedNames.Add(name)) continue;
-                foreach (string path in MatchAnimationVariants(name, character, skin, remaining, prefixes, suffixes, includeThemeLayout))
+                foreach (string path in MatchAnimationVariantsCore(name, skin, remaining, groups, hashBuffer, prefixes, suffixes))
                     yield return path;
                 if (remaining.Count == 0) yield break;
             }
@@ -2474,7 +2510,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                 foreach (string name in ExpandNumberedAnimationNames(GetBasename(candidate.Path)))
                 {
                     if (!attemptedNames.Add(name)) continue;
-                    foreach (string path in MatchAnimationVariants(name, character, skin, remaining, DefaultPrefixModifiers, DefaultSuffixModifiers, includeThemeLayout))
+                    foreach (string path in MatchAnimationVariantsCore(name, skin, remaining, groups, hashBuffer, DefaultPrefixModifiers, DefaultSuffixModifiers))
                         yield return path;
                     if (remaining.Count == 0) yield break;
                 }
@@ -2522,7 +2558,8 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             if (targetHashes.Count == 0) yield break;
 
             IReadOnlyList<string> sourceNames = GetAnimationNames(character, cancellationToken);
-            HashSet<string> prefixes = GetReusableAnimationPrefixes(sourceNames);
+            HashSet<string> prefixes = Corpus.GetOrCreate($"animation-reusable-prefixes/{character.ToLowerInvariant()}",
+                _ => GetReusableAnimationPrefixes(sourceNames));
 
             foreach (string name in sourceNames)
             {
@@ -2568,19 +2605,17 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             !value.Contains('\\') &&
             !value.StartsWith("0x", StringComparison.OrdinalIgnoreCase);
 
-        private IReadOnlyList<string> GetAnimationNames(string character, CancellationToken cancellationToken)
+        internal IReadOnlyList<string> GetAnimationNames(string character, CancellationToken cancellationToken)
         {
-            return Corpus.GetOrCreate(
-                $"animation-names/{character.ToLowerInvariant()}",
-                paths => BuildAnimationNames(paths, character, cancellationToken));
+            var index = Corpus.GetOrCreate("animation-names-by-character", paths => BuildAnimationNamesByCharacter(paths, cancellationToken));
+            return index.TryGetValue(character, out IReadOnlyList<string> names) ? names : Array.Empty<string>();
         }
 
-        private static IReadOnlyList<string> BuildAnimationNames(
+        private static IReadOnlyDictionary<string, IReadOnlyList<string>> BuildAnimationNamesByCharacter(
             IReadOnlyList<string> knownPaths,
-            string character,
             CancellationToken cancellationToken)
         {
-            var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var namesByCharacter = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
             var knownAnimationPathRegex = new Regex(
                 @"^(?:assets|data)/characters/(?<character>[^/]+)/(?:skins|themes)/(?<skin>[^/]+)/animations/[^/]+\.anm$",
                 RegexOptions.IgnoreCase);
@@ -2590,14 +2625,18 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                 string path = knownPaths[pathIndex];
                 if (!path.EndsWith(".anm", StringComparison.OrdinalIgnoreCase)) continue;
                 Match context = knownAnimationPathRegex.Match(PathUtils.NormalizePath(path));
-                if (!context.Success || !context.Groups["character"].Value.Equals(character, StringComparison.OrdinalIgnoreCase))
-                    continue;
+                if (!context.Success) continue;
 
+                string character = context.Groups["character"].Value;
+                if (!namesByCharacter.TryGetValue(character, out var names))
+                    namesByCharacter[character] = names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 string name = GetBasename(path);
                 if (name.Length > 0) names.Add(name);
             }
 
-            return names.OrderBy(name => name, StringComparer.OrdinalIgnoreCase).ToList();
+            return namesByCharacter.ToDictionary(pair => pair.Key,
+                pair => (IReadOnlyList<string>)pair.Value.OrderBy(name => name, StringComparer.OrdinalIgnoreCase).ToArray(),
+                StringComparer.OrdinalIgnoreCase);
         }
 
         private (IReadOnlyList<string> Prefixes, IReadOnlyList<string> Suffixes) GetDynamicAnimationAffixes(CancellationToken cancellationToken)
@@ -2642,8 +2681,25 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             IReadOnlyList<string> suffixes = null,
             bool includeThemeLayout = false)
         {
-            string[][] pathPrefixes = Corpus.GetOrCreate($"animation-path-prefixes/{character}/{skin}/{includeThemeLayout}", _ =>
-                BuildAnimationPathPrefixes(character, skin, includeThemeLayout));
+            AnimationPathGroup[] groups = GetAnimationPathGroups(character, skin, includeThemeLayout);
+            var hashBuffer = new ulong[groups.Max(group => group.Prefixes.Length)];
+            foreach (string path in MatchAnimationVariantsCore(name, skin, remaining, groups, hashBuffer, prefixes, suffixes))
+                yield return path;
+        }
+
+        private sealed record AnimationPathGroup(string[] Prefixes, byte[][] EncodedPrefixes, int MaximumPrefixBytes);
+
+        private AnimationPathGroup[] GetAnimationPathGroups(string character, string skin, bool includeThemeLayout) =>
+            Corpus.GetOrCreate($"animation-path-prefixes/{character}/{skin}/{includeThemeLayout}", _ =>
+                BuildAnimationPathPrefixes(character, skin, includeThemeLayout).Select(prefixes =>
+                {
+                    byte[][] encoded = prefixes.Select(Encoding.UTF8.GetBytes).ToArray();
+                    return new AnimationPathGroup(prefixes, encoded, encoded.Max(value => value.Length));
+                }).ToArray());
+
+        private static IEnumerable<string> MatchAnimationVariantsCore(string name, string skin, ISet<ulong> remaining,
+            AnimationPathGroup[] groups, ulong[] hashBuffer, IReadOnlyList<string> prefixes, IReadOnlyList<string> suffixes)
+        {
             foreach (string path in MatchName(name)) yield return path;
 
             string converted = Regex.Replace(name, @"skin\d+", skin, RegexOptions.IgnoreCase);
@@ -2655,27 +2711,48 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                 string stem = value.EndsWith(".anm", StringComparison.OrdinalIgnoreCase) ? value[..^4] : value;
                 if (string.IsNullOrWhiteSpace(stem) || stem.Contains('/') || stem.Contains('\\')) yield break;
                 stem = stem.ToLowerInvariant();
-                foreach (string[] group in pathPrefixes)
+                foreach (AnimationPathGroup group in groups)
                 foreach (string pre in prefixes ?? DefaultPrefixModifiers)
                 foreach (string suf in suffixes ?? DefaultSuffixModifiers)
                 foreach (string variant in ExpandAnimationStemVariants(pre + stem + suf))
-                foreach (string prefix in group)
                 {
-                    if (remaining.Count == 0) yield break;
-                    if (remaining.Remove(HashAnimationPath(prefix, variant)))
-                        yield return prefix + variant + ".anm";
+                    HashAnimationGroup(group, variant, hashBuffer);
+                    for (int i = 0; i < group.Prefixes.Length; i++)
+                    {
+                        if (remaining.Count == 0) yield break;
+                        if (remaining.Remove(hashBuffer[i]))
+                            yield return group.Prefixes[i] + variant + ".anm";
+                    }
                 }
             }
         }
 
-        private static ulong HashAnimationPath(string prefix, string stem)
+        private static void HashAnimationGroup(AnimationPathGroup group, string stem, Span<ulong> hashes)
         {
-            int length = prefix.Length + stem.Length + 4;
-            Span<char> path = length <= 512 ? stackalloc char[length] : new char[length];
-            prefix.AsSpan().CopyTo(path);
-            stem.AsSpan().CopyTo(path[prefix.Length..]);
-            ".anm".AsSpan().CopyTo(path[(prefix.Length + stem.Length)..]);
-            return XxHash64Ext.Hash(path);
+            int stemLength = Encoding.UTF8.GetByteCount(stem);
+            int capacity = group.MaximumPrefixBytes + stemLength + 4;
+            byte[] rentedStem = null, rentedPath = null;
+            Span<byte> stemBytes = stemLength <= 512 ? stackalloc byte[stemLength]
+                : (rentedStem = ArrayPool<byte>.Shared.Rent(stemLength)).AsSpan(0, stemLength);
+            Span<byte> path = capacity <= 1024 ? stackalloc byte[capacity]
+                : (rentedPath = ArrayPool<byte>.Shared.Rent(capacity)).AsSpan(0, capacity);
+            try
+            {
+                Encoding.UTF8.GetBytes(stem, stemBytes);
+                for (int i = 0; i < group.EncodedPrefixes.Length; i++)
+                {
+                    byte[] prefix = group.EncodedPrefixes[i];
+                    prefix.CopyTo(path);
+                    stemBytes.CopyTo(path[prefix.Length..]);
+                    ".anm"u8.CopyTo(path[(prefix.Length + stemLength)..]);
+                    hashes[i] = XxHash64.HashToUInt64(path[..(prefix.Length + stemLength + 4)]);
+                }
+            }
+            finally
+            {
+                if (rentedStem != null) ArrayPool<byte>.Shared.Return(rentedStem);
+                if (rentedPath != null) ArrayPool<byte>.Shared.Return(rentedPath);
+            }
         }
 
         private static string[][] BuildAnimationPathPrefixes(string character, string skin, bool includeThemeLayout)

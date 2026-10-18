@@ -25,7 +25,7 @@ internal static class GameEvidencePatternsDiagnostic
     internal static void Run(string[] args)
     {
         string Option(string name) => args.FirstOrDefault(a => a.StartsWith(name + "=", StringComparison.Ordinal))?[(name.Length + 1)..];
-        string state = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AssetsManager");
+        string state = Option("--state") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AssetsManager");
         string root = Option("--root") ?? @"C:\Riot Games\League of Legends (PBE)";
         string stage = Option("--stage") ?? "roles";
         string filter = Option("--wad");
@@ -76,6 +76,10 @@ internal static class GameEvidencePatternsDiagnostic
                 Measure("Numbers", () => guesser.SubstituteNumbers(engine, cancellation.Token, maximum: 200));
                 Measure("Padded numbers", () => guesser.SubstituteBasicPaddedNumbers(engine, cancellation.Token));
             }
+            else if (stage == "portraits")
+            {
+                Measure("Learned portraits", () => guesser.GuessPortraitVariants(engine, cancellation.Token));
+            }
             else if (stage == "custom")
             {
                 guesser.RunCustomAttacks(engine, null, cancellation.Token,
@@ -96,6 +100,50 @@ internal static class GameEvidencePatternsDiagnostic
             {
                 Measure("Numbers", () => guesser.SubstituteNumbers(engine, cancellation.Token, maximum: 200));
                 Measure("Padded numbers", () => guesser.SubstituteBasicPaddedNumbers(engine, cancellation.Token));
+            }
+            else if (stage is "legacy-textures" or "legacy-bins" or "scoped-suffixes")
+            {
+                var activePaths = new HashSet<string>(StringComparer.Ordinal);
+                foreach (string file in guesser.FindWads(root))
+                {
+                    cancellation.Token.ThrowIfCancellationRequested();
+                    if (filter != null && !file.Contains(filter, StringComparison.OrdinalIgnoreCase)) continue;
+                    using var wad = new WadFile(file);
+                    if (!wad.Chunks.Keys.Any(pending.Contains)) continue;
+                    foreach (ulong hash in wad.Chunks.Keys)
+                        if (known.TryGetValue(hash, out string path)) activePaths.Add(path);
+                }
+                if (stage == "scoped-suffixes")
+                {
+                    var expression = new Regex(@"^(.*?)(\.[^.]+)?(\.[^.]+)$");
+                    var suffixes = new HashSet<string>(StringComparer.Ordinal) { "" };
+                    var formats = new HashSet<(string Prefix, string Extension)>();
+                    foreach (string path in known.Values)
+                    {
+                        Match match = expression.Match(path);
+                        if (!match.Success) continue;
+                        suffixes.Add(match.Groups[2].Value);
+                        if (activePaths.Contains(path)) formats.Add((match.Groups[1].Value, match.Groups[3].Value));
+                    }
+                    Console.WriteLine($"Scoped suffixes: {formats.Count} formats; {suffixes.Count} suffixes");
+                    foreach (string suffix in suffixes)
+                    foreach (var format in formats)
+                    {
+                        cancellation.Token.ThrowIfCancellationRequested();
+                        engine.CheckNormalizedParts(format.Prefix, suffix, format.Extension, HashGuessStrategy.WordlistVariant,
+                            "WAD-scoped patch suffixes");
+                    }
+                }
+                else foreach (string extension in stage == "legacy-bins" ? new[] { ".bin" } : new[] { ".dds", ".tex" })
+                {
+                    string[] paths = known.Values.Where(path => path.EndsWith(extension, StringComparison.OrdinalIgnoreCase) &&
+                        (stage == "legacy-bins" || path.StartsWith("assets/characters/", StringComparison.Ordinal))).ToArray();
+                    var words = HashGuessEngine.BuildWordlist(paths.Select(Path.GetFileName)).Take(15_000).ToArray();
+                    string[] scoped = paths.Where(activePaths.Contains).ToArray();
+                    Console.WriteLine($"Legacy {extension}: {words.Length} original vocabulary words; {scoped.Length} paths in WADs with pending targets");
+                    Measure("Legacy " + extension, () => guesser.RunFocusedWordlistSubstitution(engine, scoped, words,
+                        cancellation.Token, int.MaxValue));
+                }
             }
             else if (stage == "roles" && filter == null)
             {
@@ -218,7 +266,7 @@ internal static class GameEvidencePatternsDiagnostic
                     foreach (char letter in "abcdefghijklmnopqrstuvwxyz0123456789_-") Check(path.AsSpan(0, end), letter.ToString(), path.AsSpan(end));
                 }
             }
-            else throw new ArgumentException("Stage must be basic, numbers, custom, banners, local-names, roles, number-pairs or typos.");
+            else throw new ArgumentException("Stage must be basic, numbers, portraits, custom, banners, local-names, roles, legacy-textures, legacy-bins, scoped-suffixes, number-pairs or typos.");
             complete = true;
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }

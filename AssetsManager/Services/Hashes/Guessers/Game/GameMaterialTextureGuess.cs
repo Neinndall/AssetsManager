@@ -63,9 +63,12 @@ internal sealed partial class GameHashGuesser
                         using var stream = new MemoryStream(bytes.Array, bytes.Offset, bytes.Count, false);
                         var tree = new BinTree(stream);
                         visited.Add((chunk.PathHash, chunk.Checksum));
-                        if (!GameMaterialTextureIndex.HasUnresolvedContext(engine, tree, path, cancellationToken)) continue;
-                        checkedCandidates += GetMaterialTextureIndex(cancellationToken).Guess(engine, tree, path, wadPath,
+                        if (!GameMaterialTextureIndex.HasUnresolvedSamplerContext(engine, tree, path, cancellationToken)) continue;
+                        var index = GetMaterialTextureIndex(cancellationToken);
+                        checkedCandidates += index.Guess(engine, tree, path, wadPath,
                             chunk.PathHash, cancellationToken, candidateBudget - checkedCandidates);
+                        checkedCandidates += index.GuessSharedParticles(engine, tree, path, wadPath, chunk.PathHash,
+                            cancellationToken, candidateBudget - checkedCandidates);
                     }
                     catch (Exception exception) when (exception is not OperationCanceledException)
                     {

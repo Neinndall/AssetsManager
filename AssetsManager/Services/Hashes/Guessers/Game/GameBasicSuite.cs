@@ -526,6 +526,64 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                 if (checkedCount >= candidateBudget || engine.RemainingUnknownCount == 0) break;
             }
 
+            if (checkedCount < candidateBudget && engine.RemainingUnknownCount > 0)
+                checkedCount += GuessPortraitVariants(engine, cancellationToken, characterList, candidateBudget - checkedCount,
+                    count => progress?.Invoke(checkedCount + count));
+            progress?.Invoke(checkedCount);
+            return checkedCount;
+        }
+
+        internal int GuessPortraitVariants(HashGuessEngine engine, CancellationToken cancellationToken,
+            IEnumerable<string> characters = null, int candidateBudget = int.MaxValue, Action<int> progress = null)
+        {
+            ArgumentNullException.ThrowIfNull(engine);
+            if (candidateBudget < 0) throw new ArgumentOutOfRangeException(nameof(candidateBudget));
+            if (candidateBudget == 0 || engine.RemainingUnknownCount == 0) return 0;
+            var index = Corpus.GetOrCreate("portrait-variant-context", paths =>
+            {
+                var skins = new Dictionary<string, HashSet<int>>(StringComparer.OrdinalIgnoreCase);
+                var variants = new HashSet<(string Kind, string Variant, string Extension)>();
+                var skinPattern = new Regex(@"^(?:data|assets)/characters/([^/]+)/skins/skin([0-9]+)\.bin$", RegexOptions.CultureInvariant);
+                var portraitPattern = new Regex(@"/hud/[^/]+_(circle|square)_([0-9]+)_([a-z0-9_]+)\.(tex|dds)$", RegexOptions.CultureInvariant);
+                foreach (string path in paths)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (path.Contains("/hud/", StringComparison.Ordinal))
+                    {
+                        Match portrait = portraitPattern.Match(path);
+                        if (portrait.Success) variants.Add((portrait.Groups[1].Value, portrait.Groups[3].Value, portrait.Groups[4].Value));
+                    }
+                    if (!path.EndsWith(".bin", StringComparison.Ordinal) || !path.Contains("/skins/skin", StringComparison.Ordinal)) continue;
+                    Match skin = skinPattern.Match(path);
+                    if (!skin.Success || !int.TryParse(skin.Groups[2].Value, NumberStyles.None, CultureInfo.InvariantCulture, out int number)) continue;
+                    if (!skins.TryGetValue(skin.Groups[1].Value, out var numbers)) skins[skin.Groups[1].Value] = numbers = new();
+                    numbers.Add(number);
+                }
+                return (Skins: skins.ToDictionary(pair => pair.Key, pair => pair.Value.Order().ToArray(), StringComparer.OrdinalIgnoreCase),
+                    Variants: variants.OrderBy(value => value.Kind, StringComparer.Ordinal).ThenBy(value => value.Variant, StringComparer.Ordinal)
+                        .ThenBy(value => value.Extension, StringComparer.Ordinal).ToArray());
+            });
+            int checkedCount = 0;
+            Span<char> pathBuffer = stackalloc char[512];
+            foreach (string value in (characters ?? GetCharacters()).Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.Ordinal))
+            {
+                string character = value.ToLowerInvariant();
+                if (!index.Skins.TryGetValue(character, out int[] skins)) continue;
+                foreach (int skin in skins)
+                foreach (var variant in index.Variants)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (pathBuffer.TryWrite(CultureInfo.InvariantCulture,
+                        $"assets/characters/{character}/hud/{character}_{variant.Kind}_{skin}_{variant.Variant}.{variant.Extension}", out int length))
+                        engine.CheckNormalizedPath(pathBuffer[..length], HashGuessStrategy.CharacterTemplate, "GAME learned portrait variants");
+                    else
+                        engine.Check($"assets/characters/{character}/hud/{character}_{variant.Kind}_{skin}_{variant.Variant}.{variant.Extension}",
+                            HashGuessStrategy.CharacterTemplate, "GAME learned portrait variants");
+                    checkedCount++;
+                    if ((checkedCount & 0x3FFF) == 0) progress?.Invoke(checkedCount);
+                    if (checkedCount >= candidateBudget || engine.RemainingUnknownCount == 0) return checkedCount;
+                }
+            }
             progress?.Invoke(checkedCount);
             return checkedCount;
         }
