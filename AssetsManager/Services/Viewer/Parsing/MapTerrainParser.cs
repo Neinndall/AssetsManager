@@ -54,11 +54,13 @@ namespace AssetsManager.Services.Viewer.Parsing
                 .ToArray();
             BinTreeObject container = FindContainer(materials, map);
             MapTextureReference terrainPaint = ReadTerrainPaint(container, resolveWadPath);
-            if (skins.Length == 0 && terrainPaint == null)
+            Vector2? boundsMax = ReadVector2(container?.Properties, BoundsMaxField);
+            // Terrain coordinates remain meaningful without any MapSkin textures.
+            if (skins.Length == 0 && terrainPaint == null && !boundsMax.HasValue)
                 return null;
 
             Vector2 min = ReadVector2(container?.Properties, BoundsMinField) ?? Vector2.Zero;
-            Vector2 max = ReadVector2(container?.Properties, BoundsMaxField) ?? Vector2.Zero;
+            Vector2 max = boundsMax ?? Vector2.Zero;
             var transitions = flags
                 .Where(flag => flag.TransitionSeconds > 0f)
                 .GroupBy(flag => flag.Flag)

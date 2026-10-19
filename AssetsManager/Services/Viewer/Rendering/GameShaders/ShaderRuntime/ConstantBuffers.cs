@@ -44,6 +44,12 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                     case "PerFramePixelCB":
                         WritePerFramePixel(block.Data, frame, skinned);
                         break;
+                    case "GrassDisortVS":
+                        // With no actors pushing the brush, origin spheres can make its pivot divide by zero.
+                        // Keep all ten positions distant; the remaining components and velocities stay zero.
+                        for (int sphere = 0; sphere < 10; sphere++)
+                            WriteVector3(block.Data, sphere * 4, new Vector3(1e6f));
+                        break;
                     case "CharacterPerDrawVertexCB" when character.HasValue || particle != null:
                         WriteCharacterPerDrawVertex(block.Data, frame, character?.World ?? Matrix4x4.Identity);
                         break;

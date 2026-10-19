@@ -21,6 +21,8 @@ Improvements
 Changes
 
 Bug Fixes
+  - 3D Studio / Prevented invalid deformation in map grass and bushes.
+  - 3D Studio / Preserved terrain texture placement when map skin data is missing.
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 

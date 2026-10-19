@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Numerics;
 using AssetsManager.Services.Viewer.Parsing;
@@ -7,14 +8,52 @@ using AssetsManager.Services.Viewer.Rendering.GameShaders;
 using AssetsManager.Views.Models.Viewer;
 using LeagueToolkit.Core.Meta;
 using LeagueToolkit.Core.Meta.Properties;
+using LeagueToolkit.Core.Wad;
 using LeagueToolkit.Hashing;
+using AssetsManager.Tests.Support;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
 {
     public sealed class MapTerrainTests
     {
         private const string Container = "Maps/MapGeometry/Map11/Base_SRX";
+        private readonly ITestOutputHelper _output;
+
+        public MapTerrainTests(ITestOutputHelper output) => _output = output;
+
+        [Theory]
+        [InlineData(11, "Base_SRX")]
+        [InlineData(12, "Crepe")]
+        public void InstalledMapBoundsRemainAvailableWhenShippingSkinDataIsUnavailable(int id, string name)
+        {
+            string install = InstalledSkins.FindInstall();
+            Assert.NotNull(install);
+            string path = System.IO.Path.Combine(install, @"Game\DATA\FINAL\Maps\Shipping", $"Map{id}.wad.client");
+            using var wad = new WadFile(path);
+            MapPath map = MapPath.FromEntryPath($"Maps/MapGeometry/Map{id}/{name}");
+            BinTree Read(string virtualPath)
+            {
+                using var chunk = wad.LoadChunkDecompressed(XxHash64Ext.Hash(virtualPath.ToLowerInvariant()));
+                using var stream = new MemoryStream(chunk.Span.ToArray(), writable: false);
+                return new BinTree(stream);
+            }
+            BinTree materials = Read(map.MaterialsVirtualPath);
+            BinTree shipping = Read($"data/maps/shipping/map{id}/map{id}.bin");
+            MapTerrainData complete = MapTerrainParser.Parse(materials, shipping, map);
+            MapTerrainData withoutShipping = MapTerrainParser.Parse(materials, null, map);
+            Assert.NotNull(complete);
+            Assert.NotNull(withoutShipping);
+            Assert.Equal(complete.BoundsMin, withoutShipping.BoundsMin);
+            Assert.Equal(complete.BoundsMax, withoutShipping.BoundsMax);
+            Assert.Equal(complete.TerrainTransform, withoutShipping.TerrainTransform);
+            Assert.True(withoutShipping.TerrainTransform.X > 0f);
+            Assert.True(withoutShipping.TerrainTransform.Y > 0f);
+            Assert.Empty(withoutShipping.Skins);
+            _output.WriteLine($"{map}: bounds={complete.BoundsMin}..{complete.BoundsMax}; transform={complete.TerrainTransform}; " +
+                $"skins={complete.Skins.Count}; requests without shipping={withoutShipping.TextureRequests.Count()}; wad={path}");
+        }
 
         [Fact]
         public void EverySkinOfTheContainerKeepsItsTintsCubeAndTheOpeningRule()
@@ -78,7 +117,53 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
         {
             BinTree map = MapDocument(Skin("Default", "Maps/MapGeometry/Map11/Arcade", 0x30));
 
-            Assert.Null(MapTerrainParser.Parse(Materials(Vector2.One), map, Path()));
+            MapTerrainData terrain = MapTerrainParser.Parse(Materials(Vector2.One), map, Path());
+            Assert.NotNull(terrain);
+            Assert.Empty(terrain.Skins);
+            Assert.Empty(terrain.TextureRequests);
+            Assert.Equal(new Vector4(1f, 1f, 0f, 0f), terrain.TerrainTransform);
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void BoundsSurviveWithoutSkinOrPaintAssets(bool missingMapDocument)
+        {
+            BinTree materials = Materials(new Vector2(1100f, 2200f));
+            materials.Objects.Values.Single().Properties.Add(Fnv1a.HashLower("boundsMin"),
+                new BinTreeVector2(Fnv1a.HashLower("boundsMin"), new Vector2(100f, 200f)));
+
+            MapTerrainData terrain = MapTerrainParser.Parse(materials, missingMapDocument ? null : MapDocument(), Path());
+
+            Assert.NotNull(terrain);
+            Assert.Empty(terrain.Skins);
+            Assert.Empty(terrain.TextureRequests);
+            Assert.Empty(terrain.EnvironmentCubes);
+            Vector4 transform = terrain.TerrainTransform;
+            Assert.Equal(0f, 100f * transform.X + transform.Z, 5);
+            Assert.Equal(1f, 1100f * transform.X + transform.Z, 5);
+            Assert.Equal(0f, 200f * transform.Y + transform.W, 5);
+            Assert.Equal(1f, 2200f * transform.Y + transform.W, 5);
+        }
+
+        [Fact]
+        public void MissingBoundsAndAssetsDoNotInventTerrainData()
+        {
+            BinTree materials = Materials(Vector2.One);
+            materials.Objects.Values.Single().Properties.Remove(Fnv1a.HashLower("boundsMax"));
+            Assert.Null(MapTerrainParser.Parse(materials, null, Path()));
+            Assert.Null(MapTerrainParser.Parse(null, null, Path()));
+        }
+
+        [Theory]
+        [InlineData(0f, 0f)]
+        [InlineData(-1f, 10f)]
+        [InlineData(10f, 0f)]
+        public void BoundsWithoutAssetsKeepDegenerateExtentsNeutral(float x, float z)
+        {
+            MapTerrainData terrain = MapTerrainParser.Parse(Materials(new Vector2(x, z)), null, Path());
+            Assert.NotNull(terrain);
+            Assert.Equal(Vector4.Zero, terrain.TerrainTransform);
         }
 
         [Fact]
