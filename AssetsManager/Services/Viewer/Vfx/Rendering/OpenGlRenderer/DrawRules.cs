@@ -34,7 +34,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 int ribs = Math.Min(instanceCount, BeamsPerEmitter * 2);
                 return ribs <= BeamsPerEmitter * 2 - used ? ribs : 0;
             }
-            if (definition.DrawsAsTrail)
+            if (definition.DrawsAsTrail && definition.PrimitiveKind is VfxPrimitiveKind.CameraTrail or VfxPrimitiveKind.ArbitraryTrail)
             {
                 if (used >= VfxTrailGeometry.TrailPointsPerEmitter) return 0;
                 int perSource = VfxTrailGeometry.ResolvePointCount(instanceCount);

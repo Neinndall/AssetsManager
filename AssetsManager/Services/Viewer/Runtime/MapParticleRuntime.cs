@@ -27,6 +27,7 @@ namespace AssetsManager.Services.Viewer.Runtime
             System = system;
             Graph = graph;
             Capacity = capacity;
+            DrawGroupKey = system.PathHash;
             ChunkId = MapOutlineSemantics.ChunkId(particle.ChunkHash);
             ItemId = MapOutlineSemantics.ItemId(particle.ChunkHash, particle.KeyHash);
         }
@@ -35,6 +36,8 @@ namespace AssetsManager.Services.Viewer.Runtime
         public VfxSystemDefinition System { get; }
         public VfxPlaybackGraphRuntime Graph { get; }
         public int Capacity { get; }
+        internal object DrawGroupKey { get; }
+        internal int SharedDrawCapacity { get; set; } = 4096;
         internal string ChunkId { get; }
         internal string ItemId { get; }
 

@@ -7,6 +7,8 @@ HOTFIX UPDATE
 New Features
 
 Improvements
+  - 3D Studio / Repeated map effects share drawing work while keeping independent animation.
+  - 3D Studio / Mesh particles render in batches to reduce graphics calls.
   - 3D Studio / Map textures use compressed GPU uploads where supported, preserving authored mipmaps and progressive loading.
   - 3D Studio / Large map effects prepare in smaller batches so the viewport can keep responding during loading.
   - 3D Studio / Reduced repeated curve-table lookups while simulating particle effects.

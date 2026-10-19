@@ -20,6 +20,14 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         private GL _gl = null!;
         private GlDrawBindings _drawBindings;
         internal bool CacheDrawBindings { get; set; } = true;
+        internal IReadOnlyDictionary<object, object> SharedDrawGroups { get; set; }
+        internal IReadOnlyDictionary<object, int> SharedDrawCapacities { get; set; }
+        internal (int Draws, int Instances) LastParticleDrawCounts { get; private set; }
+        private object DrawGroup(VfxPlaybackRuntime.EmitterState emitter)
+        {
+            object graph = emitter.RenderGraphKey ?? emitter;
+            return SharedDrawGroups?.GetValueOrDefault(graph) ?? graph;
+        }
         internal (int Programs, int UniformBuffers) LastDrawBindingCounts =>
             (_drawBindings.ProgramBindCount, _drawBindings.UniformBufferBindCount);
         private VfxShaderUniforms _particleUniforms, _stockParticleUniforms, _meshUniforms, _stockMeshUniforms;
@@ -36,10 +44,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         private int[] _instanceOrder = Array.Empty<int>();
         private readonly Dictionary<(object Graph, string Path, int SourceOrder, int Pass), int> _emitterUsed = new();
         private readonly Dictionary<(object Graph, string Path, int SourceOrder), VfxPlaybackRuntime.EmitterState> _firstSourceByEmitter = new();
-        private readonly Dictionary<(object Graph, string Path, int SourceOrder), List<VfxPlaybackRuntime.EmitterState>> _sortedQuadGroups = new();
-        private readonly HashSet<(object Graph, string Path, int SourceOrder, int Pass)> _renderedSortedQuadGroups = new();
-        private readonly List<List<VfxPlaybackRuntime.EmitterState>> _quadSourceLists = new();
-        private int _quadSourceListCount;
+        private readonly Dictionary<(object Graph, string Path, int SourceOrder), List<VfxPlaybackRuntime.EmitterState>> _drawSourceGroups = new();
+        private readonly HashSet<(object Graph, string Path, int SourceOrder, int Pass)> _renderedSourceGroups = new();
+        private readonly List<List<VfxPlaybackRuntime.EmitterState>> _sourceLists = new();
+        private int _sourceListCount;
         private readonly List<VfxRenderQueue.PassDraw> _particlePassDraws = new();
         private Func<VfxPlaybackRuntime.EmitterState, int> _particlePassCountSelector;
         private Func<VfxPlaybackRuntime.EmitterState, int, bool> _particleTransparencySelector;
@@ -53,7 +61,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             finally { _drawingShadows = false; }
         }
         private readonly HashSet<uint> _ownerHiddenSubmeshes = new();
-        private AssetsManager.Services.Viewer.Rendering.GameShaders.GameShaderRuntime.DrawElementsDelegate _drawElements = null!;
         private const int Stride = VfxPlaybackRuntime.InstanceStride;
         private const int QuadsPerEmitter = 4096;
         private const int MeshesPerEmitter = 512;
@@ -128,10 +135,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         {
             _gl = gl;
             _drawBindings = new GlDrawBindings(gl);
-            var proc = gl.Context.GetProcAddress("glDrawElements");
-            if (proc == IntPtr.Zero)
-                throw new NotSupportedException("The active OpenGL context does not expose glDrawElements.");
-            _drawElements = System.Runtime.InteropServices.Marshal.GetDelegateForFunctionPointer<AssetsManager.Services.Viewer.Rendering.GameShaders.GameShaderRuntime.DrawElementsDelegate>(proc);
             bool gles = GlShaderCompiler.UsesEmbeddedProfile(gl);
             _gles = gles;
             _gameShaders = new AssetsManager.Services.Viewer.Rendering.GameShaders.GameShaderRuntime(gl, gles, settings);
@@ -438,25 +441,27 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
 
             Dictionary<(object Graph, string Path, int SourceOrder, int Pass), int> emitterUsed = _emitterUsed;
             Dictionary<(object Graph, string Path, int SourceOrder), VfxPlaybackRuntime.EmitterState> firstSourceByEmitter = _firstSourceByEmitter;
-            Dictionary<(object Graph, string Path, int SourceOrder), List<VfxPlaybackRuntime.EmitterState>> sortedQuadGroups = _sortedQuadGroups;
+            Dictionary<(object Graph, string Path, int SourceOrder), List<VfxPlaybackRuntime.EmitterState>> drawSourceGroups = _drawSourceGroups;
             foreach (VfxRenderQueueEntry candidate in renderQueue)
             {
                 VfxPlaybackRuntime.EmitterState candidateEmitter = candidate.Emitter;
-                var key = (candidateEmitter.RenderGraphKey ?? candidateEmitter,
+                var key = (DrawGroup(candidateEmitter),
                     candidateEmitter.RenderPath ?? string.Empty,
                     candidateEmitter.SourceOrder);
                 firstSourceByEmitter.TryAdd(key, candidateEmitter);
-                if (candidateEmitter.InstanceCount <= 0 || !candidateEmitter.IsVisible ||
-                    !ShouldSortInstances(candidateEmitter.Def, 2)) continue;
-                if (!sortedQuadGroups.TryGetValue(key, out List<VfxPlaybackRuntime.EmitterState> sources))
+                if (candidateEmitter.InstanceCount <= 0 || !candidateEmitter.IsVisible || candidateEmitter.Def.Disabled ||
+                    !(candidateEmitter.Def.DrawsAsQuad || candidateEmitter.Def.DrawsAsMesh ||
+                        (SharedDrawGroups != null && (candidateEmitter.Def.DrawsAsProjection || candidateEmitter.Def.DrawsAsTrail || candidateEmitter.Def.DrawsAsBeam)))) continue;
+                if (!drawSourceGroups.TryGetValue(key, out List<VfxPlaybackRuntime.EmitterState> sources))
                 {
-                    sources = RentQuadSourceList();
-                    sortedQuadGroups[key] = sources;
+                    sources = RentSourceList();
+                    drawSourceGroups[key] = sources;
                 }
                 sources.Add(candidateEmitter);
             }
-            HashSet<(object Graph, string Path, int SourceOrder, int Pass)> renderedSortedQuadGroups = _renderedSortedQuadGroups;
+            HashSet<(object Graph, string Path, int SourceOrder, int Pass)> renderedSourceGroups = _renderedSourceGroups;
 
+            LastParticleDrawCounts = default;
             _drawingWireframe = useWireframe;
             _particlePassCountSelector ??= emitter => ParticlePassCount(emitter, emitter.Def.DrawsAsMesh, _drawingWireframe);
             _particleTransparencySelector ??= (emitter, pass) => ParticlePassTransparent(emitter, pass, _drawingWireframe);
@@ -479,39 +484,41 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 if (es.Def.DrawsAsMesh && es.MeshVao == 0)
                     continue;
 
-                // LTK allocates one draw component per graph/path/emitter definition. Every live
-                // source of that child path shares the same fixed draw budget and palette phase.
-                var emitterKey = (es.RenderGraphKey ?? es, es.RenderPath ?? string.Empty, es.SourceOrder);
+                // Placements of one map system share drawing identity; simulation graph identities stay intact.
+                var emitterKey = (DrawGroup(es), es.RenderPath ?? string.Empty, es.SourceOrder);
                 var passKey = (emitterKey.Item1, emitterKey.Item2, emitterKey.Item3, passIndex);
                 VfxPlaybackRuntime.EmitterState paletteSource = firstSourceByEmitter.GetValueOrDefault(emitterKey) ?? es;
                 float sharedPalettePhase = ResolveEmitterPhase(es.Def, paletteSource.EmitterAge);
                 int renderInstanceCount;
                 ReadOnlySpan<float> instancesSpan;
-                if (sortedQuadGroups.TryGetValue(emitterKey, out List<VfxPlaybackRuntime.EmitterState> quadSources))
+                if (renderedSourceGroups.Contains(passKey)) continue;
+                if (drawSourceGroups.TryGetValue(emitterKey, out List<VfxPlaybackRuntime.EmitterState> drawSources) &&
+                    CompatibleSources(drawSources))
                 {
-                    // Quads.tsx gathers every live source first and sorts the combined set once.
-                    if (!renderedSortedQuadGroups.Add(passKey)) continue;
-                    EnsureInstanceSortCapacity(QuadsPerEmitter, QuadsPerEmitter * Stride);
-                    renderInstanceCount = VfxRenderQueue.CopyQuadSourcesBackToFront(
-                        quadSources,
-                        QuadsPerEmitter,
-                        Stride,
-                        view,
-                        _groupedInstances,
-                        _sortedInstances,
-                        _instanceDepths,
-                        _instanceOrder);
+                    // One source set owns the budget, ordering and appearance of this emitter pass.
+                    if (!renderedSourceGroups.Add(passKey)) continue;
+                    renderInstanceCount = GatherInstances(drawSources, view);
+                    _activeSources = drawSources;
                     if (renderInstanceCount == 0) continue;
-                    instancesSpan = new ReadOnlySpan<float>(_sortedInstances, 0, renderInstanceCount * Stride);
+                    instancesSpan = IsRibbonSource(es)
+                        ? ReadOnlySpan<float>.Empty : new ReadOnlySpan<float>(_gatheredSorted ? _sortedInstances : _groupedInstances, 0, renderInstanceCount * Stride);
                     emitterUsed[passKey] = renderInstanceCount;
                 }
                 else
                 {
+                    _activeSources = null;
                     int alreadyUsed = emitterUsed.GetValueOrDefault(passKey);
-                    renderInstanceCount = ResolveEmitterDrawCount(es.Def, alreadyUsed, es.InstanceCount);
+                    renderInstanceCount = SourceDrawCount(es, alreadyUsed);
                     if (renderInstanceCount == 0) continue;
                     emitterUsed[passKey] = alreadyUsed + renderInstanceCount;
                     instancesSpan = es.PrepareInstances(renderInstanceCount);
+                    if (ShouldSortInstances(es.Def, renderInstanceCount))
+                    {
+                        EnsureInstanceSortCapacity(renderInstanceCount, renderInstanceCount * Stride);
+                        VfxRenderQueue.CopyInstancesBackToFront(es.RawInstances, renderInstanceCount, Stride,
+                            view, _sortedInstances, _instanceDepths, _instanceOrder);
+                        instancesSpan = _sortedInstances.AsSpan(0, renderInstanceCount * Stride);
+                    }
                 }
 
                 if (es.Def.DrawsAsMesh && es.MeshVao != 0)
@@ -603,9 +610,13 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             if (_meshProgram != 0) _gl.DeleteProgram(_meshProgram);
             _meshProgram = 0;
             _meshResources.Dispose();
+            SharedDrawGroups = null;
+            SharedDrawCapacities = null;
+            if (_meshInstanceVbo != 0) _gl.DeleteBuffer(_meshInstanceVbo);
+            _meshInstanceVbo = 0;
             _capture.Dispose();
             ResetEmitterDrawScratch();
-            _quadSourceLists.Clear();
+            _sourceLists.Clear();
             _groupedInstances = Array.Empty<float>();
             _sortedInstances = Array.Empty<float>();
             _instanceDepths = Array.Empty<float>();

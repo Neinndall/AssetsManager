@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -13,7 +13,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
         internal static GameShaderTranslator.TranslatedProgram Compose(GameShaderTranslator.TranslatedProgram program, bool mesh,
             IReadOnlyList<string> borderedTextures = null)
         {
-            string feed = mesh ? VfxShaderSource.MeshVertex : VfxShaderSource.ParticleVertex;
+            string feed = mesh ? VfxMeshInstanceShaderSource.Vertex : VfxShaderSource.ParticleVertex;
             feed = Regex.Replace(feed, @"^out (\w+) (\w+);", "$1 $2;", RegexOptions.Multiline);
             feed = feed.Replace("void main(){", "void particleGeometry(){");
             feed = mesh
@@ -48,7 +48,9 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             string shared = "vec3 particleWorld; vec3 particleNormal; vec4 particleTint; vec2 particleBaseUv; vec2 particleMultUv; vec2 particleLookup; float particleErosion;\n";
             if (mesh) shared += "vec4 particleUvRowU; vec4 particleUvRowV; vec4 particleMultRowU; vec4 particleMultRowV;\n";
             string helpers = Helpers(mesh);
-            if (mesh) helpers = helpers.Replace("vColorDynamics", "uGameLookupDrivers");
+            if (mesh) helpers = VfxMeshInstanceShaderSource.InstanceReads(helpers)
+                .Replace("particleTint = uColor;", "particleTint = vInstanceTint;")
+                .Replace("particleErosion = uErosionDrive;", "particleErosion = vInstanceErosion;");
             string geometry = feed + "\n" + helpers;
             // Geometry and its uniform declarations precede accessor prototypes and the translated stage.
             vertex = InsertAfterPrecision(vertex, shared + geometry);
@@ -160,7 +162,7 @@ void particleUvRows(vec2 scale, float angle, vec2 offset, vec2 center,
 }
 ";
 
-        private static string Helpers(bool mesh) => (mesh ? "uniform vec4 uColor;\nuniform float uErosionDrive;\n" + MeshUvHelpers : string.Empty) + @"
+        private static string Helpers(bool mesh) => (mesh ? MeshUvHelpers : string.Empty) + @"
 uniform int uGamePremultiplied;
 uniform int uHasTexMult;
 uniform int uColorLookUpTypeX;

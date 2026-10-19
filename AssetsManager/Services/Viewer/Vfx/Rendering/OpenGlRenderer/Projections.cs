@@ -83,7 +83,7 @@ public sealed partial class VfxOpenGlRenderer
         uniforms.Uniform1(uniforms.AddressModeMult, definition.TextureMultAddressMode);
         uniforms.Uniform2(uniforms.UvTransformCenterMult, definition.TextureMultTransformCenter.X, definition.TextureMultTransformCenter.Y);
         Vector2 emitterUvOffsetMult = VfxUvSemantics.Periodic(
-            definition.TextureMultEmitterUvScrollRate * emitter.RenderTime, definition.TextureMultAddressMode);
+            definition.TextureMultEmitterUvScrollRate * (_activeSources != null ? 0f : emitter.RenderTime), definition.TextureMultAddressMode);
         uniforms.Uniform2(uniforms.UvScrollRateMult, emitterUvOffsetMult.X, emitterUvOffsetMult.Y);
         uniforms.Uniform1(uniforms.FlipUMult, definition.TextureMultFlipU ? 1 : 0);
         uniforms.Uniform1(uniforms.FlipVMult, definition.TextureMultFlipV ? 1 : 0);
@@ -141,6 +141,7 @@ public sealed partial class VfxOpenGlRenderer
         _gl.BindVertexArray(_vao);
         _gl.BindBuffer(BufferTargetARB.ArrayBuffer, _instVbo);
         _gl.BufferData(BufferTargetARB.ArrayBuffer, decals, BufferUsageARB.StreamDraw);
+        CountParticleDraw(count);
         _gl.DrawArraysInstanced(PrimitiveType.TriangleFan, 0, 4, (uint)count);
     }
 

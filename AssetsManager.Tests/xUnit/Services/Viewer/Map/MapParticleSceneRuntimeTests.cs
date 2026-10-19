@@ -32,6 +32,26 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
         }
 
         [Fact]
+        public void SharedDrawCapacityTracksMapStatesWithoutReplacingIndependentGraphs()
+        {
+            var first = Runtime("First", Vector3.Zero);
+            var second = Runtime("Second", Vector3.One);
+            Assert.Equal(first.DrawGroupKey, second.DrawGroupKey);
+            Assert.NotSame(first.Graph, second.Graph);
+            var systems = new Dictionary<uint, VfxSystemDefinition> { [first.System.PathHash] = first.System };
+            var group = new MapParticleSystemGroupData(first.System.PathHash, first.System, new[] { first.Particle, second.Particle });
+            var catalog = new MapParticleSystemCatalog(systems, new Dictionary<uint, uint>(), new[] { group });
+            using var scene = new MapParticleSceneRuntime(new[] { first, second }, catalog: catalog);
+            Assert.Equal(Math.Min(4096, first.Capacity * 2), first.SharedDrawCapacity);
+            first.Advance(.2f);
+            var graph = first.Graph;
+            scene.Reconcile(catalog with { Groups = new[] { group with { Particles = new[] { first.Particle } } } }, new[] { first });
+            Assert.Same(graph, first.Graph);
+            Assert.Equal(.2f, first.Graph.Root.CurrentTime, 5);
+            Assert.Equal(Math.Min(4096, first.Capacity), first.SharedDrawCapacity);
+        }
+
+        [Fact]
         public void RestartRewindsPlacedDriversToTheirInitialSeededState()
         {
             MapParticleRuntime runtime = Runtime("Restart", new Vector3(0f, 0f, -10f));
