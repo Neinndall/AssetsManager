@@ -856,7 +856,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
         }
 
         private static readonly Regex SkinPathRegex = new(
-            @"characters/(?<champ>[^/]+)/(?:skins|themes)/(?<skin>base|(?:skin|theme)0*(?<num>\d+))",
+            @"characters/(?<champ>[^/]+)/(?:(?:skins|themes)/(?<skin>base|(?:skin|theme)0*(?<num>\d+))|themes/(?<skin>[^/]+))",
             RegexOptions.Compiled | RegexOptions.IgnoreCase);
         private static readonly Regex MaterialPathRegex = new(
             @"characters/(?<champ>[^/]+)/(?<folder>skins|themes)/(?<skin>[^/]+)(?:/materials)?/(?<mat>[^/]+)$",
@@ -1383,6 +1383,15 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                     candidateDirs.Add("data/" + dir);
                 }
 
+                // Companion models can live in TierN while their textures belong to the theme root.
+                bool isThemeMesh = dir.Contains("/themes/", StringComparison.Ordinal);
+                if (isThemeMesh)
+                    foreach (string candidateDir in candidateDirs.ToArray())
+                    {
+                        Match themeDirectory = Regex.Match(candidateDir, @"/themes/[^/]+/", RegexOptions.CultureInvariant);
+                        if (themeDirectory.Success) candidateDirs.Add(candidateDir[..(themeDirectory.Index + themeDirectory.Length)]);
+                    }
+
                 Match skinFolderMatch = Regex.Match(dir, @"/skins/skin30*(?<num>\d+)/", RegexOptions.IgnoreCase);
                 if (skinFolderMatch.Success)
                 {
@@ -1398,6 +1407,13 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                 }
 
                 var candidateStems = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { fileStem };
+                var themeTextureStems = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                if (isThemeMesh)
+                {
+                    string stem = Regex.Replace(fileStem, @"_tier[0-9]+$", "", RegexOptions.CultureInvariant);
+                    candidateStems.Add(stem);
+                    themeTextureStems.Add(stem);
+                }
                 if (fileStem.StartsWith("jade_", StringComparison.OrdinalIgnoreCase))
                     candidateStems.Add(fileStem[5..]);
                 else
@@ -1510,6 +1526,12 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                 {
                     string cleanName = skinName.ToLowerInvariant();
                     candidateStems.Add(cleanName);
+                    if (isThemeMesh)
+                    {
+                        string stem = Regex.Replace(cleanName, @"_tier[0-9]+$", "", RegexOptions.CultureInvariant);
+                        candidateStems.Add(stem);
+                        themeTextureStems.Add(stem);
+                    }
                     candidateStems.Add(cleanName.Replace(' ', '_'));
                     candidateStems.Add(cleanName.Replace(" ", ""));
                     string[] parts = cleanName.Split(new[] { '_', ' ', '-' }, StringSplitOptions.RemoveEmptyEntries);
@@ -1553,6 +1575,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                     {
                         candidateStems.Add(sm);
                         candidateStems.Add($"{fileStem}_{sm}");
+                        foreach (string stem in themeTextureStems) candidateStems.Add($"{stem}_{sm}");
                         if (!string.IsNullOrEmpty(cleanChamp))
                             candidateStems.Add($"{cleanChamp}_{sm}");
                     }

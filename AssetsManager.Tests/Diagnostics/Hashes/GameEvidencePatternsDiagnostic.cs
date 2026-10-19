@@ -51,6 +51,11 @@ internal static class GameEvidencePatternsDiagnostic
                 if (XxHash64Ext.Hash(path) != hash) throw new InvalidDataException("Session seed does not match its XXH64 hash.");
                 if (engine.Check(path, HashGuessStrategy.WordlistVariant, "Verified session seed")) seeded.Add(hash);
             }
+        if (args.Contains("--learn-seed", StringComparer.Ordinal) && seeded.Count > 0)
+        {
+            hashFile = new HashFile(HashGuessDomain.Game, known.Values.Concat(engine.Matches.Values.Select(match => match.Path)));
+            known = hashFile.Load();
+        }
         var guesser = new GameHashGuesser(hashFile);
         var watch = Stopwatch.StartNew();
         using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(seconds));
@@ -75,6 +80,24 @@ internal static class GameEvidencePatternsDiagnostic
                 Measure("Token removal", () => guesser.RemoveBasenameTokens(engine, cancellation.Token));
                 Measure("Numbers", () => guesser.SubstituteNumbers(engine, cancellation.Token, maximum: 200));
                 Measure("Padded numbers", () => guesser.SubstituteBasicPaddedNumbers(engine, cancellation.Token));
+            }
+            else if (stage == "grep-bins")
+            {
+                string binFilter = Option("--bin") ?? throw new ArgumentException("Provide --bin=<path fragment>.");
+                foreach (string file in guesser.FindWads(root))
+                {
+                    cancellation.Token.ThrowIfCancellationRequested();
+                    if (filter != null && !file.Contains(filter, StringComparison.OrdinalIgnoreCase)) continue;
+                    using var wad = new WadFile(file);
+                    foreach (var (hash, chunk) in wad.Chunks)
+                    {
+                        if (chunk.Compression == WadChunkCompression.Satellite || !known.TryGetValue(hash, out string path) ||
+                            !path.EndsWith(".bin", StringComparison.Ordinal) || !path.Contains(binFilter, StringComparison.OrdinalIgnoreCase) ||
+                            !visited.Add((hash, chunk.Checksum))) continue;
+                        using var data = wad.LoadChunkDecompressed(chunk);
+                        Measure(path, () => guesser.GrepWad(engine, data.DangerousGetArray(), path, file, hash, cancellation.Token));
+                    }
+                }
             }
             else if (stage == "portraits")
             {
@@ -266,7 +289,7 @@ internal static class GameEvidencePatternsDiagnostic
                     foreach (char letter in "abcdefghijklmnopqrstuvwxyz0123456789_-") Check(path.AsSpan(0, end), letter.ToString(), path.AsSpan(end));
                 }
             }
-            else throw new ArgumentException("Stage must be basic, numbers, portraits, custom, banners, local-names, roles, legacy-textures, legacy-bins, scoped-suffixes, number-pairs or typos.");
+            else throw new ArgumentException("Stage must be basic, numbers, portraits, grep-bins, custom, banners, local-names, roles, legacy-textures, legacy-bins, scoped-suffixes, number-pairs or typos.");
             complete = true;
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
