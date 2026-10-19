@@ -37,8 +37,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
             MapParticleRuntime runtime = Runtime("Restart", new Vector3(0f, 0f, -10f));
             using var scene = new MapParticleSceneRuntime(new[] { runtime });
 
-            runtime.Advance(0.25f);
-            Assert.Equal(0.25f, runtime.Graph.Root.CurrentTime, 5);
+            runtime.Advance(0.2f);
+            Assert.Equal(0.2f, runtime.Graph.Root.CurrentTime, 5);
 
             scene.Restart();
 

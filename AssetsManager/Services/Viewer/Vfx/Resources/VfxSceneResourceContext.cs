@@ -100,10 +100,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
             }
         }
 
-        internal IReadOnlyList<MapParticleRuntime> CreateMapRuntimes(MapParticleSystemCatalog catalog)
+        internal Task<IReadOnlyList<MapParticleRuntime>> CreateMapRuntimesAsync(
+            MapParticleSystemCatalog catalog, CancellationToken cancellationToken)
         {
             ThrowIfDisposed();
-            return MapParticleRuntime.CreateAll(catalog, PreparePlaybackAtWorldTransform);
+            return MapParticleRuntime.CreateAllAsync(catalog, PreparePlaybackAtWorldTransform, cancellationToken);
         }
 
         internal async Task EnsureMaterializedAsync(

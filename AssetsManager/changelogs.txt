@@ -7,6 +7,9 @@ HOTFIX UPDATE
 New Features
 
 Improvements
+  - 3D Studio / Map textures use compressed GPU uploads where supported, preserving authored mipmaps and progressive loading.
+  - 3D Studio / Large map effects prepare in smaller batches so the viewport can keep responding during loading.
+  - 3D Studio / Reduced repeated curve-table lookups while simulating particle effects.
   - Hash Guessing Lab / Reduces repeated work in GAME GrepWad animation and material searches while preserving path coverage.
   - Hash Guessing Lab / GAME Custom finds shared particle textures referenced by skin materials.
   - Hash Guessing Lab / GAME Basic learns portrait form variants from known skins.

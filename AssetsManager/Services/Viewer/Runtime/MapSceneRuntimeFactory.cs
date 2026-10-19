@@ -245,20 +245,25 @@ namespace AssetsManager.Services.Viewer.Runtime
 
                 var runtimes = new List<MapParticleRuntime>();
                 int kept = 0;
+                int prepared = 0;
                 foreach ((MapParticleSystemGroupData group, MapParticleData particle) in MapParticleRuntime.Playable(catalog))
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     if (existing.Remove(MapParticleRuntime.ReuseKeyOf(particle), out MapParticleRuntime runtime))
                     {
                         runtimes.Add(runtime);
                         kept++;
                         continue;
                     }
+                    if (prepared > 0 && prepared % MapParticleRuntime.PreparationBatchSize == 0)
+                        await MapParticleRuntime.YieldPreparationAsync(cancellationToken);
                     runtimes.Add(MapParticleRuntime.Create(
                         particle,
                         group.System,
                         catalog.Systems,
                         catalog.ResourceMap,
                         resources.PreparePlaybackAtWorldTransform));
+                    prepared++;
                 }
 
                 return new MapParticlePlan(generation, catalog, runtimes, created, kept);

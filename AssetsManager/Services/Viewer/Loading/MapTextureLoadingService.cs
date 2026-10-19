@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Viewer.Resolvers;
+using AssetsManager.Services.Viewer.Resources.Textures;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.Viewer;
 
@@ -19,12 +20,14 @@ namespace AssetsManager.Services.Viewer.Loading
     {
         internal const int PreviewTextureSize = 64;
         internal const int FullTextureSize = 1024;
-        private const int MaxConcurrentLoads = 4;
+        private const int MaxConcurrentReads = 8;
+        private const int MaxConcurrentDecodes = 4;
 
         private readonly MapAssetResolver _assetResolver;
         private readonly LogService _logService;
         private readonly MapTextureDecodeCache _decodeCache = new();
-        private readonly SemaphoreSlim _decodeGate = new(MaxConcurrentLoads, MaxConcurrentLoads);
+        private readonly SemaphoreSlim _readGate = new(MaxConcurrentReads, MaxConcurrentReads);
+        private readonly SemaphoreSlim _decodeGate = new(MaxConcurrentDecodes, MaxConcurrentDecodes);
         private readonly CancellationTokenSource _disposeCancellation = new();
 
         public MapTextureLoadingService(
@@ -346,9 +349,9 @@ namespace AssetsManager.Services.Viewer.Loading
 
         internal static bool PreviewSatisfiesFull(MapTextureImage preview)
         {
-            if (preview?.BaseLevel == null)
+            if (preview == null)
                 return false;
-            int landedWidth = preview.BaseLevel.PixelWidth;
+            int landedWidth = preview.Width;
             return landedWidth >= FullTextureSize || landedWidth < PreviewTextureSize;
         }
 
@@ -360,7 +363,7 @@ namespace AssetsManager.Services.Viewer.Loading
             int requestedWidth)
         {
             CancellationToken cancellationToken = _disposeCancellation.Token;
-            await _decodeGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+            await _readGate.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
             {
                 await using Stream stream = await _assetResolver.OpenReadAsync(asset, cancellationToken).ConfigureAwait(false);
@@ -368,14 +371,22 @@ namespace AssetsManager.Services.Viewer.Loading
                     return null;
 
                 string extension = DetectTextureExtension(stream, virtualPath ?? asset.VirtualPath);
-                IReadOnlyList<System.Windows.Media.Imaging.BitmapSource> levels = await Task.Run(
-                    () => TextureUtils.LoadViewerTextureMipChain(stream, extension, requestedWidth),
-                    cancellationToken).ConfigureAwait(false);
-                return levels.Count > 0 ? new MapTextureImage(levels) : null;
+                BlockTextureData blocks = await Task.Run(
+                    () => BlockTextureData.TryReadTex(stream, requestedWidth), cancellationToken).ConfigureAwait(false);
+                if (blocks != null) return new MapTextureImage(blocks);
+                await _decodeGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+                try
+                {
+                    IReadOnlyList<System.Windows.Media.Imaging.BitmapSource> levels = await Task.Run(
+                        () => TextureUtils.LoadViewerTextureMipChain(stream, extension, requestedWidth),
+                        cancellationToken).ConfigureAwait(false);
+                    return levels.Count > 0 ? new MapTextureImage(levels) : null;
+                }
+                finally { _decodeGate.Release(); }
             }
             finally
             {
-                _decodeGate.Release();
+                _readGate.Release();
             }
         }
 

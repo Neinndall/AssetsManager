@@ -81,7 +81,7 @@ namespace AssetsManager.Services.Viewer.Runtime
                 cancellationToken);
             try
             {
-                IReadOnlyList<MapParticleRuntime> runtimes = resources.CreateMapRuntimes(catalog);
+                IReadOnlyList<MapParticleRuntime> runtimes = await resources.CreateMapRuntimesAsync(catalog, cancellationToken);
                 return new MapParticleSceneRuntime(runtimes, resources, catalog);
             }
             catch
