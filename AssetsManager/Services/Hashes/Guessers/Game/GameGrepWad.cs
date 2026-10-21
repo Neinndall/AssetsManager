@@ -222,6 +222,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                     string value = match.Groups[1].Success ? match.Groups[1].Value : match.Groups[2].Value;
                     if (!IsAscii(value)) continue;
                     string path = NormalizePath(value);
+                    GuessNamespacedPreloadScripts(engine, path, sourceWadPath, sourceChunkHash, cancellationToken);
                     if (path.EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
                     {
                         string prefix = path[..^4];
@@ -1962,6 +1963,52 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                 if (engine.RemainingUnknownCount == 0) break;
             }
             return checkedCandidates;
+        }
+
+        private void GuessNamespacedPreloadScripts(HashGuessEngine engine, string name, string sourceWadPath,
+            ulong sourceChunkHash, CancellationToken cancellationToken)
+        {
+            if (name.Contains('/') || name.Contains('\\')) return;
+            var owners = Corpus.GetOrCreate("preload-script-owners", paths =>
+            {
+                const string prefix = "data/characters/";
+                var result = new HashSet<string>(StringComparer.Ordinal);
+                foreach (string path in paths)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (!path.StartsWith(prefix, StringComparison.Ordinal)) continue;
+                    int end = path.IndexOf('/', prefix.Length);
+                    if (end <= prefix.Length) continue;
+                    ReadOnlySpan<char> relative = path.AsSpan(end + 1);
+                    bool script = relative.StartsWith("spells/", StringComparison.Ordinal) &&
+                        (relative.EndsWith(".luabin64", StringComparison.Ordinal) || relative.EndsWith(".preload", StringComparison.Ordinal));
+                    bool rootBin = relative.IndexOf('/') < 0 && relative.EndsWith(".bin", StringComparison.Ordinal);
+                    if (script || rootBin) result.Add(path[prefix.Length..end]);
+                }
+                return result;
+            });
+            int dot = name.IndexOf('.');
+            if (dot > 0 && dot == name.LastIndexOf('.') && owners.Contains(name[..dot]))
+            {
+                string owner = name[..dot], script = name[(dot + 1)..];
+                if (!script.StartsWith(owner + "_", StringComparison.Ordinal)) script = owner + "_" + script;
+                Check(owner, script);
+                return;
+            }
+            if (dot >= 0) return;
+            for (int separator = name.LastIndexOf('_'); separator > 0; separator = name.LastIndexOf('_', separator - 1))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (owners.Contains(name[..separator])) Check(name[..separator], name);
+            }
+
+            void Check(string owner, string script)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                string prefix = $"data/characters/{owner}/spells/";
+                engine.CheckNormalizedParts(prefix, script, ".luabin64", HashGuessStrategy.PreloadReference, sourceWadPath, sourceChunkHash);
+                engine.CheckNormalizedParts(prefix, script, ".preload", HashGuessStrategy.PreloadReference, sourceWadPath, sourceChunkHash);
+            }
         }
 
         private static IEnumerable<HashGuessCandidate> ExtractLuaManifestCandidates(

@@ -66,7 +66,37 @@ internal static class GameEvidencePatternsDiagnostic
         Console.WriteLine($"Evidence patterns {stage}: {pending.Count} targets; time budget {seconds}s; no persistence");
         try
         {
-            if (stage == "basic")
+            if (stage == "map-siblings")
+            {
+                Measure("MAP geometry companions", () => guesser.GuessMapGeometrySiblings(engine, cancellation.Token));
+            }
+            else if (stage == "script-families")
+            {
+                Measure("Character script families", () => guesser.GuessScriptFamilyAliases(engine, cancellation.Token));
+            }
+            else if (stage == "grep-preloads")
+            {
+                foreach (string file in guesser.FindWads(root).Where(path => Path.GetFileName(path).Equals("Scripts.wad.client", StringComparison.OrdinalIgnoreCase)))
+                {
+                    using var wad = new WadFile(file);
+                    foreach (var chunk in wad.Chunks.Values)
+                    {
+                        cancellation.Token.ThrowIfCancellationRequested();
+                        if (chunk.Compression == WadChunkCompression.Satellite) continue;
+                        bool named = known.TryGetValue(chunk.PathHash, out string path);
+                        if (named && !path.EndsWith(".preload", StringComparison.Ordinal)) continue;
+                        using var data = wad.LoadChunkDecompressed(chunk);
+                        var bytes = data.DangerousGetArray();
+                        if (!named)
+                        {
+                            if (HashGuessingService.InferChunkExtension(bytes, false) != "preload") continue;
+                            path = chunk.PathHash.ToString("x16") + ".preload";
+                        }
+                        guesser.GrepWad(engine, bytes, path, file, chunk.PathHash, cancellation.Token);
+                    }
+                }
+            }
+            else if (stage == "basic")
             {
                 var lcu = new HashFile(HashGuessDomain.Lcu, Path.Combine(state, "hashes", "hashes.lcu.txt"));
                 Measure("Cross domain", () => guesser.GuessFromLcuHashes(engine, new LcuHashGuesser(lcu, null), cancellation.Token));
@@ -289,7 +319,7 @@ internal static class GameEvidencePatternsDiagnostic
                     foreach (char letter in "abcdefghijklmnopqrstuvwxyz0123456789_-") Check(path.AsSpan(0, end), letter.ToString(), path.AsSpan(end));
                 }
             }
-            else throw new ArgumentException("Stage must be basic, numbers, portraits, grep-bins, custom, banners, local-names, roles, legacy-textures, legacy-bins, scoped-suffixes, number-pairs or typos.");
+            else throw new ArgumentException("Stage must be map-siblings, script-families, grep-preloads, basic, numbers, portraits, grep-bins, custom, banners, local-names, roles, legacy-textures, legacy-bins, scoped-suffixes, number-pairs or typos.");
             complete = true;
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }

@@ -13,6 +13,86 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
 {
     internal sealed partial class GameHashGuesser
     {
+        internal int GuessScriptFamilyAliases(HashGuessEngine engine, CancellationToken cancellationToken,
+            int candidateBudget = int.MaxValue, Action<int> progress = null)
+        {
+            ArgumentNullException.ThrowIfNull(engine);
+            if (candidateBudget < 0) throw new ArgumentOutOfRangeException(nameof(candidateBudget));
+            cancellationToken.ThrowIfCancellationRequested();
+            if (candidateBudget == 0 || engine.RemainingUnknownCount == 0) return 0;
+            var families = Corpus.GetOrCreate("character-script-families", paths =>
+            {
+                var owners = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+                foreach (string path in paths)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (!path.StartsWith("data/characters/", StringComparison.Ordinal) ||
+                        !path.EndsWith(".luabin64", StringComparison.Ordinal) && !path.EndsWith(".preload", StringComparison.Ordinal)) continue;
+                    string[] parts = path.Split('/');
+                    if (parts.Length != 5 || parts[3] != "spells") continue;
+                    if (!owners.TryGetValue(parts[2], out var names)) owners[parts[2]] = names = new HashSet<string>(StringComparer.Ordinal);
+                    names.Add(parts[4][..parts[4].LastIndexOf('.')]);
+                }
+                var result = new List<(string Owner, string[] Names)>();
+                foreach (var group in owners.GroupBy(pair => pair.Key[(pair.Key.LastIndexOf('_') + 1)..], StringComparer.Ordinal))
+                {
+                    if (group.Count() < 2) continue;
+                    string[] names = group.SelectMany(pair => pair.Value.Select(name =>
+                            name.StartsWith(pair.Key + "_", StringComparison.Ordinal) ? name[(pair.Key.Length + 1)..] : name))
+                        .Distinct(StringComparer.Ordinal).OrderBy(name => name, StringComparer.Ordinal).ToArray();
+                    foreach (var owner in group.OrderBy(pair => pair.Key, StringComparer.Ordinal))
+                    {
+                        // Require examples of this owner's naming convention before borrowing family names.
+                        if (owner.Value.Count(name => name.StartsWith(owner.Key + "_", StringComparison.Ordinal)) >= 3)
+                            result.Add((owner.Key, names));
+                    }
+                }
+                return result;
+            });
+            int checkedCandidates = 0;
+            string[] scriptExtensions = { ".luabin64", ".preload" };
+            foreach (var (owner, names) in families)
+            {
+                string prefix = $"data/characters/{owner}/spells/{owner}_";
+                foreach (string name in names)
+                foreach (string extension in scriptExtensions)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (checkedCandidates >= candidateBudget || engine.RemainingUnknownCount == 0) return checkedCandidates;
+                    engine.CheckNormalizedParts(prefix, name, extension, HashGuessStrategy.CharacterTemplate,
+                        "GAME learned character script family");
+                    if ((++checkedCandidates & 0x3fff) == 0) progress?.Invoke(checkedCandidates);
+                }
+            }
+            progress?.Invoke(checkedCandidates);
+            return checkedCandidates;
+        }
+
+        internal int GuessMapGeometrySiblings(HashGuessEngine engine, CancellationToken cancellationToken,
+            int candidateBudget = int.MaxValue, Action<int> progress = null)
+        {
+            ArgumentNullException.ThrowIfNull(engine);
+            if (candidateBudget < 0) throw new ArgumentOutOfRangeException(nameof(candidateBudget));
+            cancellationToken.ThrowIfCancellationRequested();
+            if (candidateBudget == 0 || engine.RemainingUnknownCount == 0) return 0;
+
+            var geometryPaths = Corpus.GetOrCreate("map-geometry-sibling-paths", paths => paths
+                .Where(path => path.StartsWith("data/maps/mapgeometry/", StringComparison.Ordinal) &&
+                    path.EndsWith(".mapgeo", StringComparison.Ordinal))
+                .Distinct(StringComparer.Ordinal).OrderBy(path => path, StringComparer.Ordinal).ToArray());
+            int checkedCandidates = 0;
+            foreach (string geometryPath in geometryPaths)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (checkedCandidates >= candidateBudget || engine.RemainingUnknownCount == 0) break;
+                engine.CheckPrefixSuffix(geometryPath.AsSpan(0, geometryPath.Length - ".mapgeo".Length),
+                    ".navregions", HashGuessStrategy.ExtensionVariant, "GAME map geometry companion");
+                if ((++checkedCandidates & 0xff) == 0) progress?.Invoke(checkedCandidates);
+            }
+            progress?.Invoke(checkedCandidates);
+            return checkedCandidates;
+        }
+
         internal IReadOnlyList<string> GetCharacters() =>
             Corpus.GetOrCreate("characters", values => values
                 .Select(path => Regex.Match(path, @"^(?:assets/|data/)?characters/([^/.]+)(?:/|$)", RegexOptions.IgnoreCase))
