@@ -737,7 +737,7 @@
                                         </Border>
                                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                             <TextBlock Text="GAME STATE" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                                            <TextBlock Text="Buffs the skin's shaders react to" FontSize="9" Foreground="{StaticResource TextMuted}" Margin="0,1,0,0"/>
+                                            <TextBlock Text="Buffs affecting materials and visible parts" FontSize="9" Foreground="{StaticResource TextMuted}" Margin="0,1,0,0"/>
                                         </StackPanel>
                                         <materialIcons:MaterialIcon Grid.Column="2" Style="{StaticResource AnimatedChevronStyle}"/>
                                     </Grid>
@@ -755,7 +755,7 @@
                                                     </DataTemplate>
                                                 </ItemsControl.ItemTemplate>
                                             </ItemsControl>
-                                            <TextBlock Text="Needs game shaders on. States tied to an animation follow the playing clip."
+                                            <TextBlock Text="Material effects need game shaders on. States tied to an animation follow the playing clip."
                                                        FontSize="9" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap" Margin="0,8,0,0"/>
                                         </StackPanel>
                                     </Border>

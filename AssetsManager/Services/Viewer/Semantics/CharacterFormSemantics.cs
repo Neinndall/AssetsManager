@@ -9,6 +9,23 @@ namespace AssetsManager.Services.Viewer.Semantics
 {
     internal static class CharacterFormSemantics
     {
+        internal static IReadOnlyList<string> GameStateBuffs(
+            IEnumerable<ModelPart> parts, VfxOwnerSceneContext owner)
+        {
+            var materials = (parts ?? Enumerable.Empty<ModelPart>())
+                .Select(part => part.MaterialDefinition)
+                .Where(material => material != null)
+                .Distinct();
+            return materials.SelectMany(material =>
+                    material.DynamicParameters.SelectMany(parameter => parameter.Buffs ?? Array.Empty<string>())
+                    .Concat(material.TextureSwaps.SelectMany(swap => swap.Options.SelectMany(option => option.Condition.Buffs()))))
+                .Concat((owner?.SubmeshConditions ?? Array.Empty<VfxSubmeshCondition>())
+                    .SelectMany(condition => condition.Condition.Buffs()))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(buff => buff, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+        }
+
         /// <summary>
         /// Forms the Studio can preview: forms that reload the model with their own SKN, SKL or materials,
         /// and forms that fit the loaded owner mesh as authored; any other form cannot be previewed.
@@ -63,7 +80,7 @@ namespace AssetsManager.Services.Viewer.Semantics
             IEnumerable<VfxSubmeshCondition> conditions = null,
             GameMaterialState state = null)
         {
-            IReadOnlySet<uint> hidden = FormHiddenSubmeshes(initiallyHidden, form, parts);
+            IReadOnlySet<uint> hidden = FormHiddenSubmeshes(initiallyHidden, form, parts, conditions);
             if (conditions == null)
                 return hidden;
 
@@ -83,7 +100,8 @@ namespace AssetsManager.Services.Viewer.Semantics
         private static IReadOnlySet<uint> FormHiddenSubmeshes(
             IEnumerable<uint> initiallyHidden,
             CharacterFormDefinition form,
-            IEnumerable<ModelPart> parts)
+            IEnumerable<ModelPart> parts,
+            IEnumerable<VfxSubmeshCondition> conditions)
         {
             // A reloading form's GearData initialSubmeshToHide, when authored, replaces the owner's
             // baseline; its GearData show/hide lists still apply on top.
@@ -94,14 +112,13 @@ namespace AssetsManager.Services.Viewer.Semantics
             if (form == null || form.IsBase)
                 return hidden;
 
-            // Authored show/hide lists in GearData take absolute priority
+            // Keep authored gear lists unless none of their alternate parts exist in this mesh.
             if ((form.ShowSubmeshHashes != null && form.ShowSubmeshHashes.Count > 0) ||
                 (form.HideSubmeshHashes != null && form.HideSubmeshHashes.Count > 0))
             {
-                if (form.ShowSubmeshHashes != null)
-                    hidden.ExceptWith(form.ShowSubmeshHashes);
-                if (form.HideSubmeshHashes != null)
-                    hidden.UnionWith(form.HideSubmeshHashes);
+                var replacement = ResolveMissingFormSwap(form, parts, hidden, conditions);
+                hidden.ExceptWith(replacement?.Show ?? form.ShowSubmeshHashes ?? Array.Empty<uint>());
+                hidden.UnionWith(replacement?.Hide ?? form.HideSubmeshHashes ?? Array.Empty<uint>());
                 return hidden;
             }
 
@@ -115,6 +132,33 @@ namespace AssetsManager.Services.Viewer.Semantics
             }
 
             return hidden;
+        }
+
+        private static VfxSubmeshCondition ResolveMissingFormSwap(
+            CharacterFormDefinition form,
+            IEnumerable<ModelPart> parts,
+            IReadOnlySet<uint> initiallyHidden,
+            IEnumerable<VfxSubmeshCondition> conditions)
+        {
+            if (form.ReloadsModel || parts == null || conditions == null || form.ShowSubmeshHashes?.Count is not > 0)
+                return null;
+            var meshHashes = parts.Where(part => !string.IsNullOrWhiteSpace(part.Name))
+                .Select(part => Fnv1a.HashLower(part.Name)).ToHashSet();
+            if (form.ShowSubmeshHashes.Any(meshHashes.Contains))
+                return null;
+            uint[] hides = (form.HideSubmeshHashes ?? Array.Empty<uint>()).Where(meshHashes.Contains).ToArray();
+            if (hides.Length == 0 || hides.Any(initiallyHidden.Contains))
+                return null;
+
+            // Repair only a unique skin-local geometry swap. Do not enable its buff or related effects.
+            var matches = conditions.Where(condition =>
+                    condition.Condition is { Kind: GameMaterialBoolKind.Buff, Name.Length: > 0 } &&
+                    condition.Show.Count > 0 &&
+                    condition.Show.All(hash => meshHashes.Contains(hash) && initiallyHidden.Contains(hash)) &&
+                    condition.Hide.All(hash => meshHashes.Contains(hash) && !initiallyHidden.Contains(hash)) &&
+                    hides.All(condition.Hide.Contains))
+                .Take(2).ToArray();
+            return matches.Length == 1 ? matches[0] : null;
         }
 
         private static (IReadOnlyList<uint> Show, IReadOnlyList<uint> Hide) InferFormSubmeshes(

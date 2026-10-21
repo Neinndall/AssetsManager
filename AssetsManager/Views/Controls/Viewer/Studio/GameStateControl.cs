@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using AssetsManager.Services.Viewer.Semantics;
 using AssetsManager.Views.Models.Viewer;
 
 namespace AssetsManager.Views.Controls.Viewer
@@ -15,17 +16,10 @@ namespace AssetsManager.Views.Controls.Viewer
     {
         private AnimationClipCatalogItem _playingAnimationClip;
 
-        /// <summary>Offers every buff the champion's materials read, on as the focused actor left them.</summary>
+        /// <summary>Offers buffs read by materials and submesh conditions, on as the focused actor left them.</summary>
         private void RebuildCharacterGameStates()
         {
-            IEnumerable<string> buffs = (_championModel?.Parts ?? Enumerable.Empty<ModelPart>())
-                .Select(part => part.MaterialDefinition)
-                .Where(material => material != null)
-                .Distinct()
-                .SelectMany(material => material.DynamicParameters.SelectMany(parameter => parameter.Buffs ?? Array.Empty<string>())
-                    .Concat(material.TextureSwaps.SelectMany(swap => swap.Options.SelectMany(option => option.Condition.Buffs()))))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .OrderBy(buff => buff, StringComparer.OrdinalIgnoreCase);
+            var buffs = CharacterFormSemantics.GameStateBuffs(_championModel?.Parts, _activeBundle?.OwnerSceneContext);
             _model.SetCharacterGameStates(buffs, FocusedActor?.EnabledGameStates, OnCharacterGameStateChanged,
                 CharacterGameStateLabel);
             UpdateChampionGameState();

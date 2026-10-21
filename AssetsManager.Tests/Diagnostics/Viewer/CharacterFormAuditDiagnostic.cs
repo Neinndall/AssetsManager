@@ -23,10 +23,17 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
     {
         internal static void Run(string[] args)
         {
+            if (args.Contains("--census"))
+            {
+                CharacterFormCensusDiagnostic.Run(args);
+                return;
+            }
             if (args.Contains("--preview"))
             {
+                string[] buffs = args.Where(arg => arg.StartsWith("--buff=", StringComparison.Ordinal))
+                    .Select(arg => arg[7..]).ToArray();
                 foreach (string path in args.Where(arg => !arg.StartsWith("--", StringComparison.Ordinal)))
-                    PrintPreview(path);
+                    PrintPreview(path, buffs);
                 return;
             }
             var names = new Dictionary<uint, string>();
@@ -87,7 +94,7 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
             }
         }
 
-        private static void PrintPreview(string path)
+        private static void PrintPreview(string path, string[] buffs)
         {
             var log = new LogService(new Serilog.LoggerConfiguration().CreateLogger());
             using var hashes = new HashResolverService(new DirectoriesCreator(), log);
@@ -114,11 +121,14 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                 });
             }
             Console.WriteLine($"[Preview Forms] {path} authored={bundle.CharacterForms.Count}");
+            Console.WriteLine($"availableBuffs=[{string.Join(",", CharacterFormSemantics.GameStateBuffs(model.Parts, bundle.OwnerSceneContext))}]");
+            Console.WriteLine($"enabledBuffs=[{string.Join(",", buffs)}]");
             foreach (var option in CharacterFormSemantics.FormOptions(bundle.CharacterForms, bundle.OwnerSceneContext, model))
             {
                 VfxOwnerSceneContext playbackOwner = bundle.CreateCharacterPlaybackView(option.Definition).OwnerSceneContext;
                 var hidden = CharacterFormSemantics.HiddenSubmeshes(bundle.OwnerSceneContext.InitialHiddenSubmeshHashes,
-                    option.Definition, model.Parts, bundle.OwnerSceneContext.SubmeshConditions);
+                    option.Definition, model.Parts, bundle.OwnerSceneContext.SubmeshConditions,
+                    GameMaterialState.From(option.Definition.GearIndex, buffs, null));
                 Console.WriteLine($"label={option.Label} gear={option.Definition.GearIndex} path={option.Definition.PathHash:x8} " +
                     $"visible=[{string.Join(",", model.Parts.Where(part => !hidden.Contains(LeagueToolkit.Hashing.Fnv1a.HashLower(part.Name))).Select(part => part.Name))}] " +
                     $"ownerMesh={playbackOwner?.MeshPath} ownerSkeleton={playbackOwner?.SkeletonPath}");
