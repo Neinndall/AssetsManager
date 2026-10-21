@@ -1168,6 +1168,16 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                             Match m = SkinPathRegex.Match(refSkin.Replace('\\', '/'));
                             if (m.Success)
                             {
+                                if (obj.Properties.TryGetValue(Fnv1a.HashLower("championSkinName"), out var skinNameProperty) &&
+                                    skinNameProperty is BinTreeString skinName && targetTexHashes.Any(engine.UnknownHashes.Contains))
+                                {
+                                    foreach (string candidate in EnumerateArenaPropLabelTextures(refSkin, skinName.Value))
+                                    {
+                                        cancellationToken.ThrowIfCancellationRequested();
+                                        if (targetTexHashes.Contains(XxHash64Ext.Hash(candidate)))
+                                            Check(engine, candidate, HashGuessStrategy.BinLengthPath, sourceWadPath, sourceChunkHash);
+                                    }
+                                }
                                 string sKey = m.Groups["skin"].Value.ToLowerInvariant();
                                 if (!submeshesBySkin.TryGetValue(sKey, out var smSet))
                                     submeshesBySkin[sKey] = smSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -2139,6 +2149,53 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             return new UTF8Encoding(false, true).GetString(bytes);
         }
 
+        internal static IEnumerable<string> EnumerateArenaPropLabelTextures(string meshPath, string skinLabel)
+        {
+            string path = NormalizePath(meshPath);
+            string[] parts = path.Split('/');
+            if (parts.Length < 6 || parts[0] != "assets" || parts[1] != "characters" || parts[2].Length <= 10 ||
+                !parts[2].StartsWith("tft_", StringComparison.Ordinal) || !parts[2].EndsWith("_props", StringComparison.Ordinal)) yield break;
+            string owner = parts[2][4..^6];
+            if (owner.Length == 0 || string.IsNullOrWhiteSpace(skinLabel) ||
+                !skinLabel.StartsWith(owner + "_", StringComparison.OrdinalIgnoreCase) ||
+                skinLabel.Any(c => !char.IsAsciiLetterOrDigit(c) && c != '_')) yield break;
+            string prefix = path[..(path.LastIndexOf('/') + 1)] + "tft_arenaskin_" + skinLabel.ToLowerInvariant();
+            foreach (string suffix in new[] { "_tx", "_tx_cm" })
+            foreach (string extension in TextureMapExtensions)
+                yield return prefix + suffix + extension;
+        }
+
+        internal static IEnumerable<HashGuessCandidate> ExtractMapGeometryTextureCandidates(
+            string text, CancellationToken cancellationToken)
+        {
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            int search = 0;
+            while (search < text.Length)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                int start = text.IndexOf("maps/kitpieces/", search, StringComparison.OrdinalIgnoreCase);
+                if (start < 0) yield break;
+                search = start + "maps/kitpieces/".Length;
+                if (start >= 7 && text.AsSpan(start - 7, 7).Equals("assets/", StringComparison.OrdinalIgnoreCase)) start -= 7;
+                if (start < 4) continue;
+                int length = text[start - 4] | text[start - 3] << 8 |
+                             text[start - 2] << 16 | text[start - 1] << 24;
+                if (length is <= 0 or > 512 || length > text.Length - start) continue;
+                string material = text.Substring(start, length).ToLowerInvariant();
+                if (material.Any(c => !char.IsAsciiLetterOrDigit(c) && c is not ('_' or '/' or '.' or '-'))) continue;
+                if (material.StartsWith("assets/", StringComparison.Ordinal)) material = material[7..];
+                int separator = material.IndexOf("/materials/", StringComparison.Ordinal);
+                if (separator < 0 || !material.EndsWith("_mat", StringComparison.Ordinal) ||
+                    material.Contains("/../", StringComparison.Ordinal) || material.Contains("//", StringComparison.Ordinal)) continue;
+                string stem = material[(material.LastIndexOf('/') + 1)..^4];
+                if (stem.Length == 0) continue;
+                string texture = "assets/" + material[..separator] + "/textures/" + stem + "_tx";
+                if (!seen.Add(texture)) continue;
+                yield return new(texture + ".tex", HashGuessStrategy.BinLengthPath);
+                yield return new(texture + ".dds", HashGuessStrategy.BinLengthPath);
+            }
+        }
+
         private static IEnumerable<HashGuessCandidate> GrepFile(
             ArraySegment<byte> data,
             CancellationToken cancellationToken)
@@ -2147,6 +2204,10 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
 
             string text = Encoding.Latin1.GetString(data.Array, data.Offset, data.Count);
             var paths = new HashSet<string>(StringComparer.Ordinal);
+
+            if (text.StartsWith("OEGM", StringComparison.Ordinal))
+                foreach (var candidate in ExtractMapGeometryTextureCandidates(text, cancellationToken))
+                    yield return candidate;
 
             foreach (Match match in Regex.Matches(text, @"(?:ASSETS|Common|DATA|DATA_SOON|DATA_Soon|Gameplay|Global|LEVELS|Loadouts|UX|UIAutoAtlas)/[0-9a-zA-Z_. /-]+"))
             {

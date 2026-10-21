@@ -7,6 +7,9 @@ HOTFIX UPDATE
 New Features
 
 Improvements
+  - Hash Guessing Lab / GAME Grep resolves arena prop textures named after their skin labels.
+  - Hash Guessing Lab / GAME Grep finds map textures from material names stored in geometry files.
+  - Hash Guessing Lab / GAME Basic preserves learned numeric padding to find more filename variants.
   - Hash Guessing Lab / Reduces temporary memory allocations when checking known GAME and LCU hashes.
   - Hash Guessing Lab / GAME Basic finds navigation region files alongside map geometry and reuses spell names between character variants.
   - Hash Guessing Lab / GAME GrepWad resolves namespaced spell references from preload files.

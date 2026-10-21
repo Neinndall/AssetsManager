@@ -132,6 +132,47 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                 cancellationToken, "Generated numeric variant", progress, unpadded);
         }
 
+        internal int GuessLearnedPaddedNumbers(HashGuessEngine engine, CancellationToken cancellationToken,
+            int maximum = 200, int candidateBudget = int.MaxValue, Action<int> progress = null)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (maximum <= 0 || candidateBudget <= 0 || engine.RemainingUnknownCount == 0) return 0;
+            var formats = Corpus.GetOrCreate("game-learned-padded-number-formats", paths =>
+            {
+                var learned = new HashSet<(string Prefix, string Suffix, int Width)>();
+                foreach (string path in paths)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    int start = path.LastIndexOf('/') + 1;
+                    for (int at = start; at < path.Length;)
+                    {
+                        if (!char.IsAsciiDigit(path[at])) { at++; continue; }
+                        int end = at + 1;
+                        while (end < path.Length && char.IsAsciiDigit(path[end])) end++;
+                        if (end - at is >= 3 and <= 6 && path[at] == '0')
+                            learned.Add((path[..at], path[end..], end - at));
+                        at = end;
+                    }
+                }
+                return learned.OrderBy(f => f.Prefix, StringComparer.Ordinal).ThenBy(f => f.Suffix, StringComparer.Ordinal)
+                    .ThenBy(f => f.Width).ToArray();
+            });
+            var numbers = formats.Select(f => f.Width).Distinct().ToDictionary(width => width,
+                width => Enumerable.Range(0, maximum).Select(value => value.ToString("D" + width, CultureInfo.InvariantCulture)).ToArray());
+            int checkedCount = 0;
+            foreach (var format in formats)
+            foreach (string value in numbers[format.Width])
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (checkedCount >= candidateBudget || engine.RemainingUnknownCount == 0) return Finish();
+                engine.CheckNormalizedParts(format.Prefix, value,
+                    format.Suffix, HashGuessStrategy.NumberVariant, "GAME learned numeric padding");
+                if ((++checkedCount & 0xff) == 0) progress?.Invoke(checkedCount);
+            }
+            return Finish();
+            int Finish() { progress?.Invoke(checkedCount); return checkedCount; }
+        }
+
         internal IEnumerable<HashGuessCandidate> SubstituteBasicNumbers(int maximum = 100)
         {
             foreach (HashGuessCandidate candidate in SubstituteNumbers(maximum))

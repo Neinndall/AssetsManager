@@ -436,6 +436,12 @@ namespace AssetsManager.Services.Hashes
                             progress: count => progress?.Report(
                                 engine.CreateProgress("GAME Basic: padded numeric variants", progressOffsetPadded + count)));
                     }
+                    if (engine.RemainingUnknownCount > 0)
+                    {
+                        int learnedOffset = checkedCandidates;
+                        checkedCandidates += _gameGuesser.GuessLearnedPaddedNumbers(engine, cancellationToken,
+                            progress: count => progress?.Report(engine.CreateProgress("GAME Basic: learned numeric padding", learnedOffset + count)));
+                    }
                 }
 
                 var matches = engine.Matches.Values.OrderBy(value => value.Path, StringComparer.OrdinalIgnoreCase).ToList();
