@@ -7,6 +7,7 @@ HOTFIX UPDATE
 New Features
 
 Improvements
+  - Hash Guessing Lab / Reduces temporary memory allocations when checking known GAME and LCU hashes.
   - Hash Guessing Lab / GAME Basic finds navigation region files alongside map geometry and reuses spell names between character variants.
   - Hash Guessing Lab / GAME GrepWad resolves namespaced spell references from preload files.
   - 3D Studio / Repeated map effects share drawing work while keeping independent animation.

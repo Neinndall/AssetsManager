@@ -242,7 +242,15 @@ namespace AssetsManager.Utils
 
         public string Resolve(ulong hash)
         {
-            if (!_isLoaded || _hashAccessor == null) return null;
+            int index = FindIndex(hash);
+            return index >= 0 ? ResolveByIndex(index) : null;
+        }
+
+        public bool Contains(ulong hash) => FindIndex(hash) >= 0;
+
+        private int FindIndex(ulong hash)
+        {
+            if (!_isLoaded || _hashAccessor == null) return -1;
 
             // Búsqueda binaria directamente sobre el MemoryMappedViewAccessor (Zero-RAM)
             int low = 0;
@@ -255,7 +263,7 @@ namespace AssetsManager.Utils
 
                 if (midHash == hash)
                 {
-                    return ResolveByIndex(mid);
+                    return mid;
                 }
                 
                 if (midHash < hash)
@@ -268,7 +276,7 @@ namespace AssetsManager.Utils
                 }
             }
 
-            return null;
+            return -1;
         }
 
         public string ResolveByIndex(int index)
