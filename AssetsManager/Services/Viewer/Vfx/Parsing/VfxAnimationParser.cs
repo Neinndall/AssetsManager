@@ -566,7 +566,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 interruptionGroups,
                 flags,
                 parametricValues,
-                className);
+                className)
+            {
+                PlaysOwnEvents = ownerClassHash == VfxParsingHash.Fnv1a("SequencerClipData") ||
+                    ownerClassHash == VfxParsingHash.Fnv1a("ParametricClipData") &&
+                    Get(properties, 0x69de8fca) is BinTreeBool { Value: true }
+            };
         }
 
         private static IReadOnlyList<uint> ReadClipChildren(IReadOnlyDictionary<uint, BinTreeProperty> properties)

@@ -27,6 +27,7 @@ Improvements
 Changes
 
 Bug Fixes
+  - 3D Studio / Restored VFX and visual events attached to parent animation clips, including Ahri's dance.
   - Manage Versions / Updated shared Windows files, including shader caches and Bootstrap, when languages are selected.
   - Manage Versions / Prevented downloading other languages when the selected language has no separate files.
   - 3D Studio / Fixed incomplete alternate appearances when selecting skin forms.

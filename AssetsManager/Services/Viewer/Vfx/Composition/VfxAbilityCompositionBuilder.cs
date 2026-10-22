@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using AssetsManager.Services.Viewer.Animation;
 using AssetsManager.Views.Models.Viewer;
 using LeagueToolkit.Hashing;
 
@@ -80,15 +81,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Composition
             ArgumentNullException.ThrowIfNull(resourceMap);
 
             var events = new List<VfxCompositionEvent>();
-            float passTime = 0f;
             int resolvedCount = 0;
             int count = Math.Min(playlist.Count, Math.Min(stepDurations.Count, frameSeconds.Count));
-            for (int index = 0; index < count; index++)
+            float passTime = stepDurations.Take(count).Where(duration => float.IsFinite(duration) && duration > 0f).Sum();
+            foreach (var (step, offset, tick) in AnimationGraphPlayback.TimedEventClips(root, playlist, stepDurations, frameSeconds))
             {
-                AnimationClipDefinition step = playlist[index];
-                float tick = float.IsFinite(frameSeconds[index]) && frameSeconds[index] > 0f
-                    ? frameSeconds[index]
-                    : 1f / 30f;
                 VfxAbilityComposition atomic = Build(
                     step,
                     systems,
@@ -99,10 +96,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Composition
                 {
                     VfxParticleEventDefinition cue = compositionEvent.Event;
                     if (cue.IsKillEvent) continue;
-                    float start = passTime + cue.StartFrame * tick;
+                    float start = offset + cue.StartFrame * tick;
                     float end = cue.EndFrame < 0f
                         ? -1f
-                        : passTime + cue.EndFrame * tick;
+                        : offset + cue.EndFrame * tick;
                     VfxCompositionEvent timed = compositionEvent with
                     {
                         Event = cue with
@@ -114,10 +111,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Composition
                     events.Add(timed);
                     if (timed.System != null) resolvedCount++;
                 }
-
-                float duration = stepDurations[index];
-                if (float.IsFinite(duration) && duration > 0f)
-                    passTime += duration;
             }
 
             return new VfxAbilityComposition(

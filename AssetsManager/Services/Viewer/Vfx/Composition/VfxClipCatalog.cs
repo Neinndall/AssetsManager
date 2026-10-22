@@ -75,7 +75,7 @@ internal sealed class VfxClipCatalog : IDisposable
 
             var particleEvents = new List<VfxCompositionEvent>();
             int eventCount = 0;
-            foreach (AnimationClipDefinition atomic in playlist)
+            foreach (AnimationClipDefinition atomic in AnimationGraphPlayback.EventClips(clip, playlist))
             {
                 VfxAbilityComposition composition = VfxAbilityCompositionBuilder.Build(
                     atomic,
@@ -204,8 +204,15 @@ internal sealed class VfxClipCatalog : IDisposable
             IAnimationAsset timedAsset = GraphPoseAnimationAsset.Wrap(RetimeForGraph(asset, atomic.TickDuration),
                 atomic, graph, basisPath == null ? null : GetOrLoadAsset(basisPath, cancellationToken));
             steps.Add(timedAsset);
-            float tick = 1f / timedAsset.Fps;
+            passTime += timedAsset.Duration;
+        }
 
+        var eventSteps = AnimationGraphPlayback.TimedEventClips(item.Clip,
+            playlist.Select(step => step.Clip).ToArray(), steps.Select(step => step.Duration).ToArray(),
+            steps.Select(step => 1f / step.Fps).ToArray());
+        foreach ((AnimationClipDefinition atomic, float start, float tick) in eventSteps)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
             VfxAbilityComposition composition = VfxAbilityCompositionBuilder.Build(
                 atomic,
                 bundle.Systems,
@@ -220,10 +227,10 @@ internal sealed class VfxClipCatalog : IDisposable
                 {
                     Event = cue.Event with
                     {
-                        StartFrame = passTime + cue.Event.StartFrame * tick,
+                        StartFrame = start + cue.Event.StartFrame * tick,
                         EndFrame = cue.Event.EndFrame < 0f
                             ? -1f
-                            : passTime + cue.Event.EndFrame * tick
+                            : start + cue.Event.EndFrame * tick
                     }
                 });
             }
@@ -231,9 +238,9 @@ internal sealed class VfxClipCatalog : IDisposable
             foreach (AnimationClipEventDefinition authoredEvent in atomic.Events)
             {
                 eventCount++;
-                double at = passTime + authoredEvent.StartFrame * tick;
+                double at = start + authoredEvent.StartFrame * tick;
                 double? until = authoredEvent.EndFrame >= 0f
-                    ? passTime + authoredEvent.EndFrame * tick
+                    ? start + authoredEvent.EndFrame * tick
                     : null;
                 until = AnimationGraphPlayback.TimedEventEnd(authoredEvent, at, until);
 
@@ -268,8 +275,6 @@ internal sealed class VfxClipCatalog : IDisposable
                         break;
                 }
             }
-
-            passTime += timedAsset.Duration;
         }
 
         int resolvedVfx = particleEvents.Count(cue => cue.System != null);

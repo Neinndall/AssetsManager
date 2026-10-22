@@ -156,6 +156,33 @@ namespace AssetsManager.Services.Viewer.Animation
             return result;
         }
 
+        internal static IEnumerable<AnimationClipDefinition> EventClips(
+            AnimationClipDefinition owner, IReadOnlyList<AnimationClipDefinition> playlist)
+            => owner.PlaysOwnEvents && !playlist.Contains(owner) ? playlist.Append(owner) : playlist;
+
+        internal static IReadOnlyList<(AnimationClipDefinition Clip, float Start, float Tick)> TimedEventClips(
+            AnimationClipDefinition owner, IReadOnlyList<AnimationClipDefinition> playlist,
+            IReadOnlyList<float> durations, IReadOnlyList<float> frameSeconds)
+        {
+            var result = new List<(AnimationClipDefinition, float, float)>();
+            float time = 0f, frames = 0f;
+            int count = Math.Min(playlist.Count, Math.Min(durations.Count, frameSeconds.Count));
+            for (int index = 0; index < count; index++)
+            {
+                float tick = float.IsFinite(frameSeconds[index]) && frameSeconds[index] > 0f
+                    ? frameSeconds[index] : 1f / 30f;
+                float duration = float.IsFinite(durations[index]) && durations[index] > 0f ? durations[index] : 0f;
+                result.Add((playlist[index], time, tick));
+                time += duration;
+                frames += duration / tick;
+            }
+
+            // Parent event frames span the entire pass, including children with different rates.
+            if (owner.PlaysOwnEvents && !playlist.Contains(owner) && frames > 0f)
+                result.Add((owner, 0f, time / frames));
+            return result;
+        }
+
         internal static IAnimationAsset RetimeForGraph(IAnimationAsset asset, float tickDuration)
         {
             ArgumentNullException.ThrowIfNull(asset);
