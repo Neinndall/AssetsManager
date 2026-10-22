@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using System.Globalization;
@@ -30,14 +29,13 @@ internal sealed partial class GameHashGuesser
         var containers = new HashSet<(string, string)>();
         var visited = new HashSet<(ulong Hash, ulong Checksum)>();
         var known = HashFile.Load();
-        byte[] animationField = new byte[4];
-        BinaryPrimitives.WriteUInt32LittleEndian(animationField, Fnv1a.HashLower("mAnimationFilePath"));
+        uint animationField = Fnv1a.HashLower("mAnimationFilePath");
         foreach (string wadPath in FindWads(rootDirectory))
         {
             cancellationToken.ThrowIfCancellationRequested();
             try
             {
-                using var wad = new WadFile(wadPath);
+                using var wad = OpenWad(wadPath);
                 if (!wad.Chunks.Keys.Any(engine.UnknownHashes.Contains)) continue;
                 foreach (var (hash, chunk) in wad.Chunks)
                 {
@@ -53,21 +51,7 @@ internal sealed partial class GameHashGuesser
                         using var data = wad.LoadChunkDecompressed(chunk);
                         visited.Add((hash, chunk.Checksum));
                         // Reject irrelevant BINs cheaply; a parsed property still verifies every accepted link.
-                        var remaining = data.Span;
-                        bool pending = false;
-                        while (remaining.Length >= 13)
-                        {
-                            cancellationToken.ThrowIfCancellationRequested();
-                            int offset = remaining.IndexOf(animationField);
-                            if (offset < 0 || remaining.Length - offset < 13) break;
-                            if (engine.UnknownHashes.Contains(BinaryPrimitives.ReadUInt64LittleEndian(remaining.Slice(offset + 5, 8))))
-                            {
-                                pending = true;
-                                break;
-                            }
-                            remaining = remaining[(offset + 1)..];
-                        }
-                        if (!pending) continue;
+                        if (!GameBinLinkProbe.ContainsPendingLink(data.Span, animationField, engine.UnknownHashes, cancellationToken)) continue;
                         var bytes = data.DangerousGetArray();
                         using var stream = new MemoryStream(bytes.Array, bytes.Offset, bytes.Count, false);
                         var tree = new BinTree(stream);
@@ -93,6 +77,7 @@ internal sealed partial class GameHashGuesser
         long candidateBudget = long.MaxValue, Action<long> progress = null)
     {
         if (containers.Count == 0 || candidateBudget <= 0 || engine.RemainingUnknownCount == 0) return 0;
+        var containerIndex = new GameAnimationContainerIndex(containers);
         var prefixes = new HashSet<string>(StringComparer.Ordinal);
         var suffixes = new HashSet<string>(StringComparer.Ordinal);
         foreach (string path in KnownPaths)
@@ -106,11 +91,7 @@ internal sealed partial class GameHashGuesser
             for (int count = 1; count < Math.Min(5, words.Length); count++)
                 suffixes.Add(string.Join('_', words[^count..]) + ".anm");
             string[] folders = normalized[..slash].Split('/');
-            if (folders.Length < 5 || folders[1] != "characters") continue;
-            bool active = containers.Any(container => container.Character == folders[2] &&
-                (folders.Skip(3).Contains(container.Container) ||
-                 container.Container == "base" && folders.Skip(3).Contains("skin0")));
-            if (!active) continue;
+            if (!containerIndex.Contains(folders)) continue;
             for (int count = 1; count < Math.Min(4, words.Length); count++)
                 prefixes.Add(normalized[..(slash + 1)] + string.Join('_', words[..count]) + "_");
         }

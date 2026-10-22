@@ -108,7 +108,49 @@ internal static class GameEvidencePatternsDiagnostic
         Console.WriteLine($"Evidence patterns {stage}: {pending.Count} targets; time budget {seconds}s; no persistence");
         try
         {
-            if (stage == "decoded-copies")
+            if (stage == "material-scope-probe")
+            {
+                using var document = JsonDocument.Parse(File.ReadAllText(Option("--references") ?? throw new ArgumentException("Provide --references.")));
+                var index = new GameMaterialTextureIndex(known.Values, cancellation.Token);
+                foreach (var reference in document.RootElement.GetProperty("References").EnumerateArray())
+                {
+                    cancellation.Token.ThrowIfCancellationRequested();
+                    ulong target = ulong.Parse(reference.GetProperty("Hash").GetString(), NumberStyles.HexNumber);
+                    if (!pending.Contains(target)) continue;
+                    var sampler = reference.GetProperty("Context").EnumerateArray().FirstOrDefault(frame =>
+                        frame.GetProperty("Owner").GetString() == "StaticMaterialShaderSamplerDef");
+                    if (sampler.ValueKind != JsonValueKind.Object || !sampler.GetProperty("Values").TryGetProperty("TextureName", out var role)) continue;
+                    string source = reference.GetProperty("Bin").GetString();
+                    var scopes = new HashSet<string>(StringComparer.Ordinal);
+                    Match single = Regex.Match(source, @"^data/characters/([^/]+)/(skins|themes)/(skin\d+)\.bin$");
+                    if (single.Success && int.TryParse(single.Groups[3].Value.AsSpan(4), out int skin) && skin < 10)
+                    {
+                        scopes.Add($"data/characters/{single.Groups[1].Value}/{single.Groups[2].Value}/skin{skin}.bin");
+                        scopes.Add($"data/characters/{single.Groups[1].Value}/{single.Groups[2].Value}/skin{skin:D2}.bin");
+                        scopes.Remove(source);
+                    }
+                    Match group = Regex.Match(source, @"^data/characters/([^/]+)/[^/]+_multi_");
+                    if (group.Success)
+                        foreach (Match token in Regex.Matches(source, @"_skins_(skin\d+)"))
+                            scopes.Add($"data/characters/{group.Groups[1].Value}/skins/{token.Groups[1].Value}.bin");
+                    var embedded = new BinTreeEmbedded(0, Fnv1a.HashLower("StaticMaterialShaderSamplerDef"), new BinTreeProperty[]
+                    {
+                        new BinTreeString(Fnv1a.HashLower("TextureName"), role.GetString()),
+                        new BinTreeWadChunkLink(Fnv1a.HashLower("texturePath"), target)
+                    });
+                    var material = new BinTreeObject(1, Fnv1a.HashLower("StaticMaterialDef"), new BinTreeProperty[]
+                    {
+                        new BinTreeContainer(Fnv1a.HashLower("samplerValues"), BinPropertyType.Embedded, new[] { embedded })
+                    });
+                    var tree = new BinTree(new[] { material }, Array.Empty<string>());
+                    foreach (string scope in scopes)
+                    {
+                        index.Guess(engine, tree, scope, source, 0, cancellation.Token);
+                        index.GuessSharedParticles(engine, tree, scope, source, 0, cancellation.Token);
+                    }
+                }
+            }
+            else if (stage == "decoded-copies")
             {
                 string copyOutput = Option("--copies") ?? throw new ArgumentException("Provide --copies.");
                 var targets = new Dictionary<(int, ulong), HashSet<ulong>>();
@@ -262,10 +304,11 @@ internal static class GameEvidencePatternsDiagnostic
             }
             else if (stage == "local-names")
             {
+                var wadPathCache = Option("--share-wad-headers") == "true" ? new GameWadPathCache() : null;
                 Measure("Local animations", () => guesser.GuessLocalNamePatterns(engine, root, true,
-                    cancellation.Token, long.MaxValue, null));
+                    cancellation.Token, long.MaxValue, null, wadPathCache));
                 Measure("Local textures", () => guesser.GuessLocalNamePatterns(engine, root, false,
-                    cancellation.Token, long.MaxValue, null));
+                    cancellation.Token, long.MaxValue, null, wadPathCache));
             }
             else if (stage == "numbers")
             {
@@ -437,7 +480,7 @@ internal static class GameEvidencePatternsDiagnostic
                     foreach (char letter in "abcdefghijklmnopqrstuvwxyz0123456789_-") Check(path.AsSpan(0, end), letter.ToString(), path.AsSpan(end));
                 }
             }
-            else throw new ArgumentException("Stage must be content-evidence, decoded-copies, map-materials-only, grep-mapgeo, learned-padding, map-siblings, script-families, grep-preloads, basic, numbers, portraits, grep-bins, custom, banners, local-names, roles, legacy-textures, legacy-bins, scoped-suffixes, number-pairs or typos.");
+            else throw new ArgumentException("Stage must be content-evidence, material-scope-probe, decoded-copies, map-materials-only, grep-mapgeo, learned-padding, map-siblings, script-families, grep-preloads, basic, numbers, portraits, grep-bins, custom, banners, local-names, roles, legacy-textures, legacy-bins, scoped-suffixes, number-pairs or typos.");
             complete = true;
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }

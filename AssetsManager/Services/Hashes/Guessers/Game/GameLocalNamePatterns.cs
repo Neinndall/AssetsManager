@@ -3,14 +3,13 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using AssetsManager.Views.Models.Hashes;
-using LeagueToolkit.Core.Wad;
 
 namespace AssetsManager.Services.Hashes.Guessers.Game;
 
 internal sealed partial class GameHashGuesser
 {
     internal long GuessLocalNamePatterns(HashGuessEngine engine, string rootDirectory, bool animations,
-        CancellationToken cancellationToken, long candidateBudget, Action<long> progress)
+        CancellationToken cancellationToken, long candidateBudget, Action<long> progress, GameWadPathCache wadPathCache = null)
     {
         var known = HashFile.Load();
         var paths = new HashSet<string>(StringComparer.Ordinal);
@@ -19,17 +18,11 @@ internal sealed partial class GameHashGuesser
             cancellationToken.ThrowIfCancellationRequested();
             try
             {
-                using var wad = new WadFile(wadPath);
-                if (!wad.Chunks.Keys.Any(engine.UnknownHashes.Contains)) continue;
-                foreach (ulong hash in wad.Chunks.Keys)
+                if (wadPathCache != null) CollectPaths(wadPathCache.Read(wadPath, cancellationToken));
+                else
                 {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    known.TryGetValue(hash, out string path);
-                    if (path == null && engine.Matches.TryGetValue(hash, out var match)) path = match.Path;
-                    if (path != null && path.Contains('/') &&
-                        (animations ? path.EndsWith(".anm", StringComparison.Ordinal) :
-                            path.EndsWith(".tex", StringComparison.Ordinal) || path.EndsWith(".dds", StringComparison.Ordinal)))
-                        paths.Add(path);
+                    using var wad = OpenWad(wadPath);
+                    CollectPaths(wad.Chunks.Keys);
                 }
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
@@ -38,6 +31,21 @@ internal sealed partial class GameHashGuesser
             }
         }
         return SubstituteLocalNameWords(engine, paths, cancellationToken, candidateBudget, progress);
+
+        void CollectPaths(IEnumerable<ulong> hashes)
+        {
+            if (!hashes.Any(engine.UnknownHashes.Contains)) return;
+            foreach (ulong hash in hashes)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                known.TryGetValue(hash, out string path);
+                if (path == null && engine.Matches.TryGetValue(hash, out var match)) path = match.Path;
+                if (path != null && path.Contains('/') &&
+                    (animations ? path.EndsWith(".anm", StringComparison.Ordinal) :
+                        path.EndsWith(".tex", StringComparison.Ordinal) || path.EndsWith(".dds", StringComparison.Ordinal)))
+                    paths.Add(path);
+            }
+        }
     }
 
     internal static long SubstituteLocalNameWords(HashGuessEngine engine, IEnumerable<string> paths,

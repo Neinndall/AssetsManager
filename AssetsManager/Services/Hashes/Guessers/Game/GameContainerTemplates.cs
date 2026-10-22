@@ -44,13 +44,16 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
 
             foreach (var pair in contexts.OrderBy(value => value.Key.Character, StringComparer.Ordinal)
                          .ThenBy(value => value.Key.Kind, StringComparer.Ordinal))
-            foreach (string format in pair.Value.Formats.OrderBy(value => value, StringComparer.Ordinal))
-            foreach (string container in pair.Value.Containers.OrderBy(value => value, StringComparer.Ordinal))
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                yield return new HashGuessCandidate(
-                    format.Replace("{container}", container, StringComparison.Ordinal),
-                    HashGuessStrategy.SkinNumberVariant);
+                string[] containers = pair.Value.Containers.OrderBy(value => value, StringComparer.Ordinal).ToArray();
+                foreach (string format in pair.Value.Formats.OrderBy(value => value, StringComparer.Ordinal))
+                foreach (string container in containers)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    yield return new HashGuessCandidate(
+                        format.Replace("{container}", container, StringComparison.Ordinal),
+                        HashGuessStrategy.SkinNumberVariant);
+                }
             }
         }
 

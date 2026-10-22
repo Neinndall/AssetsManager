@@ -107,7 +107,7 @@ namespace AssetsManager.Services.Hashes
 
                     try
                     {
-                        using var wad = new WadFile(wadPath);
+                        using var wad = HashGuesser.OpenWad(wadPath);
                         foreach (var chunk in wad.Chunks.Values)
                         {
                             cancellationToken.ThrowIfCancellationRequested();

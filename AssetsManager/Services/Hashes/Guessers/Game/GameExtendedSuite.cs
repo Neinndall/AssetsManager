@@ -71,17 +71,18 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                 source: "GAME basename word addition");
         }
 
-        internal IEnumerable<HashGuessCandidate> SubstituteCharacter(int candidateBudget = DefaultExtendedCandidateBudget) => GenerateCharacterSubstitutionCandidates(candidateBudget);
-        internal IEnumerable<HashGuessCandidate> SubstituteSkinNumbers(int candidateBudget = DefaultExtendedCandidateBudget) => GenerateSkinNumberCandidates(candidateBudget);
-        internal IEnumerable<HashGuessCandidate> SubstituteSuffixes(int candidateBudget = DefaultExtendedCandidateBudget) => GenerateSuffixCandidates(candidateBudget);
+        internal IEnumerable<HashGuessCandidate> SubstituteCharacter(int candidateBudget = DefaultExtendedCandidateBudget, CancellationToken cancellationToken = default) => GenerateCharacterSubstitutionCandidates(candidateBudget, cancellationToken);
+        internal IEnumerable<HashGuessCandidate> SubstituteSkinNumbers(int candidateBudget = DefaultExtendedCandidateBudget, CancellationToken cancellationToken = default) => GenerateSkinNumberCandidates(candidateBudget, cancellationToken);
+        internal IEnumerable<HashGuessCandidate> SubstituteSuffixes(int candidateBudget = DefaultExtendedCandidateBudget, CancellationToken cancellationToken = default) => GenerateSuffixCandidates(candidateBudget, cancellationToken);
 
-        internal IEnumerable<HashGuessCandidate> GenerateCharacterSubstitutionCandidates(int candidateBudget)
+        internal IEnumerable<HashGuessCandidate> GenerateCharacterSubstitutionCandidates(int candidateBudget, CancellationToken cancellationToken = default)
         {
             var characterCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
             var formatCounts = new Dictionary<string, int>(StringComparer.Ordinal);
             var regex = new Regex(@"^(?:assets|data)/characters/([^/]+)/", RegexOptions.IgnoreCase);
             foreach (string path in KnownPaths)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 Match match = regex.Match(path);
                 if (!match.Success) continue;
                 string character = match.Groups[1].Value;
@@ -96,18 +97,20 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             foreach (string format in formatCounts.OrderByDescending(pair => pair.Value).ThenBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => pair.Key))
             foreach (string character in characters)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 yield return new HashGuessCandidate(format.Replace("{character}", character, StringComparison.Ordinal), HashGuessStrategy.CharacterSubstitution);
                 if (CountCandidate(ref generated, candidateBudget)) yield break;
             }
         }
 
-        internal IEnumerable<HashGuessCandidate> GenerateSuffixCandidates(int candidateBudget)
+        internal IEnumerable<HashGuessCandidate> GenerateSuffixCandidates(int candidateBudget, CancellationToken cancellationToken = default)
         {
             var suffixCounts = new Dictionary<string, int>(StringComparer.Ordinal) { [string.Empty] = int.MaxValue };
             var formatCounts = new Dictionary<string, int>(StringComparer.Ordinal);
             var regex = new Regex(@"^(.*?)(\.[^.]+)?(\.[^.]+)$");
             foreach (string path in KnownPaths)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 Match match = regex.Match(path);
                 if (!match.Success) continue;
                 string suffix = match.Groups[2].Value;
@@ -125,18 +128,20 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             foreach (string format in formatCounts.OrderByDescending(pair => pair.Value).ThenBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => pair.Key))
             foreach (string suffix in suffixes)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 yield return new HashGuessCandidate(format.Replace("{suffix}", suffix, StringComparison.Ordinal), HashGuessStrategy.SuffixVariant);
                 if (CountCandidate(ref generated, candidateBudget)) yield break;
             }
         }
 
-        internal IEnumerable<HashGuessCandidate> GenerateSkinNumberCandidates(int candidateBudget)
+        internal IEnumerable<HashGuessCandidate> GenerateSkinNumberCandidates(int candidateBudget, CancellationToken cancellationToken = default)
         {
             var directoryRegex = new Regex(@"/characters/([^/]+)/skins/(base|skin\d+)/", RegexOptions.IgnoreCase);
             var skinRegex = new Regex(@"(?:base|skin\d+)", RegexOptions.IgnoreCase);
             var characters = new Dictionary<string, (HashSet<string> Skins, HashSet<(string Format, int Count)> Formats)>(StringComparer.OrdinalIgnoreCase);
             foreach (string path in KnownPaths)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 Match directory = directoryRegex.Match(path);
                 if (!directory.Success || directory.Groups[1].Value.Equals("sightward", StringComparison.OrdinalIgnoreCase)) continue;
                 string character = directory.Groups[1].Value;
@@ -151,22 +156,26 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             }
             int generated = 0;
             foreach (var character in characters.OrderBy(value => value.Key, StringComparer.Ordinal))
-            foreach ((string format, int count) in character.Value.Formats
-                .OrderBy(value => value.Format, StringComparer.Ordinal)
-                .ThenBy(value => value.Count))
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 List<string> skins = character.Value.Skins.OrderBy(value => value, StringComparer.Ordinal).ToList();
-                if (count > skins.Count) continue;
-                foreach (IEnumerable<string> combination in GetCombinations(skins, count))
+                foreach ((string format, int count) in character.Value.Formats
+                    .OrderBy(value => value.Format, StringComparer.Ordinal)
+                    .ThenBy(value => value.Count))
                 {
-                    string candidate = format;
-                    foreach (string skin in combination)
+                    if (count > skins.Count) continue;
+                    foreach (IEnumerable<string> combination in GetCombinations(skins, count))
                     {
-                        int marker = candidate.IndexOf("{skin}", StringComparison.Ordinal);
-                        candidate = candidate[..marker] + skin + candidate[(marker + 6)..];
+                        string candidate = format;
+                        foreach (string skin in combination)
+                        {
+                            int marker = candidate.IndexOf("{skin}", StringComparison.Ordinal);
+                            candidate = candidate[..marker] + skin + candidate[(marker + 6)..];
+                        }
+                        cancellationToken.ThrowIfCancellationRequested();
+                        yield return new HashGuessCandidate(candidate, HashGuessStrategy.SkinNumberVariant);
+                        if (CountCandidate(ref generated, candidateBudget)) yield break;
                     }
-                    yield return new HashGuessCandidate(candidate, HashGuessStrategy.SkinNumberVariant);
-                    if (CountCandidate(ref generated, candidateBudget)) yield break;
                 }
             }
         }
@@ -196,11 +205,11 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             if (engine.RemainingUnknownCount > 0 && ShouldRun("game-ext-chromas"))
                 checkedCandidates += await GuessSkinGroupsBinUsingChromas(engine, rootDirectory, cancellationToken, progress, checkedCandidates);
             if (engine.RemainingUnknownCount > 0 && ShouldRun("game-ext-suffixes"))
-                checkedCandidates += CheckCandidates(engine, SubstituteSuffixes(DefaultExtendedCandidateBudget), "GAME suffix substitution", cancellationToken, progress, checkedCandidates);
+                checkedCandidates += CheckCandidates(engine, SubstituteSuffixes(DefaultExtendedCandidateBudget, cancellationToken), "GAME suffix substitution", cancellationToken, progress, checkedCandidates);
             if (engine.RemainingUnknownCount > 0 && ShouldRun("game-ext-skinnumbers"))
                 checkedCandidates += CheckCandidates(
                     engine,
-                    SubstituteSkinNumbers(DefaultExtendedCandidateBudget),
+                    SubstituteSkinNumbers(DefaultExtendedCandidateBudget, cancellationToken),
                     "GAME skin number combinations",
                     cancellationToken,
                     progress,
@@ -208,7 +217,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             if (engine.RemainingUnknownCount > 0 && ShouldRun("game-ext-characters"))
                 checkedCandidates += CheckCandidates(
                     engine,
-                    SubstituteCharacter(DefaultExtendedCandidateBudget),
+                    SubstituteCharacter(DefaultExtendedCandidateBudget, cancellationToken),
                     "GAME character substitution",
                     cancellationToken,
                     progress,
@@ -342,7 +351,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                 cancellationToken.ThrowIfCancellationRequested();
                 try
                 {
-                    using var wad = new WadFile(wadPath);
+                    using var wad = OpenWad(wadPath);
                     if (!wad.Chunks.TryGetValue(skinsJsonHash, out WadChunk chunk)) continue;
                     using var dataOwner = wad.LoadChunkDecompressed(chunk);
                     ArraySegment<byte> data = dataOwner.DangerousGetArray();
