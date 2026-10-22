@@ -7,6 +7,7 @@ HOTFIX UPDATE
 New Features
 
 Improvements
+  - Explorer / Avoids initializing unopened folders when clearing search in large trees.
   - Hash Guessing Lab / GAME avoids repeated vocabulary preparation and container sorting while preserving candidate order.
   - Hash Guessing Lab / GAME Custom reduces repeated WAD reads between animation and texture searches.
   - Hash Guessing Lab / GAME Custom reduces repeated animation lookups and shares BIN reference filtering without narrowing searches.
@@ -31,6 +32,8 @@ Improvements
 Changes
 
 Bug Fixes
+  - Explorer / Restores the selected file after clearing search, including deeply nested folders, while preserving search-box focus.
+  - Explorer / Prevents previous searches or pending navigation from overriding newer searches and manual selections.
   - Hash Guessing Lab / GAME responds to cancellation during internal animation hashing and Extended preparation.
   - Hash Guessing Lab / Releases unreadable WAD files immediately so later searches can retry them.
   - Hash Guessing Lab / Recovers valid BIN entries from partially unreadable files and reports skipped data.

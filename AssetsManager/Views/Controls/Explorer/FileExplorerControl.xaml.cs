@@ -98,6 +98,8 @@ namespace AssetsManager.Views.Controls.Explorer
         private readonly FileExplorerModel _viewModel;
         
         private readonly DispatcherTimer _searchTimer;
+        private long _searchVersion;
+        private long _selectionVersion;
         private readonly ExplorerTreeLoadService _treeLoader;
         private string _currentRootPath;
         private string _backupJsonPath;
@@ -119,6 +121,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 () =>
                 {
                     WadSearchBoxService?.InvalidateIndex(_viewModel.RootNodes);
+                    TreeUIManager?.CancelNavigation(FileTreeView);
                     _viewModel.SelectedItem = null;
                     _viewModel.SelectedNodes.Clear();
                 });
@@ -185,6 +188,8 @@ namespace AssetsManager.Views.Controls.Explorer
 
             // Stop search before detaching the tree.
             _searchTimer?.Stop();
+            _searchVersion++;
+            TreeUIManager?.CancelNavigation(FileTreeView);
 
             // Detach controls before disposing their nodes.
             if (FileTreeView != null)
@@ -986,14 +991,30 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private void FileTreeView_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
+            CancelSelectionNavigation();
             if (FilePreviewer != null && FilePreviewer.ViewModel.IsGridMode)
             {
                 FilePreviewer.FileGridControl?.ClearSelectionSession(resetAnchor: false);
             }
         }
 
+        private void FileTreeView_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key is Key.Up or Key.Down or Key.Left or Key.Right or Key.Home or Key.End or Key.PageUp or Key.PageDown or Key.Space)
+                CancelSelectionNavigation();
+        }
+
+        private void CancelSelectionNavigation()
+        {
+            _selectionVersion++;
+            TreeUIManager?.CancelNavigation(FileTreeView);
+        }
+
         public void HandleSearchTextChanged()
         {
+            _searchVersion++;
+            WadSearchBoxService?.CancelSearch(_viewModel.RootNodes);
+            TreeUIManager?.CancelNavigation(FileTreeView);
             _searchTimer.Stop();
             _searchTimer.Start();
         }
@@ -1045,10 +1066,13 @@ namespace AssetsManager.Views.Controls.Explorer
         private async void SearchTimer_Tick(object sender, EventArgs e)
         {
             _searchTimer.Stop();
+            long searchVersion = _searchVersion;
+            long treeVersion = _treeLoader.Version;
+            long selectionVersion = _selectionVersion;
             string searchText = _viewModel.Toolbar.SearchText;
 
             // CRITICAL: Immediate UI feedback when clearing search
-            if (string.IsNullOrEmpty(searchText))
+            if (string.IsNullOrWhiteSpace(searchText))
             {
                 _viewModel.IsNoResultsFound = false;
             }
@@ -1058,17 +1082,17 @@ namespace AssetsManager.Views.Controls.Explorer
                 FilePreviewer.SetSearchFilter(searchText);
             }
 
-            if (!string.IsNullOrEmpty(searchText))
+            if (!string.IsNullOrWhiteSpace(searchText))
             {
                 Toolbar?.AddSearchToHistory(searchText);
             }
 
             var selectedNode = FileTreeView.SelectedItem as FileSystemNodeModel;
             var nodeToSelect = await WadSearchBoxService.PerformSearchAsync(searchText, _viewModel.RootNodes, selectedNode);
-            if (_treeLoader.IsDisposed) return;
+            if (_treeLoader.IsDisposed || treeVersion != _treeLoader.Version || searchVersion != _searchVersion) return;
 
             // Update No Results found UI after search completes
-            if (!string.IsNullOrEmpty(searchText))
+            if (!string.IsNullOrWhiteSpace(searchText))
             {
                 _viewModel.IsNoResultsFound = _viewModel.RootNodes.All(n => !n.IsVisible);
             }
@@ -1078,20 +1102,16 @@ namespace AssetsManager.Views.Controls.Explorer
                 _viewModel.IsNoResultsFound = false;
             }
 
+            if (selectionVersion != _selectionVersion) return;
+
             if (nodeToSelect != null)
             {
-                await Dispatcher.InvokeAsync(() =>
-                {
-                    TreeUIManager.SelectAndFocusNode(FileTreeView, _viewModel.RootNodes, nodeToSelect, false);
-                }, DispatcherPriority.ContextIdle);
+                await TreeUIManager.SelectAndFocusNodeAsync(FileTreeView, _viewModel.RootNodes, nodeToSelect, false);
             }
-            else if (selectedNode != null && string.IsNullOrEmpty(searchText))
+            else if (selectedNode != null && string.IsNullOrWhiteSpace(searchText))
             {
                 // If search was cleared, ensure the previously selected node is still in view
-                await Dispatcher.InvokeAsync(() =>
-                {
-                    TreeUIManager.SelectAndFocusNode(FileTreeView, _viewModel.RootNodes, selectedNode);
-                }, DispatcherPriority.ContextIdle);
+                await TreeUIManager.SelectAndFocusNodeAsync(FileTreeView, _viewModel.RootNodes, selectedNode, false);
             }
         }
 

@@ -5,6 +5,9 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Threading.Tasks;
+using System.Threading;
+using System.Runtime.CompilerServices;
+using System.Windows.Threading;
 using AssetsManager.Views.Models.Explorer;
 using AssetsManager.Utils.Framework;
 
@@ -12,110 +15,125 @@ namespace AssetsManager.Services.Explorer.Tree
 {
     public class TreeUIManager
     {
-        public void SelectAndFocusNode(ItemsControl treeView, ObservableRangeCollection<FileSystemNodeModel> rootNodes, FileSystemNodeModel node, bool focusNode = true)
+        private readonly ConditionalWeakTable<ItemsControl, CancellationTokenSource> _navigation = new();
+
+        public async void SelectAndFocusNode(ItemsControl treeView, ObservableRangeCollection<FileSystemNodeModel> rootNodes,
+            FileSystemNodeModel node, bool focusNode = true) =>
+            await SelectAndFocusNodeAsync(treeView, rootNodes, node, focusNode);
+
+        public void CancelNavigation(ItemsControl treeView)
         {
+            if (treeView != null && _navigation.TryGetValue(treeView, out var source)) source.Cancel();
+        }
+
+        public async Task<bool> SelectAndFocusNodeAsync(ItemsControl treeView,
+            ObservableRangeCollection<FileSystemNodeModel> rootNodes, FileSystemNodeModel node,
+            bool focusNode = true, CancellationToken cancellationToken = default)
+        {
+            if (treeView == null) return false;
+            treeView.Dispatcher.VerifyAccess();
+            CancelNavigation(treeView);
             var path = FindNodePath(rootNodes, node);
-            if (path == null) return;
+            if (path == null) return false;
 
-            // Use Input priority to ensure it responds fast to search clearing/user actions
-            treeView.Dispatcher.BeginInvoke(new Action(async () =>
+            using var source = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            _navigation.Remove(treeView);
+            _navigation.Add(treeView, source);
+            try
             {
-                if (focusNode) treeView.Focus();
-
-                // Start async navigation to handle virtualization properly
-                await NavigatePathAsync(treeView, path, node, focusNode);
-            }), System.Windows.Threading.DispatcherPriority.Input);
-        }
-
-        private async Task NavigatePathAsync(ItemsControl container, List<FileSystemNodeModel> path, FileSystemNodeModel target, bool focus)
-        {
-            // Fast-path: if target is already selected and all ancestors are expanded,
-            // we do not need to do any heavy scrolling or retries. Just ensure focus/view if possible.
-            bool isAlreadyPrepared = path.All(n => n == target || n.IsExpanded);
-            if (target.IsSelected && isAlreadyPrepared)
-            {
-                var finalContainer = GetGeneratedContainerForPath(container, path);
-                if (finalContainer != null)
-                {
-                    finalContainer.IsSelected = true;
-                    if (focus) finalContainer.Focus();
-                    finalContainer.BringIntoView();
-                    return;
-                }
+                return await treeView.Dispatcher.InvokeAsync(() =>
+                    NavigatePathAsync(treeView, path, node, focusNode, source.Token),
+                    DispatcherPriority.Input, source.Token).Task.Unwrap();
             }
-
-            ItemsControl currentContainer = container;
-
-            for (int i = 0; i < path.Count; i++)
+            catch (OperationCanceledException) when (source.IsCancellationRequested) { return false; }
+            finally
             {
-                var node = path[i];
-                
-                // Ensure expansion
-                if (node != target && !node.IsExpanded) node.IsExpanded = true;
-
-                TreeViewItem itemContainer = currentContainer.ItemContainerGenerator.ContainerFromItem(node) as TreeViewItem;
-
-                if (itemContainer == null)
-                {
-                    // Virtualization fix: scroll to it so the container is generated
-                    var vsp = FindVisualChild<VirtualizingStackPanel>(currentContainer);
-                    if (vsp != null)
-                    {
-                        int index = currentContainer.Items.IndexOf(node);
-                        if (index >= 0) vsp.BringIndexIntoViewPublic(index);
-                    }
-
-                    // A single tiny wait is usually enough for the ItemContainerGenerator to catch up
-                    await Task.Delay(25);
-                    itemContainer = currentContainer.ItemContainerGenerator.ContainerFromItem(node) as TreeViewItem;
-                }
-
-                if (itemContainer != null)
-                {
-                    if (node == target)
-                    {
-                        itemContainer.IsSelected = true;
-                        itemContainer.BringIntoView();
-                        if (focus) itemContainer.Focus();
-                        return;
-                    }
-                    
-                    if (!itemContainer.IsExpanded) itemContainer.IsExpanded = true;
-                    currentContainer = itemContainer;
-                }
-                else
-                {
-                    break;
-                }
+                if (_navigation.TryGetValue(treeView, out var current) && ReferenceEquals(current, source))
+                    _navigation.Remove(treeView);
             }
         }
 
-        private TreeViewItem GetGeneratedContainerForPath(ItemsControl currentContainer, List<FileSystemNodeModel> path)
+        private static async Task<bool> NavigatePathAsync(ItemsControl container, List<FileSystemNodeModel> path,
+            FileSystemNodeModel target, bool focus, CancellationToken cancellationToken)
         {
+            ItemsControl owner = container;
             foreach (var node in path)
             {
-                if (currentContainer == null) return null;
-                var itemContainer = currentContainer.ItemContainerGenerator.ContainerFromItem(node) as TreeViewItem;
-                if (itemContainer == null) return null;
-                currentContainer = itemContainer;
+                cancellationToken.ThrowIfCancellationRequested();
+                var item = await RealizeItemAsync(owner, node, cancellationToken);
+                if (item == null) return false;
+                cancellationToken.ThrowIfCancellationRequested();
+                if (ReferenceEquals(node, target))
+                {
+                    item.IsSelected = true;
+                    cancellationToken.ThrowIfCancellationRequested();
+                    item.BringIntoView();
+                    // Recycling can clear the model while replacing a filtered container. Finish after layout settles.
+                    await container.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ContextIdle, cancellationToken);
+                    cancellationToken.ThrowIfCancellationRequested();
+                    container.UpdateLayout();
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (container is TreeView tree && !ReferenceEquals(tree.SelectedItem, target)) return false;
+                    if (owner.ItemContainerGenerator.ContainerFromItem(target) is not TreeViewItem selectedItem) return false;
+                    target.IsSelected = true;
+                    if (focus) selectedItem.Focus();
+                    return true;
+                }
+                node.IsExpanded = true;
+                item.IsExpanded = true;
+                owner = item;
             }
-            return currentContainer as TreeViewItem;
+            return false;
+        }
+
+        private static async Task<TreeViewItem> RealizeItemAsync(ItemsControl owner, FileSystemNodeModel node,
+            CancellationToken cancellationToken)
+        {
+            for (int attempt = 0; attempt < 4; attempt++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                int index = owner.Items.IndexOf(node);
+                if (index < 0) return null;
+                if (owner.ItemContainerGenerator.ContainerFromItem(node) is TreeViewItem generated) return generated;
+
+                owner.ApplyTemplate();
+                owner.UpdateLayout();
+                // A nested panel's indexes refer to different items; only the owner's host can realize this node.
+                if (FindItemsHost(owner, owner) is VirtualizingStackPanel panel)
+                    panel.BringIndexIntoViewPublic(index);
+
+                await owner.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Loaded, cancellationToken);
+            }
+            cancellationToken.ThrowIfCancellationRequested();
+            return owner.ItemContainerGenerator.ContainerFromItem(node) as TreeViewItem;
+        }
+
+        private static Panel FindItemsHost(DependencyObject parent, ItemsControl owner)
+        {
+            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
+            {
+                var child = VisualTreeHelper.GetChild(parent, i);
+                if (child is Panel panel && panel.IsItemsHost && ReferenceEquals(ItemsControl.GetItemsOwner(panel), owner))
+                    return panel;
+                if (child is ItemsControl) continue;
+                var found = FindItemsHost(child, owner);
+                if (found != null) return found;
+            }
+            return null;
         }
 
         public List<FileSystemNodeModel> FindNodePath(IEnumerable<FileSystemNodeModel> nodes, FileSystemNodeModel nodeToFind)
         {
-            if (nodeToFind == null) return null;
-            
+            if (nodes == null || nodeToFind == null) return null;
             var path = new List<FileSystemNodeModel>();
-            var current = nodeToFind;
-            
-            while (current != null)
+            var visited = new HashSet<FileSystemNodeModel>();
+            for (var current = nodeToFind; current != null; current = current.Parent)
             {
-                path.Insert(0, current);
-                current = current.Parent;
+                if (!visited.Add(current)) return null;
+                path.Add(current);
             }
-            
-            return path;
+            path.Reverse();
+            return nodes.Any(root => ReferenceEquals(root, path[0])) ? path : null;
         }
 
         public void CollapseAll(FileSystemNodeModel node)
@@ -174,17 +192,5 @@ namespace AssetsManager.Services.Explorer.Tree
             }
         }
 
-        private static T FindVisualChild<T>(DependencyObject parent) where T : DependencyObject
-        {
-            if (parent == null) return null;
-            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
-            {
-                var child = VisualTreeHelper.GetChild(parent, i);
-                if (child is T result) return result;
-                var descendant = FindVisualChild<T>(child);
-                if (descendant != null) return descendant;
-            }
-            return null;
-        }
     }
 }

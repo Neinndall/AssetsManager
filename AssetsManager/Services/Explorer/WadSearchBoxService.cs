@@ -51,6 +51,18 @@ namespace AssetsManager.Services.Explorer
         {
             if (rootNodes == null) return;
 
+            CancelSearch(rootNodes);
+
+            lock (_indexLock)
+            {
+                _treeIndexes.Remove(rootNodes);
+            }
+        }
+
+        public void CancelSearch(ObservableRangeCollection<FileSystemNodeModel> rootNodes)
+        {
+            if (rootNodes == null) return;
+
             lock (_searchLock)
             {
                 if (ReferenceEquals(_activeSearchRoots, rootNodes))
@@ -58,11 +70,6 @@ namespace AssetsManager.Services.Explorer
                     _searchCts?.Cancel();
                     _activeSearchRoots = null;
                 }
-            }
-
-            lock (_indexLock)
-            {
-                _treeIndexes.Remove(rootNodes);
             }
         }
 
@@ -80,7 +87,7 @@ namespace AssetsManager.Services.Explorer
 
             try
             {
-                if (string.IsNullOrEmpty(searchText))
+                if (string.IsNullOrWhiteSpace(searchText))
                 {
                     return await FilterTreeAsync(rootNodes, string.Empty, token, activeNode);
                 }
@@ -173,7 +180,7 @@ namespace AssetsManager.Services.Explorer
                     return new TreeFilterProjection(toShow, matchIndices, visibleChildren);
                 }, cancellationToken);
 
-                await Application.Current.Dispatcher
+                await (Application.Current?.Dispatcher ?? Dispatcher.CurrentDispatcher)
                     .InvokeAsync(() => ApplySearchVisibilityAsync(allNodes, searchResult, query, isMetadataSearch, cancellationToken))
                     .Task
                     .Unwrap();
@@ -421,7 +428,7 @@ namespace AssetsManager.Services.Explorer
                 if (sw.ElapsedMilliseconds > 16) { await Task.Yield(); sw.Restart(); }
             }
 
-            _ = Application.Current.Dispatcher.InvokeAsync(async () =>
+            _ = (Application.Current?.Dispatcher ?? Dispatcher.CurrentDispatcher).InvokeAsync(async () =>
             {
                 try
                 {
@@ -432,7 +439,7 @@ namespace AssetsManager.Services.Explorer
                         if (cancellationToken.IsCancellationRequested) break;
                         if (prioritizedNodes.Contains(node)) continue;
 
-                        if (!node.IsVisible || node.HasMatch || node.VisibleChildren != node.LoadedChildren)
+                        if (!node.IsVisible || node.HasMatch || node.HasFilteredChildren)
                         {
                             ResetNodeState(node);
                             if (bgSw.ElapsedMilliseconds > 16) { await Task.Yield(); bgSw.Restart(); }
@@ -450,7 +457,7 @@ namespace AssetsManager.Services.Explorer
         private void ResetNodeState(FileSystemNodeModel node)
         {
             if (!node.IsVisible) node.IsVisible = true;
-            if (node.VisibleChildren != node.LoadedChildren) node.VisibleChildren = null;
+            if (node.HasFilteredChildren) node.VisibleChildren = null;
             if (node.HasMatch)
             {
                 node.HasMatch = false;

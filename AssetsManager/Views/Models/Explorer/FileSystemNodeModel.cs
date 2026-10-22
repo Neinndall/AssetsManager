@@ -161,6 +161,7 @@ namespace AssetsManager.Views.Models.Explorer
         }
 
         private ObservableRangeCollection<FileSystemNodeModel> _visibleChildren;
+        internal bool HasFilteredChildren => _visibleChildren != null && !ReferenceEquals(_visibleChildren, _children);
         public ObservableRangeCollection<FileSystemNodeModel> VisibleChildren
         {
             get => _visibleChildren ?? Children;
