@@ -66,6 +66,36 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
         }
 
         [Fact]
+        public async Task InventoryAndContextRecoverValidEntriesFromDamagedWadAndLooseBins()
+        {
+            using var bridge = new AssetsManagerTestBridge();
+            bridge.Directories.CreateHashesDirectories();
+            string root = bridge.CreateDirectory("Game");
+            byte[] bytes = BinHashDocumentReaderTests.DamagedBin();
+            WadBuilder.Bake(new[] { new WadBakeEntry("data/damaged.bin", () => new MemoryStream(bytes), WadChunkCompression.Zstd) },
+                Path.Combine(root, "test.wad.client"), new WadBakeSettings());
+            await File.WriteAllBytesAsync(Path.Combine(root, "damaged.bin"), bytes);
+            var store = new BinRstHashGuessingStore(bridge.Directories);
+            var persistence = new HashGuessPersistenceService(new HashGuessingStore(bridge.Directories), store);
+            using var resolver = new HashResolverService(bridge.Directories, bridge.LogService);
+            using var httpClient = new HttpClient(new StaticMetaSchemaHandler());
+            var service = new BinRstHashGuessingService(store, persistence, resolver, bridge.Directories, bridge.LogService,
+                new MetaSchemaHashSource(httpClient, bridge.Directories, bridge.LogService));
+
+            var inventory = await service.BuildInventoryAsync(root, true, false, null, CancellationToken.None);
+            Assert.Equal(2, inventory.ScannedBins);
+            Assert.True(new HashSet<ulong> { 1, 3 }.SetEquals(
+                await store.LoadUnknownAsync(InternalHashKind.BinEntries, CancellationToken.None)));
+            string marker = Path.Combine(bridge.Directories.HashLabPath, "internal.bin.patch.txt");
+            await File.WriteAllTextAsync(marker, "internal:bin:v4:old");
+            var result = await service.RunContentGuessingAsync(root, true, false, null, CancellationToken.None,
+                new HashSet<string> { "bin-context-strings" });
+            Assert.Contains(result.Matches, match => match.Value == "FirstName" && match.CanPromote);
+            Assert.Contains(result.Matches, match => match.Value == "LastName" && match.CanPromote);
+            Assert.StartsWith("internal:bin:v5:", await File.ReadAllTextAsync(marker));
+        }
+
+        [Fact]
         public async Task HashResolverSkipsEmptyCatalogWarmupAndLoadsLaterCatalogs()
         {
             using var bridge = new AssetsManagerTestBridge();
