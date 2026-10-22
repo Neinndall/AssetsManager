@@ -19,6 +19,92 @@ namespace AssetsManager.Tests.xUnit.Services.Monitor;
 public sealed class ManifestDownloaderTests
 {
     [Fact]
+    public async Task UnlistedSelectedLocaleKeepsCommonFilesWithoutSelectingOtherLanguages()
+    {
+        using var bridge = new AssetsManagerTestBridge();
+        (RmanManifest manifest, byte[] bundle) = CreateManifest("localized"u8.ToArray());
+        manifest.Languages.Add(new RmanLanguage { LanguageId = 1, Name = "ar_AE" });
+        var localized = manifest.Files.Single();
+        localized.LanguageIds.Add(1);
+        manifest.Files.Add(new RmanFile
+        {
+            Name = "common.bin", FileSize = localized.FileSize, HashType = localized.HashType,
+            ChunkIds = localized.ChunkIds.ToList()
+        });
+        var handler = new RangeBundleHandler(bundle);
+        using var httpClient = new HttpClient(handler);
+        using var downloader = new ManifestDownloader(httpClient, bridge.LogService, bridge.Directories, new HashService());
+        string output = Path.Combine(bridge.RootPath, "client");
+
+        Assert.Equal(1, await downloader.VerifyManifestAsync(manifest, output,
+            langs: new System.Collections.Generic.List<string> { "en_US" }));
+        Assert.Equal(2, await downloader.VerifyManifestAsync(manifest, output));
+        Assert.Equal(0, handler.RequestCount);
+    }
+
+    [Fact]
+    public async Task LocaleSelectionIncludesSharedWindowsFilesAndOnlySelectedLocalizedFiles()
+    {
+        using var bridge = new AssetsManagerTestBridge();
+        byte[] payload = "shared manifest chunk"u8.ToArray();
+        (RmanManifest manifest, byte[] bundle) = CreateManifest(payload);
+        manifest.Languages.AddRange(new[]
+        {
+            new RmanLanguage { LanguageId = 47, Name = "windows" },
+            new RmanLanguage { LanguageId = 10, Name = "en_US" },
+            new RmanLanguage { LanguageId = 13, Name = "es_ES" },
+            new RmanLanguage { LanguageId = 2, Name = "macos" }
+        });
+        byte[][] tags = { Array.Empty<byte>(), new byte[] { 47 }, new byte[] { 10 }, new byte[] { 13 },
+            new byte[] { 47, 10 }, new byte[] { 47, 13 }, new byte[] { 55 }, new byte[] { 2 } };
+        RmanFile template = manifest.Files.Single();
+        manifest.Files = tags.Select((ids, index) => new RmanFile
+        {
+            Name = $"Data/file{index}.wad.client", FileSize = template.FileSize, HashType = template.HashType,
+            ChunkIds = template.ChunkIds.ToList(), LanguageIds = ids.ToList()
+        }).ToList();
+        var handler = new RangeBundleHandler(bundle);
+        using var httpClient = new HttpClient(handler);
+        using var downloader = new ManifestDownloader(httpClient, bridge.LogService, bridge.Directories, new HashService());
+        string output = Path.Combine(bridge.RootPath, "client");
+        var locales = new System.Collections.Generic.List<string> { "en_US" };
+
+        Assert.Equal(4, await downloader.VerifyManifestAsync(manifest, output, langs: locales));
+        Assert.False(Directory.Exists(output));
+        Assert.Equal(0, handler.RequestCount);
+        Assert.Equal(4, await downloader.DownloadManifestAsync(manifest, output, langs: locales));
+        foreach (int index in new[] { 0, 1, 2, 4 })
+            Assert.Equal(payload, await File.ReadAllBytesAsync(Path.Combine(output, manifest.Files[index].Name)));
+        foreach (int index in new[] { 3, 5, 6, 7 })
+            Assert.False(File.Exists(Path.Combine(output, manifest.Files[index].Name)));
+        Assert.Equal(0, await downloader.VerifyManifestAsync(manifest, output, langs: locales));
+        Assert.Equal(1, await downloader.VerifyManifestAsync(manifest, Path.Combine(bridge.RootPath, "filtered"),
+            filter: "file1\\.wad\\.client$", langs: locales));
+    }
+
+    [Fact]
+    public async Task LocaleSelectionDoesNotTreatLanguageIdOneAsAPlatform()
+    {
+        using var bridge = new AssetsManagerTestBridge();
+        (RmanManifest manifest, byte[] bundle) = CreateManifest("localized"u8.ToArray());
+        manifest.Languages.AddRange(new[]
+        {
+            new RmanLanguage { LanguageId = 1, Name = "ar_AE" },
+            new RmanLanguage { LanguageId = 2, Name = "en_US" }
+        });
+        manifest.Files[0].LanguageIds.Add(1);
+        var handler = new RangeBundleHandler(bundle);
+        using var httpClient = new HttpClient(handler);
+        using var downloader = new ManifestDownloader(httpClient, bridge.LogService, bridge.Directories, new HashService());
+        string output = Path.Combine(bridge.RootPath, "client");
+
+        Assert.Equal(0, await downloader.DownloadManifestAsync(manifest, output,
+            langs: new System.Collections.Generic.List<string> { "en_US" }));
+        Assert.False(File.Exists(Path.Combine(output, manifest.Files[0].Name)));
+        Assert.Equal(0, handler.RequestCount);
+    }
+
+    [Fact]
     public async Task MergesBoundedGapWithoutWritingGapBytesToTheTarget()
     {
         using var bridge = new AssetsManagerTestBridge();

@@ -109,22 +109,14 @@ public sealed class ManifestDownloader : IDisposable
             cancellationToken);
     }
 
-    private async Task<int> DownloadManifestCoreAsync(
-        RmanManifest manifest,
-        string outputPath,
-        string filter,
-        List<string> langs,
-        bool verificationOnly,
-        CancellationToken cancellationToken)
+    internal static List<RmanFile> SelectFiles(RmanManifest manifest, string filter, List<string> langs)
     {
-
-        // Phase 1: Filter the manifest and prepare the target file set.
-        string outputRoot = Path.GetFullPath(outputPath);
-        string outputRootPrefix = Path.EndsInDirectorySeparator(outputRoot)
-            ? outputRoot
-            : outputRoot + Path.DirectorySeparatorChar;
         var regex = !string.IsNullOrEmpty(filter) ? new Regex(filter, RegexOptions.IgnoreCase) : null;
         var selectedLangIds = new HashSet<byte>();
+        // RMAN's language table also holds platform tags; their IDs vary between manifests.
+        var platformIds = manifest.Languages
+            .Where(language => language.Name.Equals("windows", StringComparison.OrdinalIgnoreCase))
+            .Select(language => language.LanguageId).ToHashSet();
 
         if (langs != null && langs.Any())
         {
@@ -135,17 +127,32 @@ public sealed class ManifestDownloader : IDisposable
             }
         }
 
-        var filteredFiles = manifest.Files.Where(file =>
+        return manifest.Files.Where(file =>
         {
             if (regex != null && !regex.IsMatch(file.Name)) return false;
-            if (selectedLangIds.Count > 0)
+            if (langs?.Count > 0)
             {
-                bool isNeutral = file.LanguageIds.Count == 0;
+                bool isNeutral = file.LanguageIds.All(platformIds.Contains);
                 bool matchesLang = file.LanguageIds.Any(id => selectedLangIds.Contains(id));
                 if (!isNeutral && !matchesLang) return false;
             }
             return true;
         }).ToList();
+    }
+
+    private async Task<int> DownloadManifestCoreAsync(
+        RmanManifest manifest,
+        string outputPath,
+        string filter,
+        List<string> langs,
+        bool verificationOnly,
+        CancellationToken cancellationToken)
+    {
+        string outputRoot = Path.GetFullPath(outputPath);
+        string outputRootPrefix = Path.EndsInDirectorySeparator(outputRoot)
+            ? outputRoot
+            : outputRoot + Path.DirectorySeparatorChar;
+        var filteredFiles = SelectFiles(manifest, filter, langs);
 
         if (!verificationOnly)
             _directoriesCreator.CreateDirectory(outputRoot);
