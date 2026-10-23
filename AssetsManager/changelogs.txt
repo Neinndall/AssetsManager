@@ -7,6 +7,7 @@ HOTFIX UPDATE
 New Features
 
 Improvements
+  - Hash Guessing Lab / BIN resolves object paths for map skins and Nexus finishers.
   - Explorer / Recognizes GMESH files even when their names are unresolved.
   - Explorer / Recognizes navigation region files even when their names are unresolved.
   - Hash Guessing Lab / GAME GrepWad finds navigation region files from map geometry references.

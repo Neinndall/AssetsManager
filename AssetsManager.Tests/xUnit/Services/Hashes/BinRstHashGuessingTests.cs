@@ -997,6 +997,8 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
         [InlineData("SkinCharacterDataProperties")]
         [InlineData("TftSkinCharacterDataProperties")]
         [InlineData("AnimationGraphData")]
+        [InlineData("MapSkin")]
+        [InlineData("NexusFinisher")]
         public async Task ObjectPathFromEntryPathResolvesMatchingHashForSupportedTypes(string className)
         {
             using var bridge = new AssetsManagerTestBridge();

@@ -58,7 +58,9 @@ namespace AssetsManager.Services.Hashes
             Fnv1a.HashLower("SpellObject"),
             Fnv1a.HashLower("SkinCharacterDataProperties"),
             Fnv1a.HashLower("TftSkinCharacterDataProperties"),
-            Fnv1a.HashLower("AnimationGraphData")
+            Fnv1a.HashLower("AnimationGraphData"),
+            Fnv1a.HashLower("MapSkin"),
+            Fnv1a.HashLower("NexusFinisher")
         };
 
         private static readonly HashSet<uint> SkinCharacterDataPropertiesTypes = new()
