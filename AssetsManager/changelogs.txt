@@ -8,6 +8,7 @@ New Features
   - 3D Studio / Preview persistent skin effects with their conditions, including manual activation from Game State.
 
 Improvements
+  - 3D Studio / Game State controls feature a single-column layout, requirement guide, and styled manual override badges.
   - 3D Studio / Compact Game State controls merge duplicate buff references and separate manual overrides, with effect names and conditions on hover.
   - Hash Guessing Lab / BIN resolves object paths for map skins and Nexus finishers.
   - Explorer / Recognizes GMESH files even when their names are unresolved.
