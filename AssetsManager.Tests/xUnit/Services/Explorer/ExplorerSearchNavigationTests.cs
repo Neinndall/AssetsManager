@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Xml.Linq;
 using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -8,6 +9,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Input;
+using System.Windows.Markup;
 using System.Windows.Media;
 using System.Windows.Threading;
 using AssetsManager.Services.Core;
@@ -23,6 +25,149 @@ namespace AssetsManager.Tests.xUnit.Services.Explorer;
 
 public sealed class ExplorerSearchNavigationTests
 {
+    [Fact]
+    public void FilteringAllowsInputToCancelBeforeTheRemainingRowsAreUpdated() => Run(async () =>
+    {
+        var roots = new ObservableRangeCollection<FileSystemNodeModel>(Enumerable.Range(0, 500)
+            .Select(i => new FileSystemNodeModel($"file{i}.bin", NodeType.VirtualFile)));
+        var search = new WadSearchBoxService(null, new LogService(Log.Logger));
+        bool inputHandled = false;
+        roots[0].PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName != nameof(FileSystemNodeModel.IsVisible) || roots[0].IsVisible) return;
+            Dispatcher.CurrentDispatcher.BeginInvoke(DispatcherPriority.Input, new Action(() =>
+            {
+                inputHandled = true;
+                search.CancelSearch(roots);
+            }));
+            // Force one UI batch over its budget without depending on machine speed.
+            Thread.Sleep(20);
+        };
+        try
+        {
+            search.RebuildIndex(roots);
+            await search.PerformSearchAsync("missing-file", roots);
+            Assert.True(inputHandled);
+            Assert.False(roots[0].IsVisible);
+            Assert.True(roots[^1].IsVisible);
+            await search.PerformSearchAsync("file", roots);
+            Assert.All(roots, node => Assert.True(node.IsVisible));
+        }
+        finally { search.InvalidateIndex(roots); }
+    });
+
+    [Fact]
+    public void NavigationScrollsTheTargetBeforeCommittingSelection() => Run(async () =>
+    {
+        using var fixture = new TreeFixture(0, 0, productionStyle: true);
+        bool? selectedOnFirstScroll = null;
+        fixture.Tree.AddHandler(FrameworkElement.RequestBringIntoViewEvent, new RequestBringIntoViewEventHandler((_, e) =>
+        {
+            if (e.TargetObject is TreeViewItem item && ReferenceEquals(item.DataContext, fixture.Target))
+                selectedOnFirstScroll ??= item.IsSelected;
+        }), handledEventsToo: true);
+        var navigation = new TreeUIManager();
+        Assert.True(await navigation.SelectAndFocusNodeAsync(fixture.Tree, fixture.Roots, fixture.Target, false));
+        Assert.Equal(false, selectedOnFirstScroll);
+        Assert.Same(fixture.Target, fixture.Tree.SelectedItem);
+        Assert.True(fixture.Target.IsSelected);
+        AssertInViewport(fixture.Tree, fixture.Path);
+    });
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(6)]
+    public void ClearingClickedSkinsJsonWithProductionStylesPreservesSelection(int depth) => Run(async () =>
+    {
+        using var fixture = new TreeFixture(depth, 160, productionStyle: true);
+        fixture.Target.Name = "skins.json";
+        var search = new WadSearchBoxService(null, new LogService(Log.Logger));
+        var navigation = new TreeUIManager();
+        try
+        {
+            await search.PerformSearchAsync("skins.json", fixture.Roots);
+            ItemsControl owner = fixture.Tree;
+            foreach (var node in fixture.Path)
+            {
+                owner.UpdateLayout();
+                var item = Assert.IsType<TreeViewItem>(owner.ItemContainerGenerator.ContainerFromItem(node));
+                SelectionBehavior.ApplyPrimaryTreeAction(item);
+                owner = item;
+            }
+            await Dispatcher.Yield(DispatcherPriority.ContextIdle);
+            Assert.Same(fixture.Target, fixture.Tree.SelectedItem);
+            var selected = fixture.Tree.SelectedItem as FileSystemNodeModel;
+            var restored = await search.PerformSearchAsync("", fixture.Roots, selected);
+            Assert.True(await navigation.SelectAndFocusNodeAsync(fixture.Tree, fixture.Roots, restored, false));
+            await Task.Delay(150);
+            fixture.Tree.UpdateLayout();
+            Assert.Same(fixture.Target, fixture.Tree.SelectedItem);
+            Assert.True(fixture.Target.IsSelected);
+            AssertInViewport(fixture.Tree, fixture.Path);
+        }
+        finally { search.InvalidateIndex(fixture.Roots); }
+    });
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ReturningToSkinsJsonAfterOtherFiltersRestoresTheClickedFile(bool clearBetweenQueries) => Run(async () =>
+    {
+        using var fixture = new TreeFixture(6, 160, productionStyle: true);
+        fixture.Target.Name = "skins.json";
+        var other = fixture.Target.Parent.Children[5];
+        var search = new WadSearchBoxService(null, new LogService(Log.Logger));
+        var navigation = new TreeUIManager();
+        try
+        {
+            foreach (var target in new[] { fixture.Target, other, fixture.Target, other, fixture.Target })
+            {
+                await search.PerformSearchAsync(target.Name, fixture.Roots, fixture.Tree.SelectedItem as FileSystemNodeModel);
+                await Dispatcher.Yield(DispatcherPriority.ContextIdle);
+                var path = navigation.FindNodePath(fixture.Roots, target);
+                ItemsControl owner = fixture.Tree;
+                foreach (var node in path)
+                {
+                    owner.UpdateLayout();
+                    var item = Assert.IsType<TreeViewItem>(owner.ItemContainerGenerator.ContainerFromItem(node));
+                    if (ReferenceEquals(node, target)) SelectionBehavior.ApplyPrimaryTreeAction(item);
+                    else item.IsExpanded = true;
+                    owner = item;
+                }
+                await Dispatcher.Yield(DispatcherPriority.ContextIdle);
+                Assert.Same(target, fixture.Tree.SelectedItem);
+                if (!clearBetweenQueries && !ReferenceEquals(target, fixture.Target)) continue;
+                var restored = await search.PerformSearchAsync("", fixture.Roots, fixture.Tree.SelectedItem as FileSystemNodeModel);
+                Assert.Same(target, restored);
+                var selectionChanges = new List<bool>();
+                System.ComponentModel.PropertyChangedEventHandler selectionChanged = (_, e) =>
+                {
+                    if (e.PropertyName == nameof(FileSystemNodeModel.IsSelected)) selectionChanges.Add(target.IsSelected);
+                };
+                target.PropertyChanged += selectionChanged;
+                bool navigated = await navigation.SelectAndFocusNodeAsync(fixture.Tree, fixture.Roots, restored, false);
+                target.PropertyChanged -= selectionChanged;
+                Assert.All(selectionChanges.SkipWhile(selected => !selected), selected => Assert.True(selected,
+                    $"Selection was cleared after being restored: {string.Join(",", selectionChanges)}"));
+                var state = new List<string>();
+                owner = fixture.Tree;
+                foreach (var node in path)
+                {
+                    var item = owner?.ItemContainerGenerator.ContainerFromItem(node) as TreeViewItem;
+                    state.Add($"{node.Name}: index={owner?.Items.IndexOf(node)}, realized={item != null}, expanded={node.IsExpanded}, selected={item?.IsSelected}");
+                    owner = item;
+                }
+                Assert.True(navigated, $"Target {target.Name}, selected {(fixture.Tree.SelectedItem as FileSystemNodeModel)?.Name}: {string.Join("; ", state)}");
+                await Task.Delay(150);
+                fixture.Tree.UpdateLayout();
+                Assert.Same(target, fixture.Tree.SelectedItem);
+                Assert.True(target.IsSelected);
+                AssertInViewport(fixture.Tree, path);
+            }
+        }
+        finally { search.InvalidateIndex(fixture.Roots); }
+    });
+
     [Fact]
     public void ClearingSearchDoesNotInitializeUnloadedFolderChildren() => Run(async () =>
     {
@@ -233,7 +378,7 @@ public sealed class ExplorerSearchNavigationTests
         internal List<FileSystemNodeModel> Path { get; } = new();
         internal FileSystemNodeModel Target { get; }
 
-        internal TreeFixture(int depth, int siblings, bool deferRoot = false)
+        internal TreeFixture(int depth, int siblings, bool deferRoot = false, bool productionStyle = false)
         {
             for (int i = 0; i < siblings; i++) Roots.Add(new FileSystemNodeModel($"root{i:D4}", NodeType.VirtualDirectory));
             FileSystemNodeModel parent = null;
@@ -261,6 +406,21 @@ public sealed class ExplorerSearchNavigationTests
             style.Setters.Add(new Setter(UIElement.VisibilityProperty, new Binding("IsVisible") { Converter = new BooleanToVisibilityConverter() }));
             style.Setters.Add(new Setter(ItemsControl.ItemsPanelProperty, new ItemsPanelTemplate(new FrameworkElementFactory(typeof(VirtualizingStackPanel)))));
             Tree = new TreeView { ItemsSource = Roots, ItemTemplate = template };
+            if (productionStyle)
+            {
+                var sourceRoot = System.IO.Path.GetFullPath(System.IO.Path.Combine(AppContext.BaseDirectory, "../../../../../AssetsManager/Themes"));
+                var styles = XElement.Load(System.IO.Path.Combine(sourceRoot, "TreeViewStyles.xaml"));
+                var buttons = XElement.Load(System.IO.Path.Combine(sourceRoot, "ButtonStyles.xaml"));
+                styles.Elements().First().AddAfterSelf(buttons.Elements().Where(e => e.Name.LocalName != "ResourceDictionary.MergedDictionaries"));
+                var xaml = styles.ToString()
+                        .Replace("/Themes/", "/AssetsManager;component/Themes/")
+                        .Replace("clr-namespace:AssetsManager.Views.Helpers", "clr-namespace:AssetsManager.Views.Helpers;assembly=AssetsManager");
+                Tree.Resources.MergedDictionaries.Add((ResourceDictionary)XamlReader.Parse(xaml));
+                style = new Style(typeof(TreeViewItem), (Style)Tree.FindResource("ModernTreeViewItem"));
+                style.Setters.Add(new Setter(UIElement.VisibilityProperty, new Binding("IsVisible") { Converter = new BooleanToVisibilityConverter() }));
+                Tree.Style = (Style)Tree.FindResource("ModernTreeView");
+                Tree.ItemContainerStyle = style;
+            }
             Tree.Resources.Add(typeof(TreeViewItem), style);
             VirtualizingPanel.SetIsVirtualizing(Tree, true);
             VirtualizingPanel.SetVirtualizationMode(Tree, VirtualizationMode.Recycling);

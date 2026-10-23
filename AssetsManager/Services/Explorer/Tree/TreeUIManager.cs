@@ -56,34 +56,50 @@ namespace AssetsManager.Services.Explorer.Tree
         private static async Task<bool> NavigatePathAsync(ItemsControl container, List<FileSystemNodeModel> path,
             FileSystemNodeModel target, bool focus, CancellationToken cancellationToken)
         {
-            ItemsControl owner = container;
-            foreach (var node in path)
+            for (int attempt = 0; attempt < 4; attempt++)
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                var item = await RealizeItemAsync(owner, node, cancellationToken);
-                if (item == null) return false;
-                cancellationToken.ThrowIfCancellationRequested();
-                if (ReferenceEquals(node, target))
+                ItemsControl owner = container;
+                foreach (var node in path)
                 {
-                    item.IsSelected = true;
                     cancellationToken.ThrowIfCancellationRequested();
-                    item.BringIntoView();
-                    // Recycling can clear the model while replacing a filtered container. Finish after layout settles.
-                    await container.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ContextIdle, cancellationToken);
+                    var item = await RealizeItemAsync(owner, node, cancellationToken);
+                    if (item == null) break;
                     cancellationToken.ThrowIfCancellationRequested();
-                    container.UpdateLayout();
-                    cancellationToken.ThrowIfCancellationRequested();
-                    if (container is TreeView tree && !ReferenceEquals(tree.SelectedItem, target)) return false;
-                    if (owner.ItemContainerGenerator.ContainerFromItem(target) is not TreeViewItem selectedItem) return false;
-                    target.IsSelected = true;
-                    if (focus) selectedItem.Focus();
-                    return true;
+                    if (ReferenceEquals(node, target))
+                    {
+                        item.BringIntoView();
+                        await container.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Loaded, cancellationToken);
+                        cancellationToken.ThrowIfCancellationRequested();
+                        container.UpdateLayout();
+                        cancellationToken.ThrowIfCancellationRequested();
+                        // Layout can recycle any ancestor, so the previous owner may no longer belong to this path.
+                        var selectedItem = GetGeneratedItem(container, path);
+                        if (!ReferenceEquals(selectedItem, item)) break;
+                        selectedItem.IsSelected = true;
+                        cancellationToken.ThrowIfCancellationRequested();
+                        if (container is TreeView tree && !ReferenceEquals(tree.SelectedItem, target)) return false;
+                        target.IsSelected = true;
+                        if (focus) selectedItem.Focus();
+                        return true;
+                    }
+                    node.IsExpanded = true;
+                    item.IsExpanded = true;
+                    owner = item;
                 }
-                node.IsExpanded = true;
-                item.IsExpanded = true;
-                owner = item;
             }
             return false;
+        }
+
+        private static TreeViewItem GetGeneratedItem(ItemsControl owner, List<FileSystemNodeModel> path)
+        {
+            TreeViewItem item = null;
+            foreach (var node in path)
+            {
+                item = owner.ItemContainerGenerator.ContainerFromItem(node) as TreeViewItem;
+                if (item == null) return null;
+                owner = item;
+            }
+            return item;
         }
 
         private static async Task<TreeViewItem> RealizeItemAsync(ItemsControl owner, FileSystemNodeModel node,
@@ -92,12 +108,14 @@ namespace AssetsManager.Services.Explorer.Tree
             for (int attempt = 0; attempt < 4; attempt++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                if (owner.ItemContainerGenerator.ContainerFromItem(node) is TreeViewItem generated) return generated;
                 int index = owner.Items.IndexOf(node);
                 if (index < 0) return null;
-                if (owner.ItemContainerGenerator.ContainerFromItem(node) is TreeViewItem generated) return generated;
 
                 owner.ApplyTemplate();
                 owner.UpdateLayout();
+                cancellationToken.ThrowIfCancellationRequested();
+                if (owner.ItemContainerGenerator.ContainerFromItem(node) is TreeViewItem realized) return realized;
                 // A nested panel's indexes refer to different items; only the owner's host can realize this node.
                 if (FindItemsHost(owner, owner) is VirtualizingStackPanel panel)
                     panel.BringIndexIntoViewPublic(index);
