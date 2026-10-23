@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using AssetsManager.Services.Hashes;
@@ -75,6 +76,29 @@ public sealed class GameMapGeometrySiblingTests
         var result = await service.RunGameBasicGuessingAsync(bridge.RootPath, null, CancellationToken.None,
             selectedSubMethods: selected ? new HashSet<string> { "game-basic-extensions" } : new HashSet<string>());
         Assert.Equal(selected ? new[] { target } : Array.Empty<string>(), result.Matches.Select(match => match.Path));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(".mapgeo")]
+    [InlineData(".materials.bin")]
+    public void EmbeddedGeometryReferenceResolvesNavigationSdfInfo(string extension)
+    {
+        using var stream = new MemoryStream();
+        using (var writer = new BinaryWriter(stream, Encoding.ASCII, leaveOpen: true))
+        {
+            byte[] path = Encoding.ASCII.GetBytes("Maps/MapGeometry/Map22/Base" + extension);
+            writer.Write((ushort)path.Length);
+            writer.Write(path);
+        }
+        var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong> { 0x00f6663d8b8ceb61 });
+        new GameHashGuesser().GrepWad(engine, new ArraySegment<byte>(stream.ToArray()),
+            "data/maps/example.inibin", "Map22.wad.client", 456, CancellationToken.None);
+
+        var match = Assert.Single(engine.Matches.Values);
+        Assert.Equal("data/maps/mapgeometry/map22/base.navsdfinfo", match.Path);
+        Assert.Equal("Map22.wad.client", match.SourceWadPath);
+        Assert.Equal(456UL, match.SourceChunkHash);
     }
 
     private static GameHashGuesser Guesser(params string[] paths) => new(new HashFile(HashGuessDomain.Game, paths));

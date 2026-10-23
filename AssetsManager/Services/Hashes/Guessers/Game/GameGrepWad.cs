@@ -159,6 +159,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                             ? path[..^14] : path.EndsWith(".mapgeo", StringComparison.OrdinalIgnoreCase) ? path[..^7] : path;
                         CheckGame($"data/{geometryBase}.mapgeo");
                         CheckGame($"data/{geometryBase}.materials.bin");
+                        CheckGame($"data/{geometryBase}.navsdfinfo");
                     }
                     else if (path.StartsWith("clientstates/", StringComparison.OrdinalIgnoreCase) ||
                              path.StartsWith("patching/", StringComparison.OrdinalIgnoreCase) ||

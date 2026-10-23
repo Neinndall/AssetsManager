@@ -7,6 +7,7 @@ HOTFIX UPDATE
 New Features
 
 Improvements
+  - Hash Guessing Lab / GAME GrepWad resolves map navigation SDF metadata paths.
   - Explorer / Avoids initializing unopened folders when clearing search in large trees.
   - Hash Guessing Lab / GAME avoids repeated vocabulary preparation and container sorting while preserving candidate order.
   - Hash Guessing Lab / GAME Custom reduces repeated WAD reads between animation and texture searches.

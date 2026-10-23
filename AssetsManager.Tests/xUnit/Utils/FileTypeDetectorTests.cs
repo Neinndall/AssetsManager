@@ -9,6 +9,13 @@ namespace AssetsManager.Tests.xUnit.Utils
     public sealed class FileTypeDetectorTests
     {
         [Fact]
+        public void GuessExtensionRecognizesNavigationSdfInfo()
+        {
+            byte[] data = { 0x4E, 0x53, 0x44, 0x49, 1, 0, 0, 0, 0, 0, 0, 0 };
+            Assert.Equal("navsdfinfo", FileTypeDetector.GuessExtension(data));
+        }
+
+        [Fact]
         public void IsEncryptedRiotTexRecognizesEsportsTextureSignature()
         {
             ReadOnlySpan<byte> encryptedTex = new byte[] { 0xC9, 0xE3, 0x44, 0x26, 0x64, 0xBB, 0x01, 0x61 };
