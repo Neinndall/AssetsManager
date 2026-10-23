@@ -82,7 +82,7 @@ public sealed class GameMapGeometrySiblingTests
     [InlineData("")]
     [InlineData(".mapgeo")]
     [InlineData(".materials.bin")]
-    public void EmbeddedGeometryReferenceResolvesNavigationSdfInfo(string extension)
+    public void EmbeddedGeometryReferenceResolvesNavigationCompanions(string extension)
     {
         using var stream = new MemoryStream();
         using (var writer = new BinaryWriter(stream, Encoding.ASCII, leaveOpen: true))
@@ -91,11 +91,16 @@ public sealed class GameMapGeometrySiblingTests
             writer.Write((ushort)path.Length);
             writer.Write(path);
         }
-        var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong> { 0x00f6663d8b8ceb61 });
+        const string regions = "data/maps/mapgeometry/map22/base.navregions";
+        var engine = new HashGuessEngine(HashGuessDomain.Game,
+            new HashSet<ulong> { 0x00f6663d8b8ceb61, XxHash64Ext.Hash(regions) });
         new GameHashGuesser().GrepWad(engine, new ArraySegment<byte>(stream.ToArray()),
             "data/maps/example.inibin", "Map22.wad.client", 456, CancellationToken.None);
 
-        var match = Assert.Single(engine.Matches.Values);
+        Assert.Equal(2, engine.Matches.Count);
+        Assert.Empty(engine.UnknownHashes);
+        Assert.Equal(regions, engine.Matches[XxHash64Ext.Hash(regions)].Path);
+        var match = engine.Matches[0x00f6663d8b8ceb61];
         Assert.Equal("data/maps/mapgeometry/map22/base.navsdfinfo", match.Path);
         Assert.Equal("Map22.wad.client", match.SourceWadPath);
         Assert.Equal(456UL, match.SourceChunkHash);

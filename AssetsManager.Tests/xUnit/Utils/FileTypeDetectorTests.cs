@@ -8,11 +8,14 @@ namespace AssetsManager.Tests.xUnit.Utils
 {
     public sealed class FileTypeDetectorTests
     {
-        [Fact]
-        public void GuessExtensionRecognizesNavigationSdfInfo()
+        [Theory]
+        [InlineData("NSDI", "navsdfinfo")]
+        [InlineData("NVRG", "navregions")]
+        [InlineData("GMSH", "gmesh")]
+        public void GuessExtensionRecognizesGameBinarySignatures(string signature, string extension)
         {
-            byte[] data = { 0x4E, 0x53, 0x44, 0x49, 1, 0, 0, 0, 0, 0, 0, 0 };
-            Assert.Equal("navsdfinfo", FileTypeDetector.GuessExtension(data));
+            byte[] data = System.Text.Encoding.ASCII.GetBytes(signature + "\u0001\0\0\0\0\0\0\0");
+            Assert.Equal(extension, FileTypeDetector.GuessExtension(data));
         }
 
         [Fact]
