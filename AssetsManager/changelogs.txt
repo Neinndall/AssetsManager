@@ -7,6 +7,7 @@ HOTFIX UPDATE
 New Features
 
 Improvements
+  - Hash Guessing Lab / GAME GrepWad finds missing UI atlas textures and portrait names from related sprites.
   - Hash Guessing Lab / GAME GrepWad resolves map navigation SDF metadata paths.
   - Explorer / Avoids initializing unopened folders when clearing search in large trees.
   - Hash Guessing Lab / GAME avoids repeated vocabulary preparation and container sorting while preserving candidate order.

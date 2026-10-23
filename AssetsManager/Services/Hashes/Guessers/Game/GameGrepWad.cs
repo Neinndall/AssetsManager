@@ -2190,6 +2190,15 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
 
             IReadOnlyDictionary<ulong, string> knownDict = HashFile.Load();
 
+            string atlasPath = knownDict.GetValueOrDefault(sourceChunkHash, sourcePath);
+            if (atlasPath.StartsWith("clientstates/", StringComparison.OrdinalIgnoreCase) ||
+                atlasPath.StartsWith("ux/", StringComparison.OrdinalIgnoreCase))
+            {
+                for (int index = 0; index < atlas.TextureHashes.Count; index++)
+                    Check(engine, $"uiautoatlas/{atlasPath}/atlas_{index}.tex",
+                        HashGuessStrategy.AtlasReference, sourceWadPath, sourceChunkHash);
+            }
+
             // Ensure any sprite hash not in HashFile is marked unknown in engine
             var unresolvedSprites = new HashSet<ulong>();
             foreach (var sprite in atlas.Sprites)
@@ -2230,6 +2239,14 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                     cancellationToken.ThrowIfCancellationRequested();
                     candidateDirs.Add(dir);
                 }
+            }
+
+            foreach (var sprite in atlas.Sprites)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!knownDict.TryGetValue(sprite.SpriteHash, out string spritePath)) continue;
+                string directory = PathUtils.NormalizeSeparators(Path.GetDirectoryName(spritePath));
+                if (!string.IsNullOrEmpty(directory)) candidateDirs.Add(directory);
             }
 
             IReadOnlyList<string> candidatePatterns = GetAutoAtlasCandidatePatterns();
@@ -2290,7 +2307,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
 
         private IReadOnlyList<string> GetAutoAtlasCandidatePatterns()
         {
-            return Corpus.GetOrCreate("autoatlas-candidate-patterns-v4", knownPaths =>
+            return Corpus.GetOrCreate("autoatlas-candidate-patterns-v5", knownPaths =>
             {
                 var patterns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -2318,6 +2335,8 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                         }
                     }
                     else if (norm.Contains("/icons2d/", StringComparison.OrdinalIgnoreCase) ||
+                             (norm.Contains("/hud/", StringComparison.OrdinalIgnoreCase) &&
+                              norm.Contains("_circle", StringComparison.OrdinalIgnoreCase)) ||
                              norm.StartsWith("ux/", StringComparison.OrdinalIgnoreCase) ||
                              norm.StartsWith("clientstates/", StringComparison.OrdinalIgnoreCase))
                     {
