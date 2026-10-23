@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using AssetsManager.Services.Viewer.Resolvers;
+using AssetsManager.Services.Viewer.Vfx.Semantics;
 using AssetsManager.Views.Models.Viewer;
 using LeagueToolkit.Hashing;
 
@@ -81,19 +82,29 @@ namespace AssetsManager.Services.Viewer.Semantics
             GameMaterialState state = null)
         {
             IReadOnlySet<uint> hidden = FormHiddenSubmeshes(initiallyHidden, form, parts, conditions);
+            return ConditionedHiddenSubmeshes(hidden, conditions,
+                (state ?? GameMaterialState.Resting) with { Gear = form?.GearIndex ?? -1 });
+        }
+
+        internal static IReadOnlySet<uint> ConditionedHiddenSubmeshes(IEnumerable<uint> hidden,
+            IEnumerable<VfxSubmeshCondition> conditions, GameMaterialState state)
+        {
             if (conditions == null)
-                return hidden;
+                return new HashSet<uint>(hidden);
 
             // The skin's persistent conditions apply last, as authored data over any inferred form lists.
             var result = new HashSet<uint>(hidden);
-            GameMaterialState current = (state ?? GameMaterialState.Resting) with { Gear = form?.GearIndex ?? -1 };
+            var hides = new HashSet<uint>();
+            GameMaterialState current = state ?? GameMaterialState.Resting with { Gear = -1 };
+            int index = 0;
             foreach (VfxSubmeshCondition condition in conditions)
             {
-                if (condition.Condition.Evaluate(current) != true)
+                if (!VfxPersistentEffectSemantics.Active(condition, index++, current))
                     continue;
                 result.ExceptWith(condition.Show);
-                result.UnionWith(condition.Hide);
+                hides.UnionWith(condition.Hide);
             }
+            result.UnionWith(hides);
             return result;
         }
 

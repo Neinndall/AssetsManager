@@ -11,6 +11,49 @@
        >
     <UserControl.Resources>
 <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+<Style x:Key="InspectorGameStateOptionStyle" TargetType="CheckBox">
+            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+            <Setter Property="FontSize" Value="10.5"/>
+            <Setter Property="FontWeight" Value="Normal"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Height" Value="26"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <Grid Background="Transparent">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="20"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Border x:Name="Indicator" Width="14" Height="14" HorizontalAlignment="Left"
+                                    VerticalAlignment="Center" Background="{StaticResource DarkBackground}"
+                                    BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="3">
+                                <Path x:Name="CheckMark" Data="M3.5,8 L6.5,11 L12.5,4.5" Stroke="White"
+                                      StrokeThickness="1.8" Stretch="Uniform" Margin="2" Visibility="Collapsed"/>
+                            </Border>
+                            <ContentPresenter Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Stretch"/>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Indicator" Property="Background" Value="{StaticResource AccentBrush}"/>
+                                <Setter TargetName="Indicator" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                                <Setter TargetName="CheckMark" Property="Visibility" Value="Visible"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Indicator" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Indicator" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.5"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
 <Style x:Key="InspectorGroupTitleStyle" TargetType="TextBlock">
             <Setter Property="FontSize" Value="13"/>
             <Setter Property="FontWeight" Value="Bold"/>
@@ -737,7 +780,7 @@
                                         </Border>
                                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                             <TextBlock Text="GAME STATE" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                                            <TextBlock Text="Buffs affecting materials and visible parts" FontSize="9" Foreground="{StaticResource TextMuted}" Margin="0,1,0,0"/>
+                                            <TextBlock Text="Buffs, visibility and effects" FontSize="9" Foreground="{StaticResource TextMuted}" Margin="0,1,0,0"/>
                                         </StackPanel>
                                         <materialIcons:MaterialIcon Grid.Column="2" Style="{StaticResource AnimatedChevronStyle}"/>
                                     </Grid>
@@ -747,16 +790,56 @@
                                     <Border Background="{StaticResource CardBackground}" CornerRadius="12"
                                             BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="14,10">
                                         <StackPanel>
-                                            <ItemsControl ItemsSource="{Binding CharacterGameStates}">
+                                            <ItemsControl ItemsSource="{Binding CharacterGameStates}" HorizontalContentAlignment="Stretch">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate><UniformGrid Columns="2"/></ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate>
-                                                        <CheckBox Content="{Binding DisplayName}" Style="{StaticResource ModernCheckBox}" Margin="0,3,0,0"
-                                                                  IsChecked="{Binding IsEnabled, Mode=TwoWay}"/>
+                                                        <CheckBox ToolTip="{Binding Description}" Style="{StaticResource InspectorGameStateOptionStyle}" Margin="0,0,8,0"
+                                                                  IsChecked="{Binding IsEnabled, Mode=TwoWay}">
+                                                            <TextBlock Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                                                        </CheckBox>
                                                     </DataTemplate>
                                                 </ItemsControl.ItemTemplate>
                                             </ItemsControl>
-                                            <TextBlock Text="Material effects need game shaders on. States tied to an animation follow the playing clip."
+                                            <TextBlock Text="Animation states follow the clip. Materials require game shaders."
                                                        FontSize="9" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap" Margin="0,8,0,0"/>
+                                            <StackPanel Visibility="{Binding HasCharacterPersistentConditions, Converter={StaticResource BoolToVisibilityConverter}}" Margin="0,12,0,0">
+                                                <ToggleButton x:Name="PersistentConditionsSection" IsChecked="False" Style="{StaticResource CollapsibleSectionHeaderStyle}">
+                                                    <Grid Margin="6,7">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBlock Text="MANUAL OVERRIDES" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                                                        <materialIcons:MaterialIcon Grid.Column="1" Style="{StaticResource AnimatedChevronStyle}"/>
+                                                    </Grid>
+                                                </ToggleButton>
+                                                <StackPanel Visibility="{Binding IsChecked, ElementName=PersistentConditionsSection, Converter={StaticResource BooleanToVisibilityConverter}}" Margin="0,6,0,0">
+                                                    <TextBlock Text="Force an effect or visibility rule. Auto = already active. Hover for conditions."
+                                                               FontSize="9" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap" Margin="0,0,0,6"/>
+                                                    <ScrollViewer MaxHeight="156" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                                    <ItemsControl ItemsSource="{Binding CharacterPersistentConditions}" HorizontalContentAlignment="Stretch">
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate>
+                                                                <Grid ToolTip="{Binding Description}" Margin="0,0,4,0">
+                                                                    <Grid.ColumnDefinitions>
+                                                                        <ColumnDefinition Width="*"/>
+                                                                        <ColumnDefinition Width="Auto"/>
+                                                                    </Grid.ColumnDefinitions>
+                                                                    <CheckBox Style="{StaticResource InspectorGameStateOptionStyle}" IsChecked="{Binding IsEnabled, Mode=TwoWay}">
+                                                                        <TextBlock Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                                                                    </CheckBox>
+                                                                    <TextBlock Grid.Column="1" Text="Auto" FontSize="9" Foreground="{StaticResource AccentPurple}" Margin="8,0,0,0" VerticalAlignment="Center"
+                                                                               Visibility="{Binding IsAutomaticallyActive, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                                                </Grid>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                    </ScrollViewer>
+                                                </StackPanel>
+                                            </StackPanel>
                                         </StackPanel>
                                     </Border>
                                 </StackPanel>

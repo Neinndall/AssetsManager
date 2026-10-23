@@ -646,8 +646,10 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             }
         }
 
-        [Fact]
-        public void AttachedMeshWithoutPathDoesNotLoadASecondChampionBody()
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void MissingAttachedGeometryDoesNotLoadASecondChampionBody(bool authoredMesh)
         {
             string root = Path.Combine(Path.GetTempPath(), "AssetsManagerAttachedMesh", Guid.NewGuid().ToString("N"));
             string searchDirectory = Path.Combine(root, "data", "characters", "hero", "skins");
@@ -680,7 +682,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 RandomStartFrame: false,
                 IsMeshPrimitive: true,
                 PrimitiveKind: VfxPrimitiveKind.AttachedMesh,
-                MeshPath: "assets/characters/hero/skins/skin30/hero_skin30.scb");
+                MeshPath: authoredMesh ? "assets/characters/hero/skins/skin30/hero_skin30.scb" : null);
             Matrix4x4 authoredTransform = Matrix4x4.CreateScale(0.5f);
             var definition = new VfxSystemDefinition(
                 1, "attached", "Characters/Hero/Skins/Skin30/Attached", new[] { emitter }, Transform: authoredTransform);
@@ -698,7 +700,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
 
                 var state = Assert.Single(runtime.Emitters);
                 Assert.Null(state.PendingMesh);
-                Assert.Equal(VfxPrimitiveKind.AttachedMesh, state.Def.PrimitiveKind);
+                Assert.Equal(authoredMesh ? VfxPrimitiveKind.Mesh : VfxPrimitiveKind.AttachedMesh, state.Def.PrimitiveKind);
+                Assert.Null(state.Def.MeshPath);
                 Assert.False(state.Def.IsVisual);
                 Assert.Equal(Matrix4x4.CreateTranslation(3f, 0f, 0f), runtime.WorldTransform);
                 Assert.Equal(authoredTransform, state.DefinitionTransform);

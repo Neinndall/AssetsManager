@@ -644,6 +644,10 @@ namespace AssetsManager.Views.Controls.Viewer
                     return null;
                 });
             }
+            else if (_model.SelectedAnimation?.IsBindPose == true)
+            {
+                ApplyChampionBindPose();
+            }
             else if (_model.SelectedSystem == null)
             {
                 _vfxRenderer?.SetOwnerSkinningMatrices(null);

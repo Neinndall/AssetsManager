@@ -226,6 +226,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                 _loadingService.Dispose();
             _graph = null;
             _graphs.Clear();
+            ClearPersistentEffects();
+            ClearCheckpoints();
             _renderSources.Clear();
             _renderQueue.Clear();
             _shadedRenderQueue.Clear();

@@ -18,6 +18,106 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering;
 [Collection("Viewport native graphics")]
 public sealed class VfxSharedDrawGpuTests
 {
+    [Fact]
+    public void PersistentSwitchesRetainUploadedIdleTexturesAndReuseConditionResources()
+    {
+        using var scene = new Scene(false);
+        using var session = new AssetsManager.Services.Viewer.Vfx.Session.VfxRenderSession();
+        session.Initialize(scene.Gl);
+        session.SetViewportSize(64, 64);
+        var definition = Definition(VfxPrimitiveKind.CameraUnitQuad) with
+        { Rate = VfxCurveF.Const(12), BirthScale = VfxCurve3.Const(new Vector3(.3f)), TexturePath = "" };
+        var systems = new Dictionary<uint, VfxSystemDefinition> { [9] = new(9, "persistent", "persistent", new[] { definition }) };
+        var effect = new VfxIdleEffectDefinition(1, "", "", 0, "", 0, Vector3.Zero);
+        var condition = new VfxSubmeshCondition(new(GameMaterialBoolKind.Unsupported), Array.Empty<uint>(), Array.Empty<uint>())
+        { Effects = new[] { effect } };
+        session.SetAnimationSession(null, new[] { effect }, systems, new Dictionary<uint, uint> { [1] = 9 },
+            System.IO.Path.GetTempPath(), 7, 3, new VfxOwnerSceneContext("", "", 1) { SubmeshConditions = new[] { condition } });
+        // Consume the initial session purge before assigning the test image.
+        session.ProcessPendingGpuState();
+        var image = System.Windows.Media.Imaging.BitmapSource.Create(1, 1, 96, 96,
+            System.Windows.Media.PixelFormats.Bgra32, null, new byte[] { 255, 255, 255, 255 }, 4);
+        image.Freeze();
+        var idle = session.Graphs[0];
+        idle.Root.Emitters[0].PendingTexture = image;
+        session.Seek(.5);
+        Draw();
+        uint texture = idle.Root.Emitters[0].Texture;
+        Assert.NotEqual(0u, texture);
+        Assert.True(scene.Gl.IsTexture(texture));
+        var forced = GameMaterialState.From(-1, new[]
+            { AssetsManager.Services.Viewer.Vfx.Semantics.VfxPersistentEffectSemantics.PreviewKey(0) }, null);
+        session.SetOwnerGameState(forced);
+        var persistent = session.Graphs[1];
+        persistent.Root.Emitters[0].PendingTexture = image;
+        Draw();
+        Assert.True(scene.Gl.IsTexture(texture));
+        Assert.Same(idle, session.Graphs[0]);
+        Assert.Equal(texture, persistent.Root.Emitters[0].Texture);
+        session.SetOwnerGameState(null);
+        Draw();
+        Assert.True(scene.Gl.IsTexture(texture));
+        session.SetOwnerGameState(forced);
+        Assert.Same(persistent, session.Graphs[1]);
+        Draw();
+        Assert.Equal(texture, persistent.Root.Emitters[0].Texture);
+        Assert.Equal(GLEnum.NoError, scene.Gl.GetError());
+
+        void Draw()
+        {
+            scene.Gl.Viewport(0, 0, 64, 64);
+            session.Render(Matrix4x4.Identity, Matrix4x4.CreateTranslation(0, 0, -2));
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void PersistentConditionPixelsMatchIdleAttachmentsAndDisappearWhenDisabled(bool native)
+    {
+        using var scene = new Scene(native);
+        using var applied = new AssetsManager.Services.Viewer.Vfx.Session.VfxRenderSession();
+        using var baseline = new AssetsManager.Services.Viewer.Vfx.Session.VfxRenderSession();
+        var definition = Definition(VfxPrimitiveKind.CameraUnitQuad) with
+        { BirthScale = VfxCurve3.Const(new Vector3(.3f)), Rate = VfxCurveF.Const(12), TexDiv = Vector2.One, NumFrames = 1, TexturePath = "" };
+        var system = new VfxSystemDefinition(9, "persistent", "persistent", new[] { definition });
+        var systems = new Dictionary<uint, VfxSystemDefinition> { [9] = system };
+        var keys = new Dictionary<uint, uint> { [1] = 9 };
+        var effect = new VfxIdleEffectDefinition(1, "", "Root", 0, "", 0, Vector3.Zero);
+        var owner = new VfxOwnerSceneContext("", "", 1f);
+        var condition = new VfxSubmeshCondition(new(GameMaterialBoolKind.Unsupported), Array.Empty<uint>(), Array.Empty<uint>())
+        { Effects = new[] { effect } };
+        applied.SetAnimationSession(null, null, systems, keys, System.IO.Path.GetTempPath(), 7, 2,
+            owner with { SubmeshConditions = new[] { condition } });
+        baseline.SetAnimationSession(null, new[] { effect }, systems, keys, System.IO.Path.GetTempPath(), 7, 2, owner);
+        applied.SetBoneTransformSampler((time, _, _) => Matrix4x4.CreateTranslation((float)time * .2f, 0, 0));
+        baseline.SetBoneTransformSampler((time, _, _) => Matrix4x4.CreateTranslation((float)time * .2f, 0, 0));
+        applied.Seek(.5);
+        Assert.All(Draw(applied), value => Assert.Equal(0, value));
+        applied.SetOwnerGameState(GameMaterialState.From(-1, new[]
+            { AssetsManager.Services.Viewer.Vfx.Semantics.VfxPersistentEffectSemantics.PreviewKey(0) }, null));
+        baseline.Seek(.5);
+        byte[] expected = Draw(baseline);
+        Assert.Contains(expected, value => value != 0);
+        Assert.Equal(expected, Draw(applied));
+        applied.Seek(.25);
+        applied.Seek(.5);
+        Assert.Equal(expected, Draw(applied));
+        applied.SetOwnerGameState(null);
+        Assert.All(Draw(applied), value => Assert.Equal(0, value));
+        Assert.Equal(GLEnum.NoError, scene.Gl.GetError());
+
+        byte[] Draw(AssetsManager.Services.Viewer.Vfx.Session.VfxRenderSession session)
+        {
+            var states = new List<VfxPlaybackRuntime.EmitterState>();
+            foreach (var graph in session.Graphs)
+                foreach (var runtime in graph.Runtimes)
+                    foreach (var emitter in runtime.Emitters)
+                    { emitter.Texture = scene.White; emitter.TextureWidth = emitter.TextureHeight = 1; states.Add(emitter); }
+            return scene.Draw(states, false);
+        }
+    }
+
     public static IEnumerable<object[]> MeshCases()
     {
         foreach (bool native in new[] { false, true })

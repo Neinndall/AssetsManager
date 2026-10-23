@@ -5,8 +5,10 @@ AssetsManager - League of Legends | v4.1.0.3
 HOTFIX UPDATE
 
 New Features
+  - 3D Studio / Preview persistent skin effects with their conditions, including manual activation from Game State.
 
 Improvements
+  - 3D Studio / Compact Game State controls merge duplicate buff references and separate manual overrides, with effect names and conditions on hover.
   - Hash Guessing Lab / BIN resolves object paths for map skins and Nexus finishers.
   - Explorer / Recognizes GMESH files even when their names are unresolved.
   - Explorer / Recognizes navigation region files even when their names are unresolved.
@@ -38,6 +40,9 @@ Improvements
 Changes
 
 Bug Fixes
+  - 3D Studio / Fixed oversized character copies in effects that supply their own attached mesh, including Aatrox Skin33 turbines.
+  - 3D Studio / Hidden submeshes stay hidden when active persistent conditions conflict or animation events show them.
+  - 3D Studio / Skin effects resolve resource mappings declared in linked BIN files.
   - Explorer / Restores the selected file after clearing search, including deeply nested folders, while preserving search-box focus.
   - Explorer / Prevents previous searches or pending navigation from overriding newer searches and manual selections.
   - Hash Guessing Lab / GAME responds to cancellation during internal animation hashing and Extended preparation.

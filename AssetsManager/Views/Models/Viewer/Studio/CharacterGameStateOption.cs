@@ -8,17 +8,30 @@ namespace AssetsManager.Views.Models.Viewer
     {
         private readonly Action _changed;
         private bool _isEnabled;
+        private bool _isAutomaticallyActive;
 
-        internal CharacterGameStateOption(string name, bool enabled, Action changed, string displayName = null)
+        internal CharacterGameStateOption(string name, bool enabled, Action changed, string displayName = null, string description = null)
         {
             Name = name;
             DisplayName = displayName ?? name;
+            Description = description ?? DisplayName;
             _isEnabled = enabled;
             _changed = changed;
         }
 
         public string Name { get; }
         public string DisplayName { get; }
+        public string Description { get; }
+        public bool IsAutomaticallyActive
+        {
+            get => _isAutomaticallyActive;
+            internal set
+            {
+                if (_isAutomaticallyActive == value) return;
+                _isAutomaticallyActive = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsAutomaticallyActive)));
+            }
+        }
 
         public bool IsEnabled
         {

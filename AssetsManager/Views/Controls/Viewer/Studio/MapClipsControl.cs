@@ -255,7 +255,8 @@ namespace AssetsManager.Views.Controls.Viewer
                 if (cue?.System != null)
                     roots.Add(cue.System);
 
-            foreach (VfxIdleEffectDefinition idle in catalog.IdleEffects ?? Array.Empty<VfxIdleEffectDefinition>())
+            foreach (VfxIdleEffectDefinition idle in (catalog.IdleEffects ?? Array.Empty<VfxIdleEffectDefinition>())
+                .Concat(VfxPersistentEffectSemantics.AllEffects(catalog.OwnerSceneContext)))
             {
                 if (idle == null || idle.EffectKey == 0 ||
                     catalog.ResourceMap == null ||

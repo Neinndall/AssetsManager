@@ -168,7 +168,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 bool ready = _vfxRenderer?.SetSpellSession(
                     plan.Steps,
                     bundle.Systems,
-                    bundle.ResourceMap,
+                    playbackBundle.ResourceMap,
                     searchDir,
                     animation?.Duration ?? 0d,
                     playbackBundle.OwnerSceneContext,
@@ -176,6 +176,7 @@ namespace AssetsManager.Views.Controls.Viewer
                     playbackBundle.IdleEffects) == true;
                 if (_vfxRenderer != null)
                 {
+                    UpdatePersistentEffectState();
                     if (animation?.AnimationAsset != null && _championAnimationService != null)
                     {
                         float castDuration = animation.Duration;
