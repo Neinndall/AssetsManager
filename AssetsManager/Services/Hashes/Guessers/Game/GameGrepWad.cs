@@ -195,6 +195,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                     }
 
                     GuessAnimationBinPaths(engine, data, sourcePath, sourceWadPath, sourceChunkHash, cancellationToken, GetCachedBinTree);
+                    GuessUiPortraitPaths(engine, sourcePath, sourceWadPath, sourceChunkHash, cancellationToken, GetCachedBinTree);
                     GuessRegaliaBinChunkLinks(engine, data, sourcePath, sourceWadPath, sourceChunkHash, cancellationToken, GetCachedBinTree);
                     GuessSkinRoleTextures(engine, data, sourcePath, sourceWadPath, sourceChunkHash, cancellationToken, GetCachedBinTree);
                     GuessSkinCharacterBinChunkLinks(engine, data, sourcePath, sourceWadPath, sourceChunkHash, cancellationToken, GetCachedBinTree);

@@ -5,6 +5,7 @@ HOTFIX UPDATE
 New Features
 
 Improvements
+  - Hash Guessing Lab / GAME GrepWad resolves narrative portraits from UI labels and learned theme names.
   - Hash Guessing Lab / GAME Basic finds Jade child-model textures that retain their parent character names.
 
 Changes
