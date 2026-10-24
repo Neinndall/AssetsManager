@@ -1,8 +1,22 @@
+AssetsManager - League of Legends | v4.1.0.4
+
+HOTFIX UPDATE
+
+New Features
+
+Improvements
+
+Changes
+
+Bug Fixes
+  - 3D Studio / Map character clips now play persistent skin effects and apply their matching submesh visibility.
+
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 AssetsManager - League of Legends | v4.1.0.3
 
 HOTFIX UPDATE
+This update introduces persistent skin effect previews with manual activation in the 3D Studio and a redesigned Game State control layout. It also expands search coverage in the Hash Guessing Lab (textures, animations, navigation files, and object paths), optimizes overall performance (WAD reads, draw calls, batch loading, and memory allocation), and fixes bugs across the Explorer, 3D Studio model/effect rendering, and language downloads in Manage Versions.
 
 New Features
   - 3D Studio / Preview persistent skin effects with their conditions, including manual activation from Game State.
@@ -38,8 +52,6 @@ Improvements
   - Hash Guessing Lab / GAME Basic learns portrait form variants from known skins.
   - Hash Guessing Lab / GAME GrepWad resolves companion theme textures stored outside model tier folders.
   - Hash Guessing Lab / GAME GrepWad learns sibling image layouts to recover banner thumbnails.
-
-Changes
 
 Bug Fixes
   - 3D Studio / Fixed oversized character copies in effects that supply their own attached mesh, including Aatrox Skin33 turbines.

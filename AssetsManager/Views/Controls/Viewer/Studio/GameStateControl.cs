@@ -151,6 +151,7 @@ namespace AssetsManager.Views.Controls.Viewer
         }
 
         private void UpdatePersistentEffectState() => _vfxRenderer?.SetOwnerGameState(
+            _activeMapCharacterGroup?.PreviewClip != null ? _activeMapCharacterGroup.PreviewGameState :
             (_championModel?.GameState ?? GameMaterialState.Resting) with
             {
                 Gear = ReferenceEquals(_championBundle, _activeBundle)

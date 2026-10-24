@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using AssetsManager.Services.Viewer.Animation;
 using AssetsManager.Services.Viewer.Semantics;
 using AssetsManager.Services.Viewer.Vfx.Resources;
+using AssetsManager.Services.Viewer.Vfx.Session;
 using AssetsManager.Views.Models.Viewer;
 
 namespace AssetsManager.Services.Viewer.Runtime
@@ -57,6 +58,7 @@ namespace AssetsManager.Services.Viewer.Runtime
         internal IReadOnlyList<MapCharacterData> Placements { get; }
         internal IReadOnlyList<MapCharacterAnimationPlacementGroup> AnimationGroups { get; }
         internal AnimationClipDefinition PreviewClip { get; private set; }
+        internal GameMaterialState PreviewGameState { get; private set; } = GameMaterialState.Resting with { Gear = -1 };
         internal MapCharacterData PreviewPlacement { get; private set; }
         internal float PreviewTimeSeconds { get; set; }
         internal IReadOnlySet<uint> PreviewHiddenSubmeshes { get; private set; } = new HashSet<uint>();
@@ -64,17 +66,34 @@ namespace AssetsManager.Services.Viewer.Runtime
         internal void SetPreviewClip(AnimationClipDefinition clip, MapCharacterData placement = null)
         {
             PreviewClip = clip;
+            var clips = (Animation?.PreparedClipPlaylist(clip) ?? Array.Empty<AnimationClipDefinition>())
+                .Prepend(clip).Where(item => item != null);
+            PreviewGameState = GameMaterialState.From(-1, null, clips.SelectMany(item =>
+                new[] { item.OwnerPathHash, GameMaterialState.AnimationHash(item.ClipName) }).Where(hash => hash != 0));
             PreviewPlacement = placement ?? Placements?.FirstOrDefault();
             PreviewTimeSeconds = 0f;
             PreviewHiddenSubmeshes = new HashSet<uint>();
         }
 
         internal void SetPreviewHiddenSubmeshes(IReadOnlySet<uint> hidden)
-            => PreviewHiddenSubmeshes = hidden ?? new HashSet<uint>();
+            => PreviewHiddenSubmeshes = CharacterFormSemantics.ConditionedHiddenSubmeshes(
+                hidden ?? new HashSet<uint>(), Asset?.Vfx?.OwnerSceneContext?.SubmeshConditions, PreviewGameState);
+
+        internal bool StartPreviewVfxSession(VfxRenderSession session, VfxAbilityComposition composition,
+            string searchDirectory, int seed, double duration)
+        {
+            MapCharacterVfxCatalog catalog = Asset?.Vfx ?? MapCharacterVfxCatalog.Empty;
+            session.SetAnimationSession(composition, catalog.IdleEffects, catalog.Systems, catalog.ResourceMap,
+                searchDirectory, seed, duration, catalog.OwnerSceneContext);
+            // The MAP owner has its own clip state, independent of the focused champion's controls.
+            session.SetOwnerGameState(PreviewGameState);
+            return session.Graphs.Count > 0;
+        }
 
         internal void ClearPreviewClip()
         {
             PreviewClip = null;
+            PreviewGameState = GameMaterialState.Resting with { Gear = -1 };
             PreviewPlacement = null;
             PreviewTimeSeconds = 0f;
             PreviewHiddenSubmeshes = new HashSet<uint>();
