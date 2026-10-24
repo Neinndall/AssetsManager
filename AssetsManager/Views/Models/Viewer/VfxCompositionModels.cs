@@ -173,6 +173,7 @@ namespace AssetsManager.Views.Models.Viewer
         string ClassName = null)
     {
         public bool UsesEquippedGearParameter { get; init; }
+        public bool PlaysOwnEvents { get; init; }
 
         public IEnumerable<VfxParticleEventDefinition> ParticleEvents
             => (Events ?? Array.Empty<AnimationClipEventDefinition>()).OfType<VfxParticleEventDefinition>();

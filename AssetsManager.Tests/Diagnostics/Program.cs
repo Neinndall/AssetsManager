@@ -26,6 +26,36 @@ namespace AssetsManager.Tests.Diagnostics
 
         static async Task Main(string[] args)
         {
+            if (args.Length > 0 && args[0] == "game-wad-path-cache-audit")
+            {
+                GameWadPathCacheDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
+            if (args.Length > 0 && args[0] == "game-container-index-audit")
+            {
+                GameContainerIndexDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
+            if (args.Length > 0 && args[0] == "game-animation-label-probe")
+            {
+                GameAnimationLabelProbeDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
+            if (args.Length > 0 && args[0] == "game-method-coverage")
+            {
+                await GameMethodCoverageDiagnostic.RunAsync(args.Skip(1).ToArray());
+                return;
+            }
+            if (args.Length > 0 && args[0] == "hash-membership-audit")
+            {
+                HashMembershipAuditDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
+            if (args.Length > 0 && args[0] == "game-structure-probe")
+            {
+                GameStructureProbeDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
             if (args.Length > 0 && args[0] == "game-evidence-patterns")
             {
                 GameEvidencePatternsDiagnostic.Run(args.Skip(1).ToArray());
@@ -164,7 +194,7 @@ namespace AssetsManager.Tests.Diagnostics
             }
             if (args.Length > 0 && string.Equals(args[0], "game-grep-full-profile", StringComparison.OrdinalIgnoreCase))
             {
-                GameGrepFullProfileDiagnostic.Run(args.Skip(1).ToArray());
+                await GameGrepFullProfileDiagnostic.Run(args.Skip(1).ToArray());
                 return;
             }
             if (args.Length > 0 && string.Equals(args[0], "anm-audit", StringComparison.OrdinalIgnoreCase))

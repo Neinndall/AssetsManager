@@ -15,6 +15,19 @@ internal static class VfxIntegratedValue
         internal Vector4[] First, Second;
     }
     private static readonly ConditionalWeakTable<object, Tables> Cache = new();
+    [ThreadStatic] private static Array _lastValues;
+    [ThreadStatic] private static float[] _lastTimes;
+    [ThreadStatic] private static int _lastOrder;
+    [ThreadStatic] private static Vector4[] _lastTable;
+    private struct RecentTable
+    {
+        internal Array Values;
+        internal float[] Times;
+        internal int Order;
+        internal Vector4[] Data;
+    }
+    [ThreadStatic] private static RecentTable[] _recent;
+    [ThreadStatic] private static int _recentNext;
 
     internal static float Sample(VfxCurveF curve, float age, int order = 1)
         => curve.Times is not { Length: > 0 } || curve.Values is not { Length: > 0 }
@@ -37,6 +50,31 @@ internal static class VfxIntegratedValue
 
     private static Vector4 Read(float[] times, Array values, float age, int order)
     {
+        Vector4[] table = _lastTable;
+        if (!ReferenceEquals(_lastValues, values) || !ReferenceEquals(_lastTimes, times) || _lastOrder != order)
+        {
+            table = RecentOrBaked(times, values, order);
+            // Each worker owns its shortcut; unrelated scenes cannot replace a reader's table.
+            _lastValues = values;
+            _lastTimes = times;
+            _lastOrder = order;
+            _lastTable = table;
+        }
+        float placed = Math.Clamp(age, 0f, 1f) * (Samples - 1);
+        int under = Math.Min((int)placed, Samples - 2);
+        return Vector4.Lerp(table[under], table[under + 1], placed - under);
+    }
+
+    private static Vector4[] RecentOrBaked(float[] times, Array values, int order)
+    {
+        var recent = _recent ??= new RecentTable[16];
+        for (int index = 0; index < recent.Length; index++)
+        {
+            ref readonly var item = ref recent[index];
+            if (ReferenceEquals(item.Values, values) && ReferenceEquals(item.Times, times) && item.Order == order)
+                return item.Data;
+        }
+
         Tables held = Cache.GetOrCreateValue(values);
         Vector4[] table;
         lock (held)
@@ -46,12 +84,12 @@ internal static class VfxIntegratedValue
                 held.Times = times;
                 held.First = held.Second = null;
             }
-            if (order == 2) table = held.Second ??= Bake(times, values, true);
-            else table = held.First ??= Bake(times, values, false);
+            table = order == 2 ? held.Second ??= Bake(times, values, true) : held.First ??= Bake(times, values, false);
         }
-        float placed = Math.Clamp(age, 0f, 1f) * (Samples - 1);
-        int under = Math.Min((int)placed, Samples - 2);
-        return Vector4.Lerp(table[under], table[under + 1], placed - under);
+        // A particle alternates acceleration, rotation and UV curves, so one recent table alone misses that reuse.
+        recent[_recentNext] = new RecentTable { Values = values, Times = times, Order = order, Data = table };
+        _recentNext = (_recentNext + 1) % recent.Length;
+        return table;
     }
 
     private static Vector4[] Bake(float[] times, Array values, bool twice)

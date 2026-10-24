@@ -1,8 +1,71 @@
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
+AssetsManager - League of Legends | v4.1.0.3
+
+HOTFIX UPDATE
+
+New Features
+  - 3D Studio / Preview persistent skin effects with their conditions, including manual activation from Game State.
+
+Improvements
+  - 3D Studio / Game State controls feature a single-column layout, requirement guide, and styled manual override badges.
+  - 3D Studio / Compact Game State controls merge duplicate buff references and separate manual overrides, with effect names and conditions on hover.
+  - Hash Guessing Lab / BIN resolves object paths for map skins and Nexus finishers.
+  - Explorer / Recognizes GMESH files even when their names are unresolved.
+  - Explorer / Recognizes navigation region files even when their names are unresolved.
+  - Hash Guessing Lab / GAME GrepWad finds navigation region files from map geometry references.
+  - Hash Guessing Lab / GAME GrepWad finds missing UI atlas textures and portrait names from related sprites.
+  - Hash Guessing Lab / GAME GrepWad resolves map navigation SDF metadata paths.
+  - Explorer / Keeps large search updates responsive to clicks and keyboard input and avoids redundant tree scrolling.
+  - Explorer / Avoids initializing unopened folders when clearing search in large trees.
+  - Hash Guessing Lab / GAME avoids repeated vocabulary preparation and container sorting while preserving candidate order.
+  - Hash Guessing Lab / GAME Custom reduces repeated WAD reads between animation and texture searches.
+  - Hash Guessing Lab / GAME Custom reduces repeated animation lookups and shares BIN reference filtering without narrowing searches.
+  - Hash Guessing Lab / GAME Grep learns spell-slot animation names from other characters when clip labels are hashed.
+  - Hash Guessing Lab / GAME Grep resolves arena prop textures named after their skin labels.
+  - Hash Guessing Lab / GAME Grep finds map textures from material names stored in geometry files.
+  - Hash Guessing Lab / GAME Basic preserves learned numeric padding to find more filename variants.
+  - Hash Guessing Lab / Reduces temporary memory allocations when checking known GAME and LCU hashes.
+  - Hash Guessing Lab / GAME Basic finds navigation region files alongside map geometry and reuses spell names between character variants.
+  - Hash Guessing Lab / GAME GrepWad resolves namespaced spell references from preload files.
+  - 3D Studio / Repeated map effects share drawing work while keeping independent animation.
+  - 3D Studio / Mesh particles render in batches to reduce graphics calls.
+  - 3D Studio / Map textures use compressed GPU uploads where supported, preserving authored mipmaps and progressive loading.
+  - 3D Studio / Large map effects prepare in smaller batches so the viewport can keep responding during loading.
+  - 3D Studio / Reduced repeated curve-table lookups while simulating particle effects.
+  - Hash Guessing Lab / Reduces repeated work in GAME GrepWad animation and material searches while preserving path coverage.
+  - Hash Guessing Lab / GAME Custom finds shared particle textures referenced by skin materials.
+  - Hash Guessing Lab / GAME Basic learns portrait form variants from known skins.
+  - Hash Guessing Lab / GAME GrepWad resolves companion theme textures stored outside model tier folders.
+  - Hash Guessing Lab / GAME GrepWad learns sibling image layouts to recover banner thumbnails.
+
+Changes
+
+Bug Fixes
+  - 3D Studio / Fixed oversized character copies in effects that supply their own attached mesh, including Aatrox Skin33 turbines.
+  - 3D Studio / Hidden submeshes stay hidden when active persistent conditions conflict or animation events show them.
+  - 3D Studio / Skin effects resolve resource mappings declared in linked BIN files.
+  - Explorer / Restores the selected file after clearing search, including deeply nested folders, while preserving search-box focus.
+  - Explorer / Prevents previous searches or pending navigation from overriding newer searches and manual selections.
+  - Explorer / Keeps selection restoration working after switching between filters repeatedly in the same tree.
+  - Explorer / Reduces selection flicker when revealing a file after clearing search.
+  - Hash Guessing Lab / GAME responds to cancellation during internal animation hashing and Extended preparation.
+  - Hash Guessing Lab / Releases unreadable WAD files immediately so later searches can retry them.
+  - Hash Guessing Lab / Recovers valid BIN entries from partially unreadable files and reports skipped data.
+  - 3D Studio / Restored VFX and visual events attached to parent animation clips, including Ahri's dance.
+  - Manage Versions / Updated shared Windows files, including shader caches and Bootstrap, when languages are selected.
+  - Manage Versions / Prevented downloading other languages when the selected language has no separate files.
+  - 3D Studio / Fixed incomplete alternate appearances when selecting skin forms.
+  - 3D Studio / Exposed skin states that switch visible parts, including Evelynn's alternate appearance.
+  - 3D Studio / Prevented invalid deformation in map grass and bushes.
+  - 3D Studio / Preserved terrain texture placement when map skin data is missing.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
 AssetsManager - League of Legends | v4.1.0.2
 
 HOTFIX UPDATE
+Adding new features to the VFX engine, along with improvements and fixes.
 
 New Features
   - Viewer Settings / Choose VFX quality, with High selected by default.
@@ -19,8 +82,6 @@ Improvements
   - 3D Studio / VFX quality now controls particle density, simulation timing, trail smoothing, soft particles and distortion.
   - 3D Studio / Spell missiles and standalone projectile effects now follow their authored flight paths, height arcs, circular orbits and 3D pitch orientation.
   - 3D Studio / Reused missile trajectories for smoother playback and seeking.
-
-Changes
 
 Bug Fixes
   - 3D Studio / Fixed rectangular camera-facing particles deforming when rotated.

@@ -239,6 +239,9 @@ namespace AssetsManager.Services.Viewer.Loading
             }
 
             // A system's custom material may be declared by any BIN it links rather than its own.
+            resourceMap.Clear();
+            foreach (var entry in VfxResourceParser.ExtractSkinResourceMap(documents[0], documents))
+                resourceMap.TryAdd(entry.Key, entry.Value);
             foreach (uint systemHash in systems.Keys.ToArray())
             {
                 systems[systemHash] = VfxGraphParser.ResolveLinkedCustomMaterials(

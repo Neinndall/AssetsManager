@@ -1248,6 +1248,57 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
             Assert.Equal(0, engine.RemainingUnknownCount);
         }
 
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void GameImageAutoAtlasResolvesUiTexturesAndHudNamesBesideKnownSprites(bool spriteUnknown)
+        {
+            const ulong texture0 = 0x084d469a6a6025a0;
+            const ulong texture1 = 0xbc84284dd2f565a7;
+            const ulong sprite = 0xecf2967b525df574;
+            const string spritePath = "assets/ux/narrativebarks/cherry/senna_circle_0.png";
+            const string knownSpritePath = "assets/ux/narrativebarks/cherry/portrait_elise_34.png";
+            const string atlasPath = "clientstates/gameplay/ux/lol/kiwi/modesobjectives";
+            ulong atlasHash = XxHash64Ext.Hash(atlasPath);
+            var known = new List<string> { knownSpritePath, "assets/characters/senna/hud/senna_circle_0.dds", atlasPath };
+            if (!spriteUnknown) known.Add(spritePath);
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, known));
+            var pending = new HashSet<ulong> { texture0, texture1 };
+            if (spriteUnknown) pending.Add(sprite);
+            var engine = new HashGuessEngine(HashGuessDomain.Game, pending);
+
+            using var stream = new MemoryStream();
+            using (var writer = new BinaryWriter(stream, Encoding.ASCII, leaveOpen: true))
+            {
+                writer.Write("IMAA"u8);
+                writer.Write(2u);
+                writer.Write(texture0);
+                writer.Write(texture1);
+                writer.Write(2u);
+                foreach (ulong hash in new[] { XxHash64Ext.Hash(knownSpritePath), sprite })
+                {
+                    writer.Write(hash);
+                    writer.Write(0f); writer.Write(0f); writer.Write(1f); writer.Write(1f);
+                    writer.Write(0u);
+                }
+            }
+
+            game.GrepWad(engine, new ArraySegment<byte>(stream.ToArray()),
+                atlasPath + ".bin", "UI.wad.client", atlasHash);
+
+            const string prefix = "uiautoatlas/clientstates/gameplay/ux/lol/kiwi/modesobjectives/";
+            Assert.Equal(prefix + "atlas_0.tex", engine.Matches[texture0].Path);
+            Assert.Equal(prefix + "atlas_1.tex", engine.Matches[texture1].Path);
+            if (spriteUnknown) Assert.Equal(spritePath, engine.Matches[sprite].Path);
+            Assert.Equal(spriteUnknown ? 3 : 2, engine.Matches.Count);
+            Assert.Empty(engine.UnknownHashes);
+            Assert.All(engine.Matches.Values, match =>
+            {
+                Assert.Equal("UI.wad.client", match.SourceWadPath);
+                Assert.Equal(atlasHash, match.SourceChunkHash);
+            });
+        }
+
 
         [Fact]
         public void TestFromWadsExtractsSmallIconsSprites()

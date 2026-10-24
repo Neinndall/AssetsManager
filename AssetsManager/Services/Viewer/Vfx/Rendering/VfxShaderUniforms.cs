@@ -121,6 +121,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         internal readonly int MaterialRepeat;
         internal readonly int MaterialTint;
         internal readonly int MeshSkinned;
+        internal readonly int MeshInstanced;
         internal readonly int OrbitRotation;
         internal readonly int OwnerWorld;
         internal readonly int PaletteAddressMode;
@@ -238,6 +239,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             MaterialRepeat = gl.GetUniformLocation(program, "uMaterialRepeat");
             MaterialTint = gl.GetUniformLocation(program, "uMaterialTint");
             MeshSkinned = gl.GetUniformLocation(program, "uMeshSkinned");
+            MeshInstanced = gl.GetUniformLocation(program, "uMeshInstanced");
             OrbitRotation = gl.GetUniformLocation(program, "uOrbitRotation");
             OwnerWorld = gl.GetUniformLocation(program, "uOwnerWorld");
             PaletteAddressMode = gl.GetUniformLocation(program, "uPaletteAddressMode");

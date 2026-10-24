@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Linq;
 
 namespace AssetsManager.Views.Models.Viewer
 {
@@ -25,6 +26,7 @@ namespace AssetsManager.Views.Models.Viewer
         private double _characterScaleMultiplier = 1d;
 
         public ObservableCollection<CharacterGameStateOption> CharacterGameStates { get; } = new();
+        public ObservableCollection<CharacterGameStateOption> CharacterPersistentConditions { get; } = new();
         public ObservableCollection<CharacterBackdropOption> CharacterBackdrops { get; } = new();
         public ObservableCollection<CharacterSubmeshOption> CharacterSubmeshes { get; } = new();
         public ObservableCollection<CharacterFormOption> CharacterForms { get; } = new();
@@ -43,17 +45,24 @@ namespace AssetsManager.Views.Models.Viewer
         }
 
         public bool HasCharacterForms => CharacterForms.Count > 1;
-        public bool HasCharacterGameStates => CharacterGameStates.Count > 0;
+        public bool HasCharacterGameStates => CharacterGameStates.Count > 0 || HasCharacterPersistentConditions;
+        public bool HasCharacterPersistentConditions => CharacterPersistentConditions.Count > 0;
 
         /// <summary>Offers <paramref name="buffs"/> as toggles, on when <paramref name="enabled"/> holds them.</summary>
         internal void SetCharacterGameStates(IEnumerable<string> buffs, IReadOnlySet<string> enabled, Action changed,
-            Func<string, string> displayName = null)
+            Func<string, string> displayName = null, Func<string, bool> persistent = null,
+            Func<string, string> description = null, Func<string, string> canonicalName = null)
         {
             CharacterGameStates.Clear();
-            foreach (string buff in buffs ?? Array.Empty<string>())
-                CharacterGameStates.Add(new CharacterGameStateOption(buff, enabled?.Contains(buff) == true, changed,
-                    displayName?.Invoke(buff)));
+            CharacterPersistentConditions.Clear();
+            string Canonical(string key) => canonicalName?.Invoke(key) ?? key;
+            var selected = new HashSet<string>((enabled ?? new HashSet<string>()).Select(Canonical), StringComparer.OrdinalIgnoreCase);
+            foreach (string buff in (buffs ?? Array.Empty<string>()).Select(Canonical).Distinct(StringComparer.OrdinalIgnoreCase))
+                (persistent?.Invoke(buff) == true ? CharacterPersistentConditions : CharacterGameStates)
+                    .Add(new CharacterGameStateOption(buff, selected.Contains(buff), changed,
+                        displayName?.Invoke(buff), description?.Invoke(buff)));
             OnPropertyChanged(nameof(HasCharacterGameStates));
+            OnPropertyChanged(nameof(HasCharacterPersistentConditions));
         }
 
         public bool ShowChampionMesh

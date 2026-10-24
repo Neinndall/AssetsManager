@@ -8,6 +8,16 @@ namespace AssetsManager.Tests.xUnit.Utils
 {
     public sealed class FileTypeDetectorTests
     {
+        [Theory]
+        [InlineData("NSDI", "navsdfinfo")]
+        [InlineData("NVRG", "navregions")]
+        [InlineData("GMSH", "gmesh")]
+        public void GuessExtensionRecognizesGameBinarySignatures(string signature, string extension)
+        {
+            byte[] data = System.Text.Encoding.ASCII.GetBytes(signature + "\u0001\0\0\0\0\0\0\0");
+            Assert.Equal(extension, FileTypeDetector.GuessExtension(data));
+        }
+
         [Fact]
         public void IsEncryptedRiotTexRecognizesEsportsTextureSignature()
         {

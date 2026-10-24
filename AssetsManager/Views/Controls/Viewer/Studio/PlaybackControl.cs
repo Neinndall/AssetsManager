@@ -60,7 +60,12 @@ namespace AssetsManager.Views.Controls.Viewer
             if (_model.IsAnimationMode && _model.SelectedAnimation != null)
             {
                 if (_model.SelectedAnimation.IsBindPose)
-                    return false;
+                {
+                    if (_vfxRenderer?.ActiveSystem == null) ConfigureBindPoseEffects();
+                    if (_vfxRenderer?.ActiveSystem == null) return false;
+                    ResumeTimedPreview(restart);
+                    return true;
+                }
                 if (!HasSelectedAnimationReady())
                     _ = PlaySelectedAnimationAsync(_model.SelectedAnimation);
                 else

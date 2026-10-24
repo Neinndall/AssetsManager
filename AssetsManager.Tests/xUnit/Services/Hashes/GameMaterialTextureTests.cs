@@ -17,6 +17,78 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes;
 public class GameMaterialTextureTests
 {
     [Theory]
+    [InlineData("skins", "skin9")]
+    [InlineData("themes", "summer")]
+    public void SharedParticleNamesRequireTheOwningSamplerLink(string kind, string container)
+    {
+        string target = $"assets/characters/target/{kind}/{container}/particles/waves_sharp.tex";
+        string competitor = $"assets/characters/target/{kind}/{container}/particles/d.tex";
+        var index = new GameMaterialTextureIndex(new[]
+        {
+            "assets/shared/materials/waves_sharp.tex",
+            "assets/maps/particles/tft/booms/fireplant/d.tex"
+        }, CancellationToken.None);
+        var tree = new BinTree(new[] { Material("unused", "DiffuseTexture", target) }, Array.Empty<string>());
+        var engine = Engine(target, competitor);
+        string source = $"data/characters/target/{kind}/{container}.bin";
+        Assert.False(GameMaterialTextureIndex.HasUnresolvedContext(engine, tree, source, CancellationToken.None));
+        Assert.True(GameMaterialTextureIndex.HasUnresolvedSamplerContext(engine, tree, source, CancellationToken.None));
+        index.GuessSharedParticles(engine, tree, source, "Target.wad.client", 77, CancellationToken.None);
+        var match = Assert.Single(engine.Matches).Value;
+        Assert.Equal(target, match.Path);
+        Assert.Equal("Target.wad.client", match.SourceWadPath);
+        Assert.Equal(77UL, match.SourceChunkHash);
+        Assert.Contains(XxHash64Ext.Hash(competitor), engine.UnknownHashes);
+    }
+
+    [Fact]
+    public void SharedParticleSearchResumesInterruptedScopesAndPreservesVocabularyBoundaries()
+    {
+        const string target = "assets/characters/target/skins/skin9/particles/z.tex";
+        const string source = "data/characters/target/skins/skin9.bin";
+        var index = new GameMaterialTextureIndex(new[]
+        {
+            "assets/maps/particles/booms/a.tex", "assets/shared/materials/z.tex",
+            "assets/shared/materials/ignored.patch.tex", "assets/characters/foreign/skins/base/unrelated.tex"
+        }, CancellationToken.None);
+        var tree = new BinTree(new[] { Material("unused", "Top_Texture", target) }, Array.Empty<string>());
+        var engine = Engine(target);
+        Assert.Equal(1L, index.GuessSharedParticles(engine, tree, source, "one", 77, CancellationToken.None, 1));
+        Assert.Empty(engine.Matches);
+        Assert.Equal(2L, index.GuessSharedParticles(engine, tree, source, "one", 77, CancellationToken.None));
+        Assert.Equal(target, Assert.Single(engine.Matches).Value.Path);
+        var other = Engine(target);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        Assert.Throws<OperationCanceledException>(() => index.GuessSharedParticles(other, tree, source, "two", 88, cancellation.Token));
+        Assert.Equal(0L, index.GuessSharedParticles(other, tree, "data/maps/map11.bin", "two", 88, CancellationToken.None));
+        index.GuessSharedParticles(other, tree, source, "two", 88, CancellationToken.None);
+        Assert.Equal("two", Assert.Single(other.Matches).Value.SourceWadPath);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void GrepPreservesUnicodeAndLongMaterialPaths(bool longName)
+    {
+        string character = longName ? "target" : "例示";
+        string stem = longName ? new string('雪', 600) : "下层";
+        string name = $"Characters/{character}/Skins/Skin9/Materials/{character}_Skin9_{stem}";
+        string target = $"assets/characters/{character}/skins/skin9/{character}_skin9_{stem}_mult.tex";
+        var tree = new BinTree(new[]
+        {
+            Material(name, "Diffuse_Texture", target, new BinTreeHash64(Fnv1a.HashLower("name"), 123))
+        }, Array.Empty<string>());
+        using var stream = new MemoryStream();
+        tree.Write(stream);
+        var guesser = new GameHashGuesser(new HashFile(HashGuessDomain.Game, Array.Empty<string>()),
+            resolveBinHash64: hash => hash == 123 ? name : hash.ToString("x16"));
+        var engine = Engine(target);
+        guesser.GrepWad(engine, new ArraySegment<byte>(stream.ToArray()), $"data/characters/{character}/skins/skin9.bin", "Target.wad.client", 77, CancellationToken.None);
+        Assert.Equal(target, Assert.Single(engine.Matches).Value.Path);
+    }
+
+    [Theory]
     [InlineData("text")]
     [InlineData("wide")]
     [InlineData("entry")]

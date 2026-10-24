@@ -24,18 +24,23 @@ internal sealed class GameMaterialTextureIndex
     private static readonly Regex SkinBin = new(@"^(?:data|assets)/characters/([^/]+)/(skins|themes)/([^/]+)\.bin$", RegexOptions.CultureInvariant | RegexOptions.Compiled);
     private static readonly Regex CharacterTexture = new(@"^assets/characters/([^/]+)/(?:skins|themes)/([^/]+)/", RegexOptions.CultureInvariant | RegexOptions.Compiled);
     private readonly Dictionary<string, string[]> _names;
+    private readonly string[] _sharedParticleNames;
     private readonly ConditionalWeakTable<HashGuessEngine, ConcurrentDictionary<Scope, byte>> _scanned = new();
     private readonly record struct Scope(ulong Target, string Directory, string Role);
 
     internal GameMaterialTextureIndex(IEnumerable<string> paths, CancellationToken cancellationToken)
     {
         var namesByRole = Roles.ToDictionary(role => role, _ => new HashSet<string>(StringComparer.Ordinal));
+        var sharedParticleNames = new HashSet<string>(StringComparer.Ordinal);
         foreach (string value in paths)
         {
             cancellationToken.ThrowIfCancellationRequested();
             string path = PathUtils.NormalizePath(value);
             if (!path.EndsWith(".tex", StringComparison.Ordinal) && !path.EndsWith(".dds", StringComparison.Ordinal)) continue;
             string name = path[(path.LastIndexOf('/') + 1)..];
+            if ((path.StartsWith("assets/shared/materials/", StringComparison.Ordinal) ||
+                 path.StartsWith("assets/maps/particles/", StringComparison.Ordinal)) && !name[..^4].Contains('.'))
+                sharedParticleNames.Add(name);
             string[] roles = Roles.Where(role => name.Contains(role, StringComparison.Ordinal)).ToArray();
             if (roles.Length == 0) continue;
             Match character = CharacterTexture.Match(path);
@@ -54,6 +59,7 @@ internal sealed class GameMaterialTextureIndex
         }
         _names = namesByRole.ToDictionary(pair => pair.Key,
             pair => pair.Value.OrderBy(value => value, StringComparer.Ordinal).ToArray(), StringComparer.Ordinal);
+        _sharedParticleNames = sharedParticleNames.OrderBy(value => value, StringComparer.Ordinal).ToArray();
     }
 
     internal static bool HasUnresolvedContext(HashGuessEngine engine, BinTree tree, string sourcePath, CancellationToken cancellationToken)
@@ -65,6 +71,59 @@ internal sealed class GameMaterialTextureIndex
     internal static bool IsSkinBin(string path) =>
         !string.IsNullOrWhiteSpace(path) && path.EndsWith(".bin", StringComparison.OrdinalIgnoreCase) &&
         path.Contains("characters", StringComparison.OrdinalIgnoreCase) && SkinBin.IsMatch(PathUtils.NormalizePath(path));
+
+    internal static bool HasUnresolvedSamplerContext(HashGuessEngine engine, BinTree tree, string sourcePath,
+        CancellationToken cancellationToken) => tree != null && IsSkinBin(sourcePath) &&
+        SamplerTargets(engine, tree, cancellationToken).Any();
+
+    internal long GuessSharedParticles(HashGuessEngine engine, BinTree tree, string sourcePath, string wad, ulong chunk,
+        CancellationToken cancellationToken, long candidateBudget = long.MaxValue)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (tree == null || candidateBudget <= 0 || engine.RemainingUnknownCount == 0) return 0;
+        Match skin = SkinBin.Match(PathUtils.NormalizePath(sourcePath));
+        if (!skin.Success) return 0;
+        string directory = $"assets/characters/{skin.Groups[1].Value}/{skin.Groups[2].Value}/{skin.Groups[3].Value}/particles/";
+        var scanned = _scanned.GetOrCreateValue(engine);
+        long checkedCandidates = 0;
+        foreach (ulong target in SamplerTargets(engine, tree, cancellationToken).Distinct())
+        {
+            var scope = new Scope(target, directory, "shared-particles");
+            if (!scanned.TryAdd(scope, 0)) continue;
+            bool complete = false;
+            try
+            {
+                foreach (string name in _sharedParticleNames)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (!engine.UnknownHashes.Contains(target)) break;
+                    if (checkedCandidates >= candidateBudget) return checkedCandidates;
+                    checkedCandidates++;
+                    engine.CheckNormalizedParts(directory, name, ReadOnlySpan<char>.Empty,
+                        HashGuessStrategy.BinLinkSibling, wad, chunk, expectedHash: target);
+                }
+                complete = true;
+            }
+            finally { if (!complete) scanned.TryRemove(scope, out _); }
+        }
+        return checkedCandidates;
+    }
+
+    private static IEnumerable<ulong> SamplerTargets(HashGuessEngine engine, BinTree tree, CancellationToken cancellationToken)
+    {
+        foreach (var obj in tree.Objects.Values)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (obj.ClassHash != MaterialClass || !obj.Properties.TryGetValue(Samplers, out var property) ||
+                property is not BinTreeContainer samplers) continue;
+            foreach (var sampler in samplers.Elements.OfType<BinTreeStruct>())
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (sampler.Properties.TryGetValue(TexturePath, out var path) && path is BinTreeWadChunkLink link &&
+                    engine.UnknownHashes.Contains(link.Value)) yield return link.Value;
+            }
+        }
+    }
 
     internal long Guess(HashGuessEngine engine, BinTree tree, string sourcePath, string wad, ulong chunk,
         CancellationToken cancellationToken, long candidateBudget = long.MaxValue)

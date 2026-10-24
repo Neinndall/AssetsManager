@@ -1,6 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Windows.Threading;
 using AssetsManager.Services.Viewer.Parsing;
 using AssetsManager.Services.Viewer.Runtime;
 using AssetsManager.Services.Viewer.Semantics;
@@ -43,7 +47,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
         public void RuntimeAdvancesDirectlyWithoutASessionClock()
         {
             MapParticleData particle = Particle("Fire1", 0x30000001, Matrix4x4.Identity);
-            VfxSystemDefinition system = System(0x30000001);
+            VfxSystemDefinition system = System(0x30000001) with { Flags = 8 };
             var systems = new Dictionary<uint, VfxSystemDefinition> { [system.PathHash] = system };
             MapParticleRuntime runtime = MapParticleRuntime.Create(
                 particle,
@@ -57,7 +61,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
         }
 
         [Fact]
-        public void CreateAllSkipsSystemsWithNoEmitters()
+        public async Task CreateAllSkipsSystemsWithNoEmitters()
         {
             const uint hash = 0x30000002;
             MapParticleData particle = Particle("SoundOnly", hash, Matrix4x4.Identity);
@@ -71,11 +75,11 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
                 new Dictionary<uint, uint>(),
                 new[] { new MapParticleSystemGroupData(hash, soundOnly, new[] { particle }) });
 
-            Assert.Empty(MapParticleRuntime.CreateAll(catalog));
+            Assert.Empty(await MapParticleRuntime.CreateAllAsync(catalog, null, CancellationToken.None));
         }
 
         [Fact]
-        public void CreateAllBuildsOneIndependentGraphPerPlacement()
+        public async Task CreateAllBuildsOneIndependentGraphPerPlacement()
         {
             VfxSystemDefinition system = System(0x30000001);
             MapParticleData first = Particle("Fire1", system.PathHash, Matrix4x4.CreateTranslation(1, 2, 3));
@@ -88,13 +92,105 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
                     new MapParticleSystemGroupData(system.PathHash, system, new[] { first, second })
                 });
 
-            IReadOnlyList<MapParticleRuntime> runtimes = MapParticleRuntime.CreateAll(catalog);
+            IReadOnlyList<MapParticleRuntime> runtimes = await MapParticleRuntime.CreateAllAsync(catalog, null, CancellationToken.None);
 
             Assert.Equal(2, runtimes.Count);
             Assert.NotSame(runtimes[0].Graph, runtimes[1].Graph);
             Assert.Equal(new Vector3(1, 2, 3), runtimes[0].Graph.Root.WorldTransform.Translation);
             Assert.Equal(new Vector3(4, 5, 6), runtimes[1].Graph.Root.WorldTransform.Translation);
             Assert.NotEqual(runtimes[0].Graph.InitialSeed, runtimes[1].Graph.InitialSeed);
+        }
+
+        [Theory]
+        [InlineData(false)] [InlineData(true)]
+        public void PreparationYieldsToRenderingAndCancellationBetweenBatches(bool cancel)
+        {
+            Exception failure = null;
+            var thread = new Thread(() =>
+            {
+                try
+                {
+                    var dispatcher = Dispatcher.CurrentDispatcher;
+                    SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(dispatcher));
+                    using var cancellation = new CancellationTokenSource();
+                    var system = System(0x30000001);
+                    var particles = Enumerable.Range(0, 60).Select(at =>
+                        Particle($"Fire{at}", system.PathHash, Matrix4x4.CreateTranslation(at, 0, 0))).ToArray();
+                    var catalog = new MapParticleSystemCatalog(
+                        new Dictionary<uint, VfxSystemDefinition> { [system.PathHash] = system },
+                        new Dictionary<uint, uint>(),
+                        new[] { new MapParticleSystemGroupData(system.PathHash, system, particles) });
+                    int prepared = 0, seenBeforeNextBatch = 0;
+                    var loading = MapParticleRuntime.CreateAllAsync(catalog, (definition, transform, seed) =>
+                    {
+                        prepared++;
+                        var runtime = new AssetsManager.Services.Viewer.Vfx.Runtime.VfxPlaybackRuntime(seed);
+                        runtime.SetSystem(definition, transform);
+                        return runtime;
+                    }, cancellation.Token);
+                    Assert.Equal(24, prepared);
+                    Assert.False(loading.IsCompleted);
+                    dispatcher.BeginInvoke(DispatcherPriority.Render, new Action(() =>
+                    {
+                        seenBeforeNextBatch = prepared;
+                        if (cancel) cancellation.Cancel();
+                    }));
+                    dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(async () =>
+                    {
+                        try
+                        {
+                            if (cancel)
+                            {
+                                await Assert.ThrowsAnyAsync<OperationCanceledException>(() => loading);
+                                Assert.Equal(24, prepared);
+                            }
+                            else
+                            {
+                                var runtimes = await loading;
+                                Assert.Equal(60, prepared);
+                                Assert.Equal(particles, runtimes.Select(runtime => runtime.Particle));
+                                for (int at = 0; at < runtimes.Count; at++)
+                                {
+                                    var expected = MapParticleRuntime.Create(particles[at], system, catalog.Systems, catalog.ResourceMap);
+                                    expected.Advance(0.1f); runtimes[at].Advance(0.1f);
+                                    Assert.Equal(expected.Graph.InitialSeed, runtimes[at].Graph.InitialSeed);
+                                    Assert.Equal(expected.Graph.Root.WorldTransform, runtimes[at].Graph.Root.WorldTransform);
+                                    Assert.Equal(expected.Graph.Root.Emitters[0].Instances, runtimes[at].Graph.Root.Emitters[0].Instances);
+                                }
+                            }
+                            Assert.Equal(24, seenBeforeNextBatch);
+                        }
+                        catch (Exception ex) { failure = ex; }
+                        finally { dispatcher.InvokeShutdown(); }
+                    }));
+                    Dispatcher.Run();
+                }
+                catch (Exception ex) { failure = ex; }
+            }) { IsBackground = true };
+            thread.SetApartmentState(ApartmentState.STA);
+            thread.Start();
+            Assert.True(thread.Join(TimeSpan.FromSeconds(30)), "Preparation must finish or cancel without blocking the dispatcher.");
+            if (failure != null) throw failure;
+        }
+
+        [Fact]
+        public void WorkerWithAnUnpumpedDispatcherDoesNotWaitOnItsQueue()
+        {
+            Exception failure = null;
+            var thread = new Thread(() =>
+            {
+                try
+                {
+                    _ = Dispatcher.CurrentDispatcher;
+                    SynchronizationContext.SetSynchronizationContext(null);
+                    MapParticleRuntime.YieldPreparationAsync(CancellationToken.None).GetAwaiter().GetResult();
+                }
+                catch (Exception ex) { failure = ex; }
+            }) { IsBackground = true };
+            thread.SetApartmentState(ApartmentState.STA);
+            thread.Start();
+            Assert.True(thread.Join(TimeSpan.FromSeconds(5)), "A worker's dormant dispatcher must not capture preparation.");
+            if (failure != null) throw failure;
         }
 
         private static MapParticleData Particle(string name, uint system, Matrix4x4 transform)

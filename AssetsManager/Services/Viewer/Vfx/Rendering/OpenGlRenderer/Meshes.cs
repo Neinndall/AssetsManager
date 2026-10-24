@@ -15,8 +15,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         {
             if (_meshProgram == 0)
             {
-                _meshProgram = GlShaderCompiler.CreateProgram(_gl, _gles, VfxShaderSource.MeshVertex, VfxShaderSource.MeshFragment);
-            _meshUniforms = _stockMeshUniforms = new VfxShaderUniforms(_gl, _meshProgram);
+                _meshProgram = GlShaderCompiler.CreateProgram(_gl, _gles, VfxMeshInstanceShaderSource.Vertex, VfxMeshInstanceShaderSource.Fragment);
+                _meshUniforms = _stockMeshUniforms = new VfxShaderUniforms(_gl, _meshProgram);
 
                 uint boneBlock = _gl.GetUniformBlockIndex(_meshProgram, "VfxBoneTransforms");
                 if (boneBlock != uint.MaxValue)
@@ -98,11 +98,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         {
             if (es.MeshVao == 0 || es.MeshVertexCount == 0) return;
             bool beamMesh = es.Def.DrawsAsBeamMesh;
-            Vector3 beamPosition = default;
-            Matrix4x4 beamBasis = Matrix4x4.Identity;
-            float beamStretch = 0f;
-            if (beamMesh && !VfxBeamGeometry.TryMeshPlacement(es, out beamPosition, out beamBasis, out beamStretch)) return;
-            Vector4 beamTint = beamMesh ? VfxBeamGeometry.DistanceColor(es) : Vector4.One;
             bool isDistortion = !_drawingShadows && es.Def.DrawsAsDistortion && !wireframePass;
             // The game draws the scene behind a distorting emitter at any strength, so it always needs the frame.
             bool warpsFrame = isDistortion;
@@ -356,92 +351,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             // Material parameters and textures are shared by every particle in this emitter pass.
             if (native) BindGameParticle(es, true, passIndex, sharedPalettePhase);
             else _gl.FrontFace(es.Def.RenderState?.FlipWinding == true ? FrontFaceDirection.CW : FrontFaceDirection.Ccw);
-            for (int i = 0; i < instanceCount; i++)
-            {
-                int o = i * Stride;
-                _meshUniforms.Uniform3(_meshUniforms.WorldPos, instances[o], instances[o + 1], instances[o + 2]);
-                _meshUniforms.Uniform3(_meshUniforms.PlacementRight, instances[o + 36], instances[o + 37], instances[o + 38]);
-                _meshUniforms.Uniform3(_meshUniforms.PlacementUp, instances[o + 39], instances[o + 40], instances[o + 41]);
-                _meshUniforms.Uniform3(_meshUniforms.PlacementForward, instances[o + 42], instances[o + 43], instances[o + 44]);
-                if (beamMesh)
-                {
-                    _meshUniforms.Uniform3(_meshUniforms.WorldPos, beamPosition.X, beamPosition.Y, beamPosition.Z);
-                    _meshUniforms.Uniform3(_meshUniforms.PlacementRight, beamBasis.M11, beamBasis.M12, beamBasis.M13);
-                    _meshUniforms.Uniform3(_meshUniforms.PlacementUp, beamBasis.M21, beamBasis.M22, beamBasis.M23);
-                    _meshUniforms.Uniform3(_meshUniforms.PlacementForward, beamBasis.M31, beamBasis.M32, beamBasis.M33);
-                }
-                Vector3 orbitRotation = i < es.Particles.Count
-                    ? es.Particles[i].BirthOrbitalVelocity * es.Particles[i].Age
-                    : Vector3.Zero;
-                _meshUniforms.Uniform3(_meshUniforms.OrbitRotation, orbitRotation.X, orbitRotation.Y, orbitRotation.Z);
-                float ownerScale = attachedMesh && float.IsFinite(es.MeshOwnerScale) && es.MeshOwnerScale > 0f
-                    ? es.MeshOwnerScale
-                    : 1f;
-                float scaleX = ClampScale(instances[o + 3]) * ownerScale;
-                float scaleY = ClampScale(instances[o + 4]) * ownerScale;
-                float scaleZ = ClampScale(instances[o + 18]) * ownerScale;
-                if (beamMesh) scaleZ = beamStretch;
-                _meshUniforms.Uniform3(_meshUniforms.Scale, scaleX, scaleY, scaleZ);
-                Vector3 meshRotation = new(
-                    instances[o + 15],
-                    instances[o + 16],
-                    instances[o + 17]);
-                _meshUniforms.Uniform3(
-                    _meshUniforms.Rotation,
-                    meshRotation.X,
-                    meshRotation.Y,
-                    meshRotation.Z);
-                _meshUniforms.Uniform3(_meshUniforms.GameLookupDrivers, instances[o + 11],
-                    new Vector3(instances[o + 12], instances[o + 13], instances[o + 14]).Length(), instances[o + 34]);
-                _meshUniforms.Uniform4(_meshUniforms.Color, instances[o + 5] * beamTint.X, instances[o + 6] * beamTint.Y,
-                    instances[o + 7] * beamTint.Z, instances[o + 8] * beamTint.W);
-                _meshUniforms.Uniform2(_meshUniforms.BirthUvOffset, instances[o + 19], instances[o + 20]);
-                _meshUniforms.Uniform2(_meshUniforms.UvScale, instances[o + 21], instances[o + 22]);
-                _meshUniforms.Uniform1(_meshUniforms.UvRotation, instances[o + 23]);
-                _meshUniforms.Uniform1(_meshUniforms.ErosionDrive, instances[o + 24]);
-                _meshUniforms.Uniform4(_meshUniforms.ErosionMixer, instances[o + 25], instances[o + 26], instances[o + 27], instances[o + 28]);
-                _meshUniforms.Uniform2(_meshUniforms.UvOffsetMult, instances[o + 29], instances[o + 30]);
-                _meshUniforms.Uniform2(_meshUniforms.UvScaleMult, instances[o + 31], instances[o + 32]);
-                _meshUniforms.Uniform1(_meshUniforms.UvRotationMult, instances[o + 33]);
-                _meshUniforms.Uniform1(_meshUniforms.Frame, instances[o + 10]);
-
-                if (useParticleMeshSkinning && i < es.Particles.Count)
-                    UploadMeshBonePalette(es.MeshAnimation.EvaluatePalette(es.Particles[i].Age));
-
-                if (es.MeshIndexCount > 0)
-                {
-                    if (_drawElements != null)
-                    {
-                        if (attachedMesh && es.MeshRanges is { Length: > 0 })
-                        {
-                            bool narrowed = HasAttachedDrawMatch(es.MeshRanges, es.Def.SubmeshesToDraw);
-                            foreach (VfxMeshRangeData range in es.MeshRanges)
-                            {
-                                if (!ShouldDrawAttachedRange(
-                                        range.Hash,
-                                        narrowed,
-                                        es.Def.SubmeshesToDraw,
-                                        es.Def.SubmeshesToDrawAlways,
-                                        _ownerHiddenSubmeshes))
-                                {
-                                    continue;
-                                }
-
-                                if (native) _gameShaders.DrawBoundPass(_drawElements, range.IndexCount, new IntPtr(range.StartIndex * sizeof(uint)));
-                                else _drawElements((uint)PrimitiveType.Triangles, range.IndexCount, (uint)DrawElementsType.UnsignedInt,
-                                    new IntPtr(range.StartIndex * sizeof(uint)));
-                            }
-                        }
-                        else
-                        {
-                            if (native) _gameShaders.DrawBoundPass(_drawElements, es.MeshIndexCount, IntPtr.Zero);
-                            else _drawElements((uint)PrimitiveType.Triangles, es.MeshIndexCount, (uint)DrawElementsType.UnsignedInt, IntPtr.Zero);
-                        }
-                    }
-                }
-                else if (native) _gameShaders.DrawBoundArrays(PrimitiveType.Triangles, es.MeshVertexCount);
-                else _gl.DrawArrays(PrimitiveType.Triangles, 0, (uint)es.MeshVertexCount);
-            }
+            _meshUniforms.Uniform1(_meshUniforms.MeshInstanced, 1);
+            RenderMeshInstances(es, instances, instanceCount, camPos, camUp, native, useParticleMeshSkinning, attachedMesh);
             _meshUniforms = _stockMeshUniforms;
             _particleUniforms = _stockParticleUniforms;
             _gl.BindVertexArray(_vao);

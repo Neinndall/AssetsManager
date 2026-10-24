@@ -13,6 +13,86 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
 {
     internal sealed partial class GameHashGuesser
     {
+        internal int GuessScriptFamilyAliases(HashGuessEngine engine, CancellationToken cancellationToken,
+            int candidateBudget = int.MaxValue, Action<int> progress = null)
+        {
+            ArgumentNullException.ThrowIfNull(engine);
+            if (candidateBudget < 0) throw new ArgumentOutOfRangeException(nameof(candidateBudget));
+            cancellationToken.ThrowIfCancellationRequested();
+            if (candidateBudget == 0 || engine.RemainingUnknownCount == 0) return 0;
+            var families = Corpus.GetOrCreate("character-script-families", paths =>
+            {
+                var owners = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+                foreach (string path in paths)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (!path.StartsWith("data/characters/", StringComparison.Ordinal) ||
+                        !path.EndsWith(".luabin64", StringComparison.Ordinal) && !path.EndsWith(".preload", StringComparison.Ordinal)) continue;
+                    string[] parts = path.Split('/');
+                    if (parts.Length != 5 || parts[3] != "spells") continue;
+                    if (!owners.TryGetValue(parts[2], out var names)) owners[parts[2]] = names = new HashSet<string>(StringComparer.Ordinal);
+                    names.Add(parts[4][..parts[4].LastIndexOf('.')]);
+                }
+                var result = new List<(string Owner, string[] Names)>();
+                foreach (var group in owners.GroupBy(pair => pair.Key[(pair.Key.LastIndexOf('_') + 1)..], StringComparer.Ordinal))
+                {
+                    if (group.Count() < 2) continue;
+                    string[] names = group.SelectMany(pair => pair.Value.Select(name =>
+                            name.StartsWith(pair.Key + "_", StringComparison.Ordinal) ? name[(pair.Key.Length + 1)..] : name))
+                        .Distinct(StringComparer.Ordinal).OrderBy(name => name, StringComparer.Ordinal).ToArray();
+                    foreach (var owner in group.OrderBy(pair => pair.Key, StringComparer.Ordinal))
+                    {
+                        // Require examples of this owner's naming convention before borrowing family names.
+                        if (owner.Value.Count(name => name.StartsWith(owner.Key + "_", StringComparison.Ordinal)) >= 3)
+                            result.Add((owner.Key, names));
+                    }
+                }
+                return result;
+            });
+            int checkedCandidates = 0;
+            string[] scriptExtensions = { ".luabin64", ".preload" };
+            foreach (var (owner, names) in families)
+            {
+                string prefix = $"data/characters/{owner}/spells/{owner}_";
+                foreach (string name in names)
+                foreach (string extension in scriptExtensions)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (checkedCandidates >= candidateBudget || engine.RemainingUnknownCount == 0) return checkedCandidates;
+                    engine.CheckNormalizedParts(prefix, name, extension, HashGuessStrategy.CharacterTemplate,
+                        "GAME learned character script family");
+                    if ((++checkedCandidates & 0x3fff) == 0) progress?.Invoke(checkedCandidates);
+                }
+            }
+            progress?.Invoke(checkedCandidates);
+            return checkedCandidates;
+        }
+
+        internal int GuessMapGeometrySiblings(HashGuessEngine engine, CancellationToken cancellationToken,
+            int candidateBudget = int.MaxValue, Action<int> progress = null)
+        {
+            ArgumentNullException.ThrowIfNull(engine);
+            if (candidateBudget < 0) throw new ArgumentOutOfRangeException(nameof(candidateBudget));
+            cancellationToken.ThrowIfCancellationRequested();
+            if (candidateBudget == 0 || engine.RemainingUnknownCount == 0) return 0;
+
+            var geometryPaths = Corpus.GetOrCreate("map-geometry-sibling-paths", paths => paths
+                .Where(path => path.StartsWith("data/maps/mapgeometry/", StringComparison.Ordinal) &&
+                    path.EndsWith(".mapgeo", StringComparison.Ordinal))
+                .Distinct(StringComparer.Ordinal).OrderBy(path => path, StringComparer.Ordinal).ToArray());
+            int checkedCandidates = 0;
+            foreach (string geometryPath in geometryPaths)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (checkedCandidates >= candidateBudget || engine.RemainingUnknownCount == 0) break;
+                engine.CheckPrefixSuffix(geometryPath.AsSpan(0, geometryPath.Length - ".mapgeo".Length),
+                    ".navregions", HashGuessStrategy.ExtensionVariant, "GAME map geometry companion");
+                if ((++checkedCandidates & 0xff) == 0) progress?.Invoke(checkedCandidates);
+            }
+            progress?.Invoke(checkedCandidates);
+            return checkedCandidates;
+        }
+
         internal IReadOnlyList<string> GetCharacters() =>
             Corpus.GetOrCreate("characters", values => values
                 .Select(path => Regex.Match(path, @"^(?:assets/|data/)?characters/([^/.]+)(?:/|$)", RegexOptions.IgnoreCase))
@@ -50,6 +130,47 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                 _ => BuildNumberFormats(KnownPaths, null).ToHashSet(StringComparer.Ordinal));
             return _SubstituteNumbers(engine, KnownPaths, maximum, digits: 2, inferDigits: false,
                 cancellationToken, "Generated numeric variant", progress, unpadded);
+        }
+
+        internal int GuessLearnedPaddedNumbers(HashGuessEngine engine, CancellationToken cancellationToken,
+            int maximum = 200, int candidateBudget = int.MaxValue, Action<int> progress = null)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (maximum <= 0 || candidateBudget <= 0 || engine.RemainingUnknownCount == 0) return 0;
+            var formats = Corpus.GetOrCreate("game-learned-padded-number-formats", paths =>
+            {
+                var learned = new HashSet<(string Prefix, string Suffix, int Width)>();
+                foreach (string path in paths)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    int start = path.LastIndexOf('/') + 1;
+                    for (int at = start; at < path.Length;)
+                    {
+                        if (!char.IsAsciiDigit(path[at])) { at++; continue; }
+                        int end = at + 1;
+                        while (end < path.Length && char.IsAsciiDigit(path[end])) end++;
+                        if (end - at is >= 3 and <= 6 && path[at] == '0')
+                            learned.Add((path[..at], path[end..], end - at));
+                        at = end;
+                    }
+                }
+                return learned.OrderBy(f => f.Prefix, StringComparer.Ordinal).ThenBy(f => f.Suffix, StringComparer.Ordinal)
+                    .ThenBy(f => f.Width).ToArray();
+            });
+            var numbers = formats.Select(f => f.Width).Distinct().ToDictionary(width => width,
+                width => Enumerable.Range(0, maximum).Select(value => value.ToString("D" + width, CultureInfo.InvariantCulture)).ToArray());
+            int checkedCount = 0;
+            foreach (var format in formats)
+            foreach (string value in numbers[format.Width])
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (checkedCount >= candidateBudget || engine.RemainingUnknownCount == 0) return Finish();
+                engine.CheckNormalizedParts(format.Prefix, value,
+                    format.Suffix, HashGuessStrategy.NumberVariant, "GAME learned numeric padding");
+                if ((++checkedCount & 0xff) == 0) progress?.Invoke(checkedCount);
+            }
+            return Finish();
+            int Finish() { progress?.Invoke(checkedCount); return checkedCount; }
         }
 
         internal IEnumerable<HashGuessCandidate> SubstituteBasicNumbers(int maximum = 100)
@@ -526,6 +647,64 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                 if (checkedCount >= candidateBudget || engine.RemainingUnknownCount == 0) break;
             }
 
+            if (checkedCount < candidateBudget && engine.RemainingUnknownCount > 0)
+                checkedCount += GuessPortraitVariants(engine, cancellationToken, characterList, candidateBudget - checkedCount,
+                    count => progress?.Invoke(checkedCount + count));
+            progress?.Invoke(checkedCount);
+            return checkedCount;
+        }
+
+        internal int GuessPortraitVariants(HashGuessEngine engine, CancellationToken cancellationToken,
+            IEnumerable<string> characters = null, int candidateBudget = int.MaxValue, Action<int> progress = null)
+        {
+            ArgumentNullException.ThrowIfNull(engine);
+            if (candidateBudget < 0) throw new ArgumentOutOfRangeException(nameof(candidateBudget));
+            if (candidateBudget == 0 || engine.RemainingUnknownCount == 0) return 0;
+            var index = Corpus.GetOrCreate("portrait-variant-context", paths =>
+            {
+                var skins = new Dictionary<string, HashSet<int>>(StringComparer.OrdinalIgnoreCase);
+                var variants = new HashSet<(string Kind, string Variant, string Extension)>();
+                var skinPattern = new Regex(@"^(?:data|assets)/characters/([^/]+)/skins/skin([0-9]+)\.bin$", RegexOptions.CultureInvariant);
+                var portraitPattern = new Regex(@"/hud/[^/]+_(circle|square)_([0-9]+)_([a-z0-9_]+)\.(tex|dds)$", RegexOptions.CultureInvariant);
+                foreach (string path in paths)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (path.Contains("/hud/", StringComparison.Ordinal))
+                    {
+                        Match portrait = portraitPattern.Match(path);
+                        if (portrait.Success) variants.Add((portrait.Groups[1].Value, portrait.Groups[3].Value, portrait.Groups[4].Value));
+                    }
+                    if (!path.EndsWith(".bin", StringComparison.Ordinal) || !path.Contains("/skins/skin", StringComparison.Ordinal)) continue;
+                    Match skin = skinPattern.Match(path);
+                    if (!skin.Success || !int.TryParse(skin.Groups[2].Value, NumberStyles.None, CultureInfo.InvariantCulture, out int number)) continue;
+                    if (!skins.TryGetValue(skin.Groups[1].Value, out var numbers)) skins[skin.Groups[1].Value] = numbers = new();
+                    numbers.Add(number);
+                }
+                return (Skins: skins.ToDictionary(pair => pair.Key, pair => pair.Value.Order().ToArray(), StringComparer.OrdinalIgnoreCase),
+                    Variants: variants.OrderBy(value => value.Kind, StringComparer.Ordinal).ThenBy(value => value.Variant, StringComparer.Ordinal)
+                        .ThenBy(value => value.Extension, StringComparer.Ordinal).ToArray());
+            });
+            int checkedCount = 0;
+            Span<char> pathBuffer = stackalloc char[512];
+            foreach (string value in (characters ?? GetCharacters()).Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.Ordinal))
+            {
+                string character = value.ToLowerInvariant();
+                if (!index.Skins.TryGetValue(character, out int[] skins)) continue;
+                foreach (int skin in skins)
+                foreach (var variant in index.Variants)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (pathBuffer.TryWrite(CultureInfo.InvariantCulture,
+                        $"assets/characters/{character}/hud/{character}_{variant.Kind}_{skin}_{variant.Variant}.{variant.Extension}", out int length))
+                        engine.CheckNormalizedPath(pathBuffer[..length], HashGuessStrategy.CharacterTemplate, "GAME learned portrait variants");
+                    else
+                        engine.Check($"assets/characters/{character}/hud/{character}_{variant.Kind}_{skin}_{variant.Variant}.{variant.Extension}",
+                            HashGuessStrategy.CharacterTemplate, "GAME learned portrait variants");
+                    checkedCount++;
+                    if ((checkedCount & 0x3FFF) == 0) progress?.Invoke(checkedCount);
+                    if (checkedCount >= candidateBudget || engine.RemainingUnknownCount == 0) return checkedCount;
+                }
+            }
             progress?.Invoke(checkedCount);
             return checkedCount;
         }

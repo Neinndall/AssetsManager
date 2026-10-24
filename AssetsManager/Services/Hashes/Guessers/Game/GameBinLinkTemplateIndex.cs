@@ -25,6 +25,7 @@ internal sealed class GameBinLinkTemplateIndex
         internal Dictionary<(ulong Target, string Value), Pending> Pending { get; } = new();
     }
     private readonly Dictionary<Key, Family> _families = new();
+    private readonly GameSiblingImageTemplateIndex _images = new();
     private static readonly Regex CamelBoundary = new("([a-z0-9])([A-Z])", RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
     internal void Guess(HashGuessEngine engine, BinTree tree, IReadOnlyDictionary<ulong, string> known,
@@ -84,6 +85,7 @@ internal sealed class GameBinLinkTemplateIndex
                     }
                 }
             }
+            _images.Guess(engine, type, props, known, wad, chunk, cancellationToken);
             foreach (var p in props) Visit(p, identifiers);
         }
         void Visit(BinTreeProperty p, List<Identifier> inherited)

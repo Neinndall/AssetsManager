@@ -67,6 +67,18 @@ namespace AssetsManager.Services.Hashes.Guessers
         internal IReadOnlyList<string> DirectoryList() =>
             Corpus.GetOrCreate("directories", HashGuessEngine.BuildDirectoryList);
 
+        internal static WadFile OpenWad(string path)
+        {
+            var stream = File.OpenRead(path);
+            try { return new WadFile(stream); }
+            catch
+            {
+                // A failing WadFile constructor does not release its input stream.
+                stream.Dispose();
+                throw;
+            }
+        }
+
         internal string[] FindWads(string rootDirectory)
         {
             if (string.IsNullOrWhiteSpace(rootDirectory) || !Directory.Exists(rootDirectory))

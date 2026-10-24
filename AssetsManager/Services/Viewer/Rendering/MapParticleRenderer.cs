@@ -27,6 +27,8 @@ namespace AssetsManager.Services.Viewer.Rendering
         private readonly List<VfxRenderQueueEntry> _postColor = new();
         private readonly List<VfxPlaybackGraphRuntime> _graphs = new();
         private readonly Dictionary<object, int> _graphOrders = new();
+        private readonly Dictionary<object, object> _drawGroups = new();
+        private readonly Dictionary<object, int> _drawCapacities = new();
         private VfxOpenGlRenderer _renderer;
         private Matrix4x4 _preparedViewProjection;
         private Matrix4x4 _preparedView;
@@ -100,6 +102,8 @@ namespace AssetsManager.Services.Viewer.Rendering
 
             _sources.Clear();
             _graphs.Clear();
+            _drawGroups.Clear();
+            _drawCapacities.Clear();
             bool needsSoftParticles = false;
             bool needsSceneColor = false;
             foreach (MapParticleRuntime mapRuntime in runtimes)
@@ -114,6 +118,8 @@ namespace AssetsManager.Services.Viewer.Rendering
                     for (float t = 0; t < time; t += 1f / 60f) graph.Update(MathF.Min(1f / 60f, time - t));
                 }
                 _graphs.Add(graph);
+                _drawGroups[graph] = mapRuntime.DrawGroupKey;
+                _drawCapacities[mapRuntime.DrawGroupKey] = mapRuntime.SharedDrawCapacity;
                 foreach (VfxPlaybackRuntime runtime in graph.Runtimes)
                 {
                     IReadOnlyList<VfxPlaybackRuntime.EmitterState> emitters = runtime.Emitters;
@@ -134,7 +140,9 @@ namespace AssetsManager.Services.Viewer.Rendering
 
             _uploader.UploadPendingResources(_graphs, _renderer);
             _renderer.CaptureScene(viewportWidth, viewportHeight, needsSceneColor, needsSoftParticles);
-            VfxRenderQueue.BuildInto(_sources, _queue, _graphOrders);
+            _renderer.SharedDrawGroups = _drawGroups;
+            _renderer.SharedDrawCapacities = _drawCapacities;
+            VfxRenderQueue.BuildInto(_sources, _queue, _graphOrders, _drawGroups);
 
             _preparedView = MapParticleSemantics.ViewportView(view);
             _preparedViewProjection = MapParticleSemantics.ViewportViewProjection(viewProjection);
@@ -235,6 +243,8 @@ namespace AssetsManager.Services.Viewer.Rendering
             _postColor.Clear();
             _graphs.Clear();
             _graphOrders.Clear();
+            _drawGroups.Clear();
+            _drawCapacities.Clear();
         }
 
         public void Dispose()
@@ -251,6 +261,8 @@ namespace AssetsManager.Services.Viewer.Rendering
             _postColor.Clear();
             _graphs.Clear();
             _graphOrders.Clear();
+            _drawGroups.Clear();
+            _drawCapacities.Clear();
             _ready = false;
         }
     }

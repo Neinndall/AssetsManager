@@ -14,9 +14,9 @@ internal static class AnimationCatalogAuditDiagnostic
 {
     internal static void Run(string[] args)
     {
-        if (args.Length != 1 || !File.Exists(args[0]))
+        if (args.Length < 1 || !File.Exists(args[0]))
         {
-            Console.WriteLine("Usage: animation-catalog-audit <skin.bin>");
+            Console.WriteLine("Usage: animation-catalog-audit <skin.bin> [clip-name]");
             return;
         }
 
@@ -35,11 +35,12 @@ internal static class AnimationCatalogAuditDiagnostic
         Console.WriteLine($"[Catalog] skin={skinPath} graph=0x{bundle.OwnerSceneContext?.AnimationGraphPathHash:x8} " +
                           $"allClips={bundle.Clips.Count} selected={selected.Count} listed={items.Count}");
         foreach (string bin in bundle.LoadedBins) Console.WriteLine($"[BIN] {bin}");
-        foreach (var item in items)
+        foreach (var item in items.Where(item => args.Length < 2 || item.Name.Equals(args[1], StringComparison.OrdinalIgnoreCase)))
         {
             Console.WriteLine($"[Clip] 0x{item.Clip.OwnerPathHash:x8} name={item.Name} " +
                               $"class=0x{item.Clip.OwnerClassHash:x8} authored={item.Clip.AnimationFilePath} resolved={item.FilePath}");
-            if (item.Name.IndexOf("recall", StringComparison.OrdinalIgnoreCase) < 0 &&
+            Console.WriteLine($"[Events] own={item.Clip.PlaysOwnEvents} authoredParticles={item.Clip.ParticleEventCount} metadata={item.VfxSummary}");
+            if (args.Length < 2 && item.Name.IndexOf("recall", StringComparison.OrdinalIgnoreCase) < 0 &&
                 !item.Name.StartsWith("0x", StringComparison.OrdinalIgnoreCase)) continue;
             Console.WriteLine($"[NameTable] 0x{item.Clip.OwnerPathHash:x8} BIN={hashes.ResolveBinHash(item.Clip.OwnerPathHash)}");
             for (int gear = 0; gear < 3; gear++)
@@ -50,6 +51,9 @@ internal static class AnimationCatalogAuditDiagnostic
             }
             var prepared = catalog.PrepareAsync(item, bundle, Resolve, log, default).GetAwaiter().GetResult();
             Console.WriteLine($"[Decoded] clip=0x{item.Clip.OwnerPathHash:x8} duration={prepared.Duration}");
+            Console.WriteLine($"[PreparedEvents] {prepared.VfxSummary}");
+            foreach (var cue in prepared.Composition.Events)
+                Console.WriteLine($"[Particle] effect=0x{cue.Event.EffectKey:x8} resolved={cue.System != null} at={cue.Event.StartFrame} until={cue.Event.EndFrame}");
         }
         foreach (var item in items.Where(item => !string.IsNullOrWhiteSpace(item.FilePath)))
         {

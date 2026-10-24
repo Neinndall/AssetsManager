@@ -34,7 +34,8 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
             string root = args.FirstOrDefault(a => !a.StartsWith("--", StringComparison.Ordinal)) ?? @"C:\Riot Games\League of Legends (PBE)";
             string outPath = args.FirstOrDefault(a => a.StartsWith("--out=", StringComparison.Ordinal))?[6..];
             string wadFilter = args.FirstOrDefault(a => a.StartsWith("--wad=", StringComparison.Ordinal))?[6..];
-            var directories = new DirectoriesCreator();
+            string state = args.FirstOrDefault(a => a.StartsWith("--state=", StringComparison.Ordinal))?[8..];
+            var directories = state == null ? new DirectoriesCreator() : new DirectoriesCreator(state);
             var unknown = File.ReadLines(Path.Combine(directories.HashLabPath, "unknowns.game.txt"))
                 .Select(l => ulong.TryParse(l.Trim(), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out ulong h) ? h : 0)
                 .Where(h => h != 0)
@@ -61,14 +62,18 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
 
             int derivedBins = 0;
             var derivedLines = new List<string>();
+            var visited = new HashSet<(ulong Hash, ulong Checksum)>();
             foreach (string wadPath in Directory.EnumerateFiles(Path.Combine(root, "Game"), "*.wad.client", SearchOption.AllDirectories))
             {
                 if (wadFilter != null && !Path.GetFileName(wadPath).Contains(wadFilter, StringComparison.OrdinalIgnoreCase)) continue;
                 string wadName = Path.GetRelativePath(Path.Combine(root, "Game"), wadPath).Replace('\\', '/');
                 using var wad = new WadFile(wadPath);
+                if (args.Contains("--active-wads") && !wad.Chunks.Keys.Any(unknown.ContainsKey)) continue;
+                Console.WriteLine($"Scanning {wadName}");
                 foreach (var (chunkHash, chunk) in wad.Chunks)
                 {
                     if (chunk.Compression == WadChunkCompression.Satellite) continue;
+                    if (!visited.Add((chunkHash, chunk.Checksum))) continue;
                     bool isUnknown = unknown.TryGetValue(chunkHash, out Unknown self);
                     string knownPath = Game(chunkHash);
                     if (!isUnknown && knownPath != null &&

@@ -19,7 +19,7 @@ internal static class ManifestVerificationDiagnostic
         {
             Console.WriteLine(
                 "Usage: dotnet run --project AssetsManager.Tests/AssetsManager.Tests.csproj -- " +
-                "manifest-verify <manifest-path-or-url> <target-root> [filter|-] [locale1,locale2]");
+                "manifest-verify <manifest-path-or-url> <target-root> [filter|-] [locale1,locale2] [--inspect] [--inventory=output-prefix] [--download]");
             Environment.ExitCode = 2;
             return;
         }
@@ -29,6 +29,10 @@ internal static class ManifestVerificationDiagnostic
         string diagnosticRoot = Path.Combine(
             Path.GetTempPath(),
             $"AssetsManager_ManifestVerification_{Guid.NewGuid():N}");
+        bool download = args.Contains("--download");
+        bool inspect = args.Contains("--inspect");
+        string inventory = args.FirstOrDefault(arg => arg.StartsWith("--inventory=", StringComparison.Ordinal))?[12..];
+        args = args.Where(arg => !arg.StartsWith("--", StringComparison.Ordinal)).ToArray();
         string filter = args.Length > 2 && !string.IsNullOrWhiteSpace(args[2]) && args[2] != "-"
             ? args[2]
             : null;
@@ -38,11 +42,20 @@ internal static class ManifestVerificationDiagnostic
 
         try
         {
+            if (download && inventory != null) throw new ArgumentException("Inventory mode cannot download or repair files.");
             using var httpClient = new HttpClient();
             byte[] manifestBytes = await LoadManifestAsync(httpClient, manifestSource);
             var manifest = new RmanService().Parse(manifestBytes);
+            if (inspect)
+            {
+                foreach (var language in manifest.Languages)
+                    Console.WriteLine($"[Language] {language.LanguageId}={language.Name}");
+                foreach (var file in manifest.Files.Where(file => filter == null || file.Name.Contains(filter, StringComparison.OrdinalIgnoreCase)))
+                    Console.WriteLine($"[File] {file.Name} bytes={file.FileSize} languages=[{string.Join(",", file.LanguageIds)}]");
+                return;
+            }
             var logger = new LoggerConfiguration()
-                .MinimumLevel.Information()
+                .MinimumLevel.Is(inventory == null ? Serilog.Events.LogEventLevel.Information : Serilog.Events.LogEventLevel.Warning)
                 .WriteTo.Console()
                 .CreateLogger();
             var logService = new LogService(logger);
@@ -53,8 +66,17 @@ internal static class ManifestVerificationDiagnostic
                 directories,
                 new HashService());
 
-            Console.WriteLine("[ManifestVerification] Verification-only mode; no files will be downloaded or repaired.");
-            int filesToPatch = await downloader.VerifyManifestAsync(manifest, targetRoot, filter, languages);
+            if (inventory != null)
+            {
+                await ManifestInventoryDiagnostic.Run(manifest, manifestSource, targetRoot, filter, languages, inventory, downloader);
+                return;
+            }
+
+            Console.WriteLine(download ? $"[ManifestVerification] Download target: {targetRoot}" :
+                "[ManifestVerification] Verification-only mode; no files will be downloaded or repaired.");
+            int filesToPatch = download
+                ? await downloader.DownloadManifestAsync(manifest, targetRoot, filter, languages)
+                : await downloader.VerifyManifestAsync(manifest, targetRoot, filter, languages);
             Console.WriteLine($"[ManifestVerification] Files requiring repair: {filesToPatch:N0}");
         }
         catch (Exception exception)

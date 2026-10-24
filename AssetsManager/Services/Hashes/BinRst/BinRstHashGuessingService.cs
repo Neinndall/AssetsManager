@@ -23,6 +23,7 @@ namespace AssetsManager.Services.Hashes
     public sealed class BinRstHashGuessingService
     {
         private const string MetaSchemaClassSource = "Meta Schema class names";
+        private const string BinInventoryVersion = "5";
         private const string MetaSchemaPropertySource = "Meta Schema property names";
 
 
@@ -140,7 +141,7 @@ namespace AssetsManager.Services.Hashes
                                 using var stream = new MemoryStream(buffer.Array, buffer.Offset, buffer.Count, false);
                                 if (isBin)
                                 {
-                                    ReadBinInventory(stream, observed, cancellationToken);
+                                    ReadBinInventory(ReadBinDocument(stream, path, wadPath, cancellationToken), observed, cancellationToken);
                                     scannedBins++;
                                 }
                                 else
@@ -151,7 +152,7 @@ namespace AssetsManager.Services.Hashes
                             }
                             catch (Exception ex) when (ex is not OperationCanceledException)
                             {
-                                _log.LogDebug($"Internal Hash Lab skipped '{path}' in {Path.GetFileName(wadPath)}: {ex.Message}");
+                                _log.LogWarning($"Internal Hash Lab skipped '{path}' in {Path.GetFileName(wadPath)}: {ex.Message}");
                             }
                         }
                     }
@@ -185,12 +186,12 @@ namespace AssetsManager.Services.Hashes
                                 FileShare.Read,
                                 64 * 1024,
                                 FileOptions.SequentialScan);
-                            ReadBinInventory(stream, observed, cancellationToken);
+                            ReadBinInventory(ReadBinDocument(stream, path, null, cancellationToken), observed, cancellationToken);
                             scannedBins++;
                         }
                         catch (Exception ex) when (ex is not OperationCanceledException)
                         {
-                            _log.LogDebug($"Internal Hash Lab skipped loose BIN '{path}': {ex.Message}");
+                            _log.LogWarning($"Internal Hash Lab skipped loose BIN '{path}': {ex.Message}");
                         }
                         progress?.Report(new InternalHashProgress
                         {
@@ -323,7 +324,7 @@ namespace AssetsManager.Services.Hashes
                                     {
                                         ArraySegment<byte> buffer = data.DangerousGetArray();
                                         using var stream = new MemoryStream(buffer.Array, buffer.Offset, buffer.Count, false);
-                                        var tree = new BinTree(stream);
+                                        var tree = ReadBinDocument(stream, path, wadPath, cancellationToken);
                                         BinContentEvidenceSource.MatchBinContentEvidence(
                                             tree,
                                             matcher,
@@ -338,7 +339,7 @@ namespace AssetsManager.Services.Hashes
                                     }
                                     catch (Exception ex) when (ex is not OperationCanceledException)
                                     {
-                                        // Ignore malformed individual chunks and continue scanning
+                                        _log.LogWarning($"Internal Hash Lab skipped BIN '{path}' in {Path.GetFileName(wadPath)}: {ex.Message}");
                                     }
                                 }
                                 else if (isText && (selectedSubMethods == null || selectedSubMethods.Contains("rst-content-text")))
@@ -358,7 +359,7 @@ namespace AssetsManager.Services.Hashes
                         }
                         catch (Exception ex) when (ex is not OperationCanceledException)
                         {
-                            // Skip corrupted container
+                            _log.LogError(ex, $"Internal Hash Lab could not read WAD '{wadPath}'.");
                         }
                         string stageText = $"Scanning {Path.GetFileName(wadPath)}";
                         progress?.Report(CreateProgress(matcher, stopwatch, stageText, scanned, index + 1, totalSources));
@@ -374,7 +375,7 @@ namespace AssetsManager.Services.Hashes
                             try
                             {
                                 using var stream = File.OpenRead(looseBin);
-                                var tree = new BinTree(stream);
+                                var tree = ReadBinDocument(stream, looseBin, null, cancellationToken);
                                 string loosePath = GetRelativeSourcePath(rootDirectory, looseBin);
                                 BinContentEvidenceSource.MatchBinContentEvidence(
                                     tree,
@@ -389,7 +390,7 @@ namespace AssetsManager.Services.Hashes
                             }
                             catch (Exception ex) when (ex is not OperationCanceledException)
                             {
-                                // Continue
+                                _log.LogWarning($"Internal Hash Lab skipped loose BIN '{looseBin}': {ex.Message}");
                             }
                             scanned++;
                             progress?.Report(CreateProgress(matcher, stopwatch, $"Scanning loose BIN: {Path.GetFileName(looseBin)}", scanned, wads.Length + lIdx + 1, totalSources));
@@ -715,7 +716,9 @@ namespace AssetsManager.Services.Hashes
                 bool isBinDomain = string.Equals(domain, "bin", StringComparison.Ordinal);
                 string marker = Path.Combine(_directories.HashLabPath, $"internal.{domain}.patch.txt");
                 if (File.Exists(marker) && (!isBinDomain ||
-                    File.Exists(Path.Combine(_directories.HashLabPath, "unknowns.bin.xxh364.txt")))) continue;
+                    File.Exists(Path.Combine(_directories.HashLabPath, "unknowns.bin.xxh364.txt")) &&
+                    (await File.ReadAllTextAsync(marker, cancellationToken)).StartsWith(
+                        $"internal:bin:v{BinInventoryVersion}:", StringComparison.Ordinal))) continue;
 
                 await BuildInventoryAsync(rootDirectory, isBinDomain, !isBinDomain, progress, cancellationToken);
             }
@@ -817,11 +820,10 @@ namespace AssetsManager.Services.Hashes
             [InternalHashKind.RstXxh64] = new()
         };
 
-        private static void ReadBinInventory(Stream stream, Dictionary<InternalHashKind, HashSet<ulong>> observed, CancellationToken cancellationToken)
-        {
-            var tree = new BinTree(stream);
-            ReadBinInventory(tree, observed, cancellationToken);
-        }
+        private BinTree ReadBinDocument(Stream stream, string source, string wad, CancellationToken cancellationToken)
+            => BinHashDocumentReader.Read(stream,
+                message => _log.LogWarning($"Internal Hash Lab BIN '{source}'{(wad == null ? "" : $" in {Path.GetFileName(wad)}")}: {message}"),
+                cancellationToken);
 
         internal static void ReadBinInventory(BinTree tree, Dictionary<InternalHashKind, HashSet<ulong>> observed,
             CancellationToken cancellationToken = default) =>
@@ -1670,7 +1672,7 @@ namespace AssetsManager.Services.Hashes
                 ulong value = unchecked((ulong)info.Length ^ (ulong)info.LastWriteTimeUtc.Ticks);
                 xor ^= value; sum = unchecked(sum + value); count++;
             }
-            string schema = string.Equals(domain, "bin", StringComparison.Ordinal) ? "4" : "1";
+            string schema = string.Equals(domain, "bin", StringComparison.Ordinal) ? BinInventoryVersion : "1";
             return $"internal:{domain}:v{schema}:{sourceVersion}:{count}:{xor:x16}:{sum:x16}";
         }
 

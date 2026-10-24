@@ -358,6 +358,13 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
 
                 LoadMissileSpells(bundle, documentTrees, wadRoot, searchFolder, log, cancellationToken);
 
+                if (documentTrees.TryGetValue(bundle.PrimaryBinPath, out BinTree primaryTree))
+                {
+                    bundle.ResourceMap.Clear();
+                    foreach (var entry in VfxResourceParser.ExtractSkinResourceMap(primaryTree, loadedTrees))
+                        bundle.ResourceMap.TryAdd(entry.Key, entry.Value);
+                }
+
                 // A system's custom material may be declared by any BIN it links rather than its own.
                 foreach (uint systemHash in bundle.Systems.Keys.ToArray())
                 {
@@ -573,6 +580,15 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
             for (int index = 0; index < definition.Emitters.Count; index++)
             {
                 VfxEmitterDefinition emitter = definition.Emitters[index];
+                // Some attached primitives author a separate effect mesh (Aatrox's back turbines).
+                // It rides the host rig, but must not replace that geometry with the owner's full skin.
+                if (emitter.PrimitiveKind == VfxPrimitiveKind.AttachedMesh && !emitter.MeshIsSkinned &&
+                    VfxMeshFormatSemantics.IsAuthoredSimplePath(emitter.MeshPath))
+                {
+                    emitter = emitter with { PrimitiveKind = VfxPrimitiveKind.Mesh };
+                    emitters ??= definition.Emitters.ToArray();
+                    emitters[index] = emitter;
+                }
                 if (emitter.PrimitiveKind == VfxPrimitiveKind.AttachedMesh ||
                     string.IsNullOrWhiteSpace(emitter.MeshPath))
                 {

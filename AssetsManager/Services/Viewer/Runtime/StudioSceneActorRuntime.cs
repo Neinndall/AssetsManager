@@ -15,6 +15,7 @@ using AssetsManager.Views.Models.Viewer;
 using LeagueToolkit.Core.Animation;
 using LeagueToolkit.Hashing;
 using AssetsManager.Services.Viewer.Vfx.Session;
+using AssetsManager.Services.Viewer.Vfx.Semantics;
 
 namespace AssetsManager.Services.Viewer.Runtime
 {
@@ -308,6 +309,7 @@ namespace AssetsManager.Services.Viewer.Runtime
                 HashCode.Combine(clip.Name, Bundle.Systems.Count),
                 LoopDuration,
                 PlaybackBundle.OwnerSceneContext);
+            Session.SetOwnerGameState((Model.GameState ?? GameMaterialState.Resting) with { Gear = Form?.GearIndex ?? -1 });
             Session.SetOwnerSkinningMatrices(Animation.FinalBoneTransforms);
             Session.Play();
         }
@@ -318,7 +320,16 @@ namespace AssetsManager.Services.Viewer.Runtime
             Model.CurrentAnimation = null;
             Model.AnimationTime = 0d;
             ConfigureClipCues(null);
-            Session.SetSystem(null);
+            if (PlaybackBundle.IdleEffects.Count == 0 && !VfxPersistentEffectSemantics.AllEffects(PlaybackBundle.OwnerSceneContext).Any())
+            {
+                Session.SetSystem(null);
+                return;
+            }
+            Session.SetAnimationSession(null, PlaybackBundle.IdleEffects, Bundle.Systems, PlaybackBundle.ResourceMap,
+                SearchDirectory, 1337, LoopDuration, PlaybackBundle.OwnerSceneContext);
+            Session.SetBoneTransformSampler(null);
+            ApplyBindPose();
+            Session.SetOwnerGameState((Model.GameState ?? GameMaterialState.Resting) with { Gear = Form?.GearIndex ?? -1 });
         }
 
         /// <summary>The GAME STATE buffs the actor has on, read with its own clip by its materials and submesh conditions.</summary>
@@ -331,6 +342,7 @@ namespace AssetsManager.Services.Viewer.Runtime
         private void ConfigureClipCues(AnimationClipCatalogItem clip)
         {
             Model.GameState = GameMaterialState.Preview(_gameStates, clip, PlaybackBundle.SpellPreviews);
+            Session.SetOwnerGameState((Model.GameState ?? GameMaterialState.Resting) with { Gear = Form?.GearIndex ?? -1 });
             _formHiddenSubmeshes = null;
             _visibilityTimeline = clip == null
                 ? Array.Empty<VfxClipCueEvaluator.VisibilityEntry>()
@@ -364,7 +376,7 @@ namespace AssetsManager.Services.Viewer.Runtime
         internal void Advance(float deltaSeconds, bool playing, float speed, StudioSceneActor actor,
             double? transportTime = null)
         {
-            if (Clip?.AnimationAsset == null || Session.ActiveSystem == null)
+            if (Session.ActiveSystem == null)
             {
                 ApplyBindPose();
                 ApplySubmeshVisibility(actor, FormHiddenSubmeshes);
@@ -401,22 +413,29 @@ namespace AssetsManager.Services.Viewer.Runtime
             }
 
             double time = Session.PlaybackTime;
-            Animation.Update((float)time, Clip.AnimationAsset, Model.Skeleton, Model.SkinnedMesh, Model.Parts, Model.Name, Model, deltaSeconds);
-            Model.SkinningMatrices = Animation.FinalBoneTransforms;
-            Model.GpuSkinningData = Animation.SkinningData;
-            Session.SetOwnerSkinningMatrices(Animation.FinalBoneTransforms);
-            Session.UpdateBoneTransforms(_poseBoneProvider);
+            if (Clip?.AnimationAsset == null) ApplyBindPose();
+            else
+            {
+                Animation.Update((float)time, Clip.AnimationAsset, Model.Skeleton, Model.SkinnedMesh, Model.Parts, Model.Name, Model, deltaSeconds);
+                Model.SkinningMatrices = Animation.FinalBoneTransforms;
+                Model.GpuSkinningData = Animation.SkinningData;
+                Session.SetOwnerSkinningMatrices(Animation.FinalBoneTransforms);
+                Session.UpdateBoneTransforms(_poseBoneProvider);
+            }
 
             IReadOnlySet<uint> cueHidden = VfxClipCueEvaluator.HiddenSubmeshesAt(
                 _visibilityTimeline,
-                VfxClipCueEvaluator.FoldedTime(time, Clip.Duration));
+                VfxClipCueEvaluator.FoldedTime(time, LoopDuration));
+            cueHidden = CharacterFormSemantics.ConditionedHiddenSubmeshes(cueHidden,
+                Bundle.OwnerSceneContext?.SubmeshConditions,
+                (Model.GameState ?? GameMaterialState.Resting) with { Gear = Form?.GearIndex ?? -1 });
             ApplySubmeshVisibility(actor, cueHidden);
         }
 
         /// <summary>Moves the actor's clip to the transport time after an explicit seek.</summary>
         internal void Seek(double time, bool loop = true)
         {
-            if (Clip?.AnimationAsset == null || Session.ActiveSystem == null) return;
+            if (Session.ActiveSystem == null) return;
             Session.Seek(loop ? VfxClipCueEvaluator.FoldedTime(time, LoopDuration)
                 : SynchronizationService.ClampTime(time, LoopDuration));
         }

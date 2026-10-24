@@ -111,6 +111,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             {
                 uint effectKey = AsU32(Get(elem.Properties, F_idleEffectKey)) ?? 0u;
                 string effectName = GetString(elem.Properties, F_idleEffectName) ?? string.Empty;
+                if (effectKey == 0 && !string.IsNullOrEmpty(effectName))
+                    effectKey = VfxParsingHash.Fnv1a(effectName);
                 string boneName = GetString(elem.Properties, F_idleBoneName) ?? string.Empty;
                 uint boneNameHash = AsU32(Get(elem.Properties, F_idleBoneName)) ??
                     (string.IsNullOrEmpty(boneName) ? 0u : VfxParsingHash.Fnv1a(boneName));
@@ -175,12 +177,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             {
                 IReadOnlyList<uint> show = Hashes(condition.Properties, "SubmeshesToShow");
                 IReadOnlyList<uint> hide = Hashes(condition.Properties, "SubmeshesToHide");
-                if (show.Count == 0 && hide.Count == 0)
-                    continue;
+                IReadOnlyList<VfxIdleEffectDefinition> effects = ExtractIdleEffects(
+                    Get(condition.Properties, VfxParsingHash.Fnv1a("PersistentVfxs")));
                 result.Add(new VfxSubmeshCondition(
                     AssetsManager.Services.Viewer.Resolvers.SknDynamicMaterialParser.ReadBoolDriver(Get(condition.Properties, VfxParsingHash.Fnv1a("OwnerCondition"))),
                     show,
-                    hide));
+                    hide) { Effects = effects });
             }
             return result;
         }
@@ -566,7 +568,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 interruptionGroups,
                 flags,
                 parametricValues,
-                className);
+                className)
+            {
+                PlaysOwnEvents = ownerClassHash == VfxParsingHash.Fnv1a("SequencerClipData") ||
+                    ownerClassHash == VfxParsingHash.Fnv1a("ParametricClipData") &&
+                    Get(properties, 0x69de8fca) is BinTreeBool { Value: true }
+            };
         }
 
         private static IReadOnlyList<uint> ReadClipChildren(IReadOnlyDictionary<uint, BinTreeProperty> properties)

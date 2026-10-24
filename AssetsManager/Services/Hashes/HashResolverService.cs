@@ -178,8 +178,8 @@ namespace AssetsManager.Services.Hashes
 
         public bool IsKnownHash(ulong pathHash)
         {
-            return _gameCache?.Resolve(pathHash) != null ||
-                   _lcuCache?.Resolve(pathHash) != null;
+            return _gameCache?.Contains(pathHash) == true ||
+                   _lcuCache?.Contains(pathHash) == true;
         }
 
         public string ResolveBinHash(uint hash) => _binHashCache?.Resolve(hash) ?? hash.ToString("x8");

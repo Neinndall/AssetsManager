@@ -130,7 +130,10 @@ namespace AssetsManager.Views.Controls.Viewer
                     _ = PlaySelectedSpellAsync(_model.SelectedSpell);
                 else if (selected is { IsBindPose: false })
                     _ = RefreshCharacterFormAnimationAsync(selected);
+                else if (selected?.IsBindPose == true)
+                    ConfigureBindPoseEffects();
             }
+            UpdatePersistentEffectState();
             StudioViewportView.OpenTkControl?.InvalidateVisual();
         }
 

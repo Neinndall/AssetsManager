@@ -15,6 +15,8 @@ using AssetsManager.Services.Viewer.Loading;
 using AssetsManager.Services.Viewer.Resolvers;
 using LeagueToolkit.Core.Mesh;
 using AssetsManager.Services.Viewer.Rendering;
+using AssetsManager.Services.Viewer.Rendering.GameShaders;
+using AssetsManager.Shaders;
 using AssetsManager.Tests.Support;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.Settings;
@@ -36,8 +38,12 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
             var parameters = args.Where(arg => arg.StartsWith("--parameter=", StringComparison.Ordinal))
                 .Select(arg => arg[12..].Split('=', 2))
                 .ToDictionary(pair => pair[0], pair => float.Parse(pair[1], System.Globalization.CultureInfo.InvariantCulture), StringComparer.Ordinal);
+            string[] buffs = args.Where(arg => arg.StartsWith("--buff=", StringComparison.Ordinal))
+                .Select(arg => arg[7..]).ToArray();
             bool shaders = args.Contains("--shaders"), isolate = args.Contains("--isolate"), studio = args.Contains("--studio");
             bool studioLoader = args.Contains("--studio-loader");
+            bool dumpShader = args.Contains("--dump-shader");
+            string shaderRoot = args.FirstOrDefault(arg => arg.StartsWith("--shader-root=", StringComparison.Ordinal))?[14..];
             studio |= studioLoader;
             args = args.Where(arg => !arg.StartsWith("--", StringComparison.Ordinal)).ToArray();
             if (args.Length < 4)
@@ -53,6 +59,8 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
             var loader = InstalledSkins.CreateLoader(settings, log);
             string projectRoot = Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), "am-skin-part-render")).FullName;
             MapCharacterAssetData asset = loader.LoadAsync(args[0], projectRoot, CancellationToken.None).GetAwaiter().GetResult();
+            AppSettings renderSettings = string.IsNullOrWhiteSpace(shaderRoot)
+                ? settings : InstalledSkins.Settings(Path.GetFullPath(shaderRoot));
             var provider = new WadContentProvider(log, new WadNodeLoaderService(null, log), new AssetsManager.Utils.DirectoriesCreator(), new SvgParser());
             var resolver = new MapAssetResolver(provider, settings);
             var source = resolver.ResolveReferenceAsync(asset.Skin.Mesh, projectRoot).GetAwaiter().GetResult();
@@ -87,8 +95,28 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                             using var model = await new SknLoadingService(log, hashes, provider, settings)
                                 .LoadModelWithSkinBin(modelPath, binPath, projectRoot);
                             if (model == null) throw new InvalidOperationException("Studio loader returned no model.");
+                            model.GameState = GameMaterialState.From(0, buffs, null);
                             model.GpuSkinningData = GpuSkinningData.TryCreate(model.Skeleton, model.SkinnedMesh, model.Parts, out string skinningFailure);
                             if (model.GpuSkinningData == null) throw new InvalidOperationException(skinningFailure);
+                            foreach (var part in model.Parts.Where(part => part.Name == args[1]))
+                                foreach (var pass in part.MaterialDefinition.Program?.Passes ?? Array.Empty<GameMaterialPass>())
+                                {
+                                    Console.WriteLine($"[StudioProgram] {part.Name} shader={pass.ShaderPath} vs={pass.VertexShaderPath} ps={pass.PixelShaderPath} defines={string.Join(";", pass.Defines.Select(define => define.Name + "=" + define.Value))}");
+                                    Console.WriteLine($"[StudioParameters] {string.Join(";", pass.Parameters.Select(parameter => parameter.Name + "=" + parameter.Value))}");
+                                    if (dumpShader)
+                                    {
+                                        var bytecode = GameShaderProgramResolver.Read(pass, part.MaterialDefinition.Program.Kind, renderSettings);
+                                        Console.WriteLine($"[ShaderRead] ready={bytecode.Ready} failure={bytecode.Failure} fallback={bytecode.Program?.Fallback}");
+                                        if (bytecode.Ready)
+                                        {
+                                            var stage = GameShaderTranslator.TranslateStage(bytecode.Program.Pixel,
+                                                bytecode.Program.PixelReflection, GameShaderTranslator.Stage.Pixel);
+                                            string header = string.Join("\n", bytecode.Program.PixelReflection.ConstantBuffers.Select(buffer =>
+                                                $"// {buffer.Name}: {string.Join(",", buffer.Members.Select(member => member.Name + "@" + member.Offset))}"));
+                                            File.WriteAllText(args[3] + ".ps.glsl", header + "\n" + stage.Glsl);
+                                        }
+                                    }
+                                }
                             foreach (ModelPart part in model.Parts)
                                 foreach (GameMaterialTexture texture in (part.MaterialDefinition.Program?.Passes ?? Array.Empty<GameMaterialPass>()).SelectMany(pass => pass.Textures))
                                 {
@@ -96,7 +124,7 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                                     string key = SknMaterialTextureResolver.MatchTextureKey(path, part.AllTextures.Keys.ToArray());
                                     Console.WriteLine($"[StudioTexture] {part.Name} {texture.Name}: path={path} key={key} loaded={!string.IsNullOrWhiteSpace(key)}");
                                 }
-                            Render(asset, args[1], args[2], args[3], size, args.Length > 5 ? float.Parse(args[5], System.Globalization.CultureInfo.InvariantCulture) : 3.2f, settings, skin, shaders, isolate, parameters: parameters, studio: studio, loadedModel: model);
+                            Render(asset, args[1], args[2], args[3], size, args.Length > 5 ? float.Parse(args[5], System.Globalization.CultureInfo.InvariantCulture) : 3.2f, renderSettings, skin, shaders, isolate, parameters: parameters, studio: studio, loadedModel: model);
                         }
                         catch (Exception ex) { failure = ex; }
                         finally { app.Dispatcher.BeginInvokeShutdown(System.Windows.Threading.DispatcherPriority.Normal); }
@@ -104,7 +132,7 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                     System.Windows.Threading.Dispatcher.Run();
                     return;
                 }
-                try { Render(asset, args[1], args[2], args[3], size, args.Length > 5 ? float.Parse(args[5], System.Globalization.CultureInfo.InvariantCulture) : 3.2f, settings, skin, shaders, isolate, parameters: parameters, studio: studio); }
+                try { Render(asset, args[1], args[2], args[3], size, args.Length > 5 ? float.Parse(args[5], System.Globalization.CultureInfo.InvariantCulture) : 3.2f, renderSettings, skin, shaders, isolate, parameters: parameters, studio: studio); }
                 catch (Exception ex) { failure = ex; }
             });
             thread.SetApartmentState(ApartmentState.STA);
@@ -167,6 +195,7 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
 
             using var context = new HiddenWglContext();
             using GL gl = GL.GetApi(context.GetProcAddress);
+            Console.WriteLine($"[GPU] {gl.GetStringS(StringName.Vendor)} / {gl.GetStringS(StringName.Renderer)} / {gl.GetStringS(StringName.Version)}");
             uint colour = gl.GenTexture();
             gl.BindTexture(TextureTarget.Texture2D, colour);
             gl.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.Rgba8, (uint)size, (uint)size, 0, Silk.NET.OpenGL.PixelFormat.Rgba,

@@ -11,6 +11,49 @@
        >
     <UserControl.Resources>
 <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+<Style x:Key="InspectorGameStateOptionStyle" TargetType="CheckBox">
+            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+            <Setter Property="FontSize" Value="10.5"/>
+            <Setter Property="FontWeight" Value="Normal"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Height" Value="26"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <Grid Background="Transparent">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="20"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Border x:Name="Indicator" Width="14" Height="14" HorizontalAlignment="Left"
+                                    VerticalAlignment="Center" Background="{StaticResource DarkBackground}"
+                                    BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="3">
+                                <Path x:Name="CheckMark" Data="M3.5,8 L6.5,11 L12.5,4.5" Stroke="White"
+                                      StrokeThickness="1.8" Stretch="Uniform" Margin="2" Visibility="Collapsed"/>
+                            </Border>
+                            <ContentPresenter Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Stretch"/>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Indicator" Property="Background" Value="{StaticResource AccentBrush}"/>
+                                <Setter TargetName="Indicator" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                                <Setter TargetName="CheckMark" Property="Visibility" Value="Visible"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Indicator" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Indicator" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.5"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
 <Style x:Key="InspectorGroupTitleStyle" TargetType="TextBlock">
             <Setter Property="FontSize" Value="13"/>
             <Setter Property="FontWeight" Value="Bold"/>
@@ -732,12 +775,12 @@
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
-                                        <Border Grid.Column="0" Background="#15FFFFFF" CornerRadius="7" Width="26" Height="26" Margin="0,0,8,0" VerticalAlignment="Center">
-                                            <materialIcons:MaterialIcon Kind="LightningBoltOutline" Width="14" Height="14" Foreground="{StaticResource AccentPurple}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        <Border Grid.Column="0" Background="#18A78BFA" BorderBrush="#35A78BFA" BorderThickness="1" CornerRadius="8" Width="28" Height="28" Margin="0,0,10,0" VerticalAlignment="Center">
+                                            <materialIcons:MaterialIcon Kind="LightningBolt" Width="15" Height="15" Foreground="{StaticResource AccentPurple}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                         </Border>
                                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                             <TextBlock Text="GAME STATE" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                                            <TextBlock Text="Buffs the skin's shaders react to" FontSize="9" Foreground="{StaticResource TextMuted}" Margin="0,1,0,0"/>
+                                            <TextBlock Text="Buffs, visibility and persistent effects" FontSize="9" Foreground="{StaticResource TextMuted}" Margin="0,1,0,0"/>
                                         </StackPanel>
                                         <materialIcons:MaterialIcon Grid.Column="2" Style="{StaticResource AnimatedChevronStyle}"/>
                                     </Grid>
@@ -745,18 +788,86 @@
 
                                 <StackPanel Visibility="{Binding IsChecked, ElementName=CharacterGameStateSection, Converter={StaticResource BooleanToVisibilityConverter}}" Margin="0,0,0,12">
                                     <Border Background="{StaticResource CardBackground}" CornerRadius="12"
-                                            BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="14,10">
+                                            BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="14,12">
                                         <StackPanel>
-                                            <ItemsControl ItemsSource="{Binding CharacterGameStates}">
-                                                <ItemsControl.ItemTemplate>
-                                                    <DataTemplate>
-                                                        <CheckBox Content="{Binding DisplayName}" Style="{StaticResource ModernCheckBox}" Margin="0,3,0,0"
-                                                                  IsChecked="{Binding IsEnabled, Mode=TwoWay}"/>
-                                                    </DataTemplate>
-                                                </ItemsControl.ItemTemplate>
-                                            </ItemsControl>
-                                            <TextBlock Text="Needs game shaders on. States tied to an animation follow the playing clip."
-                                                       FontSize="9" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap" Margin="0,8,0,0"/>
+                                            <!-- BUFFS LIST (SINGLE COLUMN) -->
+                                            <ScrollViewer MaxHeight="160" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                                <ItemsControl ItemsSource="{Binding CharacterGameStates}" HorizontalContentAlignment="Stretch">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Grid ToolTip="{Binding Description}" Margin="0,0,4,1">
+                                                                <CheckBox Style="{StaticResource InspectorGameStateOptionStyle}" IsChecked="{Binding IsEnabled, Mode=TwoWay}">
+                                                                    <TextBlock Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                                                                </CheckBox>
+                                                            </Grid>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </ScrollViewer>
+
+                                            <!-- REQUIREMENTS INFO CARD -->
+                                            <Border Background="#0CFFFFFF" BorderBrush="#1FFFFFFF" BorderThickness="1" CornerRadius="8" Padding="10,8" Margin="0,10,0,0">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <Border Grid.Column="0" Background="#153B82F6" CornerRadius="6" Width="22" Height="22" Margin="0,1,10,0" VerticalAlignment="Top">
+                                                        <materialIcons:MaterialIcon Kind="InformationOutline" Width="13" Height="13" Foreground="{StaticResource AccentBlue}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                    </Border>
+                                                    <StackPanel Grid.Column="1">
+                                                        <TextBlock Text="PREVIEW REQUIREMENTS" FontSize="9" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,4"/>
+                                                        <TextBlock Text="• Shaders: Needed for dynamic material &amp; texture changes.&#x0a;• VFX Engine: Needed to render persistent particles &amp; meshes.&#x0a;• Animations: States tied to clips activate automatically."
+                                                                   FontSize="8.5" Foreground="{StaticResource TextMuted}" LineHeight="13" TextWrapping="Wrap"/>
+                                                    </StackPanel>
+                                                </Grid>
+                                            </Border>
+
+                                            <!-- MANUAL OVERRIDES SECTION -->
+                                            <StackPanel Visibility="{Binding HasCharacterPersistentConditions, Converter={StaticResource BoolToVisibilityConverter}}" Margin="0,12,0,0">
+                                                <ToggleButton x:Name="PersistentConditionsSection" IsChecked="False" Style="{StaticResource CollapsibleSectionHeaderStyle}">
+                                                    <Grid Margin="6,7">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <Border Grid.Column="0" Background="#15A78BFA" CornerRadius="6" Width="22" Height="22" Margin="0,0,8,0" VerticalAlignment="Center">
+                                                            <materialIcons:MaterialIcon Kind="Tune" Width="12" Height="12" Foreground="{StaticResource AccentPurple}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                        </Border>
+                                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                            <TextBlock Text="MANUAL OVERRIDES" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                                                            <TextBlock Text="Force persistent effects &amp; visibility" FontSize="8.5" Foreground="{StaticResource TextMuted}" Margin="0,1,0,0"/>
+                                                        </StackPanel>
+                                                        <materialIcons:MaterialIcon Grid.Column="2" Style="{StaticResource AnimatedChevronStyle}"/>
+                                                    </Grid>
+                                                </ToggleButton>
+                                                <StackPanel Visibility="{Binding IsChecked, ElementName=PersistentConditionsSection, Converter={StaticResource BooleanToVisibilityConverter}}" Margin="0,6,0,0">
+                                                    <TextBlock Text="Force an effect or visibility rule. Hover for triggers &amp; attachments."
+                                                               FontSize="8.5" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap" Margin="0,0,0,6"/>
+                                                    <ScrollViewer MaxHeight="160" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                                        <ItemsControl ItemsSource="{Binding CharacterPersistentConditions}" HorizontalContentAlignment="Stretch">
+                                                            <ItemsControl.ItemTemplate>
+                                                                <DataTemplate>
+                                                                    <Grid ToolTip="{Binding Description}" Margin="0,0,4,1">
+                                                                        <Grid.ColumnDefinitions>
+                                                                            <ColumnDefinition Width="*"/>
+                                                                            <ColumnDefinition Width="Auto"/>
+                                                                        </Grid.ColumnDefinitions>
+                                                                        <CheckBox Style="{StaticResource InspectorGameStateOptionStyle}" IsChecked="{Binding IsEnabled, Mode=TwoWay}">
+                                                                            <TextBlock Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                                                                        </CheckBox>
+                                                                        <Border Grid.Column="1" Background="#26A78BFA" BorderBrush="#50A78BFA" BorderThickness="1" CornerRadius="4" Padding="6,1" Margin="8,0,0,0" VerticalAlignment="Center"
+                                                                                Visibility="{Binding IsAutomaticallyActive, Converter={StaticResource BoolToVisibilityConverter}}">
+                                                                            <TextBlock Text="AUTO" FontSize="8.5" FontWeight="Bold" Foreground="{StaticResource AccentPurple}"/>
+                                                                        </Border>
+                                                                    </Grid>
+                                                                </DataTemplate>
+                                                            </ItemsControl.ItemTemplate>
+                                                        </ItemsControl>
+                                                    </ScrollViewer>
+                                                </StackPanel>
+                                            </StackPanel>
                                         </StackPanel>
                                     </Border>
                                 </StackPanel>

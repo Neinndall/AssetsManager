@@ -38,15 +38,18 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             return map;
         }
 
-        internal static IReadOnlyDictionary<uint, uint> ExtractSkinResourceMap(BinTree tree)
+        internal static IReadOnlyDictionary<uint, uint> ExtractSkinResourceMap(BinTree tree,
+            IEnumerable<BinTree> linkedTrees = null)
         {
             foreach (BinTreeObject skin in tree.Objects.Values)
             {
                 if (skin.ClassHash != SkinCharacterDataPropertiesClass) continue;
                 uint resolverHash = AsU32(Get(skin.Properties, F_mResourceResolver)) ?? 0u;
-                if (resolverHash == 0 ||
-                    !tree.Objects.TryGetValue(resolverHash, out BinTreeObject resolver) ||
-                    resolver.ClassHash != ResolverClass)
+                BinTreeObject resolver = resolverHash == 0 ? null :
+                    tree.Objects.GetValueOrDefault(resolverHash) ?? linkedTrees?
+                        .Select(linked => linked?.Objects.GetValueOrDefault(resolverHash))
+                        .FirstOrDefault(found => found != null);
+                if (resolver?.ClassHash != ResolverClass)
                 {
                     continue;
                 }

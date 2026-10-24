@@ -26,7 +26,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _particleUniforms.Uniform2(_particleUniforms.TexDiv, es.Def.TexDiv.X <= 0 ? 1f : es.Def.TexDiv.X, es.Def.TexDiv.Y <= 0 ? 1f : es.Def.TexDiv.Y);
             _particleUniforms.Uniform2(_particleUniforms.TexSize, Math.Max(1f, es.TextureWidth), Math.Max(1f, es.TextureHeight));
             Vector2 emitterUvOffset = VfxUvSemantics.Periodic(
-                VfxUvSemantics.PreFlipEmitterScroll(es.Def.EmitterUvScrollRate, es.RenderTime,
+                VfxUvSemantics.PreFlipEmitterScroll(es.Def.EmitterUvScrollRate, _activeSources != null ? 0f : es.RenderTime,
                     renderState.FlipU, renderState.FlipV),
                 renderState.TextureAddressMode);
             _particleUniforms.Uniform2(_particleUniforms.EmitterUvOffset, emitterUvOffset.X, emitterUvOffset.Y);
@@ -40,7 +40,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 Math.Max(1f, es.TextureMultWidth),
                 Math.Max(1f, es.TextureMultHeight));
             Vector2 emitterUvOffsetMult = VfxUvSemantics.Periodic(
-                VfxUvSemantics.PreFlipEmitterScroll(es.Def.TextureMultEmitterUvScrollRate, es.RenderTime,
+                VfxUvSemantics.PreFlipEmitterScroll(es.Def.TextureMultEmitterUvScrollRate, _activeSources != null ? 0f : es.RenderTime,
                     es.Def.TextureMultFlipU, es.Def.TextureMultFlipV),
                 es.Def.TextureMultAddressMode);
             _particleUniforms.Uniform2(_particleUniforms.UvScrollRateMult, emitterUvOffsetMult.X, emitterUvOffsetMult.Y);
@@ -199,18 +199,16 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             if (native) BindGameParticle(es, false, passIndex, sharedPalettePhase);
             if (es.Def.PrimitiveKind is VfxPrimitiveKind.CameraTrail or VfxPrimitiveKind.ArbitraryTrail)
             {
-                int vertices = _trailGeometry.Build(
-                    es,
-                    ResolveCameraForward(camRight, camUp),
-                    renderInstanceCount);
+                int vertices = BuildSharedRibbon(es, camPos, ResolveCameraForward(camRight, camUp), renderInstanceCount, false);
                 if (vertices > 0)
                 {
                     _gl.BindVertexArray(_trailVao);
                     _gl.BindBuffer(BufferTargetARB.ArrayBuffer, _trailVbo);
                     UploadTrailVertices(new ReadOnlySpan<float>(
-                        _trailGeometry.Vertices,
+                        _ribbonVertices,
                         0,
                         vertices * VfxTrailGeometry.VertexStride));
+                    CountParticleDraw(vertices / 3);
                     if (native) _gameShaders.DrawBoundArrays(PrimitiveType.Triangles, vertices);
                     else _gl.DrawArrays(PrimitiveType.Triangles, 0, (uint)vertices);
                     _gl.BindVertexArray(_vao);
@@ -221,15 +219,16 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 // LTK suppresses a beam ribbon when the same primitive resolves mMesh.
                 if (!string.IsNullOrWhiteSpace(es.Def.MeshPath))
                     return;
-                int vertices = _beamGeometry.Build(es, camPos, renderInstanceCount);
+                int vertices = BuildSharedRibbon(es, camPos, Vector3.Zero, renderInstanceCount, true);
                 if (vertices > 0)
                 {
                     _gl.BindVertexArray(_trailVao);
                     _gl.BindBuffer(BufferTargetARB.ArrayBuffer, _trailVbo);
                     UploadTrailVertices(new ReadOnlySpan<float>(
-                        _beamGeometry.Vertices,
+                        _ribbonVertices,
                         0,
                         vertices * VfxBeamGeometry.VertexStride));
+                    CountParticleDraw(vertices / 3);
                     if (native) _gameShaders.DrawBoundArrays(PrimitiveType.Triangles, vertices);
                     else _gl.DrawArrays(PrimitiveType.Triangles, 0, (uint)vertices);
                     _gl.BindVertexArray(_vao);
@@ -241,6 +240,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 _gl.BindBuffer(BufferTargetARB.ArrayBuffer, _instVbo);
                 // Each emitter needs its own store while earlier draws are still in flight.
                 _gl.BufferData(BufferTargetARB.ArrayBuffer, instancesSpan, BufferUsageARB.StreamDraw);
+                CountParticleDraw(renderInstanceCount);
                 if (native) _gameShaders.DrawBoundArrays(PrimitiveType.TriangleFan, 4, (uint)renderInstanceCount);
                 else _gl.DrawArraysInstanced(PrimitiveType.TriangleFan, 0, 4, (uint)renderInstanceCount);
             }
@@ -254,21 +254,24 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
 
         private void ResetEmitterDrawScratch()
         {
+            _activeSources = null;
+            _instanceOwners.AsSpan(0, _instanceOwnerCount).Clear();
+            _instanceOwnerCount = 0;
             _emitterUsed.Clear();
             _particlePassDraws.Clear();
             _firstSourceByEmitter.Clear();
-            _sortedQuadGroups.Clear();
-            _renderedSortedQuadGroups.Clear();
-            foreach (List<VfxPlaybackRuntime.EmitterState> sources in _quadSourceLists)
+            _drawSourceGroups.Clear();
+            _renderedSourceGroups.Clear();
+            foreach (List<VfxPlaybackRuntime.EmitterState> sources in _sourceLists)
                 sources.Clear();
-            _quadSourceListCount = 0;
+            _sourceListCount = 0;
         }
 
-        private List<VfxPlaybackRuntime.EmitterState> RentQuadSourceList()
+        private List<VfxPlaybackRuntime.EmitterState> RentSourceList()
         {
-            if (_quadSourceListCount == _quadSourceLists.Count)
-                _quadSourceLists.Add(new List<VfxPlaybackRuntime.EmitterState>());
-            return _quadSourceLists[_quadSourceListCount++];
+            if (_sourceListCount == _sourceLists.Count)
+                _sourceLists.Add(new List<VfxPlaybackRuntime.EmitterState>());
+            return _sourceLists[_sourceListCount++];
         }
     }
 }

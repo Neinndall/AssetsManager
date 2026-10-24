@@ -219,6 +219,7 @@ namespace AssetsManager.Views.Controls.Viewer
                         seed,
                         dur,
                         playbackBundle.OwnerSceneContext);
+                    UpdatePersistentEffectState();
                     _vfxRenderer.SetOwnerSkinningMatrices(_championAnimationService?.FinalBoneTransforms);
                     if (startTime > 0d)
                     {
@@ -336,7 +337,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void ConfigureAnimationClipCues(AnimationClipCatalogItem clip)
         {
-            ClearAnimationClipCues();
+            ClearAnimationClipCues(clearPlayingAnimation: clip == null);
             if (clip == null || _championModel == null) return;
 
             _activeAnimationClip = clip;
@@ -365,10 +366,14 @@ namespace AssetsManager.Views.Controls.Viewer
             IReadOnlySet<uint> hidden = VfxClipCueEvaluator.HiddenSubmeshesAt(
                 _animationVisibilityTimeline,
                 folded);
+            hidden = AssetsManager.Services.Viewer.Semantics.CharacterFormSemantics.ConditionedHiddenSubmeshes(
+                hidden, _activeBundle?.OwnerSceneContext?.SubmeshConditions,
+                (_championModel.GameState ?? GameMaterialState.Resting) with
+                { Gear = _model.SelectedCharacterForm?.Definition?.GearIndex ?? -1 });
             ApplyOwnerSubmeshVisibility(hidden);
         }
 
-        private void ClearAnimationClipCues()
+        private void ClearAnimationClipCues(bool clearPlayingAnimation = true)
         {
             if (_championModel != null)
             {
@@ -380,7 +385,7 @@ namespace AssetsManager.Views.Controls.Viewer
             }
 
             _activeAnimationClip = null;
-            SetPlayingAnimation(null);
+            if (clearPlayingAnimation) SetPlayingAnimation(null);
             _animationBasePartVisibility.Clear();
             _animationBaseHiddenSubmeshes.Clear();
             _animationVisibilityTimeline = Array.Empty<VfxClipCueEvaluator.VisibilityEntry>();

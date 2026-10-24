@@ -51,6 +51,18 @@ namespace AssetsManager.Services.Explorer
         {
             if (rootNodes == null) return;
 
+            CancelSearch(rootNodes);
+
+            lock (_indexLock)
+            {
+                _treeIndexes.Remove(rootNodes);
+            }
+        }
+
+        public void CancelSearch(ObservableRangeCollection<FileSystemNodeModel> rootNodes)
+        {
+            if (rootNodes == null) return;
+
             lock (_searchLock)
             {
                 if (ReferenceEquals(_activeSearchRoots, rootNodes))
@@ -58,11 +70,6 @@ namespace AssetsManager.Services.Explorer
                     _searchCts?.Cancel();
                     _activeSearchRoots = null;
                 }
-            }
-
-            lock (_indexLock)
-            {
-                _treeIndexes.Remove(rootNodes);
             }
         }
 
@@ -80,7 +87,7 @@ namespace AssetsManager.Services.Explorer
 
             try
             {
-                if (string.IsNullOrEmpty(searchText))
+                if (string.IsNullOrWhiteSpace(searchText))
                 {
                     return await FilterTreeAsync(rootNodes, string.Empty, token, activeNode);
                 }
@@ -162,10 +169,9 @@ namespace AssetsManager.Services.Explorer
                 {
                     var toShow = new HashSet<FileSystemNodeModel>();
                     var matchIndices = new Dictionary<FileSystemNodeModel, int>();
-                    FileSystemNodeModel dummyMatch = null;
                     
                     // PHASE 1: Identification (Find matching nodes)
-                    IdentifyMatchingNodes(allNodes, keywords, query, isMetadataSearch, toShow, matchIndices, ref dummyMatch, cancellationToken);
+                    IdentifyMatchingNodes(allNodes, keywords, query, isMetadataSearch, toShow, matchIndices, cancellationToken);
 
                     cancellationToken.ThrowIfCancellationRequested();
 
@@ -173,7 +179,7 @@ namespace AssetsManager.Services.Explorer
                     return new TreeFilterProjection(toShow, matchIndices, visibleChildren);
                 }, cancellationToken);
 
-                await Application.Current.Dispatcher
+                await (Application.Current?.Dispatcher ?? Dispatcher.CurrentDispatcher)
                     .InvokeAsync(() => ApplySearchVisibilityAsync(allNodes, searchResult, query, isMetadataSearch, cancellationToken))
                     .Task
                     .Unwrap();
@@ -198,17 +204,15 @@ namespace AssetsManager.Services.Explorer
         /// <summary>
         /// Evaluates each node to see if it matches the search criteria.
         /// </summary>
-        private int IdentifyMatchingNodes(
+        private void IdentifyMatchingNodes(
             IReadOnlyList<FileSystemNodeModel> allNodes,
             string[] keywords, 
             string query,
             bool isMetadataSearch,
             HashSet<FileSystemNodeModel> toShow,
             Dictionary<FileSystemNodeModel, int> matchIndices,
-            ref FileSystemNodeModel firstMatch,
             CancellationToken ct)
         {
-            int matchesFound = 0;
             foreach (var node in allNodes)
             {
                 ct.ThrowIfCancellationRequested();
@@ -237,9 +241,6 @@ namespace AssetsManager.Services.Explorer
 
                 if (found)
                 {
-                    matchesFound++;
-                    if (firstMatch == null) firstMatch = node;
-
                     matchIndices[node] = matchIndex;
                     toShow.Add(node);
 
@@ -252,7 +253,6 @@ namespace AssetsManager.Services.Explorer
                     }
                 }
             }
-            return matchesFound;
         }
 
         /// <summary>
@@ -272,11 +272,10 @@ namespace AssetsManager.Services.Explorer
 
                 bool shouldBeVisible = searchResult.VisibleNodes.Contains(node);
                 bool hasMatch = searchResult.MatchIndices.TryGetValue(node, out int matchIndex);
-                bool changed = false;
 
                 // 1. Highlighting (Standard mode only)
                 bool finalHasMatch = hasMatch && !isMetadataSearch;
-                if (node.HasMatch != finalHasMatch) { node.HasMatch = finalHasMatch; changed = true; }
+                if (node.HasMatch != finalHasMatch) node.HasMatch = finalHasMatch;
                 
                 if (finalHasMatch)
                 {
@@ -284,17 +283,17 @@ namespace AssetsManager.Services.Explorer
                     string match = node.Name.Substring(matchIndex, query.Length);
                     string post = node.Name.Substring(matchIndex + query.Length);
 
-                    if (node.PreMatch != pre) { node.PreMatch = pre; changed = true; }
-                    if (node.Match != match) { node.Match = match; changed = true; }
-                    if (node.PostMatch != post) { node.PostMatch = post; changed = true; }
+                    if (node.PreMatch != pre) node.PreMatch = pre;
+                    if (node.Match != match) node.Match = match;
+                    if (node.PostMatch != post) node.PostMatch = post;
                 }
                 else if (node.PreMatch != null)
                 {
-                    node.PreMatch = null; node.Match = null; node.PostMatch = null; changed = true;
+                    node.PreMatch = null; node.Match = null; node.PostMatch = null;
                 }
 
                 // 2. Visibility
-                if (node.IsVisible != shouldBeVisible) { node.IsVisible = shouldBeVisible; changed = true; }
+                if (node.IsVisible != shouldBeVisible) node.IsVisible = shouldBeVisible;
 
                 // 3. Insta-Expansion (Filtered children)
                 var children = node.LoadedChildren;
@@ -305,19 +304,18 @@ namespace AssetsManager.Services.Explorer
                         if (!HasSameItems(node.VisibleChildren, visibleItems))
                         {
                             node.VisibleChildren = new ObservableRangeCollection<FileSystemNodeModel>(visibleItems);
-                            changed = true;
                         }
                     }
                     else if (node.VisibleChildren != children)
                     {
-                        node.VisibleChildren = null; changed = true;
+                        node.VisibleChildren = null;
                     }
                 }
 
                 // Time-slice UI updates
-                if (changed && appSw.ElapsedMilliseconds > 16)
+                if (appSw.ElapsedMilliseconds > 16)
                 {
-                    await Task.Yield();
+                    await Dispatcher.Yield(DispatcherPriority.Background);
                     appSw.Restart();
                 }
             }
@@ -418,10 +416,10 @@ namespace AssetsManager.Services.Explorer
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 ResetNodeState(node);
-                if (sw.ElapsedMilliseconds > 16) { await Task.Yield(); sw.Restart(); }
+                if (sw.ElapsedMilliseconds > 16) { await Dispatcher.Yield(DispatcherPriority.Background); sw.Restart(); }
             }
 
-            _ = Application.Current.Dispatcher.InvokeAsync(async () =>
+            _ = (Application.Current?.Dispatcher ?? Dispatcher.CurrentDispatcher).InvokeAsync(async () =>
             {
                 try
                 {
@@ -432,10 +430,10 @@ namespace AssetsManager.Services.Explorer
                         if (cancellationToken.IsCancellationRequested) break;
                         if (prioritizedNodes.Contains(node)) continue;
 
-                        if (!node.IsVisible || node.HasMatch || node.VisibleChildren != node.LoadedChildren)
+                        if (!node.IsVisible || node.HasMatch || node.HasFilteredChildren)
                         {
                             ResetNodeState(node);
-                            if (bgSw.ElapsedMilliseconds > 16) { await Task.Yield(); bgSw.Restart(); }
+                            if (bgSw.ElapsedMilliseconds > 16) { await Dispatcher.Yield(DispatcherPriority.Background); bgSw.Restart(); }
                         }
                     }
                 }
@@ -450,7 +448,7 @@ namespace AssetsManager.Services.Explorer
         private void ResetNodeState(FileSystemNodeModel node)
         {
             if (!node.IsVisible) node.IsVisible = true;
-            if (node.VisibleChildren != node.LoadedChildren) node.VisibleChildren = null;
+            if (node.HasFilteredChildren) node.VisibleChildren = null;
             if (node.HasMatch)
             {
                 node.HasMatch = false;

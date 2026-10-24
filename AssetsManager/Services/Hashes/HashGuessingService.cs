@@ -107,7 +107,7 @@ namespace AssetsManager.Services.Hashes
 
                     try
                     {
-                        using var wad = new WadFile(wadPath);
+                        using var wad = HashGuesser.OpenWad(wadPath);
                         foreach (var chunk in wad.Chunks.Values)
                         {
                             cancellationToken.ThrowIfCancellationRequested();
@@ -331,6 +331,9 @@ namespace AssetsManager.Services.Hashes
                 if (engine.RemainingUnknownCount > 0 && ShouldRun("game-basic-characters"))
                 {
                     progress?.Report(engine.CreateProgress("GAME Basic: character files", checkedCandidates));
+                    int familyOffset = checkedCandidates;
+                    checkedCandidates += _gameGuesser.GuessScriptFamilyAliases(engine, cancellationToken,
+                        progress: count => progress?.Report(engine.CreateProgress("GAME Basic: script family aliases", familyOffset + count)));
                     int progressOffset = checkedCandidates;
                     checkedCandidates += _gameGuesser.GuessCharactersFiles(
                         engine,
@@ -383,6 +386,9 @@ namespace AssetsManager.Services.Hashes
                 if (engine.RemainingUnknownCount > 0 && ShouldRun("game-basic-extensions"))
                 {
                     progress?.Report(engine.CreateProgress("GAME Basic: extension substitution", checkedCandidates));
+                    int geometryOffset = checkedCandidates;
+                    checkedCandidates += _gameGuesser.GuessMapGeometrySiblings(engine, cancellationToken,
+                        progress: count => progress?.Report(engine.CreateProgress("GAME Basic: map geometry companions", geometryOffset + count)));
                     int progressOffset = checkedCandidates;
                     checkedCandidates += _gameGuesser.SubstituteExtensions(
                         engine,
@@ -429,6 +435,12 @@ namespace AssetsManager.Services.Hashes
                             maximum: 200,
                             progress: count => progress?.Report(
                                 engine.CreateProgress("GAME Basic: padded numeric variants", progressOffsetPadded + count)));
+                    }
+                    if (engine.RemainingUnknownCount > 0)
+                    {
+                        int learnedOffset = checkedCandidates;
+                        checkedCandidates += _gameGuesser.GuessLearnedPaddedNumbers(engine, cancellationToken,
+                            progress: count => progress?.Report(engine.CreateProgress("GAME Basic: learned numeric padding", learnedOffset + count)));
                     }
                 }
 

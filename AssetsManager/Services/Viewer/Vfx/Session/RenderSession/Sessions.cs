@@ -27,6 +27,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             _graphStopTimes.Clear();
             _graphAttachments.Clear();
             _spellSteps.Clear();
+            ClearPersistentEffects();
             _lastRigOrigin = null;
             _boneTransformProvider = null;
             _boneTransformSampler = null;
@@ -108,6 +109,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             _graphStopTimes.Clear();
             _graphAttachments.Clear();
             _spellSteps.Clear();
+            ClearPersistentEffects();
             _lastRigOrigin = null;
             _boneTransformProvider = null;
             _boneTransformSampler = null;
@@ -160,6 +162,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                 TotalDuration = Math.Min(Math.Max(0.1d, duration), 60d),
                 Speed = 1.0
             };
+            SetOwnerGameState(null);
             ApplySpellTransforms(0d);
             return steps.Count > 0 || animationDuration > 0d || _graphs.Count > 0;
         }
@@ -192,6 +195,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             _graphStopTimes.Clear();
             _graphAttachments.Clear();
             _spellSteps.Clear();
+            ClearPersistentEffects();
 
             if (_ready)
                 QueueGpuResourcePurge();
@@ -216,6 +220,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                 Speed = 1.0
             };
 
+            SetOwnerGameState(null);
             return _graphs.Count > 0;
         }
 

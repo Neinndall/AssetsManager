@@ -31,6 +31,7 @@ namespace AssetsManager.Services.Viewer.Runtime
             _runtimes = runtimes ?? Array.Empty<MapParticleRuntime>();
             _resourceOwner = resourceOwner;
             Catalog = catalog;
+            UpdateSharedDrawCapacities();
         }
 
         internal IReadOnlyList<MapParticleRuntime> Runtimes => _runtimes;
@@ -81,7 +82,7 @@ namespace AssetsManager.Services.Viewer.Runtime
                 cancellationToken);
             try
             {
-                IReadOnlyList<MapParticleRuntime> runtimes = resources.CreateMapRuntimes(catalog);
+                IReadOnlyList<MapParticleRuntime> runtimes = await resources.CreateMapRuntimesAsync(catalog, cancellationToken);
                 return new MapParticleSceneRuntime(runtimes, resources, catalog);
             }
             catch
@@ -110,7 +111,20 @@ namespace AssetsManager.Services.Viewer.Runtime
 
             _runtimes = runtimes ?? Array.Empty<MapParticleRuntime>();
             Catalog = catalog;
+            UpdateSharedDrawCapacities();
             _visible.Clear();
+        }
+
+        private void UpdateSharedDrawCapacities()
+        {
+            if (Catalog?.Groups == null) return;
+            var counts = new Dictionary<uint, int>();
+            foreach (var group in Catalog.Groups)
+                if (group?.System != null && group.Particles != null)
+                    counts[group.System.PathHash] = counts.GetValueOrDefault(group.System.PathHash) + group.Particles.Count;
+            foreach (var runtime in _runtimes)
+                if (runtime?.Particle != null && counts.TryGetValue(runtime.System.PathHash, out int count))
+                    runtime.SharedDrawCapacity = (int)Math.Min(4096L, (long)runtime.Capacity * count);
         }
 
         internal void Restart()

@@ -1095,8 +1095,9 @@ namespace AssetsManager.Services.Viewer.Rendering
             uint texture = _gl.GenTexture();
             _gl.BindTexture(TextureTarget.Texture2D, texture);
 
-            for (int level = 0; level < image.MipLevels.Count; level++)
-                UploadTextureLevel(image.MipLevels[level], level, samplingSpace);
+            if (!GlBlockTextureUploader.TryUpload(_gl, image.Blocks, samplingSpace == TextureSamplingSpace.SrgbColor))
+                for (int level = 0; level < image.MipLevels.Count; level++)
+                    UploadTextureLevel(image.MipLevels[level], level, samplingSpace);
 
             // Current LTK MAIN preserves every authored level. Only a one-level source lets the
             // GPU synthesize the missing chain, which also covers PNG/TGA fallback textures.

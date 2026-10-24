@@ -41,7 +41,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         internal static void BuildInto(
             IReadOnlyList<IReadOnlyList<VfxPlaybackRuntime.EmitterState>> runtimes,
             List<VfxRenderQueueEntry> entries,
-            Dictionary<object, int> graphOrders)
+            Dictionary<object, int> graphOrders,
+            IReadOnlyDictionary<object, object> drawGroups = null)
         {
             ArgumentNullException.ThrowIfNull(runtimes);
             ArgumentNullException.ThrowIfNull(entries);
@@ -57,6 +58,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 object runtimeKey = emitters.Count > 0
                     ? emitters[0].RenderGraphKey ?? emitters
                     : emitters;
+                if (drawGroups != null) runtimeKey = drawGroups.GetValueOrDefault(runtimeKey) ?? runtimeKey;
                 if (!graphOrders.TryGetValue(runtimeKey, out int graphOrder))
                 {
                     graphOrder = nextGraphOrder++;

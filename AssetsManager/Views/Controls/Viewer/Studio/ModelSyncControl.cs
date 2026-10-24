@@ -99,7 +99,7 @@ namespace AssetsManager.Views.Controls.Viewer
                         _model.TotalDuration = 0d;
                         _model.CurrentTime = 0d;
                         _model.IsPlaying = false;
-                        _vfxRenderer?.SetSystem(null);
+                        ConfigureBindPoseEffects();
                         _ = SynchronizeStudioPlaybackAsync();
                         StudioViewportView.OpenTkControl?.InvalidateVisual();
                     }

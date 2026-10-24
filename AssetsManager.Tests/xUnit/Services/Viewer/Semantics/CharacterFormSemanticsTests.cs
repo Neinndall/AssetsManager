@@ -22,6 +22,93 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Semantics
             new(1, 0, "Variant", new[] { show }, new[] { hide }, null, null, null,
                 new Dictionary<uint, uint>(), Array.Empty<VfxIdleEffectDefinition>(), false);
 
+        [Theory]
+        [InlineData("unique", true)]
+        [InlineData("ambiguous", false)]
+        [InlineData("unrelated", false)]
+        [InlineData("animation", false)]
+        [InlineData("reload", false)]
+        [InlineData("partial", false)]
+        [InlineData("visibleReplacement", false)]
+        [InlineData("unknownHide", false)]
+        [InlineData("hiddenHide", false)]
+        [InlineData("missingBuff", false)]
+        public void MissingGearPartsUseOnlyAnUnambiguousLocalGeometrySwap(string scenario, bool repairs)
+        {
+            using var body = new ModelPart("Body", new GeometryModel3D());
+            using var alternate = new ModelPart("Alternate", new GeometryModel3D());
+            using var accessory = new ModelPart("Accessory", new GeometryModel3D());
+            uint original = Fnv1a.HashLower(body.Name), replacement = Fnv1a.HashLower(alternate.Name);
+            uint extra = Fnv1a.HashLower(accessory.Name);
+            var buff = new GameMaterialBoolCondition(GameMaterialBoolKind.Buff,
+                Name: scenario == "missingBuff" ? null : "Transformation");
+            uint[] swapHides = scenario switch
+            {
+                "unrelated" => Array.Empty<uint>(),
+                "unknownHide" => new[] { original, 456u },
+                "hiddenHide" => new[] { original, extra },
+                _ => new[] { original }
+            };
+            var swap = new VfxSubmeshCondition(
+                scenario == "animation" ? new(GameMaterialBoolKind.Animation, Animations: new uint[] { 1 }) : buff,
+                new[] { replacement }, swapHides);
+            var conditions = new List<VfxSubmeshCondition>
+            {
+                swap,
+                new(buff, new[] { extra }, Array.Empty<uint>())
+            };
+            if (scenario == "ambiguous") conditions.Add(swap);
+            var form = Form(123, original) with { ReloadsModel = scenario == "reload" };
+            if (scenario == "partial") form = form with { ShowSubmeshHashes = new[] { 123u, extra } };
+            uint[] baseline = scenario == "visibleReplacement" ? new[] { extra } : new[] { replacement, extra };
+            var hidden = CharacterFormSemantics.HiddenSubmeshes(baseline, form,
+                new[] { body, alternate, accessory }, conditions);
+
+            Assert.Contains(original, hidden);
+            Assert.Equal(!repairs && scenario != "visibleReplacement", hidden.Contains(replacement));
+            Assert.Equal(scenario != "partial", hidden.Contains(extra));
+        }
+
+        [Fact]
+        public void GameStateBuffsIncludesNestedVisibilityConditionsAndDeduplicatesMaterialBuffs()
+        {
+            const string stealth = "spell:866b0d92";
+            using var part = new ModelPart
+            {
+                MaterialDefinition = ModelMaterialDefinition.TextureOnly("body") with
+                {
+                    DynamicParameters = new[]
+                    {
+                        new GameMaterialDynamicParameter("Tint", _ => null, new[] { "Combat", stealth })
+                    },
+                    TextureSwaps = new[]
+                    {
+                        new GameMaterialTextureSwap("Diffuse_Texture", new[]
+                        {
+                            new GameMaterialTextureSwapOption("alternate", new(GameMaterialBoolKind.Buff, Name: "Combat"))
+                        })
+                    }
+                }
+            };
+            var owner = new VfxOwnerSceneContext(null, null, 1f)
+            {
+                SubmeshConditions = new[]
+                {
+                    new VfxSubmeshCondition(new(GameMaterialBoolKind.All, Children: new[]
+                    {
+                        new GameMaterialBoolCondition(GameMaterialBoolKind.Buff, Name: stealth),
+                        new GameMaterialBoolCondition(GameMaterialBoolKind.Buff, Name: "Appearance")
+                    }), new uint[] { 1 }, Array.Empty<uint>())
+                }
+            };
+
+            Assert.Equal(new[] { "Appearance", "Combat", stealth },
+                CharacterFormSemantics.GameStateBuffs(new[] { part }, owner));
+            Assert.Equal(new[] { "Appearance", stealth }, CharacterFormSemantics.GameStateBuffs(null, owner));
+            Assert.Equal(new[] { "Combat", stealth }, CharacterFormSemantics.GameStateBuffs(new[] { part }, null));
+            Assert.Empty(CharacterFormSemantics.GameStateBuffs(null, null));
+        }
+
         // Aatrox Skin33: a persistent condition on gear 1 shows Monster_Head (1) and hides Default_Head (2).
         [Fact]
         public void PersistentSubmeshConditionsSwapSubmeshesForTheirGear()

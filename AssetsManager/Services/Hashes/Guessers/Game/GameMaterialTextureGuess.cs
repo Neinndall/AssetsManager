@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Buffers.Binary;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -22,15 +21,14 @@ internal sealed partial class GameHashGuesser
         var known = HashFile.Load();
         var visited = new HashSet<(ulong, ulong)>();
         long checkedCandidates = 0;
-        byte[] textureField = new byte[4];
-        BinaryPrimitives.WriteUInt32LittleEndian(textureField, Fnv1a.HashLower("texturePath"));
+        uint textureField = Fnv1a.HashLower("texturePath");
         foreach (string wadPath in FindWads(rootDirectory))
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (checkedCandidates >= candidateBudget || engine.RemainingUnknownCount == 0) break;
             try
             {
-                using var wad = new WadFile(wadPath);
+                using var wad = OpenWad(wadPath);
                 if (!wad.Chunks.Keys.Any(engine.UnknownHashes.Contains)) continue;
                 foreach (var chunk in wad.Chunks.Values)
                 {
@@ -44,28 +42,17 @@ internal sealed partial class GameHashGuesser
                         if (!FileTypeDetector.IsPropertyBin(data.Span)) continue;
                         // Reject irrelevant BINs before constructing their full object graphs.
                         // Parsed properties still validate every accepted reference and sampler role.
-                        var remaining = data.Span;
-                        bool pending = false;
-                        while (remaining.Length >= 13)
-                        {
-                            cancellationToken.ThrowIfCancellationRequested();
-                            int offset = remaining.IndexOf(textureField);
-                            if (offset < 0 || remaining.Length - offset < 13) break;
-                            if (engine.UnknownHashes.Contains(BinaryPrimitives.ReadUInt64LittleEndian(remaining.Slice(offset + 5, 8))))
-                            {
-                                pending = true;
-                                break;
-                            }
-                            remaining = remaining[(offset + 1)..];
-                        }
-                        if (!pending) continue;
+                        if (!GameBinLinkProbe.ContainsPendingLink(data.Span, textureField, engine.UnknownHashes, cancellationToken)) continue;
                         var bytes = data.DangerousGetArray();
                         using var stream = new MemoryStream(bytes.Array, bytes.Offset, bytes.Count, false);
                         var tree = new BinTree(stream);
                         visited.Add((chunk.PathHash, chunk.Checksum));
-                        if (!GameMaterialTextureIndex.HasUnresolvedContext(engine, tree, path, cancellationToken)) continue;
-                        checkedCandidates += GetMaterialTextureIndex(cancellationToken).Guess(engine, tree, path, wadPath,
+                        if (!GameMaterialTextureIndex.HasUnresolvedSamplerContext(engine, tree, path, cancellationToken)) continue;
+                        var index = GetMaterialTextureIndex(cancellationToken);
+                        checkedCandidates += index.Guess(engine, tree, path, wadPath,
                             chunk.PathHash, cancellationToken, candidateBudget - checkedCandidates);
+                        checkedCandidates += index.GuessSharedParticles(engine, tree, path, wadPath, chunk.PathHash,
+                            cancellationToken, candidateBudget - checkedCandidates);
                     }
                     catch (Exception exception) when (exception is not OperationCanceledException)
                     {

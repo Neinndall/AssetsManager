@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Windows.Threading;
 using AssetsManager.Services.Viewer.Semantics;
 using AssetsManager.Services.Viewer.Vfx.Runtime;
 using AssetsManager.Views.Models.Viewer;
@@ -13,6 +16,7 @@ namespace AssetsManager.Services.Viewer.Runtime
     /// </summary>
     internal sealed class MapParticleRuntime
     {
+        internal const int PreparationBatchSize = 24;
         private MapParticleRuntime(
             MapParticleData particle,
             VfxSystemDefinition system,
@@ -23,6 +27,7 @@ namespace AssetsManager.Services.Viewer.Runtime
             System = system;
             Graph = graph;
             Capacity = capacity;
+            DrawGroupKey = system.PathHash;
             ChunkId = MapOutlineSemantics.ChunkId(particle.ChunkHash);
             ItemId = MapOutlineSemantics.ItemId(particle.ChunkHash, particle.KeyHash);
         }
@@ -31,6 +36,8 @@ namespace AssetsManager.Services.Viewer.Runtime
         public VfxSystemDefinition System { get; }
         public VfxPlaybackGraphRuntime Graph { get; }
         public int Capacity { get; }
+        internal object DrawGroupKey { get; }
+        internal int SharedDrawCapacity { get; set; } = 4096;
         internal string ChunkId { get; }
         internal string ItemId { get; }
 
@@ -89,21 +96,32 @@ namespace AssetsManager.Services.Viewer.Runtime
             Graph.Update(deltaSeconds);
         }
 
-        internal static IReadOnlyList<MapParticleRuntime> CreateAll(
+        internal static async Task<IReadOnlyList<MapParticleRuntime>> CreateAllAsync(
             MapParticleSystemCatalog catalog,
-            Func<VfxSystemDefinition, Matrix4x4, int, VfxPlaybackRuntime> runtimeFactory = null)
+            Func<VfxSystemDefinition, Matrix4x4, int, VfxPlaybackRuntime> runtimeFactory,
+            CancellationToken cancellationToken)
         {
             var runtimes = new List<MapParticleRuntime>();
             foreach ((MapParticleSystemGroupData group, MapParticleData particle) in Playable(catalog))
             {
-                runtimes.Add(Create(
-                    particle,
-                    group.System,
-                    catalog.Systems,
-                    catalog.ResourceMap,
-                    runtimeFactory));
+                cancellationToken.ThrowIfCancellationRequested();
+                if (runtimes.Count > 0 && runtimes.Count % PreparationBatchSize == 0)
+                    await YieldPreparationAsync(cancellationToken);
+                runtimes.Add(Create(particle, group.System, catalog.Systems, catalog.ResourceMap, runtimeFactory));
             }
+            cancellationToken.ThrowIfCancellationRequested();
             return runtimes;
+        }
+
+        internal static async Task YieldPreparationAsync(CancellationToken cancellationToken)
+        {
+            // Resource resolvers stay on their owning context while frames and texture arrivals can run.
+            if (SynchronizationContext.Current is DispatcherSynchronizationContext &&
+                Dispatcher.FromThread(Thread.CurrentThread) != null)
+                await Dispatcher.Yield(DispatcherPriority.Background);
+            else
+                await Task.Yield();
+            cancellationToken.ThrowIfCancellationRequested();
         }
 
         /// <summary>
