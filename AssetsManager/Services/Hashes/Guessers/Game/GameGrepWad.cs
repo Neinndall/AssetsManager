@@ -195,7 +195,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                     }
 
                     GuessAnimationBinPaths(engine, data, sourcePath, sourceWadPath, sourceChunkHash, cancellationToken, GetCachedBinTree);
-                    GuessUiPortraitPaths(engine, sourcePath, sourceWadPath, sourceChunkHash, cancellationToken, GetCachedBinTree);
+                    GuessUiAssetPaths(engine, sourcePath, sourceWadPath, sourceChunkHash, cancellationToken, GetCachedBinTree);
                     GuessRegaliaBinChunkLinks(engine, data, sourcePath, sourceWadPath, sourceChunkHash, cancellationToken, GetCachedBinTree);
                     GuessSkinRoleTextures(engine, data, sourcePath, sourceWadPath, sourceChunkHash, cancellationToken, GetCachedBinTree);
                     GuessSkinCharacterBinChunkLinks(engine, data, sourcePath, sourceWadPath, sourceChunkHash, cancellationToken, GetCachedBinTree);
@@ -2206,6 +2206,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             foreach (var sprite in atlas.Sprites)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                if (engine.Matches.ContainsKey(sprite.SpriteHash)) continue;
                 if (engine.UnknownHashes.Contains(sprite.SpriteHash) || !knownDict.ContainsKey(sprite.SpriteHash))
                 {
                     engine.EnsureUnknown(sprite.SpriteHash);

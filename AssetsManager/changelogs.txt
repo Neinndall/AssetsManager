@@ -5,6 +5,9 @@ HOTFIX UPDATE
 New Features
 
 Improvements
+  - Hash Guessing Lab / GAME GrepWad resolves ping-wheel highlights and cosplay narrative portraits from UI labels.
+  - Hash Guessing Lab / Atlas scans keep hashes already resolved during the current run out of the pending count.
+  - Image atlases / Reads all texture pages correctly and rejects incomplete sprite tables.
   - Hash Guessing Lab / GAME GrepWad resolves narrative portraits from UI labels and learned theme names.
   - Hash Guessing Lab / GAME Basic finds Jade child-model textures that retain their parent character names.
 
