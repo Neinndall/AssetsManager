@@ -5,6 +5,7 @@ HOTFIX UPDATE
 New Features
 
 Improvements
+  - Hash Guessing Lab / GAME Basic finds Jade child-model textures that retain their parent character names.
 
 Changes
 

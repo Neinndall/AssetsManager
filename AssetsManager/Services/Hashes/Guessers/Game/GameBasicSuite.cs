@@ -576,13 +576,16 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                         if (pathBuf.TryWrite(CultureInfo.InvariantCulture, $"{marker}jade_{character}{subpath}", out w))
                             if (!CheckSpan(pathBuf[..w])) goto ChampionDone;
 
-                        // Candidate 2: if file stem starts with character, prefix with jade_
+                        // Child models can retain the parent character's name in their filenames.
                         int lastSlash = subpath.LastIndexOf('/');
                         if (lastSlash >= 0)
                         {
                             string folder = subpath[..(lastSlash + 1)];
                             string filename = subpath[(lastSlash + 1)..];
-                            if (filename.StartsWith(character, StringComparison.OrdinalIgnoreCase))
+                            int nameSeparator = filename.IndexOf('_');
+                            if (filename.StartsWith(character, StringComparison.OrdinalIgnoreCase) ||
+                                (nameSeparator > 0 && character.AsSpan().StartsWith(
+                                    filename.AsSpan(0, nameSeparator), StringComparison.OrdinalIgnoreCase)))
                             {
                                 if (pathBuf.TryWrite(CultureInfo.InvariantCulture, $"{marker}jade_{character}{folder}jade_{filename}", out w))
                                     if (!CheckSpan(pathBuf[..w])) goto ChampionDone;

@@ -2781,6 +2781,26 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
         }
 
         [Theory]
+        [InlineData("elisespider", "skin05", "elise_skin05_spider_tx_cm.tex", 0x09f805146f223492UL)]
+        [InlineData("elisespider", "skin03", "elise_skin03_spiders_tx_cm.tex", 0x18fae15e6d220fa6UL)]
+        [InlineData("elisespiderling", "skin05", "elise_skin05_spiderling_tx_cm.tex", 0x19e1ce01a1f92515UL)]
+        [InlineData("testchild", "skin02", "test_skin02_tx_cm.tex", 0UL)]
+        public void GameJadeProjectionResolvesChildModelsUsingParentFilenames(
+            string character, string skin, string filename, ulong expectedHash)
+        {
+            string source = $"assets/characters/{character}/skins/{skin}/{filename}";
+            string expected = $"assets/characters/jade_{character}/skins/{skin}/jade_{filename}";
+            ulong target = expectedHash == 0 ? XxHash64Ext.Hash(expected) : expectedHash;
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[] { source }));
+            var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong> { target });
+
+            game.GuessCharactersFiles(engine, CancellationToken.None, new[] { character });
+
+            Assert.Equal(expected, Assert.Single(engine.Matches.Values).Path);
+            Assert.Empty(engine.UnknownHashes);
+        }
+
+        [Theory]
         [InlineData("assets/shaders/generated/shaders/test.ps_2_0-dx11")]
         [InlineData("assets/shaders/generated/shaders/test.ps_2_0-dx11_0")]
         [InlineData("assets/shaders/generated/shaders/test.ps_2_0-metal")]
