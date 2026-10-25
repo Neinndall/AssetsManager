@@ -860,6 +860,28 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                 // Some families add a stage whose filename is the enclosing directory name.
                 foreach (string extension in ShaderExtensions)
                     directoryShaders.Add($"{directory}/{family}{extension}");
+
+                int extDot = match.Value.LastIndexOf('.');
+                if (extDot > separator)
+                {
+                    string fileStem = match.Value[(separator + 1)..extDot];
+                    foreach (string stage in new[] { "ps", "vs", "cs" })
+                    {
+                        directoryShaders.Add($"{directory}/{fileStem}.{stage}");
+                        if (fileStem.StartsWith("ps_", StringComparison.OrdinalIgnoreCase) ||
+                            fileStem.StartsWith("vs_", StringComparison.OrdinalIgnoreCase) ||
+                            fileStem.StartsWith("cs_", StringComparison.OrdinalIgnoreCase))
+                        {
+                            directoryShaders.Add($"{directory}/{stage}_{fileStem[3..]}.{stage}");
+                        }
+                        if (fileStem.EndsWith("_ps", StringComparison.OrdinalIgnoreCase) ||
+                            fileStem.EndsWith("_vs", StringComparison.OrdinalIgnoreCase) ||
+                            fileStem.EndsWith("_cs", StringComparison.OrdinalIgnoreCase))
+                        {
+                            directoryShaders.Add($"{directory}/{fileStem[..^3]}_{stage}.{stage}");
+                        }
+                    }
+                }
             }
             AddExecutableShaderReferences(shaderPaths, rootDirectory, cancellationToken);
 
