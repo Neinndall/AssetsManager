@@ -3,6 +3,7 @@ AssetsManager - League of Legends | v4.1.0.4
 HOTFIX UPDATE
 
 New Features
+  - Explorer / Preview, compare, and export INIBIN files as JSON.
 
 Improvements
   - Hash Guessing Lab / Dynamic texture searches share filename checks across unresolved links without narrowing coverage.
@@ -20,6 +21,7 @@ Improvements
 Changes
 
 Bug Fixes
+  - Explorer / INIBIN and TROYBIN previews preserve property hashes instead of showing unrelated BIN field names.
   - 3D Studio / Map character clips now play persistent skin effects and apply their matching submesh visibility.
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>

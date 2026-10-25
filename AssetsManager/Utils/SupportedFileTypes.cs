@@ -18,6 +18,7 @@ namespace AssetsManager.Utils
         public static readonly HashSet<string> Bin = new(StringComparer.OrdinalIgnoreCase) { ".bin" };
         public static readonly HashSet<string> StringTable = new(StringComparer.OrdinalIgnoreCase) { ".stringtable" };
         public static readonly HashSet<string> Troybin = new(StringComparer.OrdinalIgnoreCase) { ".troybin" };
+        public static readonly HashSet<string> Inibin = new(StringComparer.OrdinalIgnoreCase) { ".inibin" };
         public static readonly HashSet<string> Preload = new(StringComparer.OrdinalIgnoreCase) { ".preload" };
         public static readonly HashSet<string> PlainText = new(StringComparer.OrdinalIgnoreCase) { ".txt", ".xml", ".ini", ".log", ".info" };
         public static readonly HashSet<string> Lua = new(StringComparer.OrdinalIgnoreCase) { ".luabin64" };
@@ -82,6 +83,7 @@ namespace AssetsManager.Utils
                    Bin.Contains(extension) ||
                    StringTable.Contains(extension) ||
                    Troybin.Contains(extension) ||
+                   Inibin.Contains(extension) ||
                    Preload.Contains(extension) ||
                    PlainText.Contains(extension) ||
                    Lua.Contains(extension) ||
@@ -131,6 +133,7 @@ namespace AssetsManager.Utils
                    Bin.Contains(extension) ||
                    StringTable.Contains(extension) ||
                    Troybin.Contains(extension) ||
+                   Inibin.Contains(extension) ||
                    Preload.Contains(extension) ||
                    Lua.Contains(extension) ||
                    Html.Contains(extension) ||

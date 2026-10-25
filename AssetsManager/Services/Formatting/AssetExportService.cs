@@ -420,6 +420,7 @@ namespace AssetsManager.Services.Formatting
                 case ".stringtable":
                 case ".css":
                 case ".troybin":
+                case ".inibin":
                 case ".preload":
                     await HandleDataFile(node, destinationPath, extension.TrimStart('.'), formats.Data, cancellationToken, onFileSavedCallback);
                     break;

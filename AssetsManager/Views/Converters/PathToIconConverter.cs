@@ -44,6 +44,7 @@ namespace AssetsManager.Views.Converters
             { ".flac", MaterialIconKind.MusicNoteOutline },
             { ".bin", MaterialIconKind.FileCodeOutline },
             { ".troybin", MaterialIconKind.StarFourPoints },
+            { ".inibin", MaterialIconKind.FileCogOutline },
             { ".preload", MaterialIconKind.FormatListBulleted },
             { ".toc", MaterialIconKind.TableOfContents },
             { ".skl", MaterialIconKind.SitemapOutline }, 
