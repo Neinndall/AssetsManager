@@ -106,7 +106,8 @@ namespace AssetsManager.Services.Hashes
             HashGuessStrategy strategy,
             string source,
             ulong sourceChunkHash = 0,
-            ulong? expectedHash = null)
+            ulong? expectedHash = null,
+            IReadOnlySet<ulong> expectedHashes = null)
         {
             CheckedCandidates++;
             int totalLength = prefix.Length + word.Length + suffix.Length;
@@ -122,7 +123,8 @@ namespace AssetsManager.Services.Hashes
             suffix.CopyTo(buffer[(prefix.Length + word.Length)..]);
 
             ulong hash = XxHash64Ext.Hash(buffer);
-            if ((expectedHash.HasValue && hash != expectedHash.Value) || !_unknownHashes.Contains(hash))
+            if ((expectedHash.HasValue && hash != expectedHash.Value) ||
+                (expectedHashes != null && !expectedHashes.Contains(hash)) || !_unknownHashes.Contains(hash))
             {
                 DiscardedCandidates++;
                 return false;

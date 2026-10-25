@@ -98,26 +98,31 @@ internal sealed class GameMaterialTextureIndex
         if (!skin.Success) return 0;
         string directory = $"assets/characters/{skin.Groups[1].Value}/{skin.Groups[2].Value}/{skin.Groups[3].Value}/";
         var scanned = _scanned.GetOrCreateValue(engine);
+        var targets = DynamicMaterialTargets(engine, tree, cancellationToken).ToHashSet();
+        targets.RemoveWhere(target => !scanned.TryAdd(new Scope(target, directory, "dynamic-material-options"), 0));
+        if (targets.Count == 0) return 0;
         long checkedCandidates = 0;
-        foreach (ulong target in DynamicMaterialTargets(engine, tree, cancellationToken).Distinct())
+        bool complete = false;
+        try
         {
-            var scope = new Scope(target, directory, "dynamic-material-options");
-            if (!scanned.TryAdd(scope, 0)) continue;
-            bool complete = false;
-            try
+            // Hash each basename once for this directory, retaining exact ownership of every link.
+            foreach (string name in _rootSkinTextureNames)
             {
-                foreach (string name in _rootSkinTextureNames)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    if (!engine.UnknownHashes.Contains(target)) break;
-                    if (checkedCandidates >= candidateBudget) return checkedCandidates;
-                    checkedCandidates++;
-                    engine.CheckNormalizedParts(directory, name, ReadOnlySpan<char>.Empty,
-                        HashGuessStrategy.BinLinkSibling, wad, chunk, expectedHash: target);
-                }
-                complete = true;
+                cancellationToken.ThrowIfCancellationRequested();
+                if (targets.Count == 0) break;
+                if (checkedCandidates >= candidateBudget) return checkedCandidates;
+                checkedCandidates++;
+                if (engine.CheckNormalizedParts(directory, name, ReadOnlySpan<char>.Empty,
+                    HashGuessStrategy.BinLinkSibling, wad, chunk, expectedHashes: targets))
+                    targets.RemoveWhere(target => !engine.UnknownHashes.Contains(target));
             }
-            finally { if (!complete) scanned.TryRemove(scope, out _); }
+            complete = true;
+        }
+        finally
+        {
+            if (!complete)
+                foreach (ulong target in targets)
+                    scanned.TryRemove(new Scope(target, directory, "dynamic-material-options"), out _);
         }
         return checkedCandidates;
     }

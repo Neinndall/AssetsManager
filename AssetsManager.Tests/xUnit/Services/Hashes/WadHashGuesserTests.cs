@@ -1858,9 +1858,43 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
                 "assets/esports/sponsoredbanners/region/2026/r_1_sponsor-brand.dds",
                 "assets/characters/outsider/forbidden_word.tex"
             });
-            Assert.Equal(new[] { "1", "2026", "brand", "hepsiburada", "kitkat", "msi", "portuguesa", "r", "region", "sponsor", "tsl" },
+            Assert.Equal(new[] { "1", "2025", "2026", "25", "26", "brand", "esports", "ewc", "first", "fst", "hepsiburada", "kitkat", "lcp", "lol", "lta", "msi", "portuguesa", "r", "region", "sponsor", "stand", "tsl", "v1", "v2", "v3" },
                 words.Order(StringComparer.Ordinal));
             Assert.Equal(words.Count, words.Distinct(StringComparer.Ordinal).Count());
+        }
+
+        [Fact]
+        public void BannerEventBudgetPreservesThePreviousVocabularyCoverage()
+        {
+            const string root = "assets/esports/sponsoredbanners/";
+            const string expected = root + "kitkat_aaa.tex";
+            var paths = Enumerable.Range(0, 7500)
+                .Select(i => root + $"team_brand{i:D5}_logo.tex")
+                .Prepend(root + "rarezone_aaa.tex").ToArray();
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, paths));
+            var engine = CreateEngine(HashGuessDomain.Game, expected);
+
+            game.GuessEsportsBanners(engine, null, CancellationToken.None);
+
+            Assert.Equal(expected, Assert.Single(engine.Matches).Value.Path);
+            Assert.Empty(engine.UnknownHashes);
+        }
+
+        [Theory]
+        [InlineData("fst_acme.tex")]
+        [InlineData("ewc_acme_26.tex")]
+        [InlineData("lcp_acme_v3.tex")]
+        public void BannerEventPatternsKeepTheirPrefixesAndVersions(string name)
+        {
+            const string root = "assets/esports/sponsoredbanners/";
+            string expected = root + name;
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[] { root + "legacy_acme_2024.tex" }));
+            var engine = CreateEngine(HashGuessDomain.Game, expected);
+
+            game.GuessEsportsBanners(engine, null, CancellationToken.None);
+
+            Assert.Equal(expected, Assert.Single(engine.Matches).Value.Path);
+            Assert.Empty(engine.UnknownHashes);
         }
 
         [Theory]
