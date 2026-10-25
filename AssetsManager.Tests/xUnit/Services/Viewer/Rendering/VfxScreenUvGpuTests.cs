@@ -25,8 +25,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
             foreach (bool atlas in new[] { false, true })
             foreach (bool mult in new[] { false, true })
             foreach (bool game in new[] { false, true })
-                if (!game || primitive is not (VfxPrimitiveKind.Beam or VfxPrimitiveKind.CameraSegmentBeam))
-                    yield return new object[] { primitive, flips, perspective, atlas, mult, game };
+                yield return new object[] { primitive, flips, perspective, atlas, mult, game };
         }
 
         [Theory]
@@ -35,7 +34,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
             VfxPrimitiveKind primitive, int flips, bool perspective, bool atlas, bool mult, bool game)
         {
             string install = InstalledSkins.FindInstall();
-            if (install == null) return;
+            Assert.NotNull(install);
             using var context = new HiddenWglContext();
             using GL gl = GL.GetApi(context.GetProcAddress);
             using var renderer = new VfxOpenGlRenderer();
@@ -146,8 +145,9 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
                 Assert.NotEmpty(covered);
                 if (beam)
                 {
-                    // Beam screen-space transposition remains unaudited; preserve its prior path.
+                    // LTK's ribbon path rejects the screen-space native pair and keeps packed UVs.
                     Assert.Equal(ordinary, screen);
+                    if (game) Assert.NotNull(renderer.GameParticleFallback(emitter, false));
                     Assert.Equal(GLEnum.NoError, gl.GetError());
                     return;
                 }

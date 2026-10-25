@@ -13,12 +13,18 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering;
 public sealed class VfxAttachedPlacementGpuTests
 {
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void AttachedSkinAppliesOwnerPlacementOnceAfterPoseAndParticleScale(bool fallback)
+    [InlineData(false, 1f, false)]
+    [InlineData(true, 1f, false)]
+    [InlineData(false, 1f, true)]
+    [InlineData(true, 1f, true)]
+    [InlineData(false, 2.5f, false)]
+    [InlineData(true, 2.5f, false)]
+    [InlineData(false, 2.5f, true)]
+    [InlineData(true, 2.5f, true)]
+    public void AttachedSkinAppliesOwnerPlacementOnceAfterPoseAndParticleScale(bool fallback, float skinScale, bool mirrored)
     {
         string install = InstalledSkins.FindInstall();
-        if (!fallback && install is null) return;
+        if (!fallback) Assert.NotNull(install);
         using var context = new HiddenWglContext();
         using GL gl = GL.GetApi(context.GetProcAddress);
         using var renderer = new VfxOpenGlRenderer();
@@ -48,14 +54,14 @@ public sealed class VfxAttachedPlacementGpuTests
             var emitter = new VfxPlaybackRuntime.EmitterState
             {
                 Def = definition, Texture = white, TextureWidth = 1, TextureHeight = 1,
-                Instances = instance, InstanceCount = 1
+                Instances = instance, InstanceCount = 1, MeshOwnerScale = skinScale
             };
             var vertices = new[] { new Vector3(-1,-1,0), new Vector3(1,-1,0), new Vector3(0,1,0) };
             renderer.UploadEmitterMesh(emitter, new float[] { -1,-1,0, 1,-1,0, 0,1,0 },
                 new float[] { 0,0,1, 0,0,1, 0,0,1 }, new float[] { 0,0, 1,0, .5f,1 }, null,
                 boneIndices: new float[12], boneWeights: new float[] { 1,0,0,0, 1,0,0,0, 1,0,0,0 });
             Matrix4x4 pose = Matrix4x4.CreateRotationZ(.2f) * Matrix4x4.CreateTranslation(.2f,-.3f,0);
-            Matrix4x4 owner = Matrix4x4.CreateScale(.7f,1.2f,1) * Matrix4x4.CreateRotationZ(.5f)
+            Matrix4x4 owner = Matrix4x4.CreateScale(mirrored ? -.7f : .7f,1.2f,1) * Matrix4x4.CreateRotationZ(.5f)
                 * Matrix4x4.CreateTranslation(3,1,0);
             renderer.SetOwnerSkinningMatrices(new[] { pose });
             renderer.SetOwnerWorldTransform(owner);
@@ -69,7 +75,7 @@ public sealed class VfxAttachedPlacementGpuTests
             var pixels = new byte[128 * 128 * 4];
             gl.ReadPixels(0,0,128,128,PixelFormat.Rgba,PixelType.UnsignedByte,pixels.AsSpan());
             for (int index = 0; index < vertices.Length; index++)
-                vertices[index] = Vector3.Transform(Vector3.Transform(vertices[index], pose) * new Vector3(2,3,1), owner);
+                vertices[index] = Vector3.Transform(Vector3.Transform(vertices[index], pose) * new Vector3(2,3,1) * skinScale, owner);
             float Cross(Vector2 a, Vector2 b) => a.X * b.Y - a.Y * b.X;
             Vector2 a = new(vertices[0].X, vertices[0].Y);
             Vector2 b = new(vertices[1].X, vertices[1].Y);

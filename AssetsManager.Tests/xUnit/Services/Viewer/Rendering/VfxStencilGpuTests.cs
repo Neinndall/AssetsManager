@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using AssetsManager.Services.Viewer.Rendering;
+using AssetsManager.Services.Viewer.Rendering.GameShaders;
 using AssetsManager.Services.Viewer.Vfx.Rendering;
 using AssetsManager.Services.Viewer.Vfx.Runtime;
 using AssetsManager.Services.Viewer.Vfx.Semantics;
@@ -16,6 +17,48 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering;
 [Collection("Viewport native graphics")]
 public sealed class VfxStencilGpuTests
 {
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void CustomMaterialResolutionControlsEmitterStencilInNativeAndStockDraws(bool native, bool missing)
+    {
+        using var frame = new Frame(native);
+        var writer = frame.Emitter(1, 5, new(1, 0, 0, 1), .4f);
+        var custom = frame.Emitter(2, 5, new(0, 1, 0, 1), 2);
+        // A controlled custom pass uses installed particle bytecode, so the check exercises
+        // the custom binding path without depending on a particular skin's material layout.
+        GameMaterialProgram program = GameParticleProgramResolver.Create(custom.Def, false);
+        var pass = program.Passes[0] with { State = GameMaterialPassState.Default with
+            { CullEnabled = false, DepthEnabled = false, WriteMask = 15 } };
+        program = program with { Passes = new[] { pass, pass } };
+        custom.Def = custom.Def with
+        {
+            CustomMaterial = ModelMaterialDefinition.Default with
+            {
+                BindingKind = missing ? ModelMaterialBindingKind.Missing : ModelMaterialBindingKind.Authored,
+                AlphaCutoff = 0,
+                Program = program,
+                RenderState = ModelMaterialRenderState.Default with { DoubleSided = true, DepthTest = false }
+            }
+        };
+        frame.Draw(writer, custom);
+        Assert.True(frame.Pixel(32)[1] > 0);
+        Assert.Equal(missing, frame.Pixel(2)[1] == 0);
+        Assert.Equal(197, frame.Stencil(32));
+        Assert.Equal(192, frame.Stencil(2));
+        Assert.Equal(native && !missing ? 3 : 2, frame.Renderer.LastParticleDrawCounts.Draws);
+        if (native) Assert.Null(frame.Renderer.GameParticleFallback(custom, false));
+
+        frame.Clear();
+        custom.Def = custom.Def with { RenderState = custom.Def.RenderState with { StencilMode = 1 } };
+        frame.Draw(custom);
+        Assert.True(frame.Pixel(2)[1] > 0);
+        Assert.Equal(missing ? 197 : 192, frame.Stencil(32));
+        Assert.Equal(missing ? 197 : 192, frame.Stencil(2));
+    }
+
     public static IEnumerable<object[]> Primitives()
     {
         foreach (var kind in new[] { VfxPrimitiveKind.CameraQuad, VfxPrimitiveKind.Mesh,
