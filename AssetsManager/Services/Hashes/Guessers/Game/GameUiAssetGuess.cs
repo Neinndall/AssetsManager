@@ -16,20 +16,24 @@ internal sealed partial class GameHashGuesser
         CancellationToken cancellationToken, Func<BinTree> treeFactory)
     {
         if (!sourcePath.Contains("narrativebarks", StringComparison.OrdinalIgnoreCase) &&
-            !sourcePath.Contains("pingradial", StringComparison.OrdinalIgnoreCase)) return;
+            !sourcePath.Contains("pingradial", StringComparison.OrdinalIgnoreCase) &&
+            !sourcePath.Contains("modesobjectives", StringComparison.OrdinalIgnoreCase)) return;
         Match mode = Regex.Match(sourcePath.Replace('\\', '/'),
             @"^clientstates/gameplay/ux/lol/([^/]+)/([^/]+)/", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
         if (!mode.Success) return;
         string modeName = mode.Groups[1].Value.ToLowerInvariant();
         bool portraits = mode.Groups[2].Value.EndsWith("narrativebarks", StringComparison.OrdinalIgnoreCase);
-        if (!portraits && !mode.Groups[2].Value.Equals(modeName + "pingradial", StringComparison.OrdinalIgnoreCase)) return;
-        string prefix = portraits ? $"assets/ux/narrativebarks/{modeName}/portrait_" : $"assets/ux/{modeName}/hud/{modeName}_ping_";
+        bool objectives = mode.Groups[2].Value.Equals("modesobjectives", StringComparison.OrdinalIgnoreCase);
+        if (!portraits && !objectives && !mode.Groups[2].Value.Equals(modeName + "pingradial", StringComparison.OrdinalIgnoreCase)) return;
+        string prefix = portraits ? $"assets/ux/narrativebarks/{modeName}/portrait_" :
+            objectives ? $"assets/ux/{modeName}/objectives/" : $"assets/ux/{modeName}/hud/{modeName}_ping_";
         const string labelPrefix = "championsplash_";
         string[] themes = null;
         foreach (var obj in treeFactory().Objects.Values)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (obj.ClassHash != Fnv1a.HashLower("UiElementIconData") ||
+            if ((obj.ClassHash != Fnv1a.HashLower("UiElementIconData") &&
+                 (!objectives || obj.ClassHash != Fnv1a.HashLower("UiElementEffectArcFillData"))) ||
                 obj.Properties.GetValueOrDefault(Fnv1a.HashLower("TextureData")) is not BinTreeStruct texture ||
                 texture.Properties.GetValueOrDefault(Fnv1a.HashLower("TextureName")) is not BinTreeWadChunkLink link ||
                 !engine.UnknownHashes.Contains(link.Value)) continue;
@@ -41,7 +45,31 @@ internal sealed partial class GameHashGuesser
                 _ => null
             };
             name ??= _resolveBinHash?.Invoke(obj.PathHash);
-            string label = GetBasename(name?.Replace('\\', '/') ?? "").ToLowerInvariant();
+            string normalizedName = name?.Replace('\\', '/').ToLowerInvariant() ?? "";
+            string label = GetBasename(normalizedName);
+            if (objectives)
+            {
+                string file = label switch
+                {
+                    "background" when normalizedName.Contains("/objectivetemplate/", StringComparison.Ordinal) => "objective_background.png",
+                    "background" when normalizedName.Contains("/mainheaderbutton/", StringComparison.Ordinal) => "header_background.png",
+                    "background" when normalizedName.EndsWith("/viewpane/background", StringComparison.Ordinal) => "panel_background.png",
+                    "completedbackground" => "objective_background_completed.png",
+                    "completed_icon" => "completed_circle.png",
+                    "fillmeter_back" => "progress_circle_background.png",
+                    "fillmeter_incomingprogress" => "progress_circle_glow.png",
+                    "fillmeter_progress" => "progress_circle.png",
+                    "slider_slider" => "scrollbar.png",
+                    "background_gradient" => "panel_gradient_bottom.png",
+                    "icon_collapsed" => "caret.png",
+                    "backgroundhover" => "header_background_hover.png",
+                    _ => null
+                };
+                if (file != null)
+                    engine.CheckNormalizedParts(prefix, file, "", HashGuessStrategy.AtlasReference,
+                        wad, chunk, expectedHash: link.Value);
+                continue;
+            }
             if (!portraits)
             {
                 string file = label switch
