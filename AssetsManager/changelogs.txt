@@ -5,6 +5,10 @@ HOTFIX UPDATE
 New Features
 
 Improvements
+  - Hash Guessing Lab / GAME Basic derives cross-stage shader variants from known shader stems.
+  - Hash Guessing Lab / GAME GrepWad resolves companion loadscreens, main-texture submesh overrides, and base skin textures.
+  - Hash Guessing Lab / GAME GrepWad and Custom resolve cross-champion textures referenced by dynamic material swap options.
+  - Hash Guessing Lab / GAME Banners combines event prefixes and version suffixes across sponsor stems.
   - Hash Guessing Lab / GAME GrepWad resolves ping-wheel highlights and cosplay narrative portraits from UI labels.
   - Hash Guessing Lab / Atlas scans keep hashes already resolved during the current run out of the pending count.
   - Image atlases / Reads all texture pages correctly and rejects incomplete sprite tables.
