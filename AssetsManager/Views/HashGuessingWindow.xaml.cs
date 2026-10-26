@@ -389,11 +389,11 @@ namespace AssetsManager.Views
                 if (selectedIndex < 2)
                 {
                     var domain = selectedIndex == 0 ? HashGuessDomain.Game : HashGuessDomain.Lcu;
-                    var summary = await Task.Run(() => _hashGuessingService.GetUnknownSummaryAsync(domain, CancellationToken.None));
+                    var count = await Task.Run(() => _hashGuessingService.GetUnknownCountAsync(domain, CancellationToken.None));
                     if (DomainSelector != null && DomainSelector.SelectedIndex == selectedIndex)
                     {
-                        TxtUnknownCount.Text = $"{summary.Total:N0} unknowns";
-                        TxtUnknownBreakdown.Text = $"Current: {summary.Current:N0} · Recent: {summary.Recent:N0}";
+                        TxtUnknownCount.Text = $"{count:N0} unknowns";
+                        TxtUnknownBreakdown.Text = string.Empty;
                     }
                 }
                 else
@@ -1150,7 +1150,7 @@ namespace AssetsManager.Views
                         uiProgress,
                         HashLabProgressUpdateInterval);
                     IProgress<HashGuessProgress> progress = scanProgressLimiter;
-                    var summary = await Task.Run(() => _hashGuessingService.ScanUnknownHashesAsync(domain, rootPath, progress, effectiveToken), effectiveToken);
+                    var count = await Task.Run(() => _hashGuessingService.ScanUnknownHashesAsync(domain, rootPath, progress, effectiveToken), effectiveToken);
                     scanProgressLimiter.Flush();
                     await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
                     stopwatch.Stop();
@@ -1158,7 +1158,7 @@ namespace AssetsManager.Views
                     _viewModel.ProgressValue = 100;
                     _viewModel.ProgressText = "100%";
                     _viewModel.IsProgressIndeterminate = false;
-                    _viewModel.StatusText = $"Completed in {elapsedTime}: Found {summary.Total:N0} unknown hashes in scope ({summary.Current:N0} in current patch).";
+                    _viewModel.StatusText = $"Completed in {elapsedTime}: {count:N0} unknown hashes pending.";
                 }
                 else
                 {

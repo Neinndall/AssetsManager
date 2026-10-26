@@ -30,14 +30,11 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
             {
                 var store = new HashGuessingStore(new DirectoriesCreator(root));
                 var pending = new HashSet<ulong> { 1, 2 };
-                var current = new HashSet<ulong> { 2 };
-                await store.SaveUnknownHashesAsync(HashGuessDomain.Lcu, pending, current, "LCU:patch", CancellationToken.None);
+                await store.SaveUnknownHashesAsync(HashGuessDomain.Lcu, pending, CancellationToken.None);
 
-                HashUnknownInventory inventory = await store.LoadUnknownInventoryAsync(HashGuessDomain.Lcu, CancellationToken.None);
+                var pendingHashes = await store.LoadUnknownHashesAsync(HashGuessDomain.Lcu, CancellationToken.None);
 
-                Assert.Equal(pending, inventory.All);
-                Assert.Equal(current, inventory.Current);
-                Assert.Equal("LCU:patch", inventory.PatchFingerprint);
+                Assert.Equal(pending, pendingHashes);
             }
             finally
             {

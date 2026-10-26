@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using AssetsManager.Services.Hashes;
@@ -16,14 +17,15 @@ public sealed class HashUnknownInventoryTests
     [InlineData(HashGuessDomain.Game, true)]
     [InlineData(HashGuessDomain.Lcu, false)]
     [InlineData(HashGuessDomain.Lcu, true)]
-    public async Task GuessingPreservesCurrentAndHistoricalUnknownsFromTheLastScan(HashGuessDomain domain, bool grep)
+    public async Task GuessingPreservesPendingUnknownsWithoutReadingLegacyInventory(HashGuessDomain domain, bool grep)
     {
         using var bridge = new AssetsManagerTestBridge();
         string root = bridge.CreateDirectory("client");
         var store = new HashGuessingStore(bridge.Directories);
         var pending = new HashSet<ulong> { 1, 2 };
-        await store.SaveUnknownHashesAsync(domain, pending, pending, "patch-a", CancellationToken.None);
-        await store.SaveUnknownHashesAsync(domain, pending, new HashSet<ulong> { 2 }, "patch-b", CancellationToken.None);
+        await store.SaveUnknownHashesAsync(domain, pending, CancellationToken.None);
+        string legacyPath = Path.Combine(bridge.Directories.HashLabPath, $"inventory.{domain.ToString().ToLowerInvariant()}.json");
+        await File.WriteAllTextAsync(legacyPath, "obsolete invalid JSON");
         using var resolver = new HashResolverService(bridge.Directories, bridge.LogService);
         var service = new HashGuessingService(resolver, store,
             new HashGuessPersistenceService(store, new BinRstHashGuessingStore(bridge.Directories)), bridge.LogService, bridge.Directories);
@@ -33,13 +35,10 @@ public sealed class HashUnknownInventoryTests
         else
             await service.RunLcuBasicGuessingAsync(root, null, CancellationToken.None, selectedSubMethods: new HashSet<string>());
 
-        var inventory = await store.LoadUnknownInventoryAsync(domain, CancellationToken.None);
-        Assert.True(inventory.All.SetEquals(pending));
-        Assert.Equal(2UL, Assert.Single(inventory.Current));
-        Assert.Equal("patch-b", inventory.PatchFingerprint);
-        var summary = await store.LoadUnknownSummaryAsync(domain, CancellationToken.None);
-        Assert.Equal(1, summary.Current);
-        Assert.Equal(1, summary.Recent);
+        var pendingHashes = await store.LoadUnknownHashesAsync(domain, CancellationToken.None);
+        Assert.True(pendingHashes.SetEquals(pending));
+        Assert.Equal(2, await store.LoadUnknownCountAsync(domain, CancellationToken.None));
+        Assert.Equal("obsolete invalid JSON", await File.ReadAllTextAsync(legacyPath));
     }
 
     [Theory]
@@ -50,18 +49,20 @@ public sealed class HashUnknownInventoryTests
         using var bridge = new AssetsManagerTestBridge();
         string root = bridge.CreateDirectory("client");
         string extension = domain == HashGuessDomain.Game ? ".wad.client" : ".wad";
-        const string oldPath = "assets/previous-patch.bin", newPath = "assets/current-patch.bin";
+        const string oldPath = "assets/previous-patch.bin", newPath = "assets/current-patch.bin", resolvedPath = "assets/resolved.bin";
         ulong oldHash = XxHash64Ext.Hash(oldPath), newHash = XxHash64Ext.Hash(newPath);
         bridge.BakeWad(root, "current" + extension, (newPath, "new payload"));
         var store = new HashGuessingStore(bridge.Directories);
-        await store.SaveUnknownHashesAsync(domain, new[] { oldHash }, new HashSet<ulong> { oldHash }, "old-patch", CancellationToken.None);
+        await store.SaveUnknownHashesAsync(domain, new[] { oldHash, oldHash, XxHash64Ext.Hash(resolvedPath) }, CancellationToken.None);
+        await store.SaveHashesAsync(new[] { new HashGuessMatch { Domain = domain, Hash = XxHash64Ext.Hash(resolvedPath), Path = resolvedPath } }, CancellationToken.None);
         using var resolver = new HashResolverService(bridge.Directories, bridge.LogService);
         var service = new HashGuessingService(resolver, store,
             new HashGuessPersistenceService(store, new BinRstHashGuessingStore(bridge.Directories)), bridge.LogService, bridge.Directories);
-        await service.ScanUnknownHashesAsync(domain, root, null, CancellationToken.None);
-        var inventory = await store.LoadUnknownInventoryAsync(domain, CancellationToken.None);
-        Assert.True(inventory.All.SetEquals(new[] { oldHash, newHash }));
-        Assert.Equal(newHash, Assert.Single(inventory.Current));
-        Assert.StartsWith(domain + ":", inventory.PatchFingerprint);
+        Assert.Equal(2, await service.ScanUnknownHashesAsync(domain, root, null, CancellationToken.None));
+        Assert.Equal(2, await service.ScanUnknownHashesAsync(domain, root, null, CancellationToken.None));
+        var pendingHashes = await store.LoadUnknownHashesAsync(domain, CancellationToken.None);
+        Assert.True(pendingHashes.SetEquals(new[] { oldHash, newHash }));
+        Assert.Equal(2, await store.LoadUnknownCountAsync(domain, CancellationToken.None));
+        Assert.False(File.Exists(Path.Combine(bridge.Directories.HashLabPath, $"inventory.{domain.ToString().ToLowerInvariant()}.json")));
     }
 }

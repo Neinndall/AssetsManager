@@ -50,7 +50,7 @@ namespace AssetsManager.Services.Hashes
             _lcuGuesser = new LcuHashGuesser(_lcuHashFile, _logService);
         }
 
-        public async Task<HashUnknownSummary> ScanUnknownHashesAsync(
+        public async Task<int> ScanUnknownHashesAsync(
             HashGuessDomain domain,
             string rootDirectory,
             IProgress<HashGuessProgress> progress,
@@ -63,15 +63,12 @@ namespace AssetsManager.Services.Hashes
 
             HashGuesser guesser = CreateWadGuesser(domain);
             string[] wadPaths = guesser.FindWads(rootDirectory);
-            var inventory = await BuildUnknownInventoryAsync(domain, wadPaths, cancellationToken, null, progress);
+            var pendingHashes = await BuildPendingHashesAsync(domain, wadPaths, cancellationToken, null, progress);
             await _persistence.CommitPathRunAsync(
                 domain,
-                Array.Empty<HashGuessMatch>(),
-                inventory.All,
-                inventory.Current,
-                inventory.PatchFingerprint,
+                pendingHashes,
                 cancellationToken);
-            return await _store.LoadUnknownSummaryAsync(domain, cancellationToken);
+            return await _store.LoadUnknownCountAsync(domain, cancellationToken);
         }
 
         public async Task<HashGuessRunResult> RunEmbeddedPathGrepAsync(
@@ -86,8 +83,8 @@ namespace AssetsManager.Services.Hashes
 
             HashGuesser guesser = CreateWadGuesser(domain);
             string[] wadPaths = guesser.FindWads(rootDirectory);
-            var inventory = await LoadPersistedInventoryAsync(domain, rootDirectory, cancellationToken, null, progress);
-            var unknownHashes = inventory.All;
+            var pendingHashes = await LoadPendingHashesAsync(domain, rootDirectory, cancellationToken, null, progress);
+            var unknownHashes = pendingHashes;
 
             HashGuessEngine engine = null;
             var runResult = await RunWithCancellationPersistenceAsync(() => Task.Run(() =>
@@ -166,12 +163,12 @@ namespace AssetsManager.Services.Hashes
 
                 var resultMatches = engine.Matches.Values.OrderBy(match => match.Path, StringComparer.OrdinalIgnoreCase).ToList();
                 return (resultMatches, processedChunks, engine.UnknownHashes);
-            }, cancellationToken), () => engine, domain, inventory);
+            }, cancellationToken), () => engine, domain);
 
             var resultMatches = runResult.Item1;
             int processedChunks = runResult.Item2;
             var remainingUnknowns = runResult.Item3;
-            await PersistGuessingRunAsync(domain, resultMatches, remainingUnknowns, inventory.Current, inventory.PatchFingerprint, cancellationToken);
+            await PersistGuessingRunAsync(domain, remainingUnknowns, cancellationToken);
 
             _logService.LogSuccess($"Hash Lab {domain} GREP completed: {resultMatches.Count} paths resolved from {unknownHashes.Count + resultMatches.Count} unknown hashes.");
             return new HashGuessRunResult
@@ -223,20 +220,16 @@ namespace AssetsManager.Services.Hashes
 
         private async Task PersistGuessingRunAsync(
             HashGuessDomain domain,
-            IReadOnlyCollection<HashGuessMatch> matches,
             IEnumerable<ulong> remainingUnknowns,
-            IReadOnlySet<ulong> currentHashes,
-            string patchFingerprint,
             CancellationToken cancellationToken)
         {
-            await _persistence.CommitPathRunAsync(domain, matches, remainingUnknowns, currentHashes, patchFingerprint, cancellationToken);
+            await _persistence.CommitPathRunAsync(domain, remainingUnknowns, cancellationToken);
         }
 
         private async Task<T> RunWithCancellationPersistenceAsync<T>(
             Func<Task<T>> run,
             Func<HashGuessEngine> getEngine,
             HashGuessDomain domain,
-            HashUnknownInventory inventory,
             ISet<ulong> sessionResolved = null)
         {
             try
@@ -257,10 +250,7 @@ namespace AssetsManager.Services.Hashes
                     {
                         await PersistGuessingRunAsync(
                             domain,
-                            matches,
                             engine.UnknownHashes,
-                            inventory.Current,
-                            inventory.PatchFingerprint,
                             CancellationToken.None);
                     }
                     if (matches.Count > 0)
@@ -287,13 +277,13 @@ namespace AssetsManager.Services.Hashes
             IProgress<HashGuessMatch> matchProgress = null,
             IReadOnlySet<string> selectedSubMethods = null)
         {
-            var inventory = await LoadPersistedInventoryAsync(HashGuessDomain.Game, rootDirectory, cancellationToken, null, progress);
+            var pendingHashes = await LoadPendingHashesAsync(HashGuessDomain.Game, rootDirectory, cancellationToken, null, progress);
             return await RunGameBasicMethodsGuessingAsync(
                 rootDirectory,
                 progress,
                 cancellationToken,
                 null,
-                inventory,
+                pendingHashes,
                 matchProgress,
                 selectedSubMethods);
         }
@@ -303,11 +293,11 @@ namespace AssetsManager.Services.Hashes
             IProgress<HashGuessProgress> progress,
             CancellationToken cancellationToken,
             ISet<ulong> sessionResolved,
-            HashUnknownInventory inventory,
+            HashSet<ulong> pendingHashes,
             IProgress<HashGuessMatch> matchProgress,
             IReadOnlySet<string> selectedSubMethods = null)
         {
-            var unknown = CreateSessionPending(inventory.All, sessionResolved);
+            var unknown = CreateSessionPending(pendingHashes, sessionResolved);
             int initial = unknown.Count;
             HashGuessEngine engine = null;
             var runResult = await RunWithCancellationPersistenceAsync(() => Task.Run(() =>
@@ -446,17 +436,14 @@ namespace AssetsManager.Services.Hashes
 
                 var matches = engine.Matches.Values.OrderBy(value => value.Path, StringComparer.OrdinalIgnoreCase).ToList();
                 return (matches, checkedCandidates, engine.UnknownHashes);
-            }, cancellationToken), () => engine, HashGuessDomain.Game, inventory, sessionResolved);
+            }, cancellationToken), () => engine, HashGuessDomain.Game, sessionResolved);
 
             var matches = runResult.Item1;
             int checkedCandidates = runResult.Item2;
             var remainingUnknowns = runResult.Item3;
             await PersistGuessingRunAsync(
                 HashGuessDomain.Game,
-                matches,
                 remainingUnknowns,
-                inventory.Current,
-                inventory.PatchFingerprint,
                 cancellationToken);
             sessionResolved?.UnionWith(matches.Select(match => match.Hash));
             return new HashGuessRunResult
@@ -475,11 +462,11 @@ namespace AssetsManager.Services.Hashes
             IProgress<HashGuessMatch> matchProgress = null,
             IReadOnlySet<string> selectedSubMethods = null)
         {
-            var inventory = await LoadPersistedInventoryAsync(HashGuessDomain.Lcu, rootDirectory, cancellationToken, null, progress);
+            var pendingHashes = await LoadPendingHashesAsync(HashGuessDomain.Lcu, rootDirectory, cancellationToken, null, progress);
             return await RunLcuBasicMethodsGuessingAsync(
                 progress,
                 cancellationToken,
-                inventory,
+                pendingHashes,
                 matchProgress,
                 selectedSubMethods);
         }
@@ -487,11 +474,11 @@ namespace AssetsManager.Services.Hashes
         private async Task<HashGuessRunResult> RunLcuBasicMethodsGuessingAsync(
             IProgress<HashGuessProgress> progress,
             CancellationToken cancellationToken,
-            HashUnknownInventory inventory,
+            HashSet<ulong> pendingHashes,
             IProgress<HashGuessMatch> matchProgress,
             IReadOnlySet<string> selectedSubMethods = null)
         {
-            var unknown = inventory.All;
+            var unknown = pendingHashes;
             int initial = unknown.Count;
             HashGuessEngine engine = null;
             var runResult = await RunWithCancellationPersistenceAsync(() => Task.Run(() =>
@@ -602,17 +589,14 @@ namespace AssetsManager.Services.Hashes
                     .OrderBy(value => value.Path, StringComparer.OrdinalIgnoreCase)
                     .ToList();
                 return (matches, checkedCandidates, engine.UnknownHashes);
-            }, cancellationToken), () => engine, HashGuessDomain.Lcu, inventory);
+            }, cancellationToken), () => engine, HashGuessDomain.Lcu);
 
             var matches = runResult.Item1;
             int checkedCandidates = runResult.Item2;
             var remainingUnknowns = runResult.Item3;
             await PersistGuessingRunAsync(
                 HashGuessDomain.Lcu,
-                matches,
                 remainingUnknowns,
-                inventory.Current,
-                inventory.PatchFingerprint,
                 cancellationToken);
             return new HashGuessRunResult
             {
@@ -630,8 +614,8 @@ namespace AssetsManager.Services.Hashes
             IProgress<HashGuessMatch> matchProgress = null,
             IReadOnlySet<string> selectedSubMethods = null)
         {
-            var inventory = await LoadPersistedInventoryAsync(HashGuessDomain.Lcu, rootDirectory, cancellationToken, null, progress);
-            var unknown = inventory.All;
+            var pendingHashes = await LoadPendingHashesAsync(HashGuessDomain.Lcu, rootDirectory, cancellationToken, null, progress);
+            var unknown = pendingHashes;
             int initial = unknown.Count;
             HashGuessEngine engine = null;
             var runResult = await RunWithCancellationPersistenceAsync(() => Task.Run(() =>
@@ -662,12 +646,12 @@ namespace AssetsManager.Services.Hashes
 
                 var matches = engine.Matches.Values.OrderBy(value => value.Path, StringComparer.OrdinalIgnoreCase).ToList();
                 return (matches, checkedCandidates, engine.UnknownHashes);
-            }, cancellationToken), () => engine, HashGuessDomain.Lcu, inventory);
+            }, cancellationToken), () => engine, HashGuessDomain.Lcu);
 
             var matches = runResult.Item1;
             long checkedCandidates = runResult.Item2;
             var remainingUnknowns = runResult.Item3;
-            await PersistGuessingRunAsync(HashGuessDomain.Lcu, matches, remainingUnknowns, inventory.Current, inventory.PatchFingerprint, cancellationToken);
+            await PersistGuessingRunAsync(HashGuessDomain.Lcu, remainingUnknowns, cancellationToken);
             return new HashGuessRunResult { Domain = HashGuessDomain.Lcu, UnknownHashesAtStart = initial, ScannedChunks = checkedCandidates, Matches = matches };
         }
 
@@ -677,8 +661,8 @@ namespace AssetsManager.Services.Hashes
             CancellationToken cancellationToken,
             IProgress<HashGuessMatch> matchProgress = null)
         {
-            var inventory = await LoadPersistedInventoryAsync(HashGuessDomain.Lcu, rootDirectory, cancellationToken, null, progress);
-            var unknown = inventory.All;
+            var pendingHashes = await LoadPendingHashesAsync(HashGuessDomain.Lcu, rootDirectory, cancellationToken, null, progress);
+            var unknown = pendingHashes;
             int initial = unknown.Count;
             HashGuessEngine engine = null;
             var runResult = await RunWithCancellationPersistenceAsync(() => Task.Run(() =>
@@ -688,12 +672,12 @@ namespace AssetsManager.Services.Hashes
                 int checkedCandidates = _lcuGuesser.RunScopedPluginAttacks(engine, progress, cancellationToken);
                 var matches = engine.Matches.Values.OrderBy(value => value.Path, StringComparer.OrdinalIgnoreCase).ToList();
                 return (matches, checkedCandidates, engine.UnknownHashes);
-            }, cancellationToken), () => engine, HashGuessDomain.Lcu, inventory);
+            }, cancellationToken), () => engine, HashGuessDomain.Lcu);
 
             var matches = runResult.Item1;
             int checkedCandidates = runResult.Item2;
             var remainingUnknowns = runResult.Item3;
-            await PersistGuessingRunAsync(HashGuessDomain.Lcu, matches, remainingUnknowns, inventory.Current, inventory.PatchFingerprint, cancellationToken);
+            await PersistGuessingRunAsync(HashGuessDomain.Lcu, remainingUnknowns, cancellationToken);
             return new HashGuessRunResult { Domain = HashGuessDomain.Lcu, UnknownHashesAtStart = initial, ScannedChunks = checkedCandidates, Matches = matches };
         }
 
@@ -703,8 +687,8 @@ namespace AssetsManager.Services.Hashes
             CancellationToken cancellationToken,
             IProgress<HashGuessMatch> matchProgress = null)
         {
-            var inventory = await LoadPersistedInventoryAsync(HashGuessDomain.Lcu, rootDirectory, cancellationToken, null, progress);
-            var unknown = inventory.All;
+            var pendingHashes = await LoadPendingHashesAsync(HashGuessDomain.Lcu, rootDirectory, cancellationToken, null, progress);
+            var unknown = pendingHashes;
             int initial = unknown.Count;
             HashGuessEngine engine = null;
             var runResult = await RunWithCancellationPersistenceAsync(() => Task.Run(() =>
@@ -720,12 +704,12 @@ namespace AssetsManager.Services.Hashes
                     progress: current => progress?.Report(engine.CreateProgress(stage, current)));
                 var matches = engine.Matches.Values.OrderBy(value => value.Path, StringComparer.OrdinalIgnoreCase).ToList();
                 return (matches, checkedCandidates, engine.UnknownHashes);
-            }, cancellationToken), () => engine, HashGuessDomain.Lcu, inventory);
+            }, cancellationToken), () => engine, HashGuessDomain.Lcu);
 
             var matches = runResult.Item1;
             int checkedCandidates = runResult.Item2;
             var remainingUnknowns = runResult.Item3;
-            await PersistGuessingRunAsync(HashGuessDomain.Lcu, matches, remainingUnknowns, inventory.Current, inventory.PatchFingerprint, cancellationToken);
+            await PersistGuessingRunAsync(HashGuessDomain.Lcu, remainingUnknowns, cancellationToken);
             return new HashGuessRunResult { Domain = HashGuessDomain.Lcu, UnknownHashesAtStart = initial, ScannedChunks = checkedCandidates, Matches = matches };
         }
 
@@ -735,8 +719,8 @@ namespace AssetsManager.Services.Hashes
             CancellationToken cancellationToken,
             IProgress<HashGuessMatch> matchProgress = null)
         {
-            var inventory = await LoadPersistedInventoryAsync(HashGuessDomain.Lcu, rootDirectory, cancellationToken, null, progress);
-            var unknown = inventory.All;
+            var pendingHashes = await LoadPendingHashesAsync(HashGuessDomain.Lcu, rootDirectory, cancellationToken, null, progress);
+            var unknown = pendingHashes;
             int initial = unknown.Count;
             HashGuessEngine engine = null;
             var runResult = await RunWithCancellationPersistenceAsync(() => Task.Run(() =>
@@ -764,12 +748,12 @@ namespace AssetsManager.Services.Hashes
                 }
                 var matches = engine.Matches.Values.OrderBy(value => value.Path, StringComparer.OrdinalIgnoreCase).ToList();
                 return (matches, checkedCandidates, engine.UnknownHashes);
-            }, cancellationToken), () => engine, HashGuessDomain.Lcu, inventory);
+            }, cancellationToken), () => engine, HashGuessDomain.Lcu);
 
             var matches = runResult.Item1;
             int checkedCandidates = runResult.Item2;
             var remainingUnknowns = runResult.Item3;
-            await PersistGuessingRunAsync(HashGuessDomain.Lcu, matches, remainingUnknowns, inventory.Current, inventory.PatchFingerprint, cancellationToken);
+            await PersistGuessingRunAsync(HashGuessDomain.Lcu, remainingUnknowns, cancellationToken);
             return new HashGuessRunResult { Domain = HashGuessDomain.Lcu, UnknownHashesAtStart = initial, ScannedChunks = checkedCandidates, Matches = matches };
         }
 
@@ -780,8 +764,8 @@ namespace AssetsManager.Services.Hashes
             IProgress<HashGuessMatch> matchProgress = null,
             IReadOnlySet<string> selectedSubMethods = null)
         {
-            var inventory = await LoadPersistedInventoryAsync(HashGuessDomain.Lcu, rootDirectory, cancellationToken, null, progress);
-            var unknown = inventory.All;
+            var pendingHashes = await LoadPendingHashesAsync(HashGuessDomain.Lcu, rootDirectory, cancellationToken, null, progress);
+            var unknown = pendingHashes;
             int initial = unknown.Count;
             HashGuessEngine engine = null;
             var runResult = await RunWithCancellationPersistenceAsync(() => Task.Run(() =>
@@ -793,17 +777,14 @@ namespace AssetsManager.Services.Hashes
                     .OrderBy(value => value.Path, StringComparer.OrdinalIgnoreCase)
                     .ToList();
                 return (matches, checkedCandidates, engine.UnknownHashes);
-            }, cancellationToken), () => engine, HashGuessDomain.Lcu, inventory);
+            }, cancellationToken), () => engine, HashGuessDomain.Lcu);
 
             var matches = runResult.Item1;
             int checkedCandidates = runResult.Item2;
             var remainingUnknowns = runResult.Item3;
             await PersistGuessingRunAsync(
                 HashGuessDomain.Lcu,
-                matches,
                 remainingUnknowns,
-                inventory.Current,
-                inventory.PatchFingerprint,
                 cancellationToken);
             return new HashGuessRunResult
             {
@@ -820,8 +801,8 @@ namespace AssetsManager.Services.Hashes
             CancellationToken cancellationToken,
             IProgress<HashGuessMatch> matchProgress = null)
         {
-            var inventory = await LoadPersistedInventoryAsync(HashGuessDomain.Lcu, rootDirectory, cancellationToken, null, progress);
-            var unknown = inventory.All;
+            var pendingHashes = await LoadPendingHashesAsync(HashGuessDomain.Lcu, rootDirectory, cancellationToken, null, progress);
+            var unknown = pendingHashes;
             int initial = unknown.Count;
             HashGuessEngine engine = null;
             var runResult = await RunWithCancellationPersistenceAsync(() => Task.Run(() =>
@@ -831,12 +812,12 @@ namespace AssetsManager.Services.Hashes
                 long checkedCandidates = _lcuGuesser.RunV1PathPatterns(engine, progress, cancellationToken);
                 var matches = engine.Matches.Values.OrderBy(value => value.Path, StringComparer.OrdinalIgnoreCase).ToList();
                 return (matches, checkedCandidates, engine.UnknownHashes);
-            }, cancellationToken), () => engine, HashGuessDomain.Lcu, inventory);
+            }, cancellationToken), () => engine, HashGuessDomain.Lcu);
 
             var matches = runResult.Item1;
             long checkedCandidates = runResult.Item2;
             var remainingUnknowns = runResult.Item3;
-            await PersistGuessingRunAsync(HashGuessDomain.Lcu, matches, remainingUnknowns, inventory.Current, inventory.PatchFingerprint, cancellationToken);
+            await PersistGuessingRunAsync(HashGuessDomain.Lcu, remainingUnknowns, cancellationToken);
             return new HashGuessRunResult { Domain = HashGuessDomain.Lcu, UnknownHashesAtStart = initial, ScannedChunks = checkedCandidates, Matches = matches };
         }
 
@@ -847,8 +828,8 @@ namespace AssetsManager.Services.Hashes
             IProgress<HashGuessMatch> matchProgress = null,
             IReadOnlySet<string> selectedSubMethods = null)
         {
-            var inventory = await LoadPersistedInventoryAsync(HashGuessDomain.Game, rootDirectory, cancellationToken, null, progress);
-            var unknown = inventory.All;
+            var pendingHashes = await LoadPendingHashesAsync(HashGuessDomain.Game, rootDirectory, cancellationToken, null, progress);
+            var unknown = pendingHashes;
             int initial = unknown.Count;
             HashGuessEngine engine = null;
             var runResult = await RunWithCancellationPersistenceAsync(() => Task.Run(async () =>
@@ -859,12 +840,12 @@ namespace AssetsManager.Services.Hashes
                     engine, rootDirectory, progress, cancellationToken, selectedSubMethods);
                 var matches = engine.Matches.Values.OrderBy(value => value.Path, StringComparer.OrdinalIgnoreCase).ToList();
                 return (matches, checkedCandidates, engine.UnknownHashes);
-            }, cancellationToken), () => engine, HashGuessDomain.Game, inventory);
+            }, cancellationToken), () => engine, HashGuessDomain.Game);
 
             var matches = runResult.Item1;
             int checkedCandidates = runResult.Item2;
             var remainingUnknowns = runResult.Item3;
-            await PersistGuessingRunAsync(HashGuessDomain.Game, matches, remainingUnknowns, inventory.Current, inventory.PatchFingerprint, cancellationToken);
+            await PersistGuessingRunAsync(HashGuessDomain.Game, remainingUnknowns, cancellationToken);
             return new HashGuessRunResult { Domain = HashGuessDomain.Game, UnknownHashesAtStart = initial, ScannedChunks = checkedCandidates, Matches = matches };
         }
 
@@ -874,8 +855,8 @@ namespace AssetsManager.Services.Hashes
             CancellationToken cancellationToken,
             IProgress<HashGuessMatch> matchProgress = null)
         {
-            var inventory = await LoadPersistedInventoryAsync(HashGuessDomain.Game, rootDirectory, cancellationToken, null, progress);
-            var unknown = inventory.All;
+            var pendingHashes = await LoadPendingHashesAsync(HashGuessDomain.Game, rootDirectory, cancellationToken, null, progress);
+            var unknown = pendingHashes;
             int initial = unknown.Count;
             HashGuessEngine engine = null;
             var runResult = await RunWithCancellationPersistenceAsync(() => Task.Run(() =>
@@ -885,12 +866,12 @@ namespace AssetsManager.Services.Hashes
                 int checkedCandidates = _gameGuesser.GuessEsportsBanners(engine, progress, cancellationToken);
                 var matches = engine.Matches.Values.OrderBy(value => value.Path, StringComparer.OrdinalIgnoreCase).ToList();
                 return (matches, checkedCandidates, engine.UnknownHashes);
-            }, cancellationToken), () => engine, HashGuessDomain.Game, inventory);
+            }, cancellationToken), () => engine, HashGuessDomain.Game);
 
             var matches = runResult.Item1;
             int checkedCandidates = runResult.Item2;
             var remainingUnknowns = runResult.Item3;
-            await PersistGuessingRunAsync(HashGuessDomain.Game, matches, remainingUnknowns, inventory.Current, inventory.PatchFingerprint, cancellationToken);
+            await PersistGuessingRunAsync(HashGuessDomain.Game, remainingUnknowns, cancellationToken);
             return new HashGuessRunResult { Domain = HashGuessDomain.Game, UnknownHashesAtStart = initial, ScannedChunks = checkedCandidates, Matches = matches };
         }
 
@@ -901,8 +882,8 @@ namespace AssetsManager.Services.Hashes
             IProgress<HashGuessMatch> matchProgress = null,
             IReadOnlySet<string> selectedSubMethods = null)
         {
-            var inventory = await LoadPersistedInventoryAsync(HashGuessDomain.Game, rootDirectory, cancellationToken, null, progress);
-            var unknown = inventory.All;
+            var pendingHashes = await LoadPendingHashesAsync(HashGuessDomain.Game, rootDirectory, cancellationToken, null, progress);
+            var unknown = pendingHashes;
             int initial = unknown.Count;
             HashGuessEngine engine = null;
             var runResult = await RunWithCancellationPersistenceAsync(() => Task.Run(() =>
@@ -912,16 +893,16 @@ namespace AssetsManager.Services.Hashes
                 int checkedCandidates = _gameGuesser.RunCustomAttacks(engine, progress, cancellationToken, selectedSubMethods, rootDirectory);
                 var matches = engine.Matches.Values.OrderBy(value => value.Path, StringComparer.OrdinalIgnoreCase).ToList();
                 return (matches, checkedCandidates, engine.UnknownHashes);
-            }, cancellationToken), () => engine, HashGuessDomain.Game, inventory);
+            }, cancellationToken), () => engine, HashGuessDomain.Game);
 
             var matches = runResult.Item1;
             int checkedCandidates = runResult.Item2;
             var remainingUnknowns = runResult.Item3;
-            await PersistGuessingRunAsync(HashGuessDomain.Game, matches, remainingUnknowns, inventory.Current, inventory.PatchFingerprint, cancellationToken);
+            await PersistGuessingRunAsync(HashGuessDomain.Game, remainingUnknowns, cancellationToken);
             return new HashGuessRunResult { Domain = HashGuessDomain.Game, UnknownHashesAtStart = initial, ScannedChunks = checkedCandidates, Matches = matches };
         }
 
-        private async Task<HashUnknownInventory> LoadPersistedInventoryAsync(
+        private async Task<HashSet<ulong>> LoadPendingHashesAsync(
             HashGuessDomain domain,
             string rootDirectory,
             CancellationToken cancellationToken,
@@ -929,8 +910,7 @@ namespace AssetsManager.Services.Hashes
             IProgress<HashGuessProgress> progress = null)
         {
             await _hashResolverService.LoadAllHashesAsync();
-            var inventory = await _store.LoadUnknownInventoryAsync(domain, cancellationToken);
-            var unknownHashes = inventory?.All ?? await _store.LoadUnknownHashesAsync(domain, cancellationToken);
+            var unknownHashes = await _store.LoadUnknownHashesAsync(domain, cancellationToken);
             unknownHashes.RemoveWhere(hash => _hashResolverService.IsKnownHash(hash));
             if (sessionResolved != null)
             {
@@ -941,15 +921,10 @@ namespace AssetsManager.Services.Hashes
             {
                 HashGuesser guesser = CreateWadGuesser(domain);
                 string[] wadPaths = guesser.FindWads(rootDirectory);
-                return await BuildUnknownInventoryAsync(domain, wadPaths, cancellationToken, sessionResolved, progress);
+                return await BuildPendingHashesAsync(domain, wadPaths, cancellationToken, sessionResolved, progress);
             }
 
-            return new HashUnknownInventory
-            {
-                All = unknownHashes,
-                Current = inventory?.Current.Intersect(unknownHashes).ToHashSet() ?? unknownHashes.ToHashSet(),
-                PatchFingerprint = inventory?.PatchFingerprint ?? string.Empty
-            };
+            return unknownHashes;
         }
 
         private static HashSet<ulong> CreateSessionPending(IEnumerable<ulong> hashes, ISet<ulong> sessionResolved)
@@ -960,7 +935,7 @@ namespace AssetsManager.Services.Hashes
             return pending;
         }
 
-        private async Task<HashUnknownInventory> BuildUnknownInventoryAsync(
+        private async Task<HashSet<ulong>> BuildPendingHashesAsync(
             HashGuessDomain domain,
             IEnumerable<string> wadPaths,
             CancellationToken cancellationToken,
@@ -989,16 +964,14 @@ namespace AssetsManager.Services.Hashes
             if (sessionResolved != null)
             {
                 pending.ExceptWith(sessionResolved);
-                current.ExceptWith(sessionResolved);
             }
 
-            string fingerprint = $"{domain}:{wadInventory.ChunkCount}:{wadInventory.HashXor:x16}:{wadInventory.HashSum:x16}";
-            return new HashUnknownInventory { All = pending, Current = current, PatchFingerprint = fingerprint };
+            return pending;
         }
 
-        public Task<HashUnknownSummary> GetUnknownSummaryAsync(HashGuessDomain domain, CancellationToken cancellationToken)
+        public Task<int> GetUnknownCountAsync(HashGuessDomain domain, CancellationToken cancellationToken)
         {
-            return _store.LoadUnknownSummaryAsync(domain, cancellationToken);
+            return _store.LoadUnknownCountAsync(domain, cancellationToken);
         }
 
     }

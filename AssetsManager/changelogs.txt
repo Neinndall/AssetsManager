@@ -19,6 +19,7 @@ Improvements
   - Hash Guessing Lab / GAME Basic finds Jade child-model textures that retain their parent character names.
 
 Changes
+  - Hash Guessing Lab / GAME and LCU keep one pending list across patches and show a single unknown count.
 
 Bug Fixes
   - Explorer / INIBIN and TROYBIN previews preserve property hashes instead of showing unrelated BIN field names.
