@@ -6,6 +6,7 @@ New Features
   - Explorer / Preview, compare, and export INIBIN files as JSON.
 
 Improvements
+  - Hash Guessing Lab / GAME and LCU show resolved and remaining counts for the latest search.
   - Hash Guessing Lab / Dynamic texture searches share filename checks across unresolved links without narrowing coverage.
   - Hash Guessing Lab / Banner event patterns preserve the candidate budget of existing vocabulary searches.
   - Hash Guessing Lab / GAME Basic derives cross-stage shader variants from known shader stems.

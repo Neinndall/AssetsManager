@@ -32,6 +32,7 @@ namespace AssetsManager.Views
         private readonly List<HashMethodItemModel> _allMethods = new();
         private CancellationTokenSource _cancellationTokenSource;
         private bool _isUpdatingResultsColumns;
+        private readonly Dictionary<HashGuessDomain, int> _lastResolvedCounts = new();
 
         public HashGuessingWindow(
             HashGuessingService hashGuessingService,
@@ -392,8 +393,7 @@ namespace AssetsManager.Views
                     var count = await Task.Run(() => _hashGuessingService.GetUnknownCountAsync(domain, CancellationToken.None));
                     if (DomainSelector != null && DomainSelector.SelectedIndex == selectedIndex)
                     {
-                        TxtUnknownCount.Text = $"{count:N0} unknowns";
-                        TxtUnknownBreakdown.Text = string.Empty;
+                        ShowLiveUnknownCount(count, _lastResolvedCounts.GetValueOrDefault(domain));
                     }
                 }
                 else
@@ -424,8 +424,10 @@ namespace AssetsManager.Views
 
         private void ShowLiveUnknownCount(int remaining, int resolved)
         {
+            var domain = DomainSelector.SelectedIndex == 0 ? HashGuessDomain.Game : HashGuessDomain.Lcu;
+            _lastResolvedCounts[domain] = resolved;
             TxtUnknownCount.Text = $"{remaining:N0} unknowns";
-            TxtUnknownBreakdown.Text = $"Resolved: {resolved:N0} · Pending: {remaining:N0}";
+            TxtUnknownBreakdown.Text = $"Resolved: {resolved:N0} · Remaining: {remaining:N0}";
         }
 
         private void ResultsListView_Loaded(object sender, RoutedEventArgs e)
@@ -774,7 +776,7 @@ namespace AssetsManager.Views
                 if (remaining.HasValue)
                     sessionTargets = Math.Max(sessionTargets, remaining.Value + foundMatches);
 
-                if (sessionTargets > 0)
+                if (sessionTargets > 0 || remaining.HasValue)
                 {
                     int unresolved = Math.Max(0, sessionTargets - foundMatches);
                     ShowLiveUnknownCount(unresolved, foundMatches);
