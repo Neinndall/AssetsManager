@@ -68,6 +68,57 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer
             Assert.Equal(1, SknMeshDiffAnalyzer.GetTriangleCount(added));
         }
 
+        [Fact]
+        public void LocalEditPartitionsTargetIntoCommonAndChangedTriangles()
+        {
+            Point3D[] original = { new(0, 0, 0), new(1, 0, 0), new(0, 1, 0), new(1, 1, 0) };
+            Point3D[] edited = { new(0, 0, 0), new(1, 0, 0), new(0, 1, 0), new(2, 1, 0) };
+            var oldMesh = CreateMesh(original, 0, 1, 2, 1, 3, 2);
+            var newMesh = CreateMesh(edited, 0, 1, 2, 1, 3, 2);
+
+            var common = SknMeshDiffAnalyzer.ExtractCommonMesh(oldMesh, newMesh);
+            var added = SknMeshDiffAnalyzer.ExtractDifferenceMesh(oldMesh, newMesh);
+            var removed = SknMeshDiffAnalyzer.ExtractDifferenceMesh(newMesh, oldMesh);
+
+            Assert.Equal(1, SknMeshDiffAnalyzer.GetTriangleCount(common));
+            Assert.Equal(1, SknMeshDiffAnalyzer.GetTriangleCount(added));
+            Assert.Equal(1, SknMeshDiffAnalyzer.GetTriangleCount(removed));
+            Assert.Contains(edited[3], added.Positions);
+            Assert.DoesNotContain(edited[3], common.Positions);
+            Assert.Contains(original[3], removed.Positions);
+            Assert.False(SknMeshDiffAnalyzer.AreEquivalent(common, added));
+        }
+
+        [Fact]
+        public void CommonSurfaceConsumesDuplicateTrianglesAndPreservesTargetAttributes()
+        {
+            Point3D[] points = { new(0, 0, 0), new(1, 0, 0), new(0, 1, 0) };
+            var oldMesh = CreateMesh(points, 0, 1, 2);
+            var newMesh = CreateMesh(points, 0, 1, 2, 0, 1, 2);
+            for (int i = 0; i < points.Length; i++)
+            {
+                newMesh.Normals.Add(new Vector3D(0, 0, 1));
+                newMesh.TextureCoordinates.Add(new System.Windows.Point(i / 2.0, 0));
+            }
+
+            var common = SknMeshDiffAnalyzer.ExtractCommonMesh(oldMesh, newMesh);
+            Assert.Equal(1, SknMeshDiffAnalyzer.GetTriangleCount(common));
+            Assert.Equal(newMesh.Normals, common.Normals);
+            Assert.Equal(newMesh.TextureCoordinates, common.TextureCoordinates);
+            Assert.Equal(1, SknMeshDiffAnalyzer.GetTriangleCount(
+                SknMeshDiffAnalyzer.ExtractDifferenceMesh(oldMesh, newMesh)));
+        }
+
+        [Fact]
+        public void ReorderedUnchangedSurfaceHasNoChangedTriangles()
+        {
+            var oldMesh = CreateMesh(new Point3D[] { new(0, 0, 0), new(1, 0, 0), new(0, 1, 0) }, 0, 1, 2);
+            var newMesh = CreateMesh(new Point3D[] { new(0, 1, 0), new(0, 0, 0), new(1, 0, 0) }, 2, 1, 0);
+            Assert.True(SknMeshDiffAnalyzer.AreEquivalent(newMesh,
+                SknMeshDiffAnalyzer.ExtractCommonMesh(oldMesh, newMesh)));
+            Assert.Null(SknMeshDiffAnalyzer.ExtractDifferenceMesh(oldMesh, newMesh));
+        }
+
         private static MeshGeometry3D CreateMesh(Point3D[] positions, params int[] indices)
         {
             var mesh = new MeshGeometry3D();

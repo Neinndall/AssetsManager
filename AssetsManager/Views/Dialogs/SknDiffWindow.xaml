@@ -33,7 +33,7 @@
                 <!-- Left: Title -->
                 <StackPanel Grid.Column="0" VerticalAlignment="Center">
                     <TextBlock Text="GEOMETRIC DIFF" Style="{StaticResource ToolSectionLabel}" Margin="0,0,0,2"/>
-                    <TextBlock Text="Topology &amp; Vertex Validation" FontSize="10" Foreground="{StaticResource TextPrimary}" Opacity="0.8"/>
+                    <TextBlock Text="Positions &amp; triangle topology" FontSize="10" Foreground="{StaticResource TextPrimary}" Opacity="0.8"/>
                 </StackPanel>
 
                 <!-- Center: Metrics Badges -->
@@ -281,22 +281,30 @@
 
         <!-- 3. Footer -->
         <Border Grid.Row="2" Background="{StaticResource CardBackground}" CornerRadius="0,0,11,11" Padding="24,12" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0">
-            <StackPanel Orientation="Horizontal">
-                <icons:MaterialIcon Kind="Palette" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" Margin="0,0,8,0"/>
-                <TextBlock Text="LEGEND:" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,12,0"/>
-                
-                <Border Background="DodgerBlue" CornerRadius="3" Width="10" Height="10" Margin="0,0,6,0"/>
-                <TextBlock Text="Modified Part" FontSize="10" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="0,0,16,0"/>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Orientation="Horizontal" ToolTip="Moved or retriangulated surfaces appear in both OLD-only and NEW-only colors.">
+                    <icons:MaterialIcon Kind="Palette" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" Margin="0,0,8,0"/>
+                    <TextBlock Text="LEGEND:" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,12,0"/>
 
-                <Border Background="Green" CornerRadius="3" Width="10" Height="10" Margin="0,0,6,0"/>
-                <TextBlock Text="New Part" FontSize="10" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="0,0,16,0"/>
+                    <Border Background="#666E7A" CornerRadius="3" Width="10" Height="10" Margin="0,0,6,0"/>
+                    <TextBlock Text="Unchanged" FontSize="10" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="0,0,16,0"/>
 
-                <Border Background="Red" CornerRadius="3" Width="10" Height="10" Margin="0,0,6,0"/>
-                <TextBlock Text="Removed Part" FontSize="10" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="0,0,24,0"/>
+                    <Border Background="#26E666" CornerRadius="3" Width="10" Height="10" Margin="0,0,6,0"/>
+                    <TextBlock Text="NEW-only surface" FontSize="10" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="0,0,16,0"/>
 
-                <icons:MaterialIcon Kind="Sync" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" Margin="0,0,8,0" Opacity="0.7"/>
-                <TextBlock Text="Cameras are synchronized" FontSize="10" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
-            </StackPanel>
+                    <Border Background="#FF3340" CornerRadius="3" Width="10" Height="10" Margin="0,0,6,0"/>
+                    <TextBlock Text="OLD-only surface" FontSize="10" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="0,0,24,0"/>
+
+                </StackPanel>
+                <TextBlock x:Name="DiffSummaryLabel" Grid.Column="1" Margin="16,0,0,0"
+                           Foreground="{StaticResource TextMuted}" FontSize="10" VerticalAlignment="Center"
+                           TextAlignment="Right" TextTrimming="CharacterEllipsis"
+                           ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+            </Grid>
         </Border>
     </Grid>
 </base:HudWindow>

@@ -244,6 +244,32 @@
 
                             <Rectangle Width="1" Fill="#22FFFFFF" Margin="2,7" VerticalAlignment="Stretch"/>
 
+                            <!-- Surface filters share the same state across both viewports. -->
+                            <Border Background="#1AFFFFFF" CornerRadius="11" Padding="2,1" Margin="2,0">
+                                <StackPanel Orientation="Horizontal">
+                                    <ToggleButton x:Name="ShowAddedToggle" Style="{StaticResource TransparentIconToggleButton}"
+                                                  IsChecked="True" Click="SurfaceFilters_Click" Width="30" Height="30"
+                                                  ToolTip="Show NEW-only surfaces (green), including moved or retriangulated triangles"
+                                                  AutomationProperties.Name="Show NEW-only surfaces">
+                                        <materialIcons:MaterialIcon Kind="Plus" Width="13" Height="13"/>
+                                    </ToggleButton>
+                                    <ToggleButton x:Name="ShowRemovedToggle" Style="{StaticResource TransparentIconToggleButton}"
+                                                  IsChecked="True" Click="SurfaceFilters_Click" Width="30" Height="30"
+                                                  ToolTip="Show OLD-only surfaces (red), including moved or retriangulated triangles"
+                                                  AutomationProperties.Name="Show OLD-only surfaces">
+                                        <materialIcons:MaterialIcon Kind="Minus" Width="13" Height="13"/>
+                                    </ToggleButton>
+                                    <ToggleButton x:Name="ShowContextToggle" Style="{StaticResource TransparentIconToggleButton}"
+                                                  IsChecked="True" Click="SurfaceFilters_Click" Width="30" Height="30"
+                                                  ToolTip="Show unchanged context (gray); Ghost mode fades this context"
+                                                  AutomationProperties.Name="Show unchanged context">
+                                        <materialIcons:MaterialIcon Kind="EyeOutline" Width="13" Height="13"/>
+                                    </ToggleButton>
+                                </StackPanel>
+                            </Border>
+
+                            <Rectangle Width="1" Fill="#22FFFFFF" Margin="2,7" VerticalAlignment="Stretch"/>
+
                             <!-- Group 4: Visual Modes (Ghost Mode) -->
                             <Border Background="#1AFFFFFF" CornerRadius="11" Padding="2,1" Margin="2,0">
                                 <StackPanel Orientation="Horizontal">
@@ -251,7 +277,7 @@
                                                   Style="{StaticResource TransparentIconToggleButton}"
                                                   IsChecked="False"
                                                   Click="GhostModeToggle_Click"
-                                                  ToolTip="Toggle Ghost / X-Ray Mode"
+                                                  ToolTip="Fade unchanged context"
                                                   Width="30" Height="30">
                                         <materialIcons:MaterialIcon Kind="PaletteOutline" Width="13" Height="13"/>
                                     </ToggleButton>

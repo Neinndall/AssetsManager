@@ -1,11 +1,14 @@
 AssetsManager - League of Legends | v4.1.0.4
 
 HOTFIX UPDATE
+This update adds INIBIN previews, comparisons, and JSON exports, and makes SKN model differences easier to inspect with surface filters and separate triangle counts. It expands GAME hash search coverage, unifies pending hashes across patches, and improves search counters. It also fixes image atlas decoding, text previews, and persistent skin effects on map characters.
 
 New Features
   - Explorer / Preview, compare, and export INIBIN files as JSON.
+  - SKN Diff / Show or hide OLD-only surfaces, NEW-only surfaces, and unchanged context with synchronized toolbar toggles.
 
 Improvements
+  - SKN Diff / Highlight changed triangles precisely, fade unchanged context with Ghost mode, and show separate OLD/NEW triangle counts in the footer.
   - Hash Guessing Lab / GAME and LCU show resolved and remaining counts for the latest search.
   - Hash Guessing Lab / Dynamic texture searches share filename checks across unresolved links without narrowing coverage.
   - Hash Guessing Lab / Banner event patterns preserve the candidate budget of existing vocabulary searches.
