@@ -12,13 +12,25 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
     internal sealed partial class GameHashGuesser
     {
         private const int EsportsBannerSingleCandidateBudget = 2_000_000;
+        private const int EsportsBannerEventCandidateBudget = 2_000_000;
         private const int EsportsBannerCompoundCandidateBudget = 10_000_000;
         private const int EsportsBannerDoubleCandidateBudget = 2_000_000;
         private const int EsportsBannerInsertionCandidateBudget = 750_000;
         private const int EsportsBannerDoubleWordLimit = 96;
         private const string EsportsBannerPathPrefix = "assets/esports/sponsoredbanners/";
         private static readonly string[] EsportsBannerFallbackWords =
-            { "portuguesa", "msi", "2026", "hepsiburada", "kitkat", "tsl" };
+            {
+                "portuguesa", "msi", "2025", "2026", "25", "26", "hepsiburada", "kitkat", "tsl",
+                "fst", "first", "stand", "lol", "esports", "ewc", "lta", "lcp", "v1", "v2", "v3"
+            };
+        private static readonly string[] EsportsBannerEventPrefixes =
+        {
+            "fst", "msi", "worlds", "ewc", "lck", "lec", "lcs", "lta", "lcp", "cblol", "pcs", "vcs", "ljl", "lla"
+        };
+        private static readonly string[] EsportsBannerVersionSuffixes =
+        {
+            "2025", "2026", "25", "26", "v1", "v2", "v3", "01", "02"
+        };
 
         internal static IReadOnlyList<string> BuildEsportsBannerWordlist(IEnumerable<string> paths)
         {
@@ -152,6 +164,42 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                 }
             }
             int buildListCount = checkedCandidates;
+            int eventCandidateLimit = checkedCandidates + EsportsBannerEventCandidateBudget;
+            const string eventStage = "GAME Banner: event and version patterns";
+            progress?.Report(engine.CreateProgress(eventStage, checkedCandidates));
+            var middleStems = new HashSet<string>(StringComparer.Ordinal);
+            foreach (string name in names)
+            {
+                int dot = name.LastIndexOf('.');
+                string stem = dot > 0 ? name[..dot] : name;
+                string[] parts = stem.Split('_', StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length >= 2)
+                {
+                    middleStems.Add(string.Join('_', parts[1..]));
+                    if (parts.Length >= 3)
+                        middleStems.Add(string.Join('_', parts[1..^1]));
+                }
+            }
+            foreach (string directory in paths.Select(path => path[..(path.LastIndexOf('/') + 1)])
+                         .Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal))
+            {
+                if (checkedCandidates >= eventCandidateLimit || engine.RemainingUnknownCount == 0) break;
+                foreach (string eventPrefix in EsportsBannerEventPrefixes)
+                foreach (string middle in middleStems)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (checkedCandidates >= eventCandidateLimit || engine.RemainingUnknownCount == 0) break;
+                    string prefix = $"{directory}{eventPrefix}_{middle}_";
+                    engine.CheckNormalizedParts(prefix.AsSpan(0, prefix.Length - 1), "", ".tex", HashGuessStrategy.BannerVariant, eventStage);
+                    checkedCandidates++;
+                    foreach (string version in EsportsBannerVersionSuffixes)
+                    {
+                        if (checkedCandidates >= eventCandidateLimit || engine.RemainingUnknownCount == 0) break;
+                        engine.CheckNormalizedParts(prefix, version, ".tex", HashGuessStrategy.BannerVariant, eventStage);
+                        checkedCandidates++;
+                    }
+                }
+            }
             int compoundBudget = EsportsBannerCompoundCandidateBudget;
             var passes = new[]
             {

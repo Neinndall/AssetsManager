@@ -193,6 +193,88 @@ public class GameMaterialTextureTests
             "data/characters/target/skins/skin9.bin", "Target.wad.client", 77, CancellationToken.None);
         Assert.Empty(engine.Matches);
     }
+    [Fact]
+    public void DynamicOptionsShareOneBasenamePassAndKeepOtherLinksPending()
+    {
+        const string directory = "assets/characters/target/skins/skin9/";
+        var index = new GameMaterialTextureIndex(new[]
+        {
+            "assets/characters/donor/skins/base/a.tex",
+            "assets/characters/donor/skins/base/b.tex",
+            "assets/characters/donor/skins/base/c.tex"
+        }, CancellationToken.None);
+        var tree = DynamicMaterial(directory + "a.tex", directory + "c.tex", directory + "c.tex");
+        var engine = Engine(directory + "a.tex", directory + "b.tex", directory + "c.tex");
+        const string source = "data/characters/target/skins/skin9.bin";
+        Assert.True(GameMaterialTextureIndex.HasUnresolvedDynamicMaterialContext(engine, tree, source, CancellationToken.None));
+
+        Assert.Equal(3L, index.GuessDynamicMaterialOptions(engine, tree, source, "Target.wad.client", 77, CancellationToken.None));
+
+        Assert.Equal(3L, engine.CheckedCandidates);
+        Assert.Equal(2, engine.Matches.Count);
+        Assert.Equal(XxHash64Ext.Hash(directory + "b.tex"), Assert.Single(engine.UnknownHashes));
+        Assert.All(engine.Matches.Values, match =>
+        {
+            Assert.Equal("Target.wad.client", match.SourceWadPath);
+            Assert.Equal(77UL, match.SourceChunkHash);
+        });
+        Assert.False(GameMaterialTextureIndex.HasUnresolvedDynamicMaterialContext(engine, tree, source, CancellationToken.None));
+        Assert.Equal(0L, index.GuessDynamicMaterialOptions(engine, tree, source, "Target.wad.client", 77, CancellationToken.None));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void DynamicOptionsResumeInterruptedTargetsAndAcceptLaterLinks(bool cancelAfterMatch)
+    {
+        const string directory = "assets/characters/target/skins/skin9/";
+        const string source = "data/characters/target/skins/skin9.bin";
+        var index = new GameMaterialTextureIndex(new[]
+        {
+            "assets/characters/donor/skins/base/a.tex",
+            "assets/characters/donor/skins/base/b.tex",
+            "assets/characters/donor/skins/base/z.tex"
+        }, CancellationToken.None);
+        var tree = DynamicMaterial(directory + "a.tex", directory + "z.tex");
+        using var cancellation = new CancellationTokenSource();
+        var engine = new HashGuessEngine(HashGuessDomain.Game,
+            new HashSet<ulong>(new[] { "a.tex", "b.tex", "z.tex" }.Select(name => XxHash64Ext.Hash(directory + name))),
+            match => { if (cancelAfterMatch && match.Path == directory + "a.tex") cancellation.Cancel(); });
+
+        if (cancelAfterMatch)
+            Assert.Throws<OperationCanceledException>(() => index.GuessDynamicMaterialOptions(engine, tree, source,
+                "one", 77, cancellation.Token));
+        else
+            Assert.Equal(1L, index.GuessDynamicMaterialOptions(engine, tree, source, "one", 77, CancellationToken.None, 1));
+
+        Assert.Single(engine.Matches);
+        Assert.Equal(3L, index.GuessDynamicMaterialOptions(engine, tree, source, "two", 88, CancellationToken.None));
+        Assert.Equal(2, engine.Matches.Count);
+        Assert.Equal(XxHash64Ext.Hash(directory + "b.tex"), Assert.Single(engine.UnknownHashes));
+        Assert.Equal(2L, index.GuessDynamicMaterialOptions(engine, DynamicMaterial(directory + "b.tex"), source,
+            "three", 99, CancellationToken.None));
+        Assert.Empty(engine.UnknownHashes);
+    }
+
+    private static BinTree DynamicMaterial(params string[] paths) => new(new[]
+    {
+        new BinTreeObject("Synthetic/Dynamic", "StaticMaterialDef", new BinTreeProperty[]
+        {
+            new BinTreeEmbedded(Fnv1a.HashLower("dynamicMaterial"), Fnv1a.HashLower("DynamicMaterialDef"), new BinTreeProperty[]
+            {
+                new BinTreeUnorderedContainer(Fnv1a.HashLower("textures"), BinPropertyType.Embedded, new[]
+                {
+                    new BinTreeEmbedded(0, Fnv1a.HashLower("DynamicMaterialTextureSwapDef"), new BinTreeProperty[]
+                    {
+                        new BinTreeUnorderedContainer(Fnv1a.HashLower("options"), BinPropertyType.Embedded,
+                            paths.Select(path => new BinTreeEmbedded(0, Fnv1a.HashLower("DynamicMaterialTextureSwapOption"),
+                                new BinTreeProperty[] { new BinTreeWadChunkLink(Fnv1a.HashLower("TextureName"), XxHash64Ext.Hash(path)) })))
+                    })
+                })
+            })
+        })
+    }, Array.Empty<string>());
+
     private static GameMaterialTextureIndex Index() => new(new[]
     {
         "assets/characters/donor/skins/skin7/donor_skin7_body_flowmap_tx_cm.tex"

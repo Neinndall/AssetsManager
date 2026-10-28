@@ -99,7 +99,8 @@ namespace AssetsManager.Services.Formatting
                     formattedContent = await GetBinRitobinStringAsync(data);
                     break;
                 case "troybin":
-                    formattedContent = await GetTroybinJsonStringAsync(data);
+                case "inibin":
+                    formattedContent = await GetInibinJsonStringAsync(data, dataType);
                     break;
                 case "preload":
                     formattedContent = await GetPreloadJsonStringAsync(data);
@@ -237,7 +238,7 @@ namespace AssetsManager.Services.Formatting
             return await _jsonFormatterService.FormatJsonAsync(rawJson);
         }
 
-        private async Task<string> GetTroybinJsonStringAsync(byte[] data)
+        private async Task<string> GetInibinJsonStringAsync(byte[] data, string dataType)
         {
             if (data == null || data.Length == 0)
             {
@@ -246,9 +247,9 @@ namespace AssetsManager.Services.Formatting
 
             try
             {
-                using var troybinStream = new MemoryStream(data);
+                using var inputStream = new MemoryStream(data);
                 using var jsonStream = new MemoryStream();
-                var inibinFile = new LeagueToolkit.IO.Inibin.InibinFile(troybinStream);
+                var inibinFile = new LeagueToolkit.IO.Inibin.InibinFile(inputStream);
                 await _troybinParser.WriteInibinAsJsonAsync(jsonStream, inibinFile);
                 jsonStream.Position = 0;
                 using var reader = new StreamReader(jsonStream);
@@ -256,8 +257,8 @@ namespace AssetsManager.Services.Formatting
             }
             catch (Exception ex)
             {
-                _logService.LogError(ex, "Failed to parse .troybin file content.");
-                return "Error parsing .troybin file. See logs for details.";
+                _logService.LogError(ex, $"Failed to parse .{dataType} file content.");
+                return $"Error parsing .{dataType} file. See logs for details.";
             }
         }
 

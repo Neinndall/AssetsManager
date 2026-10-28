@@ -576,13 +576,16 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                         if (pathBuf.TryWrite(CultureInfo.InvariantCulture, $"{marker}jade_{character}{subpath}", out w))
                             if (!CheckSpan(pathBuf[..w])) goto ChampionDone;
 
-                        // Candidate 2: if file stem starts with character, prefix with jade_
+                        // Child models can retain the parent character's name in their filenames.
                         int lastSlash = subpath.LastIndexOf('/');
                         if (lastSlash >= 0)
                         {
                             string folder = subpath[..(lastSlash + 1)];
                             string filename = subpath[(lastSlash + 1)..];
-                            if (filename.StartsWith(character, StringComparison.OrdinalIgnoreCase))
+                            int nameSeparator = filename.IndexOf('_');
+                            if (filename.StartsWith(character, StringComparison.OrdinalIgnoreCase) ||
+                                (nameSeparator > 0 && character.AsSpan().StartsWith(
+                                    filename.AsSpan(0, nameSeparator), StringComparison.OrdinalIgnoreCase)))
                             {
                                 if (pathBuf.TryWrite(CultureInfo.InvariantCulture, $"{marker}jade_{character}{folder}jade_{filename}", out w))
                                     if (!CheckSpan(pathBuf[..w])) goto ChampionDone;
@@ -857,6 +860,28 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                 // Some families add a stage whose filename is the enclosing directory name.
                 foreach (string extension in ShaderExtensions)
                     directoryShaders.Add($"{directory}/{family}{extension}");
+
+                int extDot = match.Value.LastIndexOf('.');
+                if (extDot > separator)
+                {
+                    string fileStem = match.Value[(separator + 1)..extDot];
+                    foreach (string stage in new[] { "ps", "vs", "cs" })
+                    {
+                        directoryShaders.Add($"{directory}/{fileStem}.{stage}");
+                        if (fileStem.StartsWith("ps_", StringComparison.OrdinalIgnoreCase) ||
+                            fileStem.StartsWith("vs_", StringComparison.OrdinalIgnoreCase) ||
+                            fileStem.StartsWith("cs_", StringComparison.OrdinalIgnoreCase))
+                        {
+                            directoryShaders.Add($"{directory}/{stage}_{fileStem[3..]}.{stage}");
+                        }
+                        if (fileStem.EndsWith("_ps", StringComparison.OrdinalIgnoreCase) ||
+                            fileStem.EndsWith("_vs", StringComparison.OrdinalIgnoreCase) ||
+                            fileStem.EndsWith("_cs", StringComparison.OrdinalIgnoreCase))
+                        {
+                            directoryShaders.Add($"{directory}/{fileStem[..^3]}_{stage}.{stage}");
+                        }
+                    }
+                }
             }
             AddExecutableShaderReferences(shaderPaths, rootDirectory, cancellationToken);
 

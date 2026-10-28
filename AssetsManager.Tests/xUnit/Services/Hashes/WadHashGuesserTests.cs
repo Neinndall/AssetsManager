@@ -30,14 +30,11 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
             {
                 var store = new HashGuessingStore(new DirectoriesCreator(root));
                 var pending = new HashSet<ulong> { 1, 2 };
-                var current = new HashSet<ulong> { 2 };
-                await store.SaveUnknownHashesAsync(HashGuessDomain.Lcu, pending, current, "LCU:patch", CancellationToken.None);
+                await store.SaveUnknownHashesAsync(HashGuessDomain.Lcu, pending, CancellationToken.None);
 
-                HashUnknownInventory inventory = await store.LoadUnknownInventoryAsync(HashGuessDomain.Lcu, CancellationToken.None);
+                var pendingHashes = await store.LoadUnknownHashesAsync(HashGuessDomain.Lcu, CancellationToken.None);
 
-                Assert.Equal(pending, inventory.All);
-                Assert.Equal(current, inventory.Current);
-                Assert.Equal("LCU:patch", inventory.PatchFingerprint);
+                Assert.Equal(pending, pendingHashes);
             }
             finally
             {
@@ -1858,9 +1855,43 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
                 "assets/esports/sponsoredbanners/region/2026/r_1_sponsor-brand.dds",
                 "assets/characters/outsider/forbidden_word.tex"
             });
-            Assert.Equal(new[] { "1", "2026", "brand", "hepsiburada", "kitkat", "msi", "portuguesa", "r", "region", "sponsor", "tsl" },
+            Assert.Equal(new[] { "1", "2025", "2026", "25", "26", "brand", "esports", "ewc", "first", "fst", "hepsiburada", "kitkat", "lcp", "lol", "lta", "msi", "portuguesa", "r", "region", "sponsor", "stand", "tsl", "v1", "v2", "v3" },
                 words.Order(StringComparer.Ordinal));
             Assert.Equal(words.Count, words.Distinct(StringComparer.Ordinal).Count());
+        }
+
+        [Fact]
+        public void BannerEventBudgetPreservesThePreviousVocabularyCoverage()
+        {
+            const string root = "assets/esports/sponsoredbanners/";
+            const string expected = root + "kitkat_aaa.tex";
+            var paths = Enumerable.Range(0, 7500)
+                .Select(i => root + $"team_brand{i:D5}_logo.tex")
+                .Prepend(root + "rarezone_aaa.tex").ToArray();
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, paths));
+            var engine = CreateEngine(HashGuessDomain.Game, expected);
+
+            game.GuessEsportsBanners(engine, null, CancellationToken.None);
+
+            Assert.Equal(expected, Assert.Single(engine.Matches).Value.Path);
+            Assert.Empty(engine.UnknownHashes);
+        }
+
+        [Theory]
+        [InlineData("fst_acme.tex")]
+        [InlineData("ewc_acme_26.tex")]
+        [InlineData("lcp_acme_v3.tex")]
+        public void BannerEventPatternsKeepTheirPrefixesAndVersions(string name)
+        {
+            const string root = "assets/esports/sponsoredbanners/";
+            string expected = root + name;
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[] { root + "legacy_acme_2024.tex" }));
+            var engine = CreateEngine(HashGuessDomain.Game, expected);
+
+            game.GuessEsportsBanners(engine, null, CancellationToken.None);
+
+            Assert.Equal(expected, Assert.Single(engine.Matches).Value.Path);
+            Assert.Empty(engine.UnknownHashes);
         }
 
         [Theory]
@@ -2778,6 +2809,26 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
             Assert.Equal(0, engine.RemainingUnknownCount);
             Assert.All(expected, path =>
                 Assert.Contains(engine.Matches.Values, match => match.Path == path));
+        }
+
+        [Theory]
+        [InlineData("elisespider", "skin05", "elise_skin05_spider_tx_cm.tex", 0x09f805146f223492UL)]
+        [InlineData("elisespider", "skin03", "elise_skin03_spiders_tx_cm.tex", 0x18fae15e6d220fa6UL)]
+        [InlineData("elisespiderling", "skin05", "elise_skin05_spiderling_tx_cm.tex", 0x19e1ce01a1f92515UL)]
+        [InlineData("testchild", "skin02", "test_skin02_tx_cm.tex", 0UL)]
+        public void GameJadeProjectionResolvesChildModelsUsingParentFilenames(
+            string character, string skin, string filename, ulong expectedHash)
+        {
+            string source = $"assets/characters/{character}/skins/{skin}/{filename}";
+            string expected = $"assets/characters/jade_{character}/skins/{skin}/jade_{filename}";
+            ulong target = expectedHash == 0 ? XxHash64Ext.Hash(expected) : expectedHash;
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[] { source }));
+            var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong> { target });
+
+            game.GuessCharactersFiles(engine, CancellationToken.None, new[] { character });
+
+            Assert.Equal(expected, Assert.Single(engine.Matches.Values).Path);
+            Assert.Empty(engine.UnknownHashes);
         }
 
         [Theory]

@@ -729,7 +729,14 @@ namespace AssetsManager.Views.Dialogs.Controls
 
             if (_activeSceneModel?.Parts?.Count > 0)
             {
-                Rect3D bounds = ViewerInteractionService.GetWorldBounds(_activeSceneModel);
+                // Diff surfaces are auxiliary models; retain the source extent when filters hide them.
+                Rect3D localBounds = Rect3D.Empty;
+                foreach (var part in _activeSceneModel.Parts)
+                    if (part.Geometry?.Geometry is MeshGeometry3D mesh)
+                        localBounds.Union(mesh.Bounds);
+                Rect3D bounds = localBounds.IsEmpty
+                    ? Rect3D.Empty
+                    : _activeSceneModel.UserTransformGroup.TransformBounds(localBounds);
 
                 if (!bounds.IsEmpty)
                 {
@@ -780,6 +787,29 @@ namespace AssetsManager.Views.Dialogs.Controls
             get => GhostModeToggle.IsChecked == true;
             set => GhostModeToggle.IsChecked = value;
         }
+
+        public bool ShowAddedSurfaces
+        {
+            get => ShowAddedToggle.IsChecked == true;
+            set => ShowAddedToggle.IsChecked = value;
+        }
+
+        public bool ShowRemovedSurfaces
+        {
+            get => ShowRemovedToggle.IsChecked == true;
+            set => ShowRemovedToggle.IsChecked = value;
+        }
+
+        public bool ShowUnchangedContext
+        {
+            get => ShowContextToggle.IsChecked == true;
+            set => ShowContextToggle.IsChecked = value;
+        }
+
+        public event EventHandler SurfaceFiltersChanged;
+
+        private void SurfaceFilters_Click(object sender, RoutedEventArgs e) =>
+            SurfaceFiltersChanged?.Invoke(this, EventArgs.Empty);
 
         public event EventHandler<bool> CombinedModeToggled;
         public event EventHandler<bool> AutoRotateToggled;

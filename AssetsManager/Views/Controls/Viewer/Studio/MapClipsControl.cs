@@ -94,14 +94,8 @@ namespace AssetsManager.Views.Controls.Viewer
                     selection.Group.Animation.PreparedClipFrameSeconds(selection.Clip),
                     catalog.Systems,
                     catalog.ResourceMap);
-                int resolvedIdleVfx = VfxAbilityCompositionBuilder.CountResolvedIdleEffects(
-                    catalog.IdleEffects,
-                    catalog.Systems,
-                    catalog.ResourceMap);
-                bool hasSceneVfx = composition.ResolvedCount > 0 || resolvedIdleVfx > 0;
-                IReadOnlyDictionary<uint, VfxSystemDefinition> requiredSystems = hasSceneVfx
-                    ? RequiredMapClipSystems(catalog, composition)
-                    : new Dictionary<uint, VfxSystemDefinition>();
+                IReadOnlyDictionary<uint, VfxSystemDefinition> requiredSystems = RequiredMapClipSystems(catalog, composition);
+                bool hasSceneVfx = requiredSystems.Count > 0;
 
                 bool vfxSessionReady = false;
                 string vfxFallback = null;
@@ -143,15 +137,11 @@ namespace AssetsManager.Views.Controls.Viewer
                             _vfxRenderer.SetWorldTransform(
                                 MapCharacterSemantics.VfxWorldTransform(targetPlacement.Transform));
                             int seed = unchecked((int)(selection.Clip.OwnerPathHash ^ targetPlacement.KeyHash));
-                            vfxSessionReady = _vfxRenderer.SetAnimationSession(
+                            vfxSessionReady = selection.Group.StartPreviewVfxSession(_vfxRenderer,
                                 composition,
-                                catalog.IdleEffects,
-                                catalog.Systems,
-                                catalog.ResourceMap,
                                 resources.SearchDirectory,
                                 seed,
-                                duration,
-                                catalog.OwnerSceneContext);
+                                duration);
                             if (vfxSessionReady)
                             {
                                 _vfxRenderer.SetBoneTransformSampler((time, boneName, boneHash) =>
@@ -243,7 +233,7 @@ namespace AssetsManager.Views.Controls.Viewer
             return group.Placements[0];
         }
 
-        private static IReadOnlyDictionary<uint, VfxSystemDefinition> RequiredMapClipSystems(
+        internal static IReadOnlyDictionary<uint, VfxSystemDefinition> RequiredMapClipSystems(
             MapCharacterVfxCatalog catalog,
             VfxAbilityComposition composition)
         {
@@ -346,7 +336,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 _mapAnimationVisibilityTimeline,
                 folded);
             _activeMapCharacterGroup.SetPreviewHiddenSubmeshes(hidden);
-            _vfxRenderer?.SetOwnerHiddenSubmeshes(hidden);
+            _vfxRenderer?.SetOwnerHiddenSubmeshes(_activeMapCharacterGroup.PreviewHiddenSubmeshes);
             UpdateMapCharacterClipVfxPose();
         }
 

@@ -32,6 +32,7 @@ namespace AssetsManager.Views
         private readonly List<HashMethodItemModel> _allMethods = new();
         private CancellationTokenSource _cancellationTokenSource;
         private bool _isUpdatingResultsColumns;
+        private readonly Dictionary<HashGuessDomain, int> _lastResolvedCounts = new();
 
         public HashGuessingWindow(
             HashGuessingService hashGuessingService,
@@ -389,11 +390,10 @@ namespace AssetsManager.Views
                 if (selectedIndex < 2)
                 {
                     var domain = selectedIndex == 0 ? HashGuessDomain.Game : HashGuessDomain.Lcu;
-                    var summary = await Task.Run(() => _hashGuessingService.GetUnknownSummaryAsync(domain, CancellationToken.None));
+                    var count = await Task.Run(() => _hashGuessingService.GetUnknownCountAsync(domain, CancellationToken.None));
                     if (DomainSelector != null && DomainSelector.SelectedIndex == selectedIndex)
                     {
-                        TxtUnknownCount.Text = $"{summary.Total:N0} unknowns";
-                        TxtUnknownBreakdown.Text = $"Current: {summary.Current:N0} · Recent: {summary.Recent:N0}";
+                        ShowLiveUnknownCount(count, _lastResolvedCounts.GetValueOrDefault(domain));
                     }
                 }
                 else
@@ -424,8 +424,10 @@ namespace AssetsManager.Views
 
         private void ShowLiveUnknownCount(int remaining, int resolved)
         {
+            var domain = DomainSelector.SelectedIndex == 0 ? HashGuessDomain.Game : HashGuessDomain.Lcu;
+            _lastResolvedCounts[domain] = resolved;
             TxtUnknownCount.Text = $"{remaining:N0} unknowns";
-            TxtUnknownBreakdown.Text = $"Resolved: {resolved:N0} · Pending: {remaining:N0}";
+            TxtUnknownBreakdown.Text = $"Resolved: {resolved:N0} · Remaining: {remaining:N0}";
         }
 
         private void ResultsListView_Loaded(object sender, RoutedEventArgs e)
@@ -774,7 +776,7 @@ namespace AssetsManager.Views
                 if (remaining.HasValue)
                     sessionTargets = Math.Max(sessionTargets, remaining.Value + foundMatches);
 
-                if (sessionTargets > 0)
+                if (sessionTargets > 0 || remaining.HasValue)
                 {
                     int unresolved = Math.Max(0, sessionTargets - foundMatches);
                     ShowLiveUnknownCount(unresolved, foundMatches);
@@ -1150,7 +1152,7 @@ namespace AssetsManager.Views
                         uiProgress,
                         HashLabProgressUpdateInterval);
                     IProgress<HashGuessProgress> progress = scanProgressLimiter;
-                    var summary = await Task.Run(() => _hashGuessingService.ScanUnknownHashesAsync(domain, rootPath, progress, effectiveToken), effectiveToken);
+                    var count = await Task.Run(() => _hashGuessingService.ScanUnknownHashesAsync(domain, rootPath, progress, effectiveToken), effectiveToken);
                     scanProgressLimiter.Flush();
                     await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
                     stopwatch.Stop();
@@ -1158,7 +1160,7 @@ namespace AssetsManager.Views
                     _viewModel.ProgressValue = 100;
                     _viewModel.ProgressText = "100%";
                     _viewModel.IsProgressIndeterminate = false;
-                    _viewModel.StatusText = $"Completed in {elapsedTime}: Found {summary.Total:N0} unknown hashes in scope ({summary.Current:N0} in current patch).";
+                    _viewModel.StatusText = $"Completed in {elapsedTime}: {count:N0} unknown hashes pending.";
                 }
                 else
                 {

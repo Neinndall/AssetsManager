@@ -57,7 +57,8 @@ internal static class GameStructureProbeDiagnostic
             foreach (var (hash, chunk) in wad.Chunks)
             {
                 if (chunk.Compression == WadChunkCompression.Satellite || !visited.Add((hash, chunk.Checksum))) continue;
-                if (known.TryGetValue(hash, out string path) && !path.EndsWith(".bin", StringComparison.Ordinal)) continue;
+                if (known.TryGetValue(hash, out string path) && Path.HasExtension(path) &&
+                    !path.EndsWith(".bin", StringComparison.Ordinal)) continue;
                 try
                 {
                     using var owner = wad.LoadChunkDecompressed(chunk);

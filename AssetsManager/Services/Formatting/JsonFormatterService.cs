@@ -1,14 +1,23 @@
 using System;
-using System.Collections.Generic;
+using System.Globalization;
 using DiffPlex.DiffBuilder.Model;
 using System.Threading.Tasks;
 using System.Text.Json;
-using System.Text.Encodings.Web; // Needed for JavaScriptEncoder
+using System.Text.RegularExpressions;
+using System.Text.Encodings.Web;
 
 namespace AssetsManager.Services.Formatting
 {
     public class JsonFormatterService
     {
+        // Match escaped backslashes first so literal Unicode escape text is preserved.
+        private static readonly Regex UnicodeEscape = new(@"\\\\|\\u([0-9A-Fa-f]{4})", RegexOptions.Compiled);
+        private static readonly JsonSerializerOptions DisplayOptions = new()
+        {
+            WriteIndented = true,
+            Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+        };
+
         public string NormalizeTextForAlignment(DiffPaneModel paneModel, string[] fallbackLines = null)
         {
             if (paneModel == null || paneModel.Lines.Count == 0) return string.Empty;
@@ -46,6 +55,19 @@ namespace AssetsManager.Services.Formatting
             return sb.ToString();
         }
 
+        private static string RestoreUnicodeSpaces(string json)
+        {
+            // Even the relaxed encoder escapes Unicode spaces such as NBSP.
+            return UnicodeEscape.Replace(json, match =>
+            {
+                if (!match.Groups[1].Success) return match.Value;
+                char character = (char)ushort.Parse(match.Groups[1].Value, NumberStyles.HexNumber, CultureInfo.InvariantCulture);
+                return char.GetUnicodeCategory(character) == UnicodeCategory.SpaceSeparator
+                    ? character.ToString()
+                    : match.Value;
+            });
+        }
+
         public Task<string> FormatJsonAsync(object jsonInput)
         {
             return FormatJsonAsync(jsonInput, null);
@@ -56,9 +78,11 @@ namespace AssetsManager.Services.Formatting
             if (jsonInput == null)
                 return Task.FromResult(string.Empty);
 
-            var localOptions = options ?? new JsonSerializerOptions();
-            localOptions.WriteIndented = true;
-            localOptions.Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping;
+            var localOptions = options == null ? DisplayOptions : new JsonSerializerOptions(options)
+            {
+                WriteIndented = true,
+                Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+            };
 
             return Task.Run(() =>
             {
@@ -66,15 +90,11 @@ namespace AssetsManager.Services.Formatting
                 {
                     if (jsonInput is string jsonString)
                     {
-                        using var doc = JsonDocument.Parse(jsonString);
-                        // Highly optimized: Serialize utilizes internal ArrayPool<byte> to format 
-                        // the JsonDocument without allocating intermediate buffers or growing memory.
-                        return JsonSerializer.Serialize(doc, localOptions);
+                        using var document = JsonDocument.Parse(jsonString);
+                        return RestoreUnicodeSpaces(JsonSerializer.Serialize(document, localOptions));
                     }
-                    else
-                    {
-                        return JsonSerializer.Serialize(jsonInput, localOptions);
-                    }
+
+                    return RestoreUnicodeSpaces(JsonSerializer.Serialize(jsonInput, localOptions));
                 }
                 catch (Exception)
                 {

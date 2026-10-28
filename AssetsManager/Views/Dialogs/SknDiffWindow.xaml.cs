@@ -28,14 +28,14 @@ namespace AssetsManager.Views.Dialogs
         
         private SceneModel _oldScene;
         private SceneModel _newScene;
-        private SceneModel _combinedNewScene;
         private readonly List<MeshPartDiffItem> _partItems = new();
         private bool _isBulkUpdatingMeshParts;
         private readonly List<SceneModel> _diffOverlayScenes = new();
         private readonly Dictionary<SceneModel, string> _diffOverlayOwners = new();
         private readonly Dictionary<SceneModel, SknDiffViewportControl> _diffOverlayViewports = new();
-        private readonly Dictionary<string, MeshGeometry3D> _addedGeometryCache = new();
-        private readonly Dictionary<string, MeshGeometry3D> _removedGeometryCache = new();
+        private readonly Dictionary<string, MeshGeometry3D> _addedGeometryCache = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, MeshGeometry3D> _removedGeometryCache = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, MeshGeometry3D> _commonGeometryCache = new(StringComparer.OrdinalIgnoreCase);
 
         private EventHandler _oldCameraChangedHandler;
         private EventHandler _newCameraChangedHandler;
@@ -69,6 +69,9 @@ namespace AssetsManager.Views.Dialogs
 
             OldViewport.GhostModeToggled += Viewport_GhostModeToggled;
             NewViewport.GhostModeToggled += Viewport_GhostModeToggled;
+
+            OldViewport.SurfaceFiltersChanged += Viewport_SurfaceFiltersChanged;
+            NewViewport.SurfaceFiltersChanged += Viewport_SurfaceFiltersChanged;
 
             OldViewport.ResetCamerasClicked += Viewport_ResetCamerasClicked;
             NewViewport.ResetCamerasClicked += Viewport_ResetCamerasClicked;
@@ -191,6 +194,9 @@ namespace AssetsManager.Views.Dialogs
             OldViewport.GhostModeToggled -= Viewport_GhostModeToggled;
             NewViewport.GhostModeToggled -= Viewport_GhostModeToggled;
 
+            OldViewport.SurfaceFiltersChanged -= Viewport_SurfaceFiltersChanged;
+            NewViewport.SurfaceFiltersChanged -= Viewport_SurfaceFiltersChanged;
+
             OldViewport.ResetCamerasClicked -= Viewport_ResetCamerasClicked;
             NewViewport.ResetCamerasClicked -= Viewport_ResetCamerasClicked;
 
@@ -215,9 +221,9 @@ namespace AssetsManager.Views.Dialogs
             _diffOverlayViewports.Clear();
             _addedGeometryCache.Clear();
             _removedGeometryCache.Clear();
+            _commonGeometryCache.Clear();
             _oldScene = null;
             _newScene = null;
-            _combinedNewScene = null;
         }
 
         private void ResetCharacterCameras()
@@ -314,12 +320,12 @@ namespace AssetsManager.Views.Dialogs
             NewViewport.ClearModels();
             _oldScene = null;
             _newScene = null;
-            _combinedNewScene = null;
             _diffOverlayScenes.Clear();
             _diffOverlayOwners.Clear();
             _diffOverlayViewports.Clear();
             _addedGeometryCache.Clear();
             _removedGeometryCache.Clear();
+            _commonGeometryCache.Clear();
 
             if (oldData != null)
             {
@@ -333,16 +339,6 @@ namespace AssetsManager.Views.Dialogs
                 if (loadingWindow != null) await loadingWindow.SetStateAndRenderAsync(DiffLoadingState.ParsingNewModel);
                 _newScene = await LoadModelFromBytesAsync(newData, newPath, "NEW");
                 if (_newScene != null) NewViewport.AddModel(_newScene);
-
-                if (_oldScene != null)
-                {
-                    _combinedNewScene = await LoadModelFromBytesAsync(newData, newPath, "COMBINED_NEW");
-                    if (_combinedNewScene != null)
-                    {
-                        _combinedNewScene.IsVisible = false;
-                        OldViewport.AddAuxiliaryModel(_combinedNewScene);
-                    }
-                }
             }
 
             if (loadingWindow != null) await loadingWindow.SetStateAndRenderAsync(DiffLoadingState.Comparing3DGeometry);
@@ -431,7 +427,7 @@ namespace AssetsManager.Views.Dialogs
 
         private bool IsPartUserVisible(string partName)
         {
-            var item = _partItems.FirstOrDefault(i => i.Name == partName);
+            var item = _partItems.FirstOrDefault(i => string.Equals(i.Name, partName, StringComparison.OrdinalIgnoreCase));
             if (item != null)
             {
                 return item.IsVisible;
@@ -445,6 +441,7 @@ namespace AssetsManager.Views.Dialogs
             var part = new ModelPart(name, new GeometryModel3D(mesh, null))
             {
                 ColorTint = tint,
+                ForceUnlit = true,
                 AlphaCutoff = alphaCutoff,
                 IsVisible = isVisible
             };
@@ -452,7 +449,8 @@ namespace AssetsManager.Views.Dialogs
             {
                 Name = name,
                 IsVisible = isVisible,
-                PositionY = SceneElements.GroundLevel
+                PositionY = SceneElements.GroundLevel,
+                RotationY = (viewport == OldViewport ? _oldScene : _newScene)?.RotationY ?? 0
             };
             scene.AddPart(part);
             viewport.AddAuxiliaryModel(scene);
@@ -465,152 +463,73 @@ namespace AssetsManager.Views.Dialogs
         {
             if (_oldScene == null && _newScene == null) return;
 
-            bool isGhostMode = OldViewport.IsGhostModeChecked;
-            bool isCombined = OldViewport.IsCombinedModeChecked;
+            bool combined = OldViewport.IsCombinedModeChecked;
+            bool context = OldViewport.ShowUnchangedContext;
+            bool added = OldViewport.ShowAddedSurfaces;
+            bool removed = OldViewport.ShowRemovedSurfaces;
+            bool ghost = OldViewport.IsGhostModeChecked;
 
-            // Clear old overlays without disturbing the primary diff scenes.
             foreach (var overlay in _diffOverlayScenes)
-            {
-                if (_diffOverlayViewports.TryGetValue(overlay, out SknDiffViewportControl viewport))
-                    viewport.RemoveModel(overlay);
-                else
-                    overlay.Dispose();
-            }
+                _diffOverlayViewports[overlay].RemoveModel(overlay);
             _diffOverlayScenes.Clear();
             _diffOverlayOwners.Clear();
             _diffOverlayViewports.Clear();
 
-            if (_oldScene == null && _newScene != null)
-            {
-                double greenOpacity = 1.0;
-                if (isGhostMode)
-                {
-                    greenOpacity = 0.7;
-                }
-                foreach (var newPart in _newScene.Parts)
-                {
-                    newPart.IsVisible = IsPartUserVisible(newPart.Name);
-                    HighlightPart(newPart, Colors.Green, greenOpacity);
-                }
-                return;
-            }
+            // Draw disjoint triangle sets instead of coplanar overlays on a full mesh.
+            foreach (var part in _oldScene?.Parts ?? Enumerable.Empty<ModelPart>())
+                part.IsVisible = false;
+            foreach (var part in _newScene?.Parts ?? Enumerable.Empty<ModelPart>())
+                part.IsVisible = false;
 
-            if (_oldScene != null && _newScene == null)
-            {
-                double redOpacity = 0.5;
-                if (isGhostMode)
-                {
-                    redOpacity = 0.2;
-                }
-                foreach (var oldPart in _oldScene.Parts)
-                {
-                    oldPart.IsVisible = IsPartUserVisible(oldPart.Name);
-                    HighlightPart(oldPart, Colors.Red, redOpacity);
-                }
-                return;
-            }
+            var oldParts = _oldScene?.Parts.ToDictionary(p => p.Name, StringComparer.OrdinalIgnoreCase)
+                ?? new Dictionary<string, ModelPart>(StringComparer.OrdinalIgnoreCase);
+            var newParts = _newScene?.Parts.ToDictionary(p => p.Name, StringComparer.OrdinalIgnoreCase)
+                ?? new Dictionary<string, ModelPart>(StringComparer.OrdinalIgnoreCase);
+            var green = new System.Numerics.Vector4(0.15f, 0.9f, 0.4f, 1f);
+            var red = new System.Numerics.Vector4(1f, 0.2f, 0.25f, 1f);
+            var gray = new System.Numerics.Vector4(0.4f, 0.43f, 0.48f, ghost ? 0.12f : 1f);
+            var newViewport = combined ? OldViewport : NewViewport;
 
-            double newPartGreenOpacity = 1.0;
-            if (isGhostMode)
+            foreach (string name in oldParts.Keys.Union(newParts.Keys, StringComparer.OrdinalIgnoreCase))
             {
-                newPartGreenOpacity = 0.7;
-            }
-            double modifiedBlueOpacity = 1.0;
-            if (isGhostMode)
-            {
-                modifiedBlueOpacity = 0.6;
-            }
-            Color unchangedColor = Color.FromRgb(100, 100, 100);
-            double unchangedOpacity = 1.0;
-            if (isGhostMode)
-            {
-                unchangedColor = Color.FromRgb(120, 120, 130);
-                unchangedOpacity = 0.15;
-            }
-
-            foreach (var newPart in _newScene.Parts)
-            {
-                var oldPart = _oldScene.Parts.FirstOrDefault(p => p.Name == newPart.Name);
-                bool userVisible = IsPartUserVisible(newPart.Name);
-
+                oldParts.TryGetValue(name, out var oldPart);
+                newParts.TryGetValue(name, out var newPart);
                 if (oldPart == null)
                 {
-                    // [NEW]
-                    newPart.IsVisible = userVisible;
-                    HighlightPart(newPart, Colors.Green, newPartGreenOpacity);
+                    if (added) AddDiffOverlay(newViewport, name, "New_" + name,
+                        (MeshGeometry3D)newPart.Geometry.Geometry, green, 0f);
                 }
-                else if (!ArePartsEqual(oldPart, newPart))
+                else if (newPart == null)
                 {
-                    // [MODIFIED]
-                    newPart.IsVisible = userVisible;
-                    oldPart.IsVisible = userVisible;
-                    HighlightPart(newPart, Colors.DodgerBlue, modifiedBlueOpacity);
-                    HighlightPart(oldPart, Colors.DodgerBlue, modifiedBlueOpacity);
-
-                    // Check cache for newly added geometry pieces inside this modified part (e.g. piercings)
-                    if (_addedGeometryCache.TryGetValue(newPart.Name, out var addedMesh))
-                    {
-                        AddDiffOverlay(NewViewport, newPart.Name, "AddedOverlay_" + newPart.Name, addedMesh, new System.Numerics.Vector4(0f, 1f, 0f, 1f), 0.5f);
-                        if (isCombined)
-                        {
-                            AddDiffOverlay(OldViewport, newPart.Name, "CombinedAddedOverlay_" + newPart.Name, addedMesh, new System.Numerics.Vector4(0f, 1f, 0f, 1f), 0.5f);
-                        }
-                    }
-
-                    // Check cache for newly deleted geometry pieces inside this modified part
-                    if (_removedGeometryCache.TryGetValue(newPart.Name, out var removedMesh))
-                    {
-                        AddDiffOverlay(OldViewport, newPart.Name, "RemovedOverlay_" + newPart.Name, removedMesh, new System.Numerics.Vector4(1f, 0f, 0f, 0.8f), 0f);
-                    }
+                    if (removed) AddDiffOverlay(OldViewport, name, "Old_" + name,
+                        (MeshGeometry3D)oldPart.Geometry.Geometry, red, 0f);
                 }
                 else
                 {
-                    // [UNCHANGED]
-                    newPart.IsVisible = userVisible;
-                    HighlightPart(newPart, unchangedColor, unchangedOpacity);
-                    
-                    // In combined mode, hide the old unchanged part to avoid Z-fighting
-                    oldPart.IsVisible = userVisible && !isCombined;
-                    if (!isCombined)
+                    if (added && _addedGeometryCache.TryGetValue(name, out var addedMesh))
+                        AddDiffOverlay(newViewport, name, "New_" + name, addedMesh, green, 0f);
+                    if (removed && _removedGeometryCache.TryGetValue(name, out var removedMesh))
+                        AddDiffOverlay(OldViewport, name, "Old_" + name, removedMesh, red, 0f);
+                    if (context && _commonGeometryCache.TryGetValue(name, out var commonMesh))
                     {
-                        HighlightPart(oldPart, unchangedColor, unchangedOpacity);
+                        AddDiffOverlay(newViewport, name, "ContextNew_" + name, commonMesh, gray, 0f);
+                        if (!combined)
+                            AddDiffOverlay(OldViewport, name, "ContextOld_" + name, commonMesh, gray, 0f);
                     }
                 }
             }
+            OldViewport.RequestRender();
+            NewViewport.RequestRender();
+        }
 
-            double oldPartRedOpacity = 0.5;
-            if (isGhostMode)
-            {
-                oldPartRedOpacity = 0.2;
-            }
-
-            foreach (var oldPart in _oldScene.Parts)
-            {
-                if (!_newScene.Parts.Any(p => p.Name == oldPart.Name))
-                {
-                    // [REMOVED]
-                    oldPart.IsVisible = IsPartUserVisible(oldPart.Name);
-                    HighlightPart(oldPart, Colors.Red, oldPartRedOpacity);
-                }
-            }
-
-            if (_combinedNewScene != null)
-            {
-                _combinedNewScene.IsVisible = isCombined;
-                if (isCombined)
-                {
-                    foreach (var combPart in _combinedNewScene.Parts)
-                    {
-                        var matchingPart = _newScene.Parts.FirstOrDefault(p => p.Name == combPart.Name);
-                        if (matchingPart != null)
-                        {
-                            combPart.IsVisible = matchingPart.IsVisible;
-                            combPart.ColorTint = matchingPart.ColorTint;
-                            combPart.AlphaCutoff = matchingPart.AlphaCutoff;
-                        }
-                    }
-                }
-            }
+        private void Viewport_SurfaceFiltersChanged(object sender, EventArgs e)
+        {
+            if (sender is not SknDiffViewportControl source) return;
+            var target = source == OldViewport ? NewViewport : OldViewport;
+            target.ShowAddedSurfaces = source.ShowAddedSurfaces;
+            target.ShowRemovedSurfaces = source.ShowRemovedSurfaces;
+            target.ShowUnchangedContext = source.ShowUnchangedContext;
+            UpdateVisualHighlighting();
         }
 
         private static bool ArePartsEqual(ModelPart p1, ModelPart p2)
@@ -618,17 +537,6 @@ namespace AssetsManager.Views.Dialogs
             var m1 = p1?.Geometry?.Geometry as MeshGeometry3D;
             var m2 = p2?.Geometry?.Geometry as MeshGeometry3D;
             return SknMeshDiffAnalyzer.AreEquivalent(m1, m2);
-        }
-
-        private void HighlightPart(ModelPart part, Color color, double opacity = 1.0)
-        {
-            part.ColorTint = new System.Numerics.Vector4(color.R / 255f, color.G / 255f, color.B / 255f, (float)opacity);
-            float alphaCutoff = 0.5f;
-            if (opacity < 1.0)
-            {
-                alphaCutoff = 0f;
-            }
-            part.AlphaCutoff = alphaCutoff;
         }
 
         private bool _isSyncingToolbarVisibility = false;
@@ -732,14 +640,10 @@ namespace AssetsManager.Views.Dialogs
             if (_oldScene == null || _newScene == null) return;
 
             bool isCombined = OldViewport.IsCombinedModeChecked;
+            _newScene.RotationY = _oldScene.RotationY;
 
             if (isCombined)
             {
-                if (_combinedNewScene != null)
-                {
-                    _combinedNewScene.IsVisible = true;
-                }
-
                 // Collapse NewViewport and GridSplitter
                 NewViewportContainer.Visibility = Visibility.Collapsed;
                 ViewportSplitter.Visibility = Visibility.Collapsed;
@@ -751,11 +655,6 @@ namespace AssetsManager.Views.Dialogs
             }
             else
             {
-                if (_combinedNewScene != null)
-                {
-                    _combinedNewScene.IsVisible = false;
-                }
-
                 // Restore span and visibility
                 Grid.SetColumnSpan(OldViewportContainer, 1);
                 NewViewportContainer.Visibility = Visibility.Visible;
@@ -772,7 +671,7 @@ namespace AssetsManager.Views.Dialogs
                 OldViewport.ViewModel.UpdateSceneDisplay(oldCount, OldFileNameLabel.Text);
             }
 
-            // Update highlighting to hide unchanged parts of _oldScene in combined mode
+            // Rebuild the disjoint surface sets for the selected layout.
             UpdateVisualHighlighting();
         }
 
@@ -821,26 +720,14 @@ namespace AssetsManager.Views.Dialogs
 
         private void ApplyMeshPartVisibility()
         {
-            if (_oldScene != null)
-            {
-                foreach (ModelPart part in _oldScene.Parts)
-                    part.IsVisible = IsPartUserVisible(part.Name);
-            }
-
-            if (_newScene != null)
-            {
-                foreach (ModelPart part in _newScene.Parts)
-                    part.IsVisible = IsPartUserVisible(part.Name);
-            }
-
-            if (_combinedNewScene != null)
-            {
-                foreach (ModelPart part in _combinedNewScene.Parts)
-                    part.IsVisible = IsPartUserVisible(part.Name);
-            }
-
             foreach (var pair in _diffOverlayOwners)
-                pair.Key.IsVisible = IsPartUserVisible(pair.Value);
+            {
+                bool visible = IsPartUserVisible(pair.Value);
+                pair.Key.IsVisible = visible;
+                foreach (var part in pair.Key.Parts) part.IsVisible = visible;
+            }
+            OldViewport.RequestRender();
+            NewViewport.RequestRender();
         }
 
         private void BuildMeshPartsList()
@@ -866,13 +753,13 @@ namespace AssetsManager.Views.Dialogs
                 ModelPart oldPart = null;
                 if (_oldScene != null)
                 {
-                    oldPart = _oldScene.Parts.FirstOrDefault(p => p.Name == name);
+                    oldPart = _oldScene.Parts.FirstOrDefault(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
                 }
 
                 ModelPart newPart = null;
                 if (_newScene != null)
                 {
-                    newPart = _newScene.Parts.FirstOrDefault(p => p.Name == name);
+                    newPart = _newScene.Parts.FirstOrDefault(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
                 }
 
                 SolidColorBrush diffBrush;
@@ -946,6 +833,15 @@ namespace AssetsManager.Views.Dialogs
 
             MeshPartsItemsControl.ItemsSource = null;
             MeshPartsItemsControl.ItemsSource = _partItems;
+            int added = _partItems.Where(i => i.StatusLabel == "NEW").Sum(i =>
+                SknMeshDiffAnalyzer.GetTriangleCount(_newScene.Parts.First(p => string.Equals(p.Name, i.Name, StringComparison.OrdinalIgnoreCase)).Geometry.Geometry as MeshGeometry3D))
+                + _addedGeometryCache.Values.Sum(SknMeshDiffAnalyzer.GetTriangleCount);
+            int removed = _partItems.Where(i => i.StatusLabel == "REMOVED").Sum(i =>
+                SknMeshDiffAnalyzer.GetTriangleCount(_oldScene.Parts.First(p => string.Equals(p.Name, i.Name, StringComparison.OrdinalIgnoreCase)).Geometry.Geometry as MeshGeometry3D))
+                + _removedGeometryCache.Values.Sum(SknMeshDiffAnalyzer.GetTriangleCount);
+            DiffSummaryLabel.Text = changedCount == 0
+                ? "No position or topology changes detected"
+                : $"{changedCount:N0} changed parts | {added:N0} NEW-only / {removed:N0} OLD-only triangles";
         }
 
         private bool _isDraggingMeshPanel = false;
@@ -994,13 +890,14 @@ namespace AssetsManager.Views.Dialogs
         {
             _addedGeometryCache.Clear();
             _removedGeometryCache.Clear();
+            _commonGeometryCache.Clear();
 
             if (_oldScene == null || _newScene == null) return;
 
             foreach (var newPart in _newScene.Parts)
             {
-                var oldPart = _oldScene.Parts.FirstOrDefault(p => p.Name == newPart.Name);
-                if (oldPart == null || ArePartsEqual(oldPart, newPart)) continue;
+                var oldPart = _oldScene.Parts.FirstOrDefault(p => string.Equals(p.Name, newPart.Name, StringComparison.OrdinalIgnoreCase));
+                if (oldPart == null) continue;
 
                 MeshGeometry3D newMesh = null;
                 if (newPart.Geometry != null)
@@ -1013,6 +910,13 @@ namespace AssetsManager.Views.Dialogs
                     oldMesh = oldPart.Geometry.Geometry as MeshGeometry3D;
                 }
                 if (newMesh == null || oldMesh == null) continue;
+
+                var commonMesh = SknMeshDiffAnalyzer.ExtractCommonMesh(oldMesh, newMesh);
+                if (commonMesh != null)
+                {
+                    commonMesh.Freeze();
+                    _commonGeometryCache[newPart.Name] = commonMesh;
+                }
 
                 // 1. Detect added triangles (Old -> New)
                 var addedMesh = SknMeshDiffAnalyzer.ExtractDifferenceMesh(oldMesh, newMesh);
@@ -1038,7 +942,13 @@ namespace AssetsManager.Views.Dialogs
     {
         private const double PositionScale = 100000.0;
 
-        internal static MeshGeometry3D ExtractDifferenceMesh(MeshGeometry3D sourceMesh, MeshGeometry3D targetMesh)
+        internal static MeshGeometry3D ExtractDifferenceMesh(MeshGeometry3D sourceMesh, MeshGeometry3D targetMesh) =>
+            ExtractTriangles(sourceMesh, targetMesh, common: false);
+
+        internal static MeshGeometry3D ExtractCommonMesh(MeshGeometry3D sourceMesh, MeshGeometry3D targetMesh) =>
+            ExtractTriangles(sourceMesh, targetMesh, common: true);
+
+        private static MeshGeometry3D ExtractTriangles(MeshGeometry3D sourceMesh, MeshGeometry3D targetMesh, bool common)
         {
             if (sourceMesh == null || targetMesh == null) return null;
 
@@ -1056,14 +966,15 @@ namespace AssetsManager.Views.Dialogs
                     targetMesh.Positions[i2],
                     targetMesh.Positions[i3]);
 
-                if (sourceTriangles.TryGetValue(key, out int remaining) && remaining > 0)
+                bool matched = sourceTriangles.TryGetValue(key, out int remaining) && remaining > 0;
+                if (matched)
                 {
                     if (remaining == 1)
                         sourceTriangles.Remove(key);
                     else
                         sourceTriangles[key] = remaining - 1;
-                    continue;
                 }
+                if (matched != common) continue;
 
                 int n1 = GetOrCreateVertex(i1, targetMesh, diffMesh, diffMap);
                 int n2 = GetOrCreateVertex(i2, targetMesh, diffMesh, diffMap);

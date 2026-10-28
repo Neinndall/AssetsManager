@@ -32,7 +32,7 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
                 bridge.BakeWad(root, fixture.Item1, (chunkPath, fixture.Item2));
             var store = new HashGuessingStore(bridge.Directories);
             var targets = new HashSet<ulong> { XxHash64Ext.Hash(target) };
-            await store.SaveUnknownHashesAsync(HashGuessDomain.Game, targets, targets, "", CancellationToken.None);
+            await store.SaveUnknownHashesAsync(HashGuessDomain.Game, targets, CancellationToken.None);
             using var resolver = new HashResolverService(bridge.Directories, bridge.LogService);
             var persistence = new HashGuessPersistenceService(store, new BinRstHashGuessingStore(bridge.Directories));
             var service = new HashGuessingService(resolver, store, persistence, bridge.LogService, bridge.Directories);

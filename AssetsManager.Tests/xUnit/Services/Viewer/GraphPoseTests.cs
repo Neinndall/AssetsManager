@@ -171,6 +171,12 @@ public sealed class GraphPoseTests
             await runtime.PrepareAsync(asset, new[] { "Idle1" }, folder);
             Assert.Equal(new Vector3(3, 0, 0), runtime.Evaluate(asset, "Idle1", 0f)[0].Translation);
             Assert.True(await runtime.PrepareClipAsync(asset, attack));
+            using var group = new AssetsManager.Services.Viewer.Runtime.MapCharacterRuntimeGroup(
+                asset, runtime, Array.Empty<MapCharacterData>());
+            group.SetPreviewClip(attack);
+            Assert.True(group.PreviewGameState.IsPlaying(Fnv1a.HashLower("Attack1")));
+            Assert.True(group.PreviewGameState.IsPlaying(attack.OwnerPathHash));
+            Assert.False(group.PreviewGameState.IsPlaying(Fnv1a.HashLower("Idle1")));
             Matrix4x4[] visible = runtime.EvaluateClip(asset, attack, 0.01f).ToArray();
             Assert.True(runtime.TrySamplePreparedClipBoneTransform(asset, attack, 0.02, null, Fnv1a.HashLower("Root"), out var sampled));
             Assert.InRange(sampled.Translation.X, 5.99f, 6.01f);

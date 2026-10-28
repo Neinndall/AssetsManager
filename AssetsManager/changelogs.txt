@@ -1,8 +1,41 @@
+AssetsManager - League of Legends | v4.1.0.4
+
+HOTFIX UPDATE
+This update adds INIBIN previews, comparisons, and JSON exports, and makes SKN model differences easier to inspect with surface filters and separate triangle counts. It expands GAME hash search coverage, unifies pending hashes across patches, and improves search counters. It also fixes image atlas decoding, text previews, and persistent skin effects on map characters.
+
+New Features
+  - Explorer / Preview, compare, and export INIBIN files as JSON.
+  - SKN Diff / Show or hide OLD-only surfaces, NEW-only surfaces, and unchanged context with synchronized toolbar toggles.
+
+Improvements
+  - SKN Diff / Highlight changed triangles precisely, fade unchanged context with Ghost mode, and show separate OLD/NEW triangle counts in the footer.
+  - Hash Guessing Lab / GAME and LCU show resolved and remaining counts for the latest search.
+  - Hash Guessing Lab / Dynamic texture searches share filename checks across unresolved links without narrowing coverage.
+  - Hash Guessing Lab / Banner event patterns preserve the candidate budget of existing vocabulary searches.
+  - Hash Guessing Lab / GAME Basic derives cross-stage shader variants from known shader stems.
+  - Hash Guessing Lab / GAME GrepWad resolves companion loadscreens, main-texture submesh overrides, and base skin textures.
+  - Hash Guessing Lab / GAME GrepWad and Custom resolve cross-champion textures referenced by dynamic material swap options.
+  - Hash Guessing Lab / GAME Banners combines event prefixes and version suffixes across sponsor stems.
+  - Hash Guessing Lab / GAME GrepWad resolves ping-wheel highlights and cosplay narrative portraits from UI labels.
+  - Hash Guessing Lab / Atlas scans keep hashes already resolved during the current run out of the pending count.
+  - Image atlases / Reads all texture pages correctly and rejects incomplete sprite tables.
+  - Hash Guessing Lab / GAME GrepWad resolves narrative portraits from UI labels and learned theme names.
+  - Hash Guessing Lab / GAME Basic finds Jade child-model textures that retain their parent character names.
+
+Changes
+  - Hash Guessing Lab / GAME and LCU keep one pending list across patches and show a single unknown count.
+
+Bug Fixes
+  - Explorer / JSON previews and comparisons preserve readable Unicode text and spacing.
+  - Explorer / INIBIN and TROYBIN previews preserve property hashes instead of showing unrelated BIN field names.
+  - 3D Studio / Map character clips now play persistent skin effects and apply their matching submesh visibility.
+
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 AssetsManager - League of Legends | v4.1.0.3
 
 HOTFIX UPDATE
+This update introduces persistent skin effect previews with manual activation in the 3D Studio and a redesigned Game State control layout. It also expands search coverage in the Hash Guessing Lab (textures, animations, navigation files, and object paths), optimizes overall performance (WAD reads, draw calls, batch loading, and memory allocation), and fixes bugs across the Explorer, 3D Studio model/effect rendering, and language downloads in Manage Versions.
 
 New Features
   - 3D Studio / Preview persistent skin effects with their conditions, including manual activation from Game State.
@@ -38,8 +71,6 @@ Improvements
   - Hash Guessing Lab / GAME Basic learns portrait form variants from known skins.
   - Hash Guessing Lab / GAME GrepWad resolves companion theme textures stored outside model tier folders.
   - Hash Guessing Lab / GAME GrepWad learns sibling image layouts to recover banner thumbnails.
-
-Changes
 
 Bug Fixes
   - 3D Studio / Fixed oversized character copies in effects that supply their own attached mesh, including Aatrox Skin33 turbines.

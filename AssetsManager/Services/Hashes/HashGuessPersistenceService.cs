@@ -18,13 +18,10 @@ namespace AssetsManager.Services.Hashes
 
         public async Task CommitPathRunAsync(
             HashGuessDomain domain,
-            IEnumerable<HashGuessMatch> matches,
             IEnumerable<ulong> remainingUnknowns,
-            IReadOnlySet<ulong> currentHashes,
-            string patchFingerprint,
             CancellationToken cancellationToken)
         {
-            await _pathStore.SaveUnknownHashesAsync(domain, remainingUnknowns, currentHashes, patchFingerprint, cancellationToken);
+            await _pathStore.SaveUnknownHashesAsync(domain, remainingUnknowns, cancellationToken);
         }
 
         public Task PromotePathMatchesAsync(IEnumerable<HashGuessMatch> matches, CancellationToken cancellationToken) =>

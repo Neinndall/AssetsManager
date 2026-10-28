@@ -1,20 +1,13 @@
+using System.Globalization;
 using System.IO;
 using System.Text.Json;
 using System.Threading.Tasks;
-using AssetsManager.Services.Hashes;
 using LeagueToolkit.IO.Inibin;
 
 namespace AssetsManager.Services.Parsers
 {
     public class TroybinParser
     {
-        private readonly HashResolverService _hashResolver;
-
-        public TroybinParser(HashResolverService hashResolver)
-        {
-            _hashResolver = hashResolver;
-        }
-
         public Task WriteInibinAsJsonAsync(Stream outputStream, InibinFile inibinFile)
         {
             return Task.Run(() => WriteInibinAsJson(outputStream, inibinFile));
@@ -32,7 +25,8 @@ namespace AssetsManager.Services.Parsers
                 writer.WriteStartObject();
                 foreach (var prop in set.Value.Properties)
                 {
-                    writer.WritePropertyName(_hashResolver.ResolveBinField(prop.Key));
+                    // INIBIN keys use SDBM(section*property), not the BIN field catalog's FNV-1a.
+                    writer.WritePropertyName(prop.Key.ToString("x8", CultureInfo.InvariantCulture));
                     WriteValue(writer, prop.Value);
                 }
                 writer.WriteEndObject();

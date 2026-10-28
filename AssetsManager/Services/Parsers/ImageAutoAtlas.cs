@@ -20,13 +20,11 @@ namespace AssetsManager.Services.Parsers
     {
         public const string MagicHeader = "IMAA";
 
-        public uint Version { get; }
         public IReadOnlyList<ulong> TextureHashes { get; }
         public IReadOnlyList<ImageAutoAtlasSprite> Sprites { get; }
 
-        public ImageAutoAtlas(uint version, IReadOnlyList<ulong> textureHashes, IReadOnlyList<ImageAutoAtlasSprite> sprites)
+        public ImageAutoAtlas(IReadOnlyList<ulong> textureHashes, IReadOnlyList<ImageAutoAtlasSprite> sprites)
         {
-            Version = version;
             TextureHashes = textureHashes ?? Array.Empty<ulong>();
             Sprites = sprites ?? Array.Empty<ImageAutoAtlasSprite>();
         }
@@ -44,7 +42,7 @@ namespace AssetsManager.Services.Parsers
         public static bool TryRead(byte[] data, out ImageAutoAtlas atlas)
         {
             atlas = null;
-            if (data == null || data.Length < 16 || !IsImaa(data))
+            if (data == null || data.Length < 12 || !IsImaa(data))
                 return false;
 
             try
@@ -55,49 +53,31 @@ namespace AssetsManager.Services.Parsers
                 string magic = Encoding.ASCII.GetString(reader.ReadBytes(4));
                 if (magic != MagicHeader) return false;
 
-                uint version = reader.ReadUInt32();
-                var textures = new List<ulong>();
-
-                if (version == 1)
-                {
-                    ulong tex0 = reader.ReadUInt64();
-                    if (tex0 != 0) textures.Add(tex0);
-                }
-                else if (version == 2)
-                {
-                    ulong tex0 = reader.ReadUInt64();
-                    ulong tex1 = reader.ReadUInt64();
-                    if (tex0 != 0) textures.Add(tex0);
-                    if (tex1 != 0) textures.Add(tex1);
-                }
-                else
-                {
-                    uint textureCount = reader.ReadUInt32();
-                    for (int i = 0; i < textureCount; i++)
-                    {
-                        if (ms.Position + 8 > ms.Length) break;
-                        textures.Add(reader.ReadUInt64());
-                    }
-                }
+                uint textureCount = reader.ReadUInt32();
+                if (textureCount > (ms.Length - ms.Position - 4) / 8) return false;
+                var textures = new List<ulong>((int)textureCount);
+                for (int i = 0; i < textureCount; i++)
+                    textures.Add(reader.ReadUInt64());
 
                 if (ms.Position + 4 > ms.Length) return false;
                 uint spriteCount = reader.ReadUInt32();
-                var sprites = new List<ImageAutoAtlasSprite>((int)Math.Min(spriteCount, 100_000));
+                if ((long)spriteCount * 28 != ms.Length - ms.Position) return false;
+                var sprites = new List<ImageAutoAtlasSprite>((int)spriteCount);
 
                 for (int i = 0; i < spriteCount; i++)
                 {
-                    if (ms.Position + 28 > ms.Length) break;
                     ulong spriteHash = reader.ReadUInt64();
                     float uMin = reader.ReadSingle();
                     float vMin = reader.ReadSingle();
                     float uMax = reader.ReadSingle();
                     float vMax = reader.ReadSingle();
                     uint texIndex = reader.ReadUInt32();
+                    if (texIndex >= textureCount) return false;
 
                     sprites.Add(new ImageAutoAtlasSprite(spriteHash, uMin, vMin, uMax, vMax, texIndex));
                 }
 
-                atlas = new ImageAutoAtlas(version, textures, sprites);
+                atlas = new ImageAutoAtlas(textures, sprites);
                 return true;
             }
             catch
@@ -110,7 +90,7 @@ namespace AssetsManager.Services.Parsers
         public string ToRitobinText(HashResolverService hashResolver)
         {
             var sb = new StringBuilder();
-            sb.AppendLine($"# Image Auto Atlas ({MagicHeader} v{Version})");
+            sb.AppendLine($"# Image Auto Atlas ({MagicHeader}, {TextureHashes.Count} texture pages)");
             sb.AppendLine();
             sb.AppendLine("textures: list[string] = {");
             var textureNames = new Dictionary<uint, string>();

@@ -69,7 +69,7 @@ public sealed class GameMapGeometrySiblingTests
             $"{XxHash64Ext.Hash(geometry):x16} {geometry}\n");
         var store = new HashGuessingStore(bridge.Directories);
         var pending = new HashSet<ulong> { XxHash64Ext.Hash(target) };
-        await store.SaveUnknownHashesAsync(HashGuessDomain.Game, pending, pending, "test", CancellationToken.None);
+        await store.SaveUnknownHashesAsync(HashGuessDomain.Game, pending, CancellationToken.None);
         using var resolver = new HashResolverService(bridge.Directories, bridge.LogService);
         var service = new HashGuessingService(resolver, store,
             new HashGuessPersistenceService(store, new BinRstHashGuessingStore(bridge.Directories)), bridge.LogService, bridge.Directories);

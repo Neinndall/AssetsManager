@@ -21,10 +21,14 @@ internal sealed class GameMaterialTextureIndex
     private static readonly uint Samplers = Fnv1a.HashLower("samplerValues");
     private static readonly uint TextureName = Fnv1a.HashLower("TextureName");
     private static readonly uint TexturePath = Fnv1a.HashLower("texturePath");
+    private static readonly uint DynamicMaterial = Fnv1a.HashLower("dynamicMaterial");
+    private static readonly uint DynamicTextures = Fnv1a.HashLower("textures");
+    private static readonly uint DynamicOptions = Fnv1a.HashLower("options");
     private static readonly Regex SkinBin = new(@"^(?:data|assets)/characters/([^/]+)/(skins|themes)/([^/]+)\.bin$", RegexOptions.CultureInvariant | RegexOptions.Compiled);
     private static readonly Regex CharacterTexture = new(@"^assets/characters/([^/]+)/(?:skins|themes)/([^/]+)/", RegexOptions.CultureInvariant | RegexOptions.Compiled);
     private readonly Dictionary<string, string[]> _names;
     private readonly string[] _sharedParticleNames;
+    private readonly string[] _rootSkinTextureNames;
     private readonly ConditionalWeakTable<HashGuessEngine, ConcurrentDictionary<Scope, byte>> _scanned = new();
     private readonly record struct Scope(ulong Target, string Directory, string Role);
 
@@ -32,6 +36,7 @@ internal sealed class GameMaterialTextureIndex
     {
         var namesByRole = Roles.ToDictionary(role => role, _ => new HashSet<string>(StringComparer.Ordinal));
         var sharedParticleNames = new HashSet<string>(StringComparer.Ordinal);
+        var rootSkinTextureNames = new HashSet<string>(StringComparer.Ordinal);
         foreach (string value in paths)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -42,8 +47,11 @@ internal sealed class GameMaterialTextureIndex
                  path.StartsWith("assets/maps/particles/", StringComparison.Ordinal)) && !name[..^4].Contains('.'))
                 sharedParticleNames.Add(name);
             string[] roles = Roles.Where(role => name.Contains(role, StringComparison.Ordinal)).ToArray();
-            if (roles.Length == 0) continue;
             Match character = CharacterTexture.Match(path);
+            if (character.Success && path.LastIndexOf('/') == character.Length - 1)
+                rootSkinTextureNames.Add(name);
+            if (roles.Length == 0) continue;
+
             string relative = name;
             if (character.Success)
             {
@@ -60,6 +68,7 @@ internal sealed class GameMaterialTextureIndex
         _names = namesByRole.ToDictionary(pair => pair.Key,
             pair => pair.Value.OrderBy(value => value, StringComparer.Ordinal).ToArray(), StringComparer.Ordinal);
         _sharedParticleNames = sharedParticleNames.OrderBy(value => value, StringComparer.Ordinal).ToArray();
+        _rootSkinTextureNames = rootSkinTextureNames.OrderBy(value => value, StringComparer.Ordinal).ToArray();
     }
 
     internal static bool HasUnresolvedContext(HashGuessEngine engine, BinTree tree, string sourcePath, CancellationToken cancellationToken)
@@ -75,6 +84,69 @@ internal sealed class GameMaterialTextureIndex
     internal static bool HasUnresolvedSamplerContext(HashGuessEngine engine, BinTree tree, string sourcePath,
         CancellationToken cancellationToken) => tree != null && IsSkinBin(sourcePath) &&
         SamplerTargets(engine, tree, cancellationToken).Any();
+
+    internal static bool HasUnresolvedDynamicMaterialContext(HashGuessEngine engine, BinTree tree, string sourcePath,
+        CancellationToken cancellationToken) => tree != null && engine.RemainingUnknownCount > 0 &&
+        IsSkinBin(sourcePath) && DynamicMaterialTargets(engine, tree, cancellationToken).Any();
+
+    internal long GuessDynamicMaterialOptions(HashGuessEngine engine, BinTree tree, string sourcePath, string wad, ulong chunk,
+        CancellationToken cancellationToken, long candidateBudget = long.MaxValue)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (tree == null || candidateBudget <= 0 || engine.RemainingUnknownCount == 0) return 0;
+        Match skin = SkinBin.Match(PathUtils.NormalizePath(sourcePath));
+        if (!skin.Success) return 0;
+        string directory = $"assets/characters/{skin.Groups[1].Value}/{skin.Groups[2].Value}/{skin.Groups[3].Value}/";
+        var scanned = _scanned.GetOrCreateValue(engine);
+        var targets = DynamicMaterialTargets(engine, tree, cancellationToken).ToHashSet();
+        targets.RemoveWhere(target => !scanned.TryAdd(new Scope(target, directory, "dynamic-material-options"), 0));
+        if (targets.Count == 0) return 0;
+        long checkedCandidates = 0;
+        bool complete = false;
+        try
+        {
+            // Hash each basename once for this directory, retaining exact ownership of every link.
+            foreach (string name in _rootSkinTextureNames)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (targets.Count == 0) break;
+                if (checkedCandidates >= candidateBudget) return checkedCandidates;
+                checkedCandidates++;
+                if (engine.CheckNormalizedParts(directory, name, ReadOnlySpan<char>.Empty,
+                    HashGuessStrategy.BinLinkSibling, wad, chunk, expectedHashes: targets))
+                    targets.RemoveWhere(target => !engine.UnknownHashes.Contains(target));
+            }
+            complete = true;
+        }
+        finally
+        {
+            if (!complete)
+                foreach (ulong target in targets)
+                    scanned.TryRemove(new Scope(target, directory, "dynamic-material-options"), out _);
+        }
+        return checkedCandidates;
+    }
+
+    private static IEnumerable<ulong> DynamicMaterialTargets(HashGuessEngine engine, BinTree tree, CancellationToken cancellationToken)
+    {
+        foreach (var obj in tree.Objects.Values)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (obj.ClassHash != MaterialClass || !obj.Properties.TryGetValue(DynamicMaterial, out var dynProp) ||
+                dynProp is not BinTreeStruct dynMat || !dynMat.Properties.TryGetValue(DynamicTextures, out var texProp) ||
+                texProp is not BinTreeContainer swapDefs) continue;
+            foreach (var swapDef in swapDefs.Elements.OfType<BinTreeStruct>())
+            {
+                if (!swapDef.Properties.TryGetValue(DynamicOptions, out var optProp) || optProp is not BinTreeContainer options) continue;
+                foreach (var option in options.Elements.OfType<BinTreeStruct>())
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (option.Properties.TryGetValue(TextureName, out var linkProp) && linkProp is BinTreeWadChunkLink link &&
+                        engine.UnknownHashes.Contains(link.Value)) yield return link.Value;
+                }
+            }
+        }
+    }
 
     internal long GuessSharedParticles(HashGuessEngine engine, BinTree tree, string sourcePath, string wad, ulong chunk,
         CancellationToken cancellationToken, long candidateBudget = long.MaxValue)
