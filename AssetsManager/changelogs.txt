@@ -23,6 +23,7 @@ Changes
   - Hash Guessing Lab / GAME and LCU keep one pending list across patches and show a single unknown count.
 
 Bug Fixes
+  - Explorer / JSON previews and comparisons preserve readable Unicode text and spacing.
   - Explorer / INIBIN and TROYBIN previews preserve property hashes instead of showing unrelated BIN field names.
   - 3D Studio / Map character clips now play persistent skin effects and apply their matching submesh visibility.
 
