@@ -156,25 +156,26 @@ namespace AssetsManager.Services.Explorer.Tree
                         IsTechnicalNode = eventNode.IsTechnicalNode
                     };
 
-                    // Add Sub-Containers (HIRC families) if they exist
-                    var containerNodesToAdd = new List<FileSystemNodeModel>();
-                    foreach (var containerNode in eventNode.Containers)
+                    var families = new Stack<(AudioContainerNode Family, FileSystemNodeModel Parent)>();
+                    for (int i = eventNode.Containers.Count - 1; i >= 0; i--)
+                        families.Push((eventNode.Containers[i], newEventNode));
+                    while (families.TryPop(out var family))
                     {
-                        var newContainerNode = new FileSystemNodeModel(containerNode.Name, NodeType.VirtualDirectory)
+                        var newContainerNode = new FileSystemNodeModel(family.Family.Name, NodeType.VirtualDirectory)
                         {
-                            Parent = newEventNode,
+                            Parent = family.Parent,
                             IsGroupingFolder = true
                         };
-
+                        family.Parent.Children.Add(newContainerNode);
                         var containerSoundsToAdd = new List<FileSystemNodeModel>();
-                        foreach (var soundNode in containerNode.Sounds)
+                        foreach (var soundNode in family.Family.Sounds)
                         {
                             containerSoundsToAdd.Add(CreateSoundNode(soundNode, newContainerNode, linkedBank, clickedNode, absoluteSourceWadPath));
                         }
                         newContainerNode.Children.AddRange(containerSoundsToAdd);
-                        containerNodesToAdd.Add(newContainerNode);
+                        for (int i = family.Family.Containers.Count - 1; i >= 0; i--)
+                            families.Push((family.Family.Containers[i], newContainerNode));
                     }
-                    newEventNode.Children.AddRange(containerNodesToAdd);
 
                     // Add remaining root-level sounds of the event (if any)
                     var soundNodesToAdd = new List<FileSystemNodeModel>();
@@ -190,42 +191,25 @@ namespace AssetsManager.Services.Explorer.Tree
             });
         }
 
-        private FileSystemNodeModel CreateSoundNode(
-            WemFileNode soundNode, 
-            FileSystemNodeModel parentNode, 
-            LinkedAudioBank linkedBank, 
-            FileSystemNodeModel clickedNode, 
+        internal static FileSystemNodeModel CreateSoundNode(
+            WemFileNode soundNode,
+            FileSystemNodeModel parentNode,
+            LinkedAudioBank linkedBank,
+            FileSystemNodeModel clickedNode,
             string absoluteSourceWadPath)
         {
-            ulong sourceHash;
-            string backupChunkPath = null;
-            SerializableChunkDiff soundDiff = null;
-
-            if (soundNode.Source == AudioSourceType.Wpk && linkedBank.WpkNode != null)
+            var source = soundNode.Source switch
             {
-                sourceHash = linkedBank.WpkNode.SourceChunkPathHash;
-                backupChunkPath = linkedBank.WpkNode.BackupChunkPath;
-                soundDiff = linkedBank.WpkNode.ChunkDiff;
-            }
-            else if (linkedBank.AudioBnkNode != null)
-            {
-                sourceHash = linkedBank.AudioBnkNode.SourceChunkPathHash;
-                backupChunkPath = linkedBank.AudioBnkNode.BackupChunkPath;
-                soundDiff = linkedBank.AudioBnkNode.ChunkDiff;
-            }
-            else
-            {
-                sourceHash = clickedNode.SourceChunkPathHash;
-                backupChunkPath = clickedNode.BackupChunkPath;
-                soundDiff = clickedNode.ChunkDiff;
-            }
-
+                AudioSourceType.Wpk => linkedBank.WpkNode,
+                AudioSourceType.EventsBnk => linkedBank.EventsBnkNode,
+                _ => linkedBank.AudioBnkNode
+            } ?? clickedNode;
             return new FileSystemNodeModel(soundNode.Name, soundNode.Id, soundNode.Offset, soundNode.Size)
             {
-                SourceWadPath = absoluteSourceWadPath,
-                SourceChunkPathHash = sourceHash,
-                BackupChunkPath = backupChunkPath,
-                ChunkDiff = soundDiff,
+                SourceWadPath = source.SourceWadPath ?? absoluteSourceWadPath,
+                SourceChunkPathHash = source.SourceChunkPathHash,
+                BackupChunkPath = source.BackupChunkPath,
+                ChunkDiff = source.ChunkDiff,
                 AudioSource = soundNode.Source,
                 Parent = parentNode
             };

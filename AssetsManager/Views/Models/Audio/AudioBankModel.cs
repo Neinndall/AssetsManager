@@ -12,6 +12,17 @@ namespace AssetsManager.Views.Models.Audio
     {
         public List<AudioContainerNode> Containers { get; set; } = new List<AudioContainerNode>();
         public List<WemFileNode> Sounds { get; set; } = new List<WemFileNode>();
+
+        internal IEnumerable<WemFileNode> EnumerateSounds()
+        {
+            foreach (var sound in Sounds) yield return sound;
+            var pending = new Stack<AudioContainerNode>(Containers);
+            while (pending.TryPop(out var container))
+            {
+                foreach (var sound in container.Sounds) yield return sound;
+                foreach (var child in container.Containers) pending.Push(child);
+            }
+        }
         
         // Technical metadata to detect changes in hidden parameters
         public AudioTechnicalMetadata TechnicalInfo { get; set; }
@@ -27,6 +38,7 @@ namespace AssetsManager.Views.Models.Audio
 
     public class AudioContainerNode : AudioBankNode
     {
+        public List<AudioContainerNode> Containers { get; set; } = new List<AudioContainerNode>();
         public List<WemFileNode> Sounds { get; set; } = new List<WemFileNode>();
     }
 

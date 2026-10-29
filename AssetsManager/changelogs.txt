@@ -1,6 +1,25 @@
+AssetsManager - League of Legends | v4.1.0.6
+
+HOTFIX UPDATE
+
+New Features
+
+Improvements
+  - Audio Banks / Preserve nested sound families in Explorer, parsed comparisons, and audio exports.
+
+Changes
+
+Bug Fixes
+  - Audio Banks / Correct variable-length HIRC fields, reject invalid object boundaries, and prevent Stop actions or circular references from producing incorrect sound associations.
+  - Audio Banks / Show decoded object fields in raw BNK previews and comparisons.
+  - Audio Banks / Retrieve sounds embedded in events banks from their correct source alongside WPK and audio bank sounds.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
 AssetsManager - League of Legends | v4.1.0.5
 
 HOTFIX UPDATE
+This update improves skin previews with PBR maps, emissive masks, and skin-defined outlines. It fixes ground VFX covering characters, animated materials ignoring pause and timeline seeking, and torso deformation with game shaders enabled, including Akali Skin102. API Center also clarifies when catalog images are unavailable.
 
 New Features
   - 3D Studio / Preview roughness, metallic, occlusion and normal PBR maps of skins without explicit materials, including submesh overrides.
@@ -9,8 +28,6 @@ New Features
 
 Improvements
   - API Center / Clarify when a catalog item has no saved image URL and disable copying unavailable URLs.
-
-Changes
 
 Bug Fixes
   - 3D Studio / Correct character shader vertex masks that could separate the torso from the waist, including Akali Skin102.

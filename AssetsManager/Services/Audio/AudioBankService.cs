@@ -2,9 +2,6 @@ using System;
 using System.IO;
 using System.Linq;
 using System.IO.Hashing;
-using LeagueToolkit.Core.Meta;
-using LeagueToolkit.Core.Meta.Properties;
-using LeagueToolkit.Hashing;
 using System.Collections.Generic;
 using AssetsManager.Services.Parsers;
 using AssetsManager.Views.Models.Audio;
@@ -155,7 +152,7 @@ namespace AssetsManager.Services.Audio
             ProcessBnkWems(audioBnkData, allWems, AudioSourceType.Bnk, "AUDIO BNK");
 
             // Process the events BNK (sometimes has embedded audios too)
-            ProcessBnkWems(eventsBnkData, allWems, AudioSourceType.Bnk, "EVENTS BNK");
+            ProcessBnkWems(eventsBnkData, allWems, AudioSourceType.EventsBnk, "EVENTS BNK");
 
             return allWems;
         }
@@ -195,10 +192,7 @@ namespace AssetsManager.Services.Audio
         {
             if (allSounds == null || !allSounds.Any()) return;
 
-            var linkedWemIds = new HashSet<uint>(
-                eventNodes.SelectMany(e => e.Sounds.Select(s => s.Id))
-                .Concat(eventNodes.SelectMany(e => e.Containers.SelectMany(c => c.Sounds.Select(s => s.Id))))
-            );
+            var linkedWemIds = eventNodes.SelectMany(e => e.EnumerateSounds()).Select(s => s.Id).ToHashSet();
             var unlinkedWemIds = allSounds.Keys.Where(id => !linkedWemIds.Contains(id)).ToList();
 
             if (unlinkedWemIds.Any())
@@ -257,129 +251,60 @@ namespace AssetsManager.Services.Audio
 
             if (!hircObjects.Any()) return eventNodes;
 
-            void Traverse(uint objectId, AudioEventNode audioEventNode, AudioContainerNode currentContainer = null)
+            void AddSound(uint wemId, AudioEventNode audioEventNode, AudioContainerNode parent)
             {
-                if (!hircObjects.TryGetValue(objectId, out var currentObject)) return;
-
-                if (currentObject.Data is IHircContainer container)
+                if (wemMetadata == null || !wemMetadata.TryGetValue(wemId, out var info)) return;
+                var sounds = parent?.Sounds ?? audioEventNode.Sounds;
+                if (sounds.Any(sound => sound.Id == wemId)) return;
+                sounds.Add(new WemFileNode
                 {
-                    _logService.LogDebug($"[AUDIO TRAVERSE] Entering {currentObject.Type} (Type {(byte)currentObject.Type}), ID: {objectId}, Children: {container.Children.Count}");
-                    
-                    string typeLabel = currentObject.Type.GetAbbreviatedName();
-                    string containerName = $"[{typeLabel}] {objectId}";
-                    
-                    // Check if this container was already created for this event (due to multiple ActionIds referencing it)
-                    var nextContainer = audioEventNode.Containers.FirstOrDefault(c => c.Name == containerName);
-                    bool isNewContainer = false;
-                    
-                    if (nextContainer == null)
-                    {
-                        nextContainer = new AudioContainerNode { Name = containerName };
-                        isNewContainer = true;
-                    }
-                    
-                    foreach (var childId in container.Children)
-                    {
-                        Traverse(childId, audioEventNode, nextContainer);
-                    }
-                    
-                    // If the container accumulated any sounds and is new, add it to the event node
-                    if (isNewContainer && nextContainer.Sounds.Any())
-                    {
-                        audioEventNode.Containers.Add(nextContainer);
-                    }
-                    return;
-                }
+                    Id = wemId,
+                    Name = $"{wemId}.wem",
+                    Offset = info.Offset,
+                    Size = info.Size,
+                    Source = info.Source
+                });
+            }
 
-                switch (currentObject.Type)
+            void Traverse(uint objectId, AudioEventNode audioEventNode)
+            {
+                // Track the active path: a shared sound may belong to two separate families.
+                var path = new HashSet<uint>();
+                var pending = new Stack<(uint Id, AudioContainerNode Parent, bool Exit)>();
+                pending.Push((objectId, null, false));
+                while (pending.TryPop(out var step))
                 {
-                    case BnkObjectType.Sound:
-                        if (currentObject.Data is SoundBnkObjectData soundData)
-                        {
-                            if (wemMetadata != null && wemMetadata.ContainsKey(soundData.WemId))
-                            {
-                                var wemInfo = wemMetadata[soundData.WemId];
-                                _logService.LogDebug($"[AUDIO] Linking sound: {soundData.WemId}");
-                                var wemNode = new WemFileNode
-                                {
-                                    Id = soundData.WemId,
-                                    Name = $"{soundData.WemId}.wem",
-                                    Offset = wemInfo.Offset,
-                                    Size = wemInfo.Size,
-                                    Source = wemInfo.Source
-                                };
+                    if (step.Exit) { path.Remove(step.Id); continue; }
+                    if (!path.Add(step.Id)) continue;
+                    pending.Push((step.Id, step.Parent, true));
+                    if (!hircObjects.TryGetValue(step.Id, out var currentObject)) continue;
 
-                                if (currentContainer != null)
-                                {
-                                    if (!currentContainer.Sounds.Any(s => s.Id == wemNode.Id))
-                                    {
-                                        currentContainer.Sounds.Add(wemNode);
-                                    }
-                                }
-                                else
-                                {
-                                    if (!audioEventNode.Sounds.Any(s => s.Id == wemNode.Id))
-                                    {
-                                        audioEventNode.Sounds.Add(wemNode);
-                                    }
-                                }
-                            }
-                            else
-                            {
-                                _logService.LogDebug($"[AUDIO] Sound {soundData.WemId} found in event, but not in audio BNK/WPK.");
-                            }
-                        }
-                        break;
+                    if (currentObject.Data is IHircContainer container)
+                    {
+                        string name = $"[{currentObject.Type.GetAbbreviatedName()}] {step.Id}";
+                        var siblings = step.Parent?.Containers ?? audioEventNode.Containers;
+                        if (siblings.Any(family => family.Name == name)) continue;
+                        var family = new AudioContainerNode { Name = name };
+                        siblings.Add(family);
+                        for (int i = container.Children.Count - 1; i >= 0; i--)
+                            pending.Push((container.Children[i], family, false));
+                        continue;
+                    }
 
-                    case BnkObjectType.Action:
-                        if (currentObject.Data is ActionBnkObjectData actionData)
-                        {
-                            Traverse(actionData.ObjectId, audioEventNode, currentContainer);
-                        }
-                        break;
-
-                    case BnkObjectType.MusicTrack:
-                        if (currentObject.Data is MusicTrackBnkObjectData trackData)
-                        {
-                            // CRITICAL FIX: MusicTrack.Children contains WEM IDs directly, not HIRC object IDs
-                            // These are file IDs that need to be looked up in wemMetadata, not traversed as HIRC objects
-                            foreach (var wemId in trackData.Children)
-                            {
-                                if (wemMetadata != null && wemMetadata.ContainsKey(wemId))
-                                {
-                                    var wemInfo = wemMetadata[wemId];
-                                    _logService.LogDebug($"[AUDIO] Linking WEM from MusicTrack: {wemId}");
-                                    var wemNode = new WemFileNode
-                                    {
-                                        Id = wemId,
-                                        Name = $"{wemId}.wem",
-                                        Offset = wemInfo.Offset,
-                                        Size = wemInfo.Size,
-                                        Source = wemInfo.Source
-                                    };
-
-                                    if (currentContainer != null)
-                                    {
-                                        if (!currentContainer.Sounds.Any(s => s.Id == wemNode.Id))
-                                        {
-                                            currentContainer.Sounds.Add(wemNode);
-                                        }
-                                    }
-                                    else
-                                    {
-                                        if (!audioEventNode.Sounds.Any(s => s.Id == wemNode.Id))
-                                        {
-                                            audioEventNode.Sounds.Add(wemNode);
-                                        }
-                                    }
-                                }
-                                else
-                                {
-                                    _logService.LogDebug($"[AUDIO] WEM {wemId} found in MusicTrack, but not in audio BNK/WPK.");
-                                }
-                            }
-                        }
-                        break;
+                    switch (currentObject.Data)
+                    {
+                        case SoundBnkObjectData sound:
+                            AddSound(sound.WemId, audioEventNode, step.Parent);
+                            break;
+                        case ActionBnkObjectData { Type: 4 } action:
+                            pending.Push((action.ObjectId, step.Parent, false));
+                            break;
+                        case MusicTrackBnkObjectData track:
+                            // MusicTrack children are media IDs, not hierarchy object IDs.
+                            foreach (uint wemId in track.Children)
+                                AddSound(wemId, audioEventNode, step.Parent);
+                            break;
+                    }
                 }
             }
 
@@ -405,17 +330,6 @@ namespace AssetsManager.Services.Audio
 
                 if (audioEventNode.Sounds.Any() || audioEventNode.Containers.Any())
                 {
-                    // POST-PROCESS OPTIMIZATION:
-                    // If the event has only one container, and no sounds at the root event level,
-                    // we dissolve the container and move all its sounds to the event root level.
-                    // This avoids creating folders when all sounds belong to the exact same "family".
-                    if (audioEventNode.Containers.Count == 1 && !audioEventNode.Sounds.Any())
-                    {
-                        var singleContainer = audioEventNode.Containers[0];
-                        audioEventNode.Sounds.AddRange(singleContainer.Sounds);
-                        audioEventNode.Containers.Clear();
-                    }
-
                     eventNodes.Add(audioEventNode);
                 }
             }

@@ -460,7 +460,7 @@ namespace AssetsManager.Services.Explorer
 
                 if (containerData == null) return null;
 
-                if (node.AudioSource == AudioSourceType.Bnk)
+                if (node.AudioSource is AudioSourceType.Bnk or AudioSourceType.EventsBnk)
                 {
                     if (node.WemSize == 0) return null;
                     // Retornamos el segmento directamente usando Span para evitar copias intermedias (siendo ToArray la copia final necesaria)
