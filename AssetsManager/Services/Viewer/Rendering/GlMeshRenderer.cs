@@ -604,7 +604,8 @@ namespace AssetsManager.Services.Viewer.Rendering
                 _uUseSkinning,
                 resources.IsGpuSkinned && model.SkinningMatrices != null ? 1 : 0);
             _pbrBindings.Bind(material, path => _resources.ResolveProgramTexture(part, resources, path),
-                resources.TangentVbo != 0, !wireframePass && viewMode == StudioViewMode.Lit);
+                resources.TangentVbo != 0, !wireframePass && viewMode == StudioViewMode.Lit,
+                resources.Texture != 0);
 
             if (!wireframePass)
             {

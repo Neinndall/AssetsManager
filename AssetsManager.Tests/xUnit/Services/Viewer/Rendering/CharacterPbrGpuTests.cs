@@ -25,6 +25,66 @@ public sealed class CharacterPbrGpuTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public void EmissiveGreenIsRawDataAndBlendsAfterPbrButInsideLambertGridLighting(bool map)
+    {
+        using var draw = new Draw(map);
+        foreach (bool pbr in new[] { false, true })
+        foreach (bool grid in new[] { false, true })
+        {
+            byte[] Pixel(byte[] mask = null, bool missing = false, bool hasBase = true,
+                ModelMaterialBindingKind kind = ModelMaterialBindingKind.TextureOnly) =>
+                draw.Pixel(128, 0, 0, grid: grid, emissive: mask, pbr: pbr,
+                    missingEmissive: missing, hasBaseTexture: hasBase, kind: kind);
+            byte[] baseline = Pixel();
+            byte[] full = Pixel(new byte[] { 0, 255, 0, 0 });
+            Assert.InRange(Difference(full, new byte[] { 153, 71, 26 }), 0, 1);
+            byte[] half = Pixel(new byte[] { 0, 128, 0, 0 });
+            // Independent Edge/WebGL captures of the exact ab9bd725 material with Three 0.185.1.
+            Assert.InRange(Difference(baseline, !pbr && grid ? new byte[] { 74, 31, 7 } : new byte[] { 0, 0, 0 }), 0, 2);
+            Assert.InRange(Difference(half, !pbr && grid ? new byte[] { 114, 51, 17 } : new byte[] { 111, 50, 16 }), 0, 2);
+            Assert.True(Difference(baseline, half) > 3);
+            Assert.Equal(half, Pixel(new byte[] { 255, 128, 255, 255 }));
+            Assert.Equal(baseline, Pixel(new byte[] { 255, 0, 255, 255 }));
+            Assert.Equal(baseline, Pixel(new byte[] { 0, 255, 0, 0 }, missing: true));
+            Assert.Equal(baseline, Pixel(new byte[] { 0, 255, 0, 0 }, hasBase: false));
+            Assert.Equal(Pixel(kind: ModelMaterialBindingKind.Authored),
+                Pixel(new byte[] { 0, 255, 0, 0 }, kind: ModelMaterialBindingKind.Authored));
+        }
+        Assert.Equal(GLEnum.NoError, draw.Gl.GetError());
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void ProductionRenderersConnectEmissiveMasksIncludingLateTexturesAndUnshadedMode(bool map, bool pbr)
+    {
+        Exception failure = null;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                using var draw = new Draw(map);
+                byte[] baseline = draw.HostPixel(map, 0, StudioViewMode.Lit, pbr: pbr);
+                byte[] full = draw.HostPixel(map, 0, StudioViewMode.Lit, emissive: 255, pbr: pbr);
+                Assert.True(Difference(baseline, full) > 5);
+                Assert.InRange(Difference(full, new byte[] { 153, 71, 26 }), 0, 1);
+                Assert.Equal(full, draw.HostPixel(map, 0, StudioViewMode.Lit, emissive: 255, pbr: pbr, lateEmissive: true));
+                Assert.Equal(draw.HostPixel(map, 0, StudioViewMode.Unshaded, pbr: pbr),
+                    draw.HostPixel(map, 0, StudioViewMode.Unshaded, emissive: 128, pbr: pbr));
+                Assert.Equal(GLEnum.NoError, draw.Gl.GetError());
+            }
+            catch (Exception error) { failure = error; }
+        });
+        thread.SetApartmentState(ApartmentState.STA); thread.Start();
+        Assert.True(thread.Join(TimeSpan.FromSeconds(45)));
+        if (failure != null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public void ProductionRenderersConnectMaterialMapsAndKeepUnshadedModeIndependent(bool map)
     {
         Exception failure = null;
@@ -108,7 +168,7 @@ public sealed class CharacterPbrGpuTests
         Assert.Equal(absent, draw.Pixel(128, 0, 255, missing: true));
         Assert.Equal(present, draw.Pixel(128, 0, 255));
         draw.Bindings.Reset();
-        for (uint unit = 1; unit <= 3; unit++)
+        for (uint unit = 1; unit <= 4; unit++)
         {
             draw.Gl.ActiveTexture((TextureUnit)((uint)TextureUnit.Texture0 + unit));
             Assert.Equal(0, draw.Gl.GetInteger(GetPName.TextureBinding2D));
@@ -124,7 +184,7 @@ public sealed class CharacterPbrGpuTests
         private readonly HiddenWglContext _context = new();
         internal readonly GL Gl;
         internal readonly CharacterPbrBindings Bindings;
-        private readonly uint _program, _vao, _vertices, _base, _rma, _normal, _frame, _target;
+        private readonly uint _program, _vao, _vertices, _base, _rma, _normal, _emissive, _frame, _target;
         private readonly bool _map;
         private readonly ModelMaterialDefinition _material = ModelMaterialDefinition.TextureOnly("base") with { Pbr = new("rma", "normal") };
 
@@ -146,6 +206,7 @@ public sealed class CharacterPbrGpuTests
             Gl.VertexAttrib3(1, 0f, 0f, 1f); Gl.VertexAttrib2(2, 0.5f, 0.5f); Gl.VertexAttrib4(3, 1f, 0f, 0f, 1f);
             _base = Texture(new byte[] { 153, 71, 26, 255 }, InternalFormat.Srgb8Alpha8);
             _rma = Texture(new byte[] { 128, 0, 255, 255 }); _normal = Texture(new byte[] { 128, 128, 255, 255 });
+            _emissive = Texture(new byte[] { 0, 0, 0, 255 });
             _target = Gl.GenTexture(); Gl.BindTexture(TextureTarget.Texture2D, _target);
             Gl.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.Rgba8, 32, 32, 0, PixelFormat.Rgba, PixelType.UnsignedByte, ReadOnlySpan<byte>.Empty);
             _frame = Gl.GenFramebuffer(); Gl.BindFramebuffer(FramebufferTarget.Framebuffer, _frame);
@@ -154,11 +215,14 @@ public sealed class CharacterPbrGpuTests
         }
 
         internal byte[] Pixel(byte rough, byte metal, byte ao, bool direct = false, byte[] normal = null,
-            bool mirror = false, bool enabled = true, bool missing = false, bool grid = false, bool tangents = true)
+            bool mirror = false, bool enabled = true, bool missing = false, bool grid = false, bool tangents = true,
+            byte[] emissive = null, bool pbr = true, bool missingEmissive = false, bool hasBaseTexture = true,
+            ModelMaterialBindingKind kind = ModelMaterialBindingKind.TextureOnly)
         {
             Gl.ActiveTexture(TextureUnit.Texture0);
             Update(_rma, new[] { rough, metal, ao, (byte)255 });
             Update(_normal, normal ?? new byte[] { 128, 128, 255, 255 });
+            Update(_emissive, emissive ?? new byte[] { 0, 0, 0, 255 });
             Gl.UseProgram(_program);
             int U(string name) => Gl.GetUniformLocation(_program, name);
             Matrix4x4 identity = Matrix4x4.Identity, world = Matrix4x4.CreateScale(mirror ? -1 : 1, 1, 1);
@@ -175,12 +239,13 @@ public sealed class CharacterPbrGpuTests
             Bindings.Light(new(0, 0, 3), Vector3.Normalize(new Vector3(0, 0.6f, 0.8f)), direct ? Vector3.One : Vector3.Zero,
                 Vector3.UnitZ, Vector3.Zero, Vector3.One, Vector3.One, direct ? 0 : MathF.PI);
             Gl.BindTexture(TextureTarget.Texture2D, _base);
-            Bindings.Bind(_material, path =>
+            Bindings.Bind(_material with { Pbr = pbr ? _material.Pbr : null,
+                EmissiveTexturePath = emissive == null ? null : "emissive", BindingKind = kind }, path =>
             {
                 // A first upload binds a data texture on the active unit; the diffuse binding must survive it.
                 Gl.BindTexture(TextureTarget.Texture2D, _normal);
-                return missing ? null : path == "rma" ? _rma : _normal;
-            }, tangents, enabled);
+                return missing ? null : path == "emissive" ? (missingEmissive ? null : _emissive) : path == "rma" ? _rma : _normal;
+            }, tangents, enabled, hasBaseTexture);
             Assert.Equal((int)_base, Gl.GetInteger(GetPName.TextureBinding2D));
             Gl.BindFramebuffer(FramebufferTarget.Framebuffer, _frame); Gl.Viewport(0, 0, 32, 32);
             Gl.ClearColor(0, 0, 0, 0); Gl.Clear(ClearBufferMask.ColorBufferBit);
@@ -202,7 +267,8 @@ public sealed class CharacterPbrGpuTests
             return id;
         }
 
-        internal byte[] HostPixel(bool map, byte occlusion, StudioViewMode mode, bool late = false)
+        internal byte[] HostPixel(bool map, byte occlusion, StudioViewMode mode, bool late = false,
+            byte? emissive = null, bool pbr = true, bool lateEmissive = false)
         {
             BitmapSource Bitmap(params byte[] bytes)
             {
@@ -210,14 +276,17 @@ public sealed class CharacterPbrGpuTests
                 bitmap.Freeze(); return bitmap;
             }
             var textures = new Dictionary<string, BitmapSource> { ["base"] = Bitmap(26, 71, 153, 255), ["rma"] = Bitmap(occlusion, 0, 128, 255) };
-            BitmapSource arriving = textures["rma"];
-            if (late) textures.Remove("rma");
+            if (emissive.HasValue) textures["emissive"] = Bitmap(0, emissive.Value, 0, 255);
+            string arrivingKey = lateEmissive ? "emissive" : "rma";
+            BitmapSource arriving = textures[arrivingKey];
+            if (late || lateEmissive) textures.Remove(arrivingKey);
             void Arrive()
             {
-                textures["rma"] = arriving;
+                textures[arrivingKey] = arriving;
                 Gl.Clear(ClearBufferMask.ColorBufferBit);
             }
-            var material = ModelMaterialDefinition.TextureOnly("base") with { Pbr = new("rma", null) };
+            var material = ModelMaterialDefinition.TextureOnly("base") with { Pbr = pbr ? new("rma", null) : null,
+                EmissiveTexturePath = emissive.HasValue ? "emissive" : null };
             Vector3[] positions = { new(-1,-1,0), new(1,-1,0), new(-1,1,0), new(1,1,0) };
             var normals = Enumerable.Repeat(Vector3.UnitZ, 4).ToArray();
             var uv = Enumerable.Repeat(new Vector2(.5f), 4).ToArray();
@@ -235,7 +304,7 @@ public sealed class CharacterPbrGpuTests
                 using var renderer = new MapCharacterRenderer(); renderer.Initialize(Gl);
                 renderer.Render(new[] { group }, Matrix4x4.Identity, Matrix4x4.Identity, Matrix4x4.Identity,
                     new Vector3(0,0,3), 0, null, viewMode: mode, shadersEnabled: true);
-                if (late)
+                if (late || lateEmissive)
                 {
                     Arrive();
                     renderer.Render(new[] { group }, Matrix4x4.Identity, Matrix4x4.Identity, Matrix4x4.Identity,
@@ -256,13 +325,13 @@ public sealed class CharacterPbrGpuTests
                     { AllTextures = textures, SelectedTextureName = "base", MaterialDefinition = material });
                 using var renderer = new GlMeshRenderer(); renderer.Initialize(Gl);
                 renderer.Render(model, Matrix4x4.Identity, Matrix4x4.Identity, Matrix4x4.Identity,
-                    new Vector3(0,0,3), Vector3.UnitZ, Vector3.Zero, Vector3.UnitZ, Vector3.Zero, new Vector3(MathF.PI),
+                    new Vector3(0,0,3), Vector3.UnitZ, Vector3.Zero, Vector3.UnitZ, Vector3.Zero, new Vector3(pbr ? MathF.PI : 0.2f),
                     viewMode: mode, shadersEnabled: true);
-                if (late)
+                if (late || lateEmissive)
                 {
                     Arrive();
                     renderer.Render(model, Matrix4x4.Identity, Matrix4x4.Identity, Matrix4x4.Identity,
-                        new Vector3(0,0,3), Vector3.UnitZ, Vector3.Zero, Vector3.UnitZ, Vector3.Zero, new Vector3(MathF.PI),
+                        new Vector3(0,0,3), Vector3.UnitZ, Vector3.Zero, Vector3.UnitZ, Vector3.Zero, new Vector3(pbr ? MathF.PI : 0.2f),
                         viewMode: mode, shadersEnabled: true);
                 }
             }
@@ -280,7 +349,7 @@ public sealed class CharacterPbrGpuTests
         public void Dispose()
         {
             Bindings.Reset(); Bindings.Dispose();
-            foreach (uint texture in new[] { _base, _rma, _normal, _target }) Gl.DeleteTexture(texture);
+            foreach (uint texture in new[] { _base, _rma, _normal, _emissive, _target }) Gl.DeleteTexture(texture);
             Gl.DeleteFramebuffer(_frame); Gl.DeleteBuffer(_vertices); Gl.DeleteVertexArray(_vao); Gl.DeleteProgram(_program);
             Gl.Dispose(); _context.Dispose();
         }

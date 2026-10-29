@@ -4,6 +4,7 @@ HOTFIX UPDATE
 
 New Features
   - 3D Studio / Preview roughness, metallic, occlusion and normal PBR maps of skins without explicit materials, including submesh overrides.
+  - 3D Studio / Preview skin emissive masks with regular and PBR lighting, including characters placed on maps.
 
 Improvements
 

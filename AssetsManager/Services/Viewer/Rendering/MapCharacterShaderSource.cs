@@ -132,8 +132,9 @@ void main()
         return;
     }
 
+    vec2 materialUv = vUv * uUvRepeat + uUvOffset;
     vec4 texel = uHasTexture != 0
-        ? texture(uBaseTexture, vUv * uUvRepeat + uUvOffset)
+        ? texture(uBaseTexture, materialUv)
         : vec4(1.0);
     float alpha = texel.a * uOpacity;
     if (uAlphaTest > 0.0 && alpha < uAlphaTest)
@@ -142,12 +143,15 @@ void main()
     vec3 color = texel.rgb * srgbToLinear(uColor);
     if (uLit != 0)
     {
+        float emissiveMask = uHasTexture != 0 ? characterEmissiveMask(materialUv) : 0.0;
         if (uPbrOn != 0)
             color = shadeCharacterPbr(color, vNormal, vWorldPosition, vUv);
         else
             color *= uLightGridOn != 0
-                ? srgbToLinear(clamp(vLightGrid + vec3(uSelfIllumination * uLightGridFullBright), 0.0, 1.0))
+                ? srgbToLinear(clamp(vLightGrid * (1.0 - emissiveMask) + vec3(emissiveMask + uSelfIllumination * uLightGridFullBright), 0.0, 1.0))
                 : (gl_FrontFacing ? vStockLightFront : vStockLightBack);
+        if (uPbrOn != 0 || uLightGridOn == 0)
+            color = mix(color, texel.rgb * srgbToLinear(uColor), emissiveMask);
     }
 
     if (uPremultipliedAlpha != 0)

@@ -182,6 +182,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 .Concat(PbrOverrideCandidates.Values.SelectMany(maps => maps)
                     .SelectMany(maps => new[] { maps.Rma, maps.Normal }))
                 .Prepend(DefaultTexturePath)
+                .Prepend(EmissiveTexturePath)
                 .Where(path => !string.IsNullOrWhiteSpace(path))
                 .Distinct(StringComparer.OrdinalIgnoreCase);
 
@@ -665,7 +666,8 @@ namespace AssetsManager.Services.Viewer.Resolvers
                     skinTextureKey,
                     metadata.Pbr?.Rma != null ? null :
                         GameShaderProgramResolver.CreateDefaultSkinnedProgram(skinTextureKey, emissiveTextureKey))
-                    with { Pbr = metadata.Pbr?.Rma != null ? metadata.Pbr : null };
+                    with { Pbr = metadata.Pbr?.Rma != null ? metadata.Pbr : null,
+                        EmissiveTexturePath = metadata.EmissiveTexturePath };
             }
 
             var materialDefinitions = new Dictionary<string, ModelMaterialDefinition>(StringComparer.OrdinalIgnoreCase);
@@ -709,7 +711,8 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 materialDefinitions[submesh] = ModelMaterialDefinition.TextureOnly(
                     textureFallback,
                     maps.Rma != null ? null : GameShaderProgramResolver.CreateDefaultSkinnedProgram(textureFallback, emissiveTextureKey))
-                    with { Pbr = maps.Rma != null || maps.RmaPaths?.Count > 0 ? maps : null };
+                    with { Pbr = maps.Rma != null || maps.RmaPaths?.Count > 0 ? maps : null,
+                        EmissiveTexturePath = metadata.EmissiveTexturePath };
             }
 
             if (metadata.SubmeshRenderOrder is { Count: > 0 })

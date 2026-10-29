@@ -5,13 +5,14 @@ using Silk.NET.OpenGL;
 
 namespace AssetsManager.Services.Viewer.Rendering
 {
-    /// <summary>Shared data-texture and lighting bindings for champion and MAP character PBR previews.</summary>
+    /// <summary>Shared PBR and emissive data-texture bindings for champion and MAP character previews.</summary>
     internal sealed class CharacterPbrBindings : IDisposable
     {
         private readonly GL _gl;
         private readonly int _on, _normalOn, _camera, _direction, _light, _direction2, _light2, _sky, _ground, _ambient;
         private readonly uint _dfg, _sampler;
         private readonly int _view;
+        private readonly int _emissiveOn;
         private readonly int _orthographic;
         internal Matrix4x4 View { get; set; } = Matrix4x4.Identity;
         internal Matrix4x4 Projection { get; set; } = Matrix4x4.Identity;
@@ -26,8 +27,10 @@ namespace AssetsManager.Services.Viewer.Rendering
             _sky = Location("uPbrSky"); _ground = Location("uPbrGround"); _ambient = Location("uPbrAmbientStrength");
             _view = Location("uPbrView");
             _orthographic = Location("uPbrOrthographic");
+            _emissiveOn = Location("uCharacterEmissiveOn");
             gl.UseProgram(program);
             gl.Uniform1(Location("uPbrRma"), 1); gl.Uniform1(Location("uPbrNormal"), 2); gl.Uniform1(Location("uPbrDfg"), 3);
+            gl.Uniform1(Location("uCharacterEmissive"), 4);
             _dfg = gl.GenTexture();
             gl.BindTexture(TextureTarget.Texture2D, _dfg);
             gl.TexImage2D(TextureTarget.Texture2D, 0, (InternalFormat)0x822F /* GL_RG16F */, 16, 16, 0,
@@ -55,10 +58,14 @@ namespace AssetsManager.Services.Viewer.Rendering
             _gl.Uniform1(_orthographic, MathF.Abs(Projection.M44) > 1e-6f ? 1 : 0);
         }
 
-        internal void Bind(ModelMaterialDefinition material, Func<string, uint?> texture, bool tangents, bool enabled)
+        internal void Bind(ModelMaterialDefinition material, Func<string, uint?> texture, bool tangents, bool enabled,
+            bool hasBaseTexture = true)
         {
-            CharacterPbrMaps maps = enabled && material?.BindingKind == ModelMaterialBindingKind.TextureOnly ? material.Pbr : null;
-            if (maps == null)
+            bool textureOnly = enabled && material?.BindingKind == ModelMaterialBindingKind.TextureOnly;
+            CharacterPbrMaps maps = textureOnly ? material.Pbr : null;
+            string emissivePath = textureOnly && hasBaseTexture ? material.EmissiveTexturePath : null;
+            _gl.Uniform1(_emissiveOn, 0);
+            if (maps == null && string.IsNullOrWhiteSpace(emissivePath))
             {
                 _gl.Uniform1(_on, 0);
                 return;
@@ -72,14 +79,16 @@ namespace AssetsManager.Services.Viewer.Rendering
                         if (texture(path) is uint held && held != 0) return held;
                 return string.IsNullOrWhiteSpace(fallback) ? 0 : texture(fallback) ?? 0;
             }
-            uint rma = Resolve(maps.RmaPaths, maps.Rma);
+            uint rma = maps == null ? 0 : Resolve(maps.RmaPaths, maps.Rma);
             uint normal = rma != 0 && tangents ? Resolve(maps.NormalPaths, maps.Normal) : 0;
+            uint emissive = string.IsNullOrWhiteSpace(emissivePath) ? 0 : texture(emissivePath) ?? 0;
             _gl.Uniform1(_on, rma != 0 ? 1 : 0);
             _gl.Uniform1(_normalOn, normal != 0 ? 1 : 0);
-            for (uint unit = 1; unit <= 3; unit++)
+            _gl.Uniform1(_emissiveOn, emissive != 0 ? 1 : 0);
+            for (uint unit = 1; unit <= 4; unit++)
             {
                 _gl.ActiveTexture((TextureUnit)((uint)TextureUnit.Texture0 + unit));
-                _gl.BindTexture(TextureTarget.Texture2D, unit == 1 ? rma : unit == 2 ? normal : _dfg);
+                _gl.BindTexture(TextureTarget.Texture2D, unit == 1 ? rma : unit == 2 ? normal : unit == 3 ? _dfg : emissive);
                 _gl.BindSampler(unit, unit == 3 ? 0 : _sampler);
             }
             _gl.ActiveTexture(TextureUnit.Texture0);
@@ -88,7 +97,7 @@ namespace AssetsManager.Services.Viewer.Rendering
 
         internal void Reset()
         {
-            for (uint unit = 1; unit <= 3; unit++)
+            for (uint unit = 1; unit <= 4; unit++)
             {
                 _gl.ActiveTexture((TextureUnit)((uint)TextureUnit.Texture0 + unit));
                 _gl.BindTexture(TextureTarget.Texture2D, 0); _gl.BindSampler(unit, 0);

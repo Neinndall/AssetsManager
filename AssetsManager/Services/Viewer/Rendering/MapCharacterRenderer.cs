@@ -547,7 +547,8 @@ namespace AssetsManager.Services.Viewer.Rendering
                 _pbrBindings.Bind(command.Range.Material,
                     command.Resources.ProgramTextureLookup ??= CreateProgramTextureLookup(command.Resources),
                     command.Resources.TangentVbo != 0,
-                    !wireframePass && viewMode == StudioViewMode.Lit && command.Range.Lit);
+                    !wireframePass && viewMode == StudioViewMode.Lit && command.Range.Lit,
+                    command.Range.Texture != null);
 
                 if (_gameShaderRuntime != null)
                     _gameShaderRuntime.DrawIndexedPass(

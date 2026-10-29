@@ -116,14 +116,17 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
                             texColor.a = coverageAlpha;
                             float diff1 = max(dot(vNormal, uLightDir), 0.0);
                             float diff2 = max(dot(vNormal, uLightDir2), 0.0);
+                            float emissiveMask = characterEmissiveMask(materialUv);
                             vec3 finalLight = clamp(uAmbient + diff1 * uLightColor + diff2 * uLightColor2 + uSelfIllumination, 0.0, 1.0);
                             if (uLightGridOn != 0)
-                                finalLight = srgbToLinear(clamp(vLightGrid + vec3(uSelfIllumination * uLightGridFullBright), 0.0, 1.0));
+                                finalLight = srgbToLinear(clamp(vLightGrid * (1.0 - emissiveMask) + vec3(emissiveMask + uSelfIllumination * uLightGridFullBright), 0.0, 1.0));
                             vec3 finalColor = uMaterialUnlit != 0
                                 ? texColor.rgb
                                 : texColor.rgb * finalLight;
                             if (uPbrOn != 0 && uMaterialUnlit == 0)
                                 finalColor = shadeCharacterPbr(texColor.rgb, vNormal, vWorldPosition, vUv);
+                            if (uMaterialUnlit == 0 && (uPbrOn != 0 || uLightGridOn == 0))
+                                finalColor = mix(finalColor, texColor.rgb, emissiveMask);
 
                             if (uAlphaCutoff > 0.0 && texColor.a < uAlphaCutoff) discard;
                             if (uMaterialPremultipliedAlpha != 0)

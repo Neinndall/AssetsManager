@@ -5,6 +5,11 @@ namespace AssetsManager.Services.Viewer.Rendering
     {
         internal const string Fragment = @"
 in vec4 vPbrTangent;
+uniform int uCharacterEmissiveOn;
+uniform sampler2D uCharacterEmissive;
+float characterEmissiveMask(vec2 uv) {
+    return uCharacterEmissiveOn != 0 ? texture(uCharacterEmissive, uv).g : 0.0;
+}
 uniform int uPbrOn;
 uniform int uPbrNormalOn;
 uniform sampler2D uPbrRma;
