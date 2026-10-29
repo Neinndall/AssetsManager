@@ -134,9 +134,6 @@ namespace AssetsManager.Services.Viewer.Loading
                 new MapAssetReference(ShadersPath, 0),
                 projectRoot,
                 cancellationToken);
-            IEnumerable<BinTree> shaderTrees = shaders == null
-                ? documents
-                : documents.Append(shaders);
             string targetSknPath = skin.Mesh.VirtualPath;
             Func<ulong, string> wadChunkPathResolver = _hashResolver == null
                 ? null
@@ -144,12 +141,14 @@ namespace AssetsManager.Services.Viewer.Loading
             Func<uint, string> binEntryResolver = _hashResolver == null
                 ? null
                 : _hashResolver.ResolveBinEntry;
-            IEnumerable<BinTree> materialTrees = sharedMaterials == null
-                ? documents
-                : documents.Append(sharedMaterials);
+            // External inking documents participate in material lookup, not in the skin's VFX/animation closure.
+            var materialTrees = documents.ToList();
+            if (sharedMaterials != null && !materialTrees.Contains(sharedMaterials)) materialTrees.Add(sharedMaterials);
+            await CharacterOutlineDocumentLoader.ExpandAsync(materialTrees, _assetResolver, projectRoot,
+                wadChunkPathResolver, cancellationToken);
             SknMaterialTextureMetadata metadata = SknMaterialTextureResolver.ReadMetadata(
                 materialTrees,
-                shaderTrees,
+                shaders == null ? materialTrees : materialTrees.Append(shaders),
                 wadChunkPathResolver,
                 binEntryResolver,
                 targetSknPath);

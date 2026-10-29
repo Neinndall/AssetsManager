@@ -123,6 +123,7 @@ namespace AssetsManager.Services.Viewer.Rendering
         private int _uSelfIllumination;
         private GlLightGridBindings _lightGridBindings;
         private CharacterPbrBindings _pbrBindings;
+        private CharacterOutlineRenderer _outlines;
         private GameShaderRuntime _gameShaderRuntime;
         private bool _gles;
         private bool _ready;
@@ -172,6 +173,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             _uSelfIllumination = gl.GetUniformLocation(_program, "uSelfIllumination");
             _lightGridBindings = new GlLightGridBindings(gl, _program);
             _pbrBindings = new CharacterPbrBindings(gl, _program);
+            _outlines = new CharacterOutlineRenderer(gl, _gles);
 
             uint boneBlock = gl.GetUniformBlockIndex(_program, "BoneTransforms");
             if (boneBlock != uint.MaxValue)
@@ -267,6 +269,8 @@ namespace AssetsManager.Services.Viewer.Rendering
                         DrawQueue(_transparent, viewProjection, in gameFrame, untextured, errored, solidMode, shadersEnabled, wireframePass: false, ref activePalette, ref activeVao);
                         if (glows)
                             DrawBloomPasses(_transparent, in gameFrame, ref activePalette, ref activeVao);
+                        if (viewMode == StudioViewMode.Lit)
+                            DrawOutlines(_opaque.Concat(_transparent), viewProjection, in gameFrame, shadersEnabled);
                     }
                 }
 
@@ -565,6 +569,33 @@ namespace AssetsManager.Services.Viewer.Rendering
 
         private Func<string, uint?> CreateProgramTextureLookup(SkinResources resources) =>
             path => ResolveProgramTexture(resources, path);
+
+        private void DrawOutlines(IEnumerable<DrawCommand> commands, Matrix4x4 viewProjection,
+            in GameShaderRuntime.Frame frame, bool shadersEnabled)
+        {
+            foreach (var command in commands.Where(command => command.PassIndex <= 0))
+            {
+                if (command.Range.Material.Outline is not { } outline) continue;
+                _gl.BindVertexArray(command.Resources.Vao);
+                _gl.FrontFace(command.World.GetDeterminant() < 0f ? FrontFaceDirection.CW : FrontFaceDirection.Ccw);
+                ResetGameBindings();
+                var lookup = command.Resources.ProgramTextureLookup ??= CreateProgramTextureLookup(command.Resources);
+                if (shadersEnabled && command.Resources.HasSkin && _gameShaderRuntime != null &&
+                    _gameShaderRuntime.GetSkinnedPassCount(outline.Material) > 0)
+                {
+                    var outlined = command with { Range = command.Range with { Material = outline.Material }, PassIndex = 0 };
+                    var drawFrame = frame with { CharacterPosition = Vector3.Transform(command.Resources.BoundsCenter, command.World) };
+                    if (TryDrawGamePass(outlined, in drawFrame)) { ResetGameBindings(); continue; }
+                    ResetGameBindings();
+                }
+                if (command.Resources.HasSkin) ConfigureSkinIndexAttribute(command.Resources, integer: false);
+                UploadPalette(command.Palette);
+                _outlines.Bind(outline, command.World, viewProjection, frame.Eye, command.Resources.HasSkin, lookup);
+                _drawElements((uint)PrimitiveType.Triangles, command.Range.IndexCount,
+                    (uint)DrawElementsType.UnsignedInt, new IntPtr(checked(command.Range.StartIndex * sizeof(uint))));
+            }
+            _gl.BindSampler(0, 0);
+        }
 
         private void ResetGameBindings()
         {
@@ -1256,6 +1287,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                     if (texture != 0) _gl.DeleteTexture(texture);
                 _rawProgramTextures.Clear();
                 _pbrBindings?.Dispose();
+                _outlines?.Dispose();
                 _gameShaderRuntime?.Dispose();
                 _gameShaderRuntime = null;
                 foreach (uint sampler in _samplers.Values)

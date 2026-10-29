@@ -30,6 +30,7 @@ namespace AssetsManager.Views.Models.Viewer
         internal GameMaterialProgram Program { get; init; }
         internal CharacterPbrMaps Pbr { get; init; }
         internal string EmissiveTexturePath { get; init; }
+        internal CharacterOutlineDefinition Outline { get; init; }
         internal string BaseSamplerName { get; init; }
         internal System.Collections.Generic.IReadOnlyList<GameMaterialTextureSwap> TextureSwaps { get; init; } =
             System.Array.Empty<GameMaterialTextureSwap>();

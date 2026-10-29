@@ -25,6 +25,8 @@ namespace AssetsManager.Services.Viewer.Resolvers
         internal float SkinScale { get; init; } = 1f;
         internal float SelfIllumination { get; init; } = 0f;
         internal string EmissiveTexturePath { get; init; }
+        internal IReadOnlyDictionary<string, CharacterOutlineDefinition> Outlines { get; init; } =
+            new Dictionary<string, CharacterOutlineDefinition>(StringComparer.OrdinalIgnoreCase);
 
         /// <summary>
         /// The draw rank of each submesh, in mesh order. Explicitly ordered submeshes draw after unlisted geometry
@@ -53,10 +55,12 @@ namespace AssetsManager.Services.Viewer.Resolvers
             if (MaterialDefinitions != null &&
                 MaterialDefinitions.TryGetValue(key, out ModelMaterialDefinition material))
             {
-                return material;
+                return Outlines.TryGetValue(submeshName ?? string.Empty, out var outline)
+                    ? material with { Outline = outline } : material;
             }
 
-            return DefaultMaterialDefinition;
+            return Outlines.TryGetValue(submeshName ?? string.Empty, out var defaultOutline)
+                ? DefaultMaterialDefinition with { Outline = defaultOutline } : DefaultMaterialDefinition;
         }
     }
 
@@ -157,6 +161,8 @@ namespace AssetsManager.Services.Viewer.Resolvers
         internal IReadOnlyDictionary<string, IReadOnlyList<string>> OverrideTexturePathCandidates { get; init; } =
             new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase);
         internal CharacterPbrMaps Pbr { get; init; }
+        internal IReadOnlyDictionary<string, CharacterOutlineDefinition> Outlines { get; init; } =
+            new Dictionary<string, CharacterOutlineDefinition>(StringComparer.OrdinalIgnoreCase);
         internal IReadOnlyDictionary<string, CharacterPbrMaps> PbrOverrides { get; init; } =
             new Dictionary<string, CharacterPbrMaps>(StringComparer.OrdinalIgnoreCase);
         internal IReadOnlyDictionary<string, IReadOnlyList<CharacterPbrMaps>> PbrOverrideCandidates { get; init; } =
@@ -183,6 +189,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
                     .SelectMany(maps => new[] { maps.Rma, maps.Normal }))
                 .Prepend(DefaultTexturePath)
                 .Prepend(EmissiveTexturePath)
+                .Concat(Outlines.Values.Select(outline => outline.MaskPath))
                 .Where(path => !string.IsNullOrWhiteSpace(path))
                 .Distinct(StringComparer.OrdinalIgnoreCase);
 
@@ -191,6 +198,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 .Append(DefaultMaterial)
                 .Where(material => material?.Program?.Passes != null)
                 .SelectMany(material => material.Program.Passes)
+                .Concat(Outlines.Values.SelectMany(outline => outline.Material.Program?.Passes ?? Array.Empty<GameMaterialPass>()))
                 .SelectMany(pass => pass.Textures ?? Array.Empty<GameMaterialTexture>())
                 .Select(texture => !string.IsNullOrWhiteSpace(texture?.Texture?.VirtualPath)
                     ? texture.Texture.VirtualPath
@@ -549,6 +557,8 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 SkinScale = skinScale,
                 SelfIllumination = selfIllumination,
                 EmissiveTexturePath = emissiveTexturePath,
+                Outlines = CharacterOutlineReader.Read(CharacterOutlineReader.Links(effectiveMeshProperties),
+                    trees, shaderTreeList, wadChunkPathResolver, binEntryResolver),
                 Pbr = pbr,
                 PbrOverrides = pbrOverrides,
                 PbrOverrideCandidates = pbrCandidates.ToDictionary(pair => pair.Key,
@@ -731,7 +741,8 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 SubmeshRenderOrder = metadata.SubmeshRenderOrder ?? Array.Empty<string>(),
                 SkinScale = metadata.SkinScale,
                 SelfIllumination = metadata.SelfIllumination,
-                EmissiveTexturePath = metadata.EmissiveTexturePath
+                EmissiveTexturePath = metadata.EmissiveTexturePath,
+                Outlines = metadata.Outlines
             };
         }
 
@@ -1287,7 +1298,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
             return result;
         }
 
-        private static SknShaderDefinition ResolveLinkedShaderDefinition(
+        internal static SknShaderDefinition ResolveLinkedShaderDefinition(
             IEnumerable<BinTree> shaderTrees,
             uint pathHash,
             Func<ulong, string> wadChunkPathResolver,
@@ -1475,7 +1486,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 ? (VfxCustomMaterialBlendFactor)authored.Value
                 : fallback;
 
-        private static SknMaterialDefinition ResolveLinkedMaterialDefinition(
+        internal static SknMaterialDefinition ResolveLinkedMaterialDefinition(
             IEnumerable<BinTree> binTrees,
             uint pathHash,
             Func<ulong, string> wadChunkPathResolver,

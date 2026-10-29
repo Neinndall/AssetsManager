@@ -179,7 +179,7 @@ public sealed class CharacterPbrGpuTests
 
     private static int Difference(byte[] left, byte[] right) => left.Take(3).Zip(right).Max(pair => Math.Abs(pair.First - pair.Second));
 
-    private sealed class Draw : IDisposable
+    internal sealed class Draw : IDisposable
     {
         private readonly HiddenWglContext _context = new();
         internal readonly GL Gl;
@@ -268,7 +268,8 @@ public sealed class CharacterPbrGpuTests
         }
 
         internal byte[] HostPixel(bool map, byte occlusion, StudioViewMode mode, bool late = false,
-            byte? emissive = null, bool pbr = true, bool lateEmissive = false)
+            byte? emissive = null, bool pbr = true, bool lateEmissive = false,
+            CharacterOutlineDefinition outline = null, bool hidden = false)
         {
             BitmapSource Bitmap(params byte[] bytes)
             {
@@ -277,6 +278,7 @@ public sealed class CharacterPbrGpuTests
             }
             var textures = new Dictionary<string, BitmapSource> { ["base"] = Bitmap(26, 71, 153, 255), ["rma"] = Bitmap(occlusion, 0, 128, 255) };
             if (emissive.HasValue) textures["emissive"] = Bitmap(0, emissive.Value, 0, 255);
+            textures["mask"] = Bitmap(0, 128, 0, 255);
             string arrivingKey = lateEmissive ? "emissive" : "rma";
             BitmapSource arriving = textures[arrivingKey];
             if (late || lateEmissive) textures.Remove(arrivingKey);
@@ -286,7 +288,7 @@ public sealed class CharacterPbrGpuTests
                 Gl.Clear(ClearBufferMask.ColorBufferBit);
             }
             var material = ModelMaterialDefinition.TextureOnly("base") with { Pbr = pbr ? new("rma", null) : null,
-                EmissiveTexturePath = emissive.HasValue ? "emissive" : null };
+                EmissiveTexturePath = emissive.HasValue ? "emissive" : null, Outline = outline };
             Vector3[] positions = { new(-1,-1,0), new(1,-1,0), new(-1,1,0), new(1,1,0) };
             var normals = Enumerable.Repeat(Vector3.UnitZ, 4).ToArray();
             var uv = Enumerable.Repeat(new Vector2(.5f), 4).ToArray();
@@ -297,7 +299,7 @@ public sealed class CharacterPbrGpuTests
             {
                 var mesh = new MapCharacterMeshData(positions, normals, uv, null, null, null, indices,
                     new[] { new MapCharacterMeshRange("Body", 0, 6) });
-                var asset = new MapCharacterAssetData(new MapCharacterSkinData("test",null,null,1,Array.Empty<string>(),0), mesh, null,
+                var asset = new MapCharacterAssetData(new MapCharacterSkinData("test",null,null,1,hidden ? new[] { "Body" } : Array.Empty<string>(),0), mesh, null,
                     new SknMaterialTextureResolution(material, new Dictionary<string, ModelMaterialDefinition>()), textures, null);
                 var placement = new MapCharacterData(new MapPlaceableData(1,1,0,"test",Matrix4x4.Identity,255,null,null), "test", null, null);
                 using var group = new MapCharacterRuntimeGroup(asset, new MapCharacterAnimationRuntime(null,null), new[] { placement });
@@ -322,7 +324,7 @@ public sealed class CharacterPbrGpuTests
                 };
                 using var model = new SceneModel();
                 model.Parts.Add(new ModelPart("Body", new GeometryModel3D { Geometry = geometry })
-                    { AllTextures = textures, SelectedTextureName = "base", MaterialDefinition = material });
+                    { AllTextures = textures, SelectedTextureName = "base", MaterialDefinition = material, IsVisible = !hidden });
                 using var renderer = new GlMeshRenderer(); renderer.Initialize(Gl);
                 renderer.Render(model, Matrix4x4.Identity, Matrix4x4.Identity, Matrix4x4.Identity,
                     new Vector3(0,0,3), Vector3.UnitZ, Vector3.Zero, Vector3.UnitZ, Vector3.Zero, new Vector3(pbr ? MathF.PI : 0.2f),

@@ -5,6 +5,7 @@ HOTFIX UPDATE
 New Features
   - 3D Studio / Preview roughness, metallic, occlusion and normal PBR maps of skins without explicit materials, including submesh overrides.
   - 3D Studio / Preview skin emissive masks with regular and PBR lighting, including characters placed on maps.
+  - 3D Studio / Draw skin-defined character outlines with their colors, masks and camera-scaled widths in Lit mode.
 
 Improvements
 

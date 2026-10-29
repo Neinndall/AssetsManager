@@ -68,6 +68,7 @@ namespace AssetsManager.Services.Viewer.Rendering
         private int _uSelfIllumination;
         private GlLightGridBindings _lightGridBindings;
         private CharacterPbrBindings _pbrBindings;
+        private CharacterOutlineRenderer _outlines;
         private bool _gles;
         private bool _ready;
 
@@ -97,6 +98,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                 GlMeshShaderSource.Fragment);
             CacheUniformLocations(gl);
             _pbrBindings = new CharacterPbrBindings(gl, _program);
+            _outlines = new CharacterOutlineRenderer(gl, _gles);
             uint boneBlock = gl.GetUniformBlockIndex(_program, "BoneTransforms");
             if (boneBlock != uint.MaxValue)
                 gl.UniformBlockBinding(_program, boneBlock, 0);
@@ -207,6 +209,8 @@ namespace AssetsManager.Services.Viewer.Rendering
                     RenderSolidParts(model, cameraPosition, world, viewProj, in gameFrame,
                         lightDir, lightColor, lightDir2, lightColor2, ambientColor, materialTimeSeconds,
                         solidMode, shadersEnabled, gameSkinningMatrices);
+                    if (viewMode == StudioViewMode.Lit)
+                        RenderOutlines(model, world, viewProj, in gameFrame, shadersEnabled, gameSkinningMatrices);
                 }
 
                 if (wireframe)
@@ -517,6 +521,39 @@ namespace AssetsManager.Services.Viewer.Rendering
                 IntPtr.Zero);
             _gameShaderRuntime.ResetBindings();
             return true;
+        }
+
+        private void RenderOutlines(SceneModel model, Matrix4x4 world, Matrix4x4 viewProjection,
+            in GameShaderRuntime.Frame frame, bool shadersEnabled, IReadOnlyList<Matrix4x4> gamePalette)
+        {
+            foreach (var part in model.Parts.OrderBy(part => part.DrawRank))
+            {
+                if (!part.IsVisible || part.MaterialDefinition?.Outline is not { } outline) continue;
+                var resources = _resources.Ensure(model, part);
+                if (resources.Vao == 0) continue;
+                _gl.BindVertexArray(resources.Vao);
+                Func<string, uint?> texture = path => _resources.ResolveProgramTexture(part, resources, path);
+                if (shadersEnabled && resources.IsGpuSkinned && _gameShaderRuntime != null && gamePalette is { Count: > 0 } &&
+                    _gameShaderRuntime.GetSkinnedPassCount(outline.Material) > 0)
+                {
+                    ConfigureSkinIndexAttribute(resources, integer: true);
+                    if (_gameShaderRuntime.TryBindSkinned(outline.Material, 0, world, gamePalette,
+                        resources.TangentVbo != 0, in frame, texture, model.SelfIllumination,
+                        hasColors: resources.ColorVbo != 0))
+                    {
+                        _gameShaderRuntime.DrawBoundPass(_drawElements, resources.IndexCount, IntPtr.Zero);
+                        _gameShaderRuntime.ResetBindings();
+                        continue;
+                    }
+                    _gameShaderRuntime.ResetBindings();
+                }
+                if (resources.IsGpuSkinned) ConfigureSkinIndexAttribute(resources, integer: false);
+                UploadBoneTransforms(model.SkinningMatrices);
+                _outlines.Bind(outline, world, viewProjection, frame.Eye,
+                    resources.IsGpuSkinned && model.SkinningMatrices != null, texture);
+                _drawElements((uint)PrimitiveType.Triangles, resources.IndexCount, (uint)DrawElementsType.UnsignedInt, IntPtr.Zero);
+            }
+            _gl.BindSampler(0, 0);
         }
 
         private void RenderParts(
@@ -1038,6 +1075,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                 _bloom = null;
                 _resources?.Dispose();
                 _pbrBindings?.Dispose();
+                _outlines?.Dispose();
                 _materialTimeOrigins.Clear();
                 _bindSkinningPalettes.Clear();
                 _influenceSkinningPalettes.Clear();
