@@ -90,7 +90,7 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
             if (part?.AllTextures == null || resources == null || string.IsNullOrWhiteSpace(authoredPath))
                 return null;
 
-            if (!resources.ProgramTextureKeyByPath.TryGetValue(authoredPath, out string key))
+            if (!resources.ProgramTextureKeyByPath.TryGetValue(authoredPath, out string key) || string.IsNullOrWhiteSpace(key))
             {
                 key = SknMaterialTextureResolver.MatchTextureKey(
                     authoredPath,

@@ -67,6 +67,7 @@ namespace AssetsManager.Services.Viewer.Rendering
         private int _uWireframeColor;
         private int _uSelfIllumination;
         private GlLightGridBindings _lightGridBindings;
+        private CharacterPbrBindings _pbrBindings;
         private bool _gles;
         private bool _ready;
 
@@ -95,6 +96,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                 GlMeshShaderSource.Vertex,
                 GlMeshShaderSource.Fragment);
             CacheUniformLocations(gl);
+            _pbrBindings = new CharacterPbrBindings(gl, _program);
             uint boneBlock = gl.GetUniformBlockIndex(_program, "BoneTransforms");
             if (boneBlock != uint.MaxValue)
                 gl.UniformBlockBinding(_program, boneBlock, 0);
@@ -138,6 +140,8 @@ namespace AssetsManager.Services.Viewer.Rendering
             MapLightGridData lightGrid = null)
         {
             if (!_ready || model == null || !model.IsVisible) return;
+            _pbrBindings.View = view;
+            _pbrBindings.Projection = projection;
 
             Matrix4x4 world = CreateWorldMatrix(model, mirrorCharacterX);
             UploadBoneTransforms(model.SkinningMatrices);
@@ -333,6 +337,8 @@ namespace AssetsManager.Services.Viewer.Rendering
             _gl.Uniform3(_uCameraPosition, cameraPosition);
             _gl.Uniform1(_uEffectTime, materialTimeSeconds);
             _gl.Uniform1(_uSelfIllumination, selfIllumination);
+            _pbrBindings.Light(cameraPosition, NormalizeOrDefault(lightDir), lightColor,
+                NormalizeOrDefault(lightDir2), lightColor2, ambientColor, ambientColor, 1f);
         }
 
         private readonly record struct PartDraw(
@@ -597,6 +603,8 @@ namespace AssetsManager.Services.Viewer.Rendering
             _gl.Uniform1(
                 _uUseSkinning,
                 resources.IsGpuSkinned && model.SkinningMatrices != null ? 1 : 0);
+            _pbrBindings.Bind(material, path => _resources.ResolveProgramTexture(part, resources, path),
+                resources.TangentVbo != 0, !wireframePass && viewMode == StudioViewMode.Lit);
 
             if (!wireframePass)
             {
@@ -903,6 +911,7 @@ namespace AssetsManager.Services.Viewer.Rendering
 
         private void UnbindSceneTextures()
         {
+            _pbrBindings?.Reset();
             _gl.ActiveTexture(TextureUnit.Texture0);
             _gl.BindTexture(TextureTarget.Texture2D, 0);
         }
@@ -1027,6 +1036,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                 _bloom?.Dispose();
                 _bloom = null;
                 _resources?.Dispose();
+                _pbrBindings?.Dispose();
                 _materialTimeOrigins.Clear();
                 _bindSkinningPalettes.Clear();
                 _influenceSkinningPalettes.Clear();

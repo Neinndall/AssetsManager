@@ -122,6 +122,7 @@ namespace AssetsManager.Services.Viewer.Rendering
         private int _uWireframeColor;
         private int _uSelfIllumination;
         private GlLightGridBindings _lightGridBindings;
+        private CharacterPbrBindings _pbrBindings;
         private GameShaderRuntime _gameShaderRuntime;
         private bool _gles;
         private bool _ready;
@@ -170,6 +171,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             _uWireframeColor = gl.GetUniformLocation(_program, "uWireframeColor");
             _uSelfIllumination = gl.GetUniformLocation(_program, "uSelfIllumination");
             _lightGridBindings = new GlLightGridBindings(gl, _program);
+            _pbrBindings = new CharacterPbrBindings(gl, _program);
 
             uint boneBlock = gl.GetUniformBlockIndex(_program, "BoneTransforms");
             if (boneBlock != uint.MaxValue)
@@ -299,6 +301,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                 _gl.Disable(EnableCap.CullFace);
                 _gl.Enable(EnableCap.DepthTest);
                 _gl.DepthMask(true);
+                _pbrBindings.Reset();
                 _gl.BindSampler(0, 0);
                 _gl.BindTexture(TextureTarget.Texture2D, 0);
                 _gl.BindVertexArray(0);
@@ -528,7 +531,9 @@ namespace AssetsManager.Services.Viewer.Rendering
                 ResetGameBindings();
                 if (command.Resources.HasSkin)
                     ConfigureSkinIndexAttribute(command.Resources, integer: false);
-                UseStockProgram(viewProjection, gameFrame.Sun);
+                _pbrBindings.View = gameFrame.View;
+                _pbrBindings.Projection = gameFrame.Projection;
+                UseStockProgram(viewProjection, gameFrame.Sun, gameFrame.Eye);
                 _lightGridBindings.Apply(drawFrame.LightGrid, drawFrame.CharacterPosition);
                 if (!ReferenceEquals(activePalette, command.Palette))
                 {
@@ -539,6 +544,10 @@ namespace AssetsManager.Services.Viewer.Rendering
                 _gl.Uniform1(_uUseSkinning, command.Resources.HasSkin ? 1 : 0);
                 if (!wireframePass)
                     ApplyMaterial(command.Range, command.TimeSeconds, untextured, errored, viewMode, command.SelfIllumination);
+                _pbrBindings.Bind(command.Range.Material,
+                    command.Resources.ProgramTextureLookup ??= CreateProgramTextureLookup(command.Resources),
+                    command.Resources.TangentVbo != 0,
+                    !wireframePass && viewMode == StudioViewMode.Lit && command.Range.Lit);
 
                 if (_gameShaderRuntime != null)
                     _gameShaderRuntime.DrawIndexedPass(
@@ -663,7 +672,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             }
         }
 
-        private void UseStockProgram(Matrix4x4 viewProjection, MapSunData sun)
+        private void UseStockProgram(Matrix4x4 viewProjection, MapSunData sun, Vector3 camera = default)
         {
             _gl.UseProgram(_program);
             _gl.UniformMatrix4(_uViewProjection, 1, false, in viewProjection.M11);
@@ -674,21 +683,27 @@ namespace AssetsManager.Services.Viewer.Rendering
             _gl.Uniform3(_uSkyColor, light.SkyColor.X, light.SkyColor.Y, light.SkyColor.Z);
             _gl.Uniform3(_uGroundColor, light.GroundColor.X, light.GroundColor.Y, light.GroundColor.Z);
             _gl.Uniform1(_uAmbientStrength, light.AmbientStrength);
+            _pbrBindings.Light(camera, light.Direction, light.SunColor * light.SunStrength,
+                Vector3.UnitY, Vector3.Zero, light.SkyColor, light.GroundColor, light.AmbientStrength);
         }
 
         private uint? ResolveProgramTexture(SkinResources resources, string authoredPath)
         {
             if (resources?.Asset?.Textures == null || string.IsNullOrWhiteSpace(authoredPath))
                 return null;
-            if (resources.ProgramTexturesByPath.TryGetValue(authoredPath, out uint cached))
-                return cached == 0 ? null : cached;
+            if (resources.ProgramTexturesByPath.TryGetValue(authoredPath, out uint cached) && cached != 0)
+                return cached;
 
             string key = SknMaterialTextureResolver.MatchTextureKey(authoredPath, resources.TextureKeys);
+            if (string.IsNullOrWhiteSpace(key) && resources.TextureKeys.Length != resources.Asset.Textures.Count)
+            {
+                resources.TextureKeys = resources.Asset.Textures.Keys.ToArray();
+                key = SknMaterialTextureResolver.MatchTextureKey(authoredPath, resources.TextureKeys);
+            }
             if (string.IsNullOrWhiteSpace(key) ||
                 !resources.Asset.Textures.TryGetValue(key, out BitmapSource bitmap) ||
                 bitmap == null)
             {
-                resources.ProgramTexturesByPath[authoredPath] = 0;
                 return null;
             }
 
@@ -1239,6 +1254,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                 foreach (uint texture in _rawProgramTextures.Values)
                     if (texture != 0) _gl.DeleteTexture(texture);
                 _rawProgramTextures.Clear();
+                _pbrBindings?.Dispose();
                 _gameShaderRuntime?.Dispose();
                 _gameShaderRuntime = null;
                 foreach (uint sampler in _samplers.Values)

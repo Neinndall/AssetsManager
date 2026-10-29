@@ -1,3 +1,18 @@
+AssetsManager - League of Legends | v4.1.0.5
+
+HOTFIX UPDATE
+
+New Features
+  - 3D Studio / Preview roughness, metallic, occlusion and normal PBR maps of skins without explicit materials, including submesh overrides.
+
+Improvements
+
+Changes
+
+Bug Fixes
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
 AssetsManager - League of Legends | v4.1.0.4
 
 HOTFIX UPDATE

@@ -12,6 +12,7 @@ namespace AssetsManager.Services.Viewer.Rendering
 layout(location = 0) in vec3 aPosition;
 layout(location = 1) in vec3 aNormal;
 layout(location = 2) in vec2 aUv;
+layout(location = 3) in vec4 aTangent;
 layout(location = 5) in vec4 aSkinIndex;
 layout(location = 6) in vec4 aSkinWeight;
 
@@ -41,6 +42,8 @@ vec3 stockLight(vec3 normal)
 }
 
 out vec3 vNormal;
+out vec4 vPbrTangent;
+out vec3 vWorldPosition;
 uniform vec3 uLightGridCube[6];
 out vec3 vLightGrid;
 out vec2 vUv;
@@ -49,6 +52,7 @@ void main()
 {
     vec3 position = aPosition;
     vec3 normal = aNormal;
+    vec3 tangent = aTangent.xyz;
     if (uUseSkinning != 0)
     {
         ivec4 joints = ivec4(aSkinIndex + vec4(0.5));
@@ -59,11 +63,15 @@ void main()
             uBoneTransforms[joints.w] * aSkinWeight.w;
         position = (skin * vec4(position, 1.0)).xyz;
         normal = mat3(skin) * normal;
+        tangent = mat3(skin) * tangent;
     }
 
     vec4 worldPosition = uWorld * vec4(position, 1.0);
     mat3 normalMatrix = transpose(inverse(mat3(uWorld)));
     vNormal = normalize(normalMatrix * normal);
+    tangent = mat3(uWorld) * tangent;
+    vPbrTangent = vec4(tangent / max(length(tangent), 1e-6), aTangent.w * sign(determinant(mat3(uWorld))));
+    vWorldPosition = worldPosition.xyz;
     vStockLightFront = stockLight(vNormal);
     vStockLightBack = stockLight(-vNormal);
     vec3 gridWeight = vNormal * vNormal;
@@ -78,6 +86,8 @@ void main()
 in vec3 vStockLightFront;
 in vec3 vStockLightBack;
 in vec2 vUv;
+in vec3 vNormal;
+in vec3 vWorldPosition;
 
 uniform sampler2D uBaseTexture;
 uniform int uHasTexture;
@@ -113,6 +123,7 @@ vec3 linearToSrgb(vec3 value)
     return mix(high, low, lessThanEqual(value, vec3(0.0031308)));
 }
 
+" + CharacterPbrShaderSource.Fragment + @"
 void main()
 {
     if (uWireframePass != 0)
@@ -131,9 +142,12 @@ void main()
     vec3 color = texel.rgb * srgbToLinear(uColor);
     if (uLit != 0)
     {
-        color *= uLightGridOn != 0
-            ? srgbToLinear(clamp(vLightGrid + vec3(uSelfIllumination * uLightGridFullBright), 0.0, 1.0))
-            : (gl_FrontFacing ? vStockLightFront : vStockLightBack);
+        if (uPbrOn != 0)
+            color = shadeCharacterPbr(color, vNormal, vWorldPosition, vUv);
+        else
+            color *= uLightGridOn != 0
+                ? srgbToLinear(clamp(vLightGrid + vec3(uSelfIllumination * uLightGridFullBright), 0.0, 1.0))
+                : (gl_FrontFacing ? vStockLightFront : vStockLightBack);
     }
 
     if (uPremultipliedAlpha != 0)
