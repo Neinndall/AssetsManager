@@ -11,6 +11,7 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
                     layout(location=0) in vec3 aPos;
                     layout(location=1) in vec3 aNormal;
                     layout(location=2) in vec2 aUv;
+                    layout(location=3) in vec4 aTangent;
                     layout(location=5) in vec4 aBoneIndices;
                     layout(location=6) in vec4 aBoneWeights;
                     uniform mat4 uViewProj;
@@ -21,6 +22,7 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
                         mat4 uBoneTransforms[MAX_BONES];
                     };
                     out vec3 vNormal;
+                    out vec4 vPbrTangent;
                     uniform vec3 uLightGridCube[6];
                     out vec3 vLightGrid;
                     out vec3 vWorldPosition;
@@ -28,6 +30,7 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
                     void main(){
                             vec3 animatedPosition = aPos;
                             vec3 animatedNormal = aNormal;
+                            vec3 animatedTangent = aTangent.xyz;
                             if (uUseSkinning != 0)
                             {
                                 ivec4 boneIndices = ivec4(aBoneIndices + vec4(0.5));
@@ -38,10 +41,14 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
                                     uBoneTransforms[boneIndices.w] * aBoneWeights.w;
                                 animatedPosition = (skinMatrix * vec4(aPos, 1.0)).xyz;
                                 animatedNormal = mat3(skinMatrix) * aNormal;
+                                animatedTangent = mat3(skinMatrix) * aTangent.xyz;
                             }
                             vec4 worldPos = uWorld * vec4(animatedPosition, 1.0);
                             gl_Position = uViewProj * worldPos;
                             vNormal = normalize(mat3(uWorld) * animatedNormal);
+                            vec3 tangent = mat3(uWorld) * animatedTangent;
+                            vPbrTangent = vec4(tangent / max(length(tangent), 1e-6),
+                                aTangent.w * sign(determinant(mat3(uWorld))));
                             vec3 gridWeight = vNormal * vNormal;
                             vLightGrid = gridWeight.x * uLightGridCube[vNormal.x < 0.0 ? 1 : 0]
                                 + gridWeight.y * uLightGridCube[vNormal.y < 0.0 ? 3 : 2]
@@ -90,6 +97,7 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
                     vec4 readBaseTexture(vec2 uv){
                         return texture(uTex, uv);
                     }
+" + CharacterPbrShaderSource.Fragment + @"
                     void main(){
                             if (uWireframePass != 0)
                             {
@@ -108,12 +116,17 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
                             texColor.a = coverageAlpha;
                             float diff1 = max(dot(vNormal, uLightDir), 0.0);
                             float diff2 = max(dot(vNormal, uLightDir2), 0.0);
+                            float emissiveMask = characterEmissiveMask(materialUv);
                             vec3 finalLight = clamp(uAmbient + diff1 * uLightColor + diff2 * uLightColor2 + uSelfIllumination, 0.0, 1.0);
                             if (uLightGridOn != 0)
-                                finalLight = srgbToLinear(clamp(vLightGrid + vec3(uSelfIllumination * uLightGridFullBright), 0.0, 1.0));
+                                finalLight = srgbToLinear(clamp(vLightGrid * (1.0 - emissiveMask) + vec3(emissiveMask + uSelfIllumination * uLightGridFullBright), 0.0, 1.0));
                             vec3 finalColor = uMaterialUnlit != 0
                                 ? texColor.rgb
                                 : texColor.rgb * finalLight;
+                            if (uPbrOn != 0 && uMaterialUnlit == 0)
+                                finalColor = shadeCharacterPbr(texColor.rgb, vNormal, vWorldPosition, vUv);
+                            if (uMaterialUnlit == 0 && (uPbrOn != 0 || uLightGridOn == 0))
+                                finalColor = mix(finalColor, texColor.rgb, emissiveMask);
 
                             if (uAlphaCutoff > 0.0 && texColor.a < uAlphaCutoff) discard;
                             if (uMaterialPremultipliedAlpha != 0)

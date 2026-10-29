@@ -1,7 +1,6 @@
 using AssetsManager.Services.Viewer.Resources;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Numerics;
 using System.Runtime.InteropServices;
@@ -23,6 +22,7 @@ namespace AssetsManager.Services.Viewer.Rendering
     {
         /// <summary>Environment cube PBR game shaders light from (IBL); the preview sky the viewport shows.</summary>
         internal CubeMapData ImageLight { get; set; }
+        internal bool SuppressBloom { get; set; }
 
         private static readonly Vector3 ReferenceCharacterLightDirection =
             Vector3.Normalize(new Vector3(0.25f, 0.75f, -0.05f));
@@ -41,7 +41,6 @@ namespace AssetsManager.Services.Viewer.Rendering
         private readonly List<ModelPart> _alphaRenderQueue = new();
         private readonly List<PartDraw> _opaqueDraws = new();
         private readonly List<PartDraw> _transparentDraws = new();
-        private readonly Dictionary<SceneModel, long> _materialTimeOrigins = new();
         private readonly Dictionary<SceneModel, Matrix4x4[]> _bindSkinningPalettes = new();
         private readonly Dictionary<SceneModel, Matrix4x4[]> _influenceSkinningPalettes = new();
         private int _uViewProj;
@@ -67,6 +66,8 @@ namespace AssetsManager.Services.Viewer.Rendering
         private int _uWireframeColor;
         private int _uSelfIllumination;
         private GlLightGridBindings _lightGridBindings;
+        private CharacterPbrBindings _pbrBindings;
+        private CharacterOutlineRenderer _outlines;
         private bool _gles;
         private bool _ready;
 
@@ -95,6 +96,8 @@ namespace AssetsManager.Services.Viewer.Rendering
                 GlMeshShaderSource.Vertex,
                 GlMeshShaderSource.Fragment);
             CacheUniformLocations(gl);
+            _pbrBindings = new CharacterPbrBindings(gl, _program);
+            _outlines = new CharacterOutlineRenderer(gl, _gles);
             uint boneBlock = gl.GetUniformBlockIndex(_program, "BoneTransforms");
             if (boneBlock != uint.MaxValue)
                 gl.UniformBlockBinding(_program, boneBlock, 0);
@@ -135,9 +138,12 @@ namespace AssetsManager.Services.Viewer.Rendering
             bool shadersEnabled = false,
             bool mirrorCharacterX = false,
             MapSunData mapSun = null,
-            MapLightGridData lightGrid = null)
+            MapLightGridData lightGrid = null,
+            double? timeSeconds = null)
         {
             if (!_ready || model == null || !model.IsVisible) return;
+            _pbrBindings.View = view;
+            _pbrBindings.Projection = projection;
 
             Matrix4x4 world = CreateWorldMatrix(model, mirrorCharacterX);
             UploadBoneTransforms(model.SkinningMatrices);
@@ -150,14 +156,9 @@ namespace AssetsManager.Services.Viewer.Rendering
             }
             if (UsesGameShaders(viewMode, shadersEnabled) && gameSkinningMatrices is { Count: > 0 })
                 gameSkinningMatrices = GetInfluenceSkinningPalette(model, gameSkinningMatrices);
-            long now = Stopwatch.GetTimestamp();
-            if (!_materialTimeOrigins.TryGetValue(model, out long materialTimeOrigin))
-            {
-                materialTimeOrigin = now;
-                _materialTimeOrigins[model] = materialTimeOrigin;
-            }
-            float materialTimeSeconds =
-                (float)((now - materialTimeOrigin) / (double)Stopwatch.Frequency);
+            double sceneTime = timeSeconds ?? model.AnimationTime;
+            float materialTimeSeconds = double.IsFinite(sceneTime)
+                ? (float)Math.Clamp(sceneTime, 0d, float.MaxValue) : 0f;
             var gameFrame = new GameShaderRuntime.Frame(
                 view,
                 projection,
@@ -203,6 +204,8 @@ namespace AssetsManager.Services.Viewer.Rendering
                     RenderSolidParts(model, cameraPosition, world, viewProj, in gameFrame,
                         lightDir, lightColor, lightDir2, lightColor2, ambientColor, materialTimeSeconds,
                         solidMode, shadersEnabled, gameSkinningMatrices);
+                    if (viewMode == StudioViewMode.Lit)
+                        RenderOutlines(model, world, viewProj, in gameFrame, shadersEnabled, gameSkinningMatrices);
                 }
 
                 if (wireframe)
@@ -333,6 +336,8 @@ namespace AssetsManager.Services.Viewer.Rendering
             _gl.Uniform3(_uCameraPosition, cameraPosition);
             _gl.Uniform1(_uEffectTime, materialTimeSeconds);
             _gl.Uniform1(_uSelfIllumination, selfIllumination);
+            _pbrBindings.Light(cameraPosition, NormalizeOrDefault(lightDir), lightColor,
+                NormalizeOrDefault(lightDir2), lightColor2, ambientColor, ambientColor, 1f);
         }
 
         private readonly record struct PartDraw(
@@ -435,7 +440,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                 }
             }
 
-            if (_bloom != null && UsesGameShaders(viewMode, shadersEnabled))
+            if (!SuppressBloom && _bloom != null && UsesGameShaders(viewMode, shadersEnabled))
                 RenderBloomPasses(model, world, in gameFrame, gameSkinningMatrices);
 
             _opaqueDraws.Clear();
@@ -511,6 +516,39 @@ namespace AssetsManager.Services.Viewer.Rendering
                 IntPtr.Zero);
             _gameShaderRuntime.ResetBindings();
             return true;
+        }
+
+        private void RenderOutlines(SceneModel model, Matrix4x4 world, Matrix4x4 viewProjection,
+            in GameShaderRuntime.Frame frame, bool shadersEnabled, IReadOnlyList<Matrix4x4> gamePalette)
+        {
+            foreach (var part in model.Parts.OrderBy(part => part.DrawRank))
+            {
+                if (!part.IsVisible || part.MaterialDefinition?.Outline is not { } outline) continue;
+                var resources = _resources.Ensure(model, part);
+                if (resources.Vao == 0) continue;
+                _gl.BindVertexArray(resources.Vao);
+                Func<string, uint?> texture = path => _resources.ResolveProgramTexture(part, resources, path);
+                if (shadersEnabled && resources.IsGpuSkinned && _gameShaderRuntime != null && gamePalette is { Count: > 0 } &&
+                    _gameShaderRuntime.GetSkinnedPassCount(outline.Material) > 0)
+                {
+                    ConfigureSkinIndexAttribute(resources, integer: true);
+                    if (_gameShaderRuntime.TryBindSkinned(outline.Material, 0, world, gamePalette,
+                        resources.TangentVbo != 0, in frame, texture, model.SelfIllumination,
+                        hasColors: resources.ColorVbo != 0))
+                    {
+                        _gameShaderRuntime.DrawBoundPass(_drawElements, resources.IndexCount, IntPtr.Zero);
+                        _gameShaderRuntime.ResetBindings();
+                        continue;
+                    }
+                    _gameShaderRuntime.ResetBindings();
+                }
+                if (resources.IsGpuSkinned) ConfigureSkinIndexAttribute(resources, integer: false);
+                UploadBoneTransforms(model.SkinningMatrices);
+                _outlines.Bind(outline, world, viewProjection, frame.Eye,
+                    resources.IsGpuSkinned && model.SkinningMatrices != null, texture);
+                _drawElements((uint)PrimitiveType.Triangles, resources.IndexCount, (uint)DrawElementsType.UnsignedInt, IntPtr.Zero);
+            }
+            _gl.BindSampler(0, 0);
         }
 
         private void RenderParts(
@@ -597,6 +635,9 @@ namespace AssetsManager.Services.Viewer.Rendering
             _gl.Uniform1(
                 _uUseSkinning,
                 resources.IsGpuSkinned && model.SkinningMatrices != null ? 1 : 0);
+            _pbrBindings.Bind(material, path => _resources.ResolveProgramTexture(part, resources, path),
+                resources.TangentVbo != 0, !wireframePass && viewMode == StudioViewMode.Lit,
+                resources.Texture != 0);
 
             if (!wireframePass)
             {
@@ -903,6 +944,7 @@ namespace AssetsManager.Services.Viewer.Rendering
 
         private void UnbindSceneTextures()
         {
+            _pbrBindings?.Reset();
             _gl.ActiveTexture(TextureUnit.Texture0);
             _gl.BindTexture(TextureTarget.Texture2D, 0);
         }
@@ -1003,7 +1045,6 @@ namespace AssetsManager.Services.Viewer.Rendering
         {
             if (model != null)
             {
-                _materialTimeOrigins.Remove(model);
                 _bindSkinningPalettes.Remove(model);
                 _influenceSkinningPalettes.Remove(model);
             }
@@ -1027,7 +1068,8 @@ namespace AssetsManager.Services.Viewer.Rendering
                 _bloom?.Dispose();
                 _bloom = null;
                 _resources?.Dispose();
-                _materialTimeOrigins.Clear();
+                _pbrBindings?.Dispose();
+                _outlines?.Dispose();
                 _bindSkinningPalettes.Clear();
                 _influenceSkinningPalettes.Clear();
                 if (_boneBuffer != 0)

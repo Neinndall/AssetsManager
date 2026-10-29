@@ -28,6 +28,89 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
         };
 
         [Fact]
+        public void PbrMapsReachTextureRequestsAndMapOnlyOverridesInheritEachMissingMap()
+        {
+            const string rma = "assets/test/body_rma.tex", normal = "assets/test/body_nm.tex";
+            const string hatRma = "assets/test/hat_rma.tex", armNormal = "assets/test/arm_nm.tex";
+            const string emissive = "assets/test/body_em.tex";
+            var mesh = new BinTreeStruct(Fnv1a.HashLower("skinMeshProperties"), Fnv1a.HashLower("SkinMeshDataProperties"), new BinTreeProperty[]
+            {
+                CreateTextureLink("texture", "ASSETS/Test/Body.tex"),
+                CreateTextureLink("RoughnessMetallicAoTexture", rma), CreateTextureLink("normalMapTexture", normal),
+                CreateTextureLink("emissiveTexture", emissive),
+                new BinTreeUnorderedContainer(Fnv1a.HashLower("materialOverride"), BinPropertyType.Embedded, new[]
+                {
+                    CreateOverride("Hat", CreateTextureLink("RoughnessMetallicAoTexture", hatRma)),
+                    CreateOverride("Arm", CreateTextureLink("normalMapTexture", armNormal)),
+                    CreateOverride("Linked", new BinTreeObjectLink(Fnv1a.HashLower("Material"), 123))
+                })
+            });
+            var tree = new BinTree(new[] { new BinTreeObject("Characters/Test/Skins/Skin1", "SkinCharacterDataProperties", new BinTreeProperty[] { mesh }) }, Array.Empty<string>());
+            var metadata = SknMaterialTextureResolver.ReadMetadata(tree);
+            foreach (string path in new[] { rma, normal, hatRma, armNormal, emissive }) Assert.Contains(path, metadata.ReferencedTexturePaths);
+            var resolved = SknResolver.Resolve(metadata, new[] { "body", "body_rma", "body_nm", "hat_rma", "arm_nm" });
+            Assert.Equal(new CharacterPbrMaps(rma, normal), resolved.DefaultMaterialDefinition.Pbr);
+            Assert.Null(resolved.DefaultMaterialDefinition.Program);
+            Assert.Equal(hatRma, resolved.ResolveMaterialDefinition("hAT").Pbr.Rma);
+            Assert.Equal(normal, resolved.ResolveMaterialDefinition("hAT").Pbr.Normal);
+            Assert.Equal(rma, resolved.ResolveMaterialDefinition("arm").Pbr.Rma);
+            Assert.Equal(armNormal, resolved.ResolveMaterialDefinition("arm").Pbr.Normal);
+            Assert.Equal(new[] { hatRma, rma }, resolved.ResolveMaterialDefinition("Hat").Pbr.RmaPaths);
+            Assert.Equal(ModelMaterialBindingKind.Missing, resolved.ResolveMaterialDefinition("Linked").BindingKind);
+            Assert.Null(resolved.ResolveMaterialDefinition("Linked").Pbr);
+            // Keep the authored path even before its texture arrives, and never attach it to a material link.
+            Assert.Equal(emissive, resolved.DefaultMaterialDefinition.EmissiveTexturePath);
+            Assert.Equal(emissive, resolved.ResolveMaterialDefinition("Hat").EmissiveTexturePath);
+            Assert.Equal(emissive, resolved.ResolveMaterialDefinition("Arm").EmissiveTexturePath);
+            Assert.Null(resolved.ResolveMaterialDefinition("Linked").EmissiveTexturePath);
+        }
+
+        [Fact]
+        public void EmissiveMaskWithoutPbrReachesTextureRequestsAndKeepsTheTranslatedProgram()
+        {
+            const string emissive = "assets/test/body_em.tex";
+            var metadata = new SknMaterialTextureMetadata("body.tex", null, new Dictionary<string, SknMaterialDefinition>())
+            {
+                EmissiveTexturePath = emissive,
+                DirectOverrideTexturePaths = new Dictionary<string, string> { ["hat"] = "hat.tex" }
+            };
+            Assert.Contains(emissive, metadata.ReferencedTexturePaths);
+            var resolved = SknResolver.Resolve(metadata, new[] { "body", "hat", "body_em" });
+            Assert.Equal(emissive, resolved.DefaultMaterialDefinition.EmissiveTexturePath);
+            Assert.NotNull(resolved.DefaultMaterialDefinition.Program);
+            Assert.Null(resolved.DefaultMaterialDefinition.Pbr);
+            Assert.Equal(emissive, resolved.ResolveMaterialDefinition("hat").EmissiveTexturePath);
+            Assert.NotNull(resolved.ResolveMaterialDefinition("hat").Program);
+            var linked = SknResolver.Resolve(metadata with { HasDefaultMaterialLink = true }, new[] { "body", "body_em" });
+            Assert.Null(linked.DefaultMaterialDefinition.EmissiveTexturePath);
+        }
+
+        [Fact]
+        public void LaterDuplicatePbrMapsStayAvailableWithoutSuppressingTheFirstOverridesDefaultProgram()
+        {
+            var metadata = new SknMaterialTextureMetadata("Body.tex", null, new Dictionary<string, SknMaterialDefinition>())
+            {
+                PbrOverrides = new Dictionary<string, CharacterPbrMaps> { ["hat"] = new(null, "normal.tex") },
+                PbrOverrideCandidates = new Dictionary<string, IReadOnlyList<CharacterPbrMaps>>
+                { ["hat"] = new[] { new CharacterPbrMaps(null, "normal.tex"), new CharacterPbrMaps("late-rma.tex", null) } }
+            };
+            var material = SknResolver.Resolve(metadata, new[] { "body", "normal", "late-rma" }).ResolveMaterialDefinition("hat");
+            Assert.NotNull(material.Program);
+            Assert.NotNull(material.Pbr);
+            Assert.Equal(new[] { "late-rma.tex" }, material.Pbr.RmaPaths);
+        }
+
+        [Fact]
+        public void NormalMapAloneKeepsTheExistingDefaultProgram()
+        {
+            var metadata = new SknMaterialTextureMetadata("Body.tex", null,
+                new Dictionary<string, SknMaterialDefinition>()) { Pbr = new(null, "Normal.tex") };
+            var resolved = SknResolver.Resolve(metadata, new[] { "body", "normal" });
+            Assert.Null(resolved.DefaultMaterialDefinition.Pbr);
+            Assert.NotNull(resolved.DefaultMaterialDefinition.Program);
+        }
+
+        [Fact]
         public void ReadMetadata_GearFormOverlaysItsMeshPropertiesOnTheSkinsFieldByField()
         {
             // Sett 38 / Seraphine 69: the GearData authors only materialOverride. Everything else, and the

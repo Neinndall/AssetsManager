@@ -122,6 +122,8 @@ namespace AssetsManager.Services.Viewer.Rendering
         private int _uWireframeColor;
         private int _uSelfIllumination;
         private GlLightGridBindings _lightGridBindings;
+        private CharacterPbrBindings _pbrBindings;
+        private CharacterOutlineRenderer _outlines;
         private GameShaderRuntime _gameShaderRuntime;
         private bool _gles;
         private bool _ready;
@@ -170,6 +172,8 @@ namespace AssetsManager.Services.Viewer.Rendering
             _uWireframeColor = gl.GetUniformLocation(_program, "uWireframeColor");
             _uSelfIllumination = gl.GetUniformLocation(_program, "uSelfIllumination");
             _lightGridBindings = new GlLightGridBindings(gl, _program);
+            _pbrBindings = new CharacterPbrBindings(gl, _program);
+            _outlines = new CharacterOutlineRenderer(gl, _gles);
 
             uint boneBlock = gl.GetUniformBlockIndex(_program, "BoneTransforms");
             if (boneBlock != uint.MaxValue)
@@ -265,6 +269,8 @@ namespace AssetsManager.Services.Viewer.Rendering
                         DrawQueue(_transparent, viewProjection, in gameFrame, untextured, errored, solidMode, shadersEnabled, wireframePass: false, ref activePalette, ref activeVao);
                         if (glows)
                             DrawBloomPasses(_transparent, in gameFrame, ref activePalette, ref activeVao);
+                        if (viewMode == StudioViewMode.Lit)
+                            DrawOutlines(_opaque.Concat(_transparent), viewProjection, in gameFrame, shadersEnabled);
                     }
                 }
 
@@ -299,6 +305,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                 _gl.Disable(EnableCap.CullFace);
                 _gl.Enable(EnableCap.DepthTest);
                 _gl.DepthMask(true);
+                _pbrBindings.Reset();
                 _gl.BindSampler(0, 0);
                 _gl.BindTexture(TextureTarget.Texture2D, 0);
                 _gl.BindVertexArray(0);
@@ -357,7 +364,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                                 previewPlacement ? previewPalette : authoredPalette,
                                 cameraPosition,
                                 hidden,
-                                timeSeconds,
+                                previewPlacement ? group.PreviewTimeSeconds : timeSeconds,
                                 previewPlacement);
                         }
                     }
@@ -507,6 +514,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                 Matrix4x4 world = command.World;
                 var drawFrame = gameFrame with
                 {
+                    TimeSeconds = command.TimeSeconds,
                     CharacterPosition = Vector3.Transform(command.Resources.BoundsCenter, world)
                 };
                 _gl.FrontFace(world.GetDeterminant() < 0f
@@ -528,7 +536,9 @@ namespace AssetsManager.Services.Viewer.Rendering
                 ResetGameBindings();
                 if (command.Resources.HasSkin)
                     ConfigureSkinIndexAttribute(command.Resources, integer: false);
-                UseStockProgram(viewProjection, gameFrame.Sun);
+                _pbrBindings.View = gameFrame.View;
+                _pbrBindings.Projection = gameFrame.Projection;
+                UseStockProgram(viewProjection, gameFrame.Sun, gameFrame.Eye);
                 _lightGridBindings.Apply(drawFrame.LightGrid, drawFrame.CharacterPosition);
                 if (!ReferenceEquals(activePalette, command.Palette))
                 {
@@ -539,6 +549,11 @@ namespace AssetsManager.Services.Viewer.Rendering
                 _gl.Uniform1(_uUseSkinning, command.Resources.HasSkin ? 1 : 0);
                 if (!wireframePass)
                     ApplyMaterial(command.Range, command.TimeSeconds, untextured, errored, viewMode, command.SelfIllumination);
+                _pbrBindings.Bind(command.Range.Material,
+                    command.Resources.ProgramTextureLookup ??= CreateProgramTextureLookup(command.Resources),
+                    command.Resources.TangentVbo != 0,
+                    !wireframePass && viewMode == StudioViewMode.Lit && command.Range.Lit,
+                    command.Range.Texture != null);
 
                 if (_gameShaderRuntime != null)
                     _gameShaderRuntime.DrawIndexedPass(
@@ -555,6 +570,37 @@ namespace AssetsManager.Services.Viewer.Rendering
 
         private Func<string, uint?> CreateProgramTextureLookup(SkinResources resources) =>
             path => ResolveProgramTexture(resources, path);
+
+        private void DrawOutlines(IEnumerable<DrawCommand> commands, Matrix4x4 viewProjection,
+            in GameShaderRuntime.Frame frame, bool shadersEnabled)
+        {
+            foreach (var command in commands.Where(command => command.PassIndex <= 0))
+            {
+                if (command.Range.Material.Outline is not { } outline) continue;
+                _gl.BindVertexArray(command.Resources.Vao);
+                _gl.FrontFace(command.World.GetDeterminant() < 0f ? FrontFaceDirection.CW : FrontFaceDirection.Ccw);
+                ResetGameBindings();
+                var lookup = command.Resources.ProgramTextureLookup ??= CreateProgramTextureLookup(command.Resources);
+                if (shadersEnabled && command.Resources.HasSkin && _gameShaderRuntime != null &&
+                    _gameShaderRuntime.GetSkinnedPassCount(outline.Material) > 0)
+                {
+                    var outlined = command with { Range = command.Range with { Material = outline.Material }, PassIndex = 0 };
+                    var drawFrame = frame with
+                    {
+                        TimeSeconds = command.TimeSeconds,
+                        CharacterPosition = Vector3.Transform(command.Resources.BoundsCenter, command.World)
+                    };
+                    if (TryDrawGamePass(outlined, in drawFrame)) { ResetGameBindings(); continue; }
+                    ResetGameBindings();
+                }
+                if (command.Resources.HasSkin) ConfigureSkinIndexAttribute(command.Resources, integer: false);
+                UploadPalette(command.Palette);
+                _outlines.Bind(outline, command.World, viewProjection, frame.Eye, command.Resources.HasSkin, lookup);
+                _drawElements((uint)PrimitiveType.Triangles, command.Range.IndexCount,
+                    (uint)DrawElementsType.UnsignedInt, new IntPtr(checked(command.Range.StartIndex * sizeof(uint))));
+            }
+            _gl.BindSampler(0, 0);
+        }
 
         private void ResetGameBindings()
         {
@@ -615,6 +661,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                 _gl.FrontFace(command.World.GetDeterminant() < 0f ? FrontFaceDirection.CW : FrontFaceDirection.Ccw);
                 var drawFrame = gameFrame with
                 {
+                    TimeSeconds = command.TimeSeconds,
                     CharacterPosition = Vector3.Transform(command.Resources.BoundsCenter, command.World)
                 };
                 TryDrawGamePass(command, in drawFrame);
@@ -663,7 +710,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             }
         }
 
-        private void UseStockProgram(Matrix4x4 viewProjection, MapSunData sun)
+        private void UseStockProgram(Matrix4x4 viewProjection, MapSunData sun, Vector3 camera = default)
         {
             _gl.UseProgram(_program);
             _gl.UniformMatrix4(_uViewProjection, 1, false, in viewProjection.M11);
@@ -674,21 +721,27 @@ namespace AssetsManager.Services.Viewer.Rendering
             _gl.Uniform3(_uSkyColor, light.SkyColor.X, light.SkyColor.Y, light.SkyColor.Z);
             _gl.Uniform3(_uGroundColor, light.GroundColor.X, light.GroundColor.Y, light.GroundColor.Z);
             _gl.Uniform1(_uAmbientStrength, light.AmbientStrength);
+            _pbrBindings.Light(camera, light.Direction, light.SunColor * light.SunStrength,
+                Vector3.UnitY, Vector3.Zero, light.SkyColor, light.GroundColor, light.AmbientStrength);
         }
 
         private uint? ResolveProgramTexture(SkinResources resources, string authoredPath)
         {
             if (resources?.Asset?.Textures == null || string.IsNullOrWhiteSpace(authoredPath))
                 return null;
-            if (resources.ProgramTexturesByPath.TryGetValue(authoredPath, out uint cached))
-                return cached == 0 ? null : cached;
+            if (resources.ProgramTexturesByPath.TryGetValue(authoredPath, out uint cached) && cached != 0)
+                return cached;
 
             string key = SknMaterialTextureResolver.MatchTextureKey(authoredPath, resources.TextureKeys);
+            if (string.IsNullOrWhiteSpace(key) && resources.TextureKeys.Length != resources.Asset.Textures.Count)
+            {
+                resources.TextureKeys = resources.Asset.Textures.Keys.ToArray();
+                key = SknMaterialTextureResolver.MatchTextureKey(authoredPath, resources.TextureKeys);
+            }
             if (string.IsNullOrWhiteSpace(key) ||
                 !resources.Asset.Textures.TryGetValue(key, out BitmapSource bitmap) ||
                 bitmap == null)
             {
-                resources.ProgramTexturesByPath[authoredPath] = 0;
                 return null;
             }
 
@@ -730,7 +783,9 @@ namespace AssetsManager.Services.Viewer.Rendering
             if (mesh.HasTangents)
                 resources.TangentVbo = UploadVector4Attribute(3, mesh.Tangents);
             if (mesh.HasColors)
-                resources.ColorVbo = UploadVector4Attribute(4, mesh.Colors);
+                // Native DX11 shaders consume the packed SKN channels in BGRA order.
+                resources.ColorVbo = UploadVector4Attribute(4, mesh.Colors
+                    .Select(color => new Vector4(color.Z, color.Y, color.X, color.W)).ToArray());
             if (mesh.HasSkin)
             {
                 resources.SkinIndexVbo = UploadByte4Attribute(5, mesh.SkinIndices);
@@ -1239,6 +1294,8 @@ namespace AssetsManager.Services.Viewer.Rendering
                 foreach (uint texture in _rawProgramTextures.Values)
                     if (texture != 0) _gl.DeleteTexture(texture);
                 _rawProgramTextures.Clear();
+                _pbrBindings?.Dispose();
+                _outlines?.Dispose();
                 _gameShaderRuntime?.Dispose();
                 _gameShaderRuntime = null;
                 foreach (uint sampler in _samplers.Values)

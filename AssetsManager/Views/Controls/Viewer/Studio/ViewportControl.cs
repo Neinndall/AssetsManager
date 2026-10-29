@@ -21,6 +21,7 @@ namespace AssetsManager.Views.Controls.Viewer
         private readonly OpenGlSnapshotService _snapshotService = new();
         private OpenGlSnapshotService.SnapshotRequest _pendingSnapshot;
         private readonly Queue<Action> _glInitializationSteps = new();
+        private AssetsManager.Services.Viewer.Rendering.Core.GlSceneDepthPass _sceneDepthPass;
 
         [System.Runtime.InteropServices.DllImport("opengl32.dll", EntryPoint = "wglGetProcAddress", CharSet = System.Runtime.InteropServices.CharSet.Ansi)]
         private static extern IntPtr wglGetProcAddress(string procName);
@@ -387,6 +388,8 @@ namespace AssetsManager.Views.Controls.Viewer
             }
 
             _frameTerrainDepth = 0;
+            bool sceneDepthOnly = false;
+            bool sceneInputsPrepared = false;
 
             // A MAP scene owns the world backdrop. In Character-backdrop mode the selected Skin remains
             // the subject and is composited into the same depth/particle/post-processing frame.
@@ -412,52 +415,10 @@ namespace AssetsManager.Views.Controls.Viewer
                     AdvanceMapCharacterClip(dt);
                     _mapSceneRuntime.Update(viewProj, dt);
                 }
-                // Three.js draws all scene opaque queues before any transparent queue.
-                for (int phase = 0; phase < 2; phase++)
-                {
-                    _mapGeometryRenderer?.Render(
-                        viewProj,
-                        view,
-                        proj,
-                        eye,
-                        _mapSceneRuntime.SceneTimeSeconds,
-                        _model.PreviewViewMode,
-                        _model.EffectivePreviewWireOverlay,
-                        _model.PreviewShaders,
-                        transparentPass: phase == 1);
-                    if (phase == 0)
-                        CaptureTerrainDepth(width, height);
-                    if (_mapSceneRuntime.ShowStructures)
-                    {
-                        _mapCharacterRenderer?.Render(
-                            _mapSceneRuntime.CharacterGroups,
-                            viewProj,
-                            view,
-                            proj,
-                            eye,
-                            _mapSceneRuntime.CharacterTimeSeconds,
-                            EffectiveMapSun(),
-                            _mapSceneRuntime.Hidden,
-                            viewMode: _model.PreviewViewMode,
-                            wireOverlay: _model.EffectivePreviewWireOverlay,
-                            shadersEnabled: _model.PreviewShaders,
-                            lightGrid: _mapSceneRuntime.Scene.LightGrid,
-                            transparentPass: phase == 1);
-                    }
-                }
-                if (characterBackdrop)
-                {
-                    RenderChampionMesh(viewProj, view, proj, eye);
-                    RenderSceneActorMeshes(viewProj, view, proj, eye);
-                    if (!snapshot) UpdateCharacterArmatureOverlay(viewProj);
-                }
+                RenderMapGeometry(transparent: false);
+                CaptureTerrainDepth(width, height);
                 uint mapViewportWidth = (uint)width;
                 uint mapViewportHeight = (uint)height;
-                _mapPostEffectsRenderer?.CaptureSceneDepth(
-                    EffectiveMapPostEffects(),
-                    EffectiveMapSsao(),
-                    mapViewportWidth,
-                    mapViewportHeight);
 
                 // LTK has one global particle pass block for the scene. MAP placements and every
                 // Character session use different coordinate spaces/render owners here, so keep their
@@ -486,7 +447,6 @@ namespace AssetsManager.Views.Controls.Viewer
                     PrepareParticleSession(_vfxRenderer, sun, viewProj, view, width, height);
                 if (characterBackdrop)
                     PrepareSceneActorParticles(sun, viewProj, view, width, height);
-                RenderPreparedParticlePasses();
             }
             else if (showEnvironment)
                 _previewSurfaceRenderer?.Render(
@@ -495,18 +455,8 @@ namespace AssetsManager.Views.Controls.Viewer
                     _model.ShowPreviewGround && _groundTextureLoaded,
                     _model.ShowPreviewStage);
 
-            if (!characterBackdrop)
-            {
-                RenderChampionMesh(viewProj, view, proj, eye);
-                RenderSceneActorMeshes(viewProj, view, proj, eye);
-                if (!snapshot) UpdateCharacterArmatureOverlay(viewProj);
-            }
-
-            // Without a MAP, every Character session still shares one particle pass after all meshes.
-            if (_mapSceneRuntime == null)
-            {
-                RenderPreparedParticlePasses();
-            }
+            RenderPreparedParticlePasses(RenderSceneMeshes, CaptureSceneDepth, _mapSceneRuntime != null &&
+                MapPostEffectsRenderer.DrawsAnything(EffectiveMapPostEffects(), EffectiveMapSsao()));
             _model.LiveParticleCount = (_vfxRenderer?.LiveParticleCount ?? 0) + SceneActorParticleCount();
 
             if (_mapSceneRuntime != null)
@@ -559,6 +509,75 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 StudioViewportView.OpenTkControl.Opacity = 1d;
                 QueuePlayheadRefresh();
+            }
+
+            void RenderSceneMeshes()
+            {
+                if (_mapSceneRuntime != null)
+                {
+                    // Preserve the scene's opaque-before-transparent ordering across both renderers.
+                    RenderMapStructures(transparent: false);
+                    RenderMapGeometry(transparent: true);
+                    RenderMapStructures(transparent: true);
+                }
+
+                RenderChampionMesh(viewProj, view, proj, eye);
+                RenderSceneActorMeshes(viewProj, view, proj, eye);
+                if (!sceneDepthOnly)
+                {
+                    if (!snapshot) UpdateCharacterArmatureOverlay(viewProj);
+                    if (!sceneInputsPrepared) CaptureMapSceneDepth();
+                }
+            }
+
+            void RenderMapGeometry(bool transparent)
+            {
+                _mapGeometryRenderer?.Render(viewProj, view, proj, eye, _mapSceneRuntime.SceneTimeSeconds,
+                    _model.PreviewViewMode, _model.EffectivePreviewWireOverlay, _model.PreviewShaders,
+                    transparentPass: transparent);
+            }
+
+            void RenderMapStructures(bool transparent)
+            {
+                if (!_mapSceneRuntime.ShowStructures) return;
+                _mapCharacterRenderer?.Render(
+                    _mapSceneRuntime.CharacterGroups, viewProj, view, proj, eye,
+                    _mapSceneRuntime.CharacterTimeSeconds, EffectiveMapSun(), _mapSceneRuntime.Hidden,
+                    viewMode: _model.PreviewViewMode, wireOverlay: _model.EffectivePreviewWireOverlay,
+                    shadersEnabled: _model.PreviewShaders, lightGrid: _mapSceneRuntime.Scene.LightGrid,
+                    transparentPass: transparent);
+            }
+
+            void CaptureSceneDepth(Action capture)
+            {
+                _sceneDepthPass ??= new AssetsManager.Services.Viewer.Rendering.Core.GlSceneDepthPass(_gl);
+                bool previousBloomSuppression = _championMeshRenderer?.SuppressBloom ?? false;
+                var previousMapBloom = _mapCharacterRenderer?.Bloom;
+                try
+                {
+                    sceneDepthOnly = true;
+                    if (_championMeshRenderer != null) _championMeshRenderer.SuppressBloom = true;
+                    if (_mapCharacterRenderer != null) _mapCharacterRenderer.Bloom = null;
+                    _sceneDepthPass.Render((uint)width, (uint)height, RenderSceneMeshes, () =>
+                    {
+                        capture();
+                        CaptureMapSceneDepth();
+                    });
+                    sceneInputsPrepared = true;
+                }
+                finally
+                {
+                    sceneDepthOnly = false;
+                    if (_championMeshRenderer != null) _championMeshRenderer.SuppressBloom = previousBloomSuppression;
+                    if (_mapCharacterRenderer != null) _mapCharacterRenderer.Bloom = previousMapBloom;
+                }
+            }
+
+            void CaptureMapSceneDepth()
+            {
+                if (_mapSceneRuntime != null)
+                    _mapPostEffectsRenderer?.CaptureSceneDepth(
+                        EffectiveMapPostEffects(), EffectiveMapSsao(), (uint)width, (uint)height);
             }
         }
 
@@ -670,7 +689,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 return;
             }
 
-            RenderCharacterMesh(_championModel, viewProjection, view, projection, eye);
+            RenderCharacterMesh(_championModel, viewProjection, view, projection, eye, _model.CurrentTime);
         }
 
         /// <summary>Draws one Studio Character with the reference lighting and the active preview modes.</summary>
@@ -679,7 +698,8 @@ namespace AssetsManager.Views.Controls.Viewer
             Matrix4x4 viewProjection,
             Matrix4x4 view,
             Matrix4x4 projection,
-            Vector3 eye)
+            Vector3 eye,
+            double timeSeconds)
         {
             if (_championMeshRenderer == null || model == null) return;
 
@@ -700,7 +720,8 @@ namespace AssetsManager.Views.Controls.Viewer
                 _model.PreviewShaders,
                 mirrorCharacterX: true,
                 mapSun: _mapSceneRuntime != null ? EffectiveMapSun() : null,
-                lightGrid: _mapSceneRuntime?.Scene.LightGrid);
+                lightGrid: _mapSceneRuntime?.Scene.LightGrid,
+                timeSeconds: timeSeconds);
         }
 
         private bool ShouldRenderCharacterVfx()

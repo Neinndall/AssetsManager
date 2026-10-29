@@ -2,6 +2,13 @@ using System.Numerics;
 
 namespace AssetsManager.Views.Models.Viewer
 {
+    /// <summary>Data textures of a texture-only LIT_UBER surface; channels are roughness, metalness and occlusion.</summary>
+    internal sealed record CharacterPbrMaps(string Rma, string Normal)
+    {
+        internal System.Collections.Generic.IReadOnlyList<string> RmaPaths { get; init; }
+        internal System.Collections.Generic.IReadOnlyList<string> NormalPaths { get; init; }
+    }
+
     /// <summary>
     /// Describes the authored render state of a champion material.
     /// </summary>
@@ -21,6 +28,9 @@ namespace AssetsManager.Views.Models.Viewer
     {
         internal bool HasAuthoredTint { get; init; }
         internal GameMaterialProgram Program { get; init; }
+        internal CharacterPbrMaps Pbr { get; init; }
+        internal string EmissiveTexturePath { get; init; }
+        internal CharacterOutlineDefinition Outline { get; init; }
         internal string BaseSamplerName { get; init; }
         internal System.Collections.Generic.IReadOnlyList<GameMaterialTextureSwap> TextureSwaps { get; init; } =
             System.Array.Empty<GameMaterialTextureSwap>();

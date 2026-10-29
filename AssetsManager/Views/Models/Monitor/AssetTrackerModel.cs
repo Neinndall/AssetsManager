@@ -163,6 +163,8 @@ namespace AssetsManager.Views.Models.Monitor
                     _url = value;
                     OnPropertyChanged();
                     OnPropertyChanged(nameof(CanDownload));
+                    OnPropertyChanged(nameof(HasUrl));
+                    OnPropertyChanged(nameof(StatusDescription));
                 }
             }
         }
@@ -176,7 +178,7 @@ namespace AssetsManager.Views.Models.Monitor
         public string Status
         {
             get => _status;
-            set { if (_status != value) { _status = value; OnPropertyChanged(); } }
+            set { if (_status != value) { _status = value; OnPropertyChanged(); OnPropertyChanged(nameof(StatusDescription)); } }
         }
 
         public string Thumbnail
@@ -197,6 +199,9 @@ namespace AssetsManager.Views.Models.Monitor
         public DateTime? FirstSeenApi { get; set; }
         public DateTime? LastChecked { get; set; }
         public bool CanDownload => State == TrackedAssetState.Available && !string.IsNullOrWhiteSpace(Url);
+        public bool HasUrl => !string.IsNullOrWhiteSpace(Url);
+        public string StatusDescription => HasUrl ? Status
+            : "This catalog item has no saved image URL. An image may still exist, but it cannot be checked or downloaded here yet.";
         public string IdentityText { get; set; }
         public string TimingText { get; set; }
         public bool IsGenerated { get; set; }

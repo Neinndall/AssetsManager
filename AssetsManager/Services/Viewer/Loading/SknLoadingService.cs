@@ -519,6 +519,10 @@ namespace AssetsManager.Services.Viewer.Loading
                 Func<uint, string> binEntryResolver = _hashResolverService == null
                     ? null
                     : _hashResolverService.ResolveBinEntry;
+                await CharacterOutlineDocumentLoader.ExpandAsync(binTrees, _assetResolver, projectRoot,
+                    wadChunkPathResolver, cancellationToken);
+                foreach (var document in binTrees)
+                    if (!shaderTrees.Contains(document)) shaderTrees.Add(document);
                 SknMaterialTextureMetadata metadata =
                     SknMaterialTextureResolver.ReadMetadata(
                         binTrees,

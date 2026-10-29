@@ -13,6 +13,7 @@ using AssetsManager.Views.Models.Explorer;
 using AssetsManager.Views.Models.Settings;
 using AssetsManager.Views.Models.Viewer;
 using LeagueToolkit.Hashing;
+using LeagueToolkit.Core.Wad;
 
 namespace AssetsManager.Services.Viewer.Resolvers
 {
@@ -23,6 +24,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
     {
         private readonly WadContentProvider _wadContentProvider;
         private readonly AppSettings _appSettings;
+        internal readonly ConcurrentDictionary<string, uint[]> ObjectHeaders = new(StringComparer.OrdinalIgnoreCase);
         private readonly ConcurrentDictionary<string, Lazy<ProjectResourceIndex>> _projectIndexes =
             new(StringComparer.OrdinalIgnoreCase);
 
@@ -342,6 +344,36 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 return Array.Empty<string>();
 
             return new[] { Path.GetFullPath(selected) };
+        }
+
+        internal IReadOnlyList<MapResolvedAsset> OutlineCandidates(string projectRoot, Func<ulong, string> paths, bool allGameBins = false)
+        {
+            var result = new List<MapResolvedAsset>();
+            if (Directory.Exists(projectRoot))
+                result.AddRange(Directory.EnumerateFiles(projectRoot, "*.bin", SearchOption.AllDirectories)
+                    .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+                    .Select(path => MapResolvedAsset.FromPhysical(Path.GetRelativePath(projectRoot, path), path, MapAssetOrigin.ProjectFile)));
+            var primaryMaps = new List<MapResolvedAsset>();
+            var otherBins = new List<MapResolvedAsset>();
+            foreach (string root in GetInstallationRoots(_appSettings))
+            foreach (string file in Directory.EnumerateFiles(root, allGameBins ? "*.wad*" : "Map*.wad*", SearchOption.AllDirectories)
+                .Where(file => file.EndsWith(".wad", StringComparison.OrdinalIgnoreCase) || file.EndsWith(".wad.client", StringComparison.OrdinalIgnoreCase))
+                .OrderBy(path => path, StringComparer.OrdinalIgnoreCase))
+            {
+                using var wad = new WadFile(file);
+                string map = Path.GetFileName(file).Split('.')[0].ToLowerInvariant();
+                string conventional = $"data/maps/shipping/{map}/{map}.bin";
+                foreach (ulong hash in wad.Chunks.Keys)
+                {
+                    string path = paths?.Invoke(hash);
+                    if (hash == XxHash64Ext.Hash(conventional)) path = conventional;
+                    if (path?.EndsWith(".bin", StringComparison.OrdinalIgnoreCase) == true)
+                        (path == conventional ? primaryMaps : otherBins).Add(MapResolvedAsset.FromWad(path, file, hash));
+                }
+            }
+            result.AddRange(primaryMaps);
+            result.AddRange(otherBins);
+            return result;
         }
 
         private Task<MapResolvedAsset> ResolveGeometryAsync(

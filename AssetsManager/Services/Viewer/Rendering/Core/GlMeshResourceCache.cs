@@ -35,7 +35,7 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
             internal readonly Dictionary<string, BitmapSource> LoadedProgramBitmaps =
                 new(StringComparer.OrdinalIgnoreCase);
             internal uint TangentVbo;
-            /// <summary>Authored SKN vertex colours at location 4, the stream game shaders read as COLOR.</summary>
+            /// <summary>Authored SKN vertex colours in native BGRA order at COLOR location 4.</summary>
             internal uint ColorVbo;
             internal uint BoneIndexVbo;
             internal uint InfluenceIndexVbo;
@@ -90,7 +90,7 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
             if (part?.AllTextures == null || resources == null || string.IsNullOrWhiteSpace(authoredPath))
                 return null;
 
-            if (!resources.ProgramTextureKeyByPath.TryGetValue(authoredPath, out string key))
+            if (!resources.ProgramTextureKeyByPath.TryGetValue(authoredPath, out string key) || string.IsNullOrWhiteSpace(key))
             {
                 key = SknMaterialTextureResolver.MatchTextureKey(
                     authoredPath,
@@ -212,7 +212,9 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
                 _gl.BindBuffer(BufferTargetARB.ArrayBuffer, resources.ColorVbo);
                 _gl.BufferData(
                     BufferTargetARB.ArrayBuffer,
-                    new ReadOnlySpan<System.Numerics.Vector4>(skinningData.Colors),
+                    // Native DX11 shaders consume the packed SKN channels in BGRA order.
+                    new ReadOnlySpan<System.Numerics.Vector4>(skinningData.Colors
+                        .Select(color => new System.Numerics.Vector4(color.Z, color.Y, color.X, color.W)).ToArray()),
                     BufferUsageARB.StaticDraw);
                 ConfigureVertexAttribute(4, 4, 4 * sizeof(float), IntPtr.Zero);
             }

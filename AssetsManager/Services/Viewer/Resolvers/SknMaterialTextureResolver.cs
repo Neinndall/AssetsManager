@@ -25,6 +25,8 @@ namespace AssetsManager.Services.Viewer.Resolvers
         internal float SkinScale { get; init; } = 1f;
         internal float SelfIllumination { get; init; } = 0f;
         internal string EmissiveTexturePath { get; init; }
+        internal IReadOnlyDictionary<string, CharacterOutlineDefinition> Outlines { get; init; } =
+            new Dictionary<string, CharacterOutlineDefinition>(StringComparer.OrdinalIgnoreCase);
 
         /// <summary>
         /// The draw rank of each submesh, in mesh order. Explicitly ordered submeshes draw after unlisted geometry
@@ -53,10 +55,12 @@ namespace AssetsManager.Services.Viewer.Resolvers
             if (MaterialDefinitions != null &&
                 MaterialDefinitions.TryGetValue(key, out ModelMaterialDefinition material))
             {
-                return material;
+                return Outlines.TryGetValue(submeshName ?? string.Empty, out var outline)
+                    ? material with { Outline = outline } : material;
             }
 
-            return DefaultMaterialDefinition;
+            return Outlines.TryGetValue(submeshName ?? string.Empty, out var defaultOutline)
+                ? DefaultMaterialDefinition with { Outline = defaultOutline } : DefaultMaterialDefinition;
         }
     }
 
@@ -156,6 +160,13 @@ namespace AssetsManager.Services.Viewer.Resolvers
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         internal IReadOnlyDictionary<string, IReadOnlyList<string>> OverrideTexturePathCandidates { get; init; } =
             new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase);
+        internal CharacterPbrMaps Pbr { get; init; }
+        internal IReadOnlyDictionary<string, CharacterOutlineDefinition> Outlines { get; init; } =
+            new Dictionary<string, CharacterOutlineDefinition>(StringComparer.OrdinalIgnoreCase);
+        internal IReadOnlyDictionary<string, CharacterPbrMaps> PbrOverrides { get; init; } =
+            new Dictionary<string, CharacterPbrMaps>(StringComparer.OrdinalIgnoreCase);
+        internal IReadOnlyDictionary<string, IReadOnlyList<CharacterPbrMaps>> PbrOverrideCandidates { get; init; } =
+            new Dictionary<string, IReadOnlyList<CharacterPbrMaps>>(StringComparer.OrdinalIgnoreCase);
 
         internal IEnumerable<string> ReferencedTexturePaths =>
             DirectOverrideTexturePaths.Values
@@ -172,7 +183,13 @@ namespace AssetsManager.Services.Viewer.Resolvers
                     .Select(option => option.TexturePath))
                 .Concat(ReferencedProgramTexturePaths())
                 .Concat(ReferencedShaderDefaultTextures())
+                .Concat(PbrOverrides.Values.Append(Pbr).Where(maps => maps != null)
+                    .SelectMany(maps => new[] { maps.Rma, maps.Normal }))
+                .Concat(PbrOverrideCandidates.Values.SelectMany(maps => maps)
+                    .SelectMany(maps => new[] { maps.Rma, maps.Normal }))
                 .Prepend(DefaultTexturePath)
+                .Prepend(EmissiveTexturePath)
+                .Concat(Outlines.Values.Select(outline => outline.MaskPath))
                 .Where(path => !string.IsNullOrWhiteSpace(path))
                 .Distinct(StringComparer.OrdinalIgnoreCase);
 
@@ -181,6 +198,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 .Append(DefaultMaterial)
                 .Where(material => material?.Program?.Passes != null)
                 .SelectMany(material => material.Program.Passes)
+                .Concat(Outlines.Values.SelectMany(outline => outline.Material.Program?.Passes ?? Array.Empty<GameMaterialPass>()))
                 .SelectMany(pass => pass.Textures ?? Array.Empty<GameMaterialTexture>())
                 .Select(texture => !string.IsNullOrWhiteSpace(texture?.Texture?.VirtualPath)
                     ? texture.Texture.VirtualPath
@@ -213,6 +231,8 @@ namespace AssetsManager.Services.Viewer.Resolvers
         private static readonly uint SkinScale = Fnv1a.HashLower("skinScale");
         private static readonly uint SelfIllumination = Fnv1a.HashLower("selfIllumination");
         private static readonly uint EmissiveTexture = Fnv1a.HashLower("emissiveTexture");
+        private static readonly uint RmaTexture = Fnv1a.HashLower("RoughnessMetallicAoTexture");
+        private static readonly uint NormalTexture = Fnv1a.HashLower("normalMapTexture");
         private static readonly uint InitialSubmeshToHide = Fnv1a.HashLower("initialSubmeshToHide");
         private static readonly uint SubmeshRenderOrderField = Fnv1a.HashLower("submeshRenderOrder");
         private static readonly uint MaterialOverride = Fnv1a.HashLower("materialOverride");
@@ -308,6 +328,9 @@ namespace AssetsManager.Services.Viewer.Resolvers
             var directOverrideTexturePaths = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             var overrideTexturePathCandidates = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
             var seenOverrideSubmeshes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var pbrOverrides = new Dictionary<string, CharacterPbrMaps>(StringComparer.OrdinalIgnoreCase);
+            var pbrCandidates = new Dictionary<string, List<CharacterPbrMaps>>(StringComparer.OrdinalIgnoreCase);
+            CharacterPbrMaps pbr = null;
             IReadOnlyList<string> initialHiddenSubmeshes = Array.Empty<string>();
             bool readInitialHiddenSubmeshes = false;
             IReadOnlyList<string> submeshRenderOrder = Array.Empty<string>();
@@ -414,6 +437,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 {
                     emissiveTexturePath = emissivePath;
                 }
+                pbr ??= ReadPbrMaps(meshProperties, wadChunkPathResolver);
 
                 if (defaultTexturePath == null &&
                     TryGetTexturePath(meshProperties, Texture, wadChunkPathResolver, out string texturePath))
@@ -457,12 +481,19 @@ namespace AssetsManager.Services.Viewer.Resolvers
                         linkProperty is BinTreeObjectLink;
                     bool hasDirectTexture =
                         TryGetTexturePath(entry, Texture, wadChunkPathResolver, out string directTexturePath);
+                    CharacterPbrMaps overridePbr = ReadPbrMaps(entry, wadChunkPathResolver);
 
                     // Empty overrides are omitted. Duplicate submeshes stay in authored order:
                     // bindingOf uses the first override's material, while textureAssets lets the
                     // last texture that actually loads replace an earlier texture for that submesh.
-                    if (!hasMaterialLink && !hasDirectTexture)
+                    if (!hasMaterialLink && !hasDirectTexture && overridePbr == null)
                         continue;
+                    if (overridePbr != null)
+                    {
+                        if (!pbrCandidates.TryGetValue(normalizedSubmesh, out var candidates))
+                            pbrCandidates[normalizedSubmesh] = candidates = new();
+                        candidates.Add(overridePbr);
+                    }
 
                     if (hasDirectTexture)
                     {
@@ -476,6 +507,8 @@ namespace AssetsManager.Services.Viewer.Resolvers
 
                     if (!seenOverrideSubmeshes.Add(normalizedSubmesh))
                         continue;
+                    if (overridePbr != null)
+                        pbrOverrides[normalizedSubmesh] = overridePbr;
 
                     if (hasMaterialLink)
                     {
@@ -524,6 +557,12 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 SkinScale = skinScale,
                 SelfIllumination = selfIllumination,
                 EmissiveTexturePath = emissiveTexturePath,
+                Outlines = CharacterOutlineReader.Read(CharacterOutlineReader.Links(effectiveMeshProperties),
+                    trees, shaderTreeList, wadChunkPathResolver, binEntryResolver),
+                Pbr = pbr,
+                PbrOverrides = pbrOverrides,
+                PbrOverrideCandidates = pbrCandidates.ToDictionary(pair => pair.Key,
+                    pair => (IReadOnlyList<CharacterPbrMaps>)pair.Value, StringComparer.OrdinalIgnoreCase),
                 ShaderDefinitions = shaderDefinitions,
                 HasDefaultMaterialLink = hasDefaultMaterialLink,
                 OverrideMaterialLinkKeys = overrideMaterialLinkKeys,
@@ -613,6 +652,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
             IReadOnlySet<string> overrideSubmeshKeys = metadata.OverrideMaterialLinkKeys
                 .Concat(metadata.DirectOverrideTexturePaths.Keys)
                 .Concat(metadata.OverrideTexturePathCandidates.Keys)
+                .Concat(metadata.PbrOverrides.Keys)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
             SknShaderDefinition defaultShader = ResolveShaderDefinition(metadata, metadata.DefaultMaterial);
@@ -634,7 +674,10 @@ namespace AssetsManager.Services.Viewer.Resolvers
             {
                 defaultMaterialDefinition = ModelMaterialDefinition.TextureOnly(
                     skinTextureKey,
-                    GameShaderProgramResolver.CreateDefaultSkinnedProgram(skinTextureKey, emissiveTextureKey));
+                    metadata.Pbr?.Rma != null ? null :
+                        GameShaderProgramResolver.CreateDefaultSkinnedProgram(skinTextureKey, emissiveTextureKey))
+                    with { Pbr = metadata.Pbr?.Rma != null ? metadata.Pbr : null,
+                        EmissiveTexturePath = metadata.EmissiveTexturePath };
             }
 
             var materialDefinitions = new Dictionary<string, ModelMaterialDefinition>(StringComparer.OrdinalIgnoreCase);
@@ -664,9 +707,22 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 }
 
                 // A texture-only override falls back to the skin texture if its asset is unavailable.
+                metadata.PbrOverrides.TryGetValue(submesh, out CharacterPbrMaps overridePbr);
+                var maps = new CharacterPbrMaps(overridePbr?.Rma ?? metadata.Pbr?.Rma,
+                    overridePbr?.Normal ?? metadata.Pbr?.Normal);
+                if (metadata.PbrOverrideCandidates.TryGetValue(submesh, out var candidates))
+                    maps = maps with
+                    {
+                        RmaPaths = candidates.Reverse().Select(item => item.Rma).Append(metadata.Pbr?.Rma)
+                            .Where(path => !string.IsNullOrEmpty(path)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
+                        NormalPaths = candidates.Reverse().Select(item => item.Normal).Append(metadata.Pbr?.Normal)
+                            .Where(path => !string.IsNullOrEmpty(path)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray()
+                    };
                 materialDefinitions[submesh] = ModelMaterialDefinition.TextureOnly(
                     textureFallback,
-                    GameShaderProgramResolver.CreateDefaultSkinnedProgram(textureFallback, emissiveTextureKey));
+                    maps.Rma != null ? null : GameShaderProgramResolver.CreateDefaultSkinnedProgram(textureFallback, emissiveTextureKey))
+                    with { Pbr = maps.Rma != null || maps.RmaPaths?.Count > 0 ? maps : null,
+                        EmissiveTexturePath = metadata.EmissiveTexturePath };
             }
 
             if (metadata.SubmeshRenderOrder is { Count: > 0 })
@@ -685,8 +741,16 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 SubmeshRenderOrder = metadata.SubmeshRenderOrder ?? Array.Empty<string>(),
                 SkinScale = metadata.SkinScale,
                 SelfIllumination = metadata.SelfIllumination,
-                EmissiveTexturePath = metadata.EmissiveTexturePath
+                EmissiveTexturePath = metadata.EmissiveTexturePath,
+                Outlines = metadata.Outlines
             };
+        }
+
+        private static CharacterPbrMaps ReadPbrMaps(BinTreeStruct properties, Func<ulong, string> resolver)
+        {
+            TryGetTexturePath(properties, RmaTexture, resolver, out string rma);
+            TryGetTexturePath(properties, NormalTexture, resolver, out string normal);
+            return rma == null && normal == null ? null : new(rma, normal);
         }
 
         private static SknShaderDefinition ResolveShaderDefinition(
@@ -1234,7 +1298,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
             return result;
         }
 
-        private static SknShaderDefinition ResolveLinkedShaderDefinition(
+        internal static SknShaderDefinition ResolveLinkedShaderDefinition(
             IEnumerable<BinTree> shaderTrees,
             uint pathHash,
             Func<ulong, string> wadChunkPathResolver,
@@ -1422,7 +1486,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 ? (VfxCustomMaterialBlendFactor)authored.Value
                 : fallback;
 
-        private static SknMaterialDefinition ResolveLinkedMaterialDefinition(
+        internal static SknMaterialDefinition ResolveLinkedMaterialDefinition(
             IEnumerable<BinTree> binTrees,
             uint pathHash,
             Func<ulong, string> wadChunkPathResolver,

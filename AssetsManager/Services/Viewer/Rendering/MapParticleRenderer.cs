@@ -22,6 +22,7 @@ namespace AssetsManager.Services.Viewer.Rendering
         private readonly List<IReadOnlyList<VfxPlaybackRuntime.EmitterState>> _sources = new();
         private readonly List<VfxRenderQueueEntry> _queue = new();
         private readonly List<VfxRenderQueueEntry> _shaded = new();
+        private readonly List<VfxRenderQueueEntry> _ground = new();
         private readonly List<VfxRenderQueueEntry> _distortion = new();
         private readonly List<VfxRenderQueueEntry> _earlyDistortion = new();
         private readonly List<VfxRenderQueueEntry> _postColor = new();
@@ -35,11 +36,19 @@ namespace AssetsManager.Services.Viewer.Rendering
         private uint _preparedViewportWidth;
         private uint _preparedViewportHeight;
         private bool _preparedShaded;
+        private bool _preparedSoftDepth;
+        private bool _preparedSceneColor;
         private bool _preparedWireframe;
         private float _preparedWireOpacity;
         private bool _ready;
         private VfxStencilScene _preparedStencilScene;
         internal VfxEffectsQuality EffectsQuality { get; set; } = VfxEffectsQuality.VeryHigh;
+        bool IPreparedParticlePass.HasPreparedGroundPass => _preparedShaded && _ground.Exists(
+            entry => entry.Emitter.IsVisible && !entry.Emitter.Def.Disabled && entry.Emitter.InstanceCount > 0);
+        bool IPreparedParticlePass.HasPreparedEarlyDistortion => _preparedShaded && _earlyDistortion.Count > 0;
+        bool IPreparedParticlePass.NeedsPreparedSceneCapture => _preparedShaded && (_preparedSoftDepth || _preparedSceneColor);
+        public void CapturePreparedSceneInputs()
+            => _renderer.CaptureScene(_preparedViewportWidth, _preparedViewportHeight, _preparedSceneColor, _preparedSoftDepth);
         bool IPreparedParticlePass.HasPreparedShadowCasters => _preparedShaded && _queue.Exists(e =>
             e.Emitter.IsVisible && !e.Emitter.Def.Disabled && e.Emitter.InstanceCount > 0 && VfxRenderPhaseSemantics.CastsShadow(e.Emitter.Def));
         void IPreparedParticlePass.RenderPreparedShadowPass(Matrix4x4 lightViewProjection, Matrix4x4 eyeView)
@@ -71,8 +80,10 @@ namespace AssetsManager.Services.Viewer.Rendering
                 return;
 
             using IDisposable renderBatch = BeginPreparedRenderBatch();
+            CapturePreparedSceneInputs();
             CapturePreparedEarlyDistortionFrame();
             RenderPreparedEarlyDistortionPass();
+            RenderPreparedGroundPass();
             RenderPreparedColorPass();
             CapturePreparedDistortionFrame();
             RenderPreparedDistortionPass();
@@ -139,7 +150,8 @@ namespace AssetsManager.Services.Viewer.Rendering
                 return false;
 
             _uploader.UploadPendingResources(_graphs, _renderer);
-            _renderer.CaptureScene(viewportWidth, viewportHeight, needsSceneColor, needsSoftParticles);
+            _preparedSoftDepth = needsSoftParticles;
+            _preparedSceneColor = needsSceneColor;
             _renderer.SharedDrawGroups = _drawGroups;
             _renderer.SharedDrawCapacities = _drawCapacities;
             VfxRenderQueue.BuildInto(_sources, _queue, _graphOrders, _drawGroups);
@@ -154,6 +166,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             _preparedWireOpacity = previewPasses.WireOpacity;
 
             _shaded.Clear();
+            _ground.Clear();
             _distortion.Clear();
             _earlyDistortion.Clear();
             _postColor.Clear();
@@ -162,7 +175,11 @@ namespace AssetsManager.Services.Viewer.Rendering
                 VfxRenderPhases phases = VfxRenderPhaseSemantics.Resolve(entry.Emitter.Def, entry.Emitter.HudLayer);
                 if (phases.EarlyDistortion) _earlyDistortion.Add(entry);
                 if (phases.LateDistortion) _distortion.Add(entry);
-                if (phases.Under) _shaded.Add(entry);
+                if (phases.Under)
+                {
+                    if (entry.Emitter.Def.IsGroundLayer) _ground.Add(entry);
+                    else _shaded.Add(entry);
+                }
                 if (phases.Over) _postColor.Add(entry);
             }
             return _queue.Count > 0;
@@ -216,6 +233,12 @@ namespace AssetsManager.Services.Viewer.Rendering
                 _renderer.Render(_shaded, _preparedViewProjection, _preparedView);
         }
 
+        public void RenderPreparedGroundPass()
+        {
+            if (_preparedShaded && _ground.Count > 0)
+                _renderer.Render(_ground, _preparedViewProjection, _preparedView);
+        }
+
         internal bool HasPreparedDistortionPass => _preparedShaded && _distortion.Count > 0;
 
         public void CapturePreparedDistortionFrame()
@@ -238,6 +261,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             _sources.Clear();
             _queue.Clear();
             _shaded.Clear();
+            _ground.Clear();
             _distortion.Clear();
             _earlyDistortion.Clear();
             _postColor.Clear();
@@ -256,6 +280,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             _sources.Clear();
             _queue.Clear();
             _shaded.Clear();
+            _ground.Clear();
             _distortion.Clear();
             _earlyDistortion.Clear();
             _postColor.Clear();

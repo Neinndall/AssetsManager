@@ -63,10 +63,10 @@
                                 <TextBlock Text="{Binding DisplayName}" Foreground="{StaticResource TextPrimary}" FontSize="13" FontWeight="Bold" TextTrimming="CharacterEllipsis" ToolTip="{Binding DisplayName}"/>
                                 <TextBlock Text="{Binding CategoryName}" Foreground="{StaticResource TextSecondary}" FontSize="11" Margin="0,2,0,0"/>
                                 <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                                    <Border Background="{StaticResource HoverColor}" CornerRadius="6" Padding="7,3" Margin="0,0,6,0"><TextBlock Text="{Binding Status}" FontSize="10" Foreground="{StaticResource TextPrimary}"/></Border>
+                                    <Border Background="{StaticResource HoverColor}" CornerRadius="6" Padding="7,3" Margin="0,0,6,0" ToolTip="{Binding StatusDescription}"><TextBlock Text="{Binding Status}" FontSize="10" Foreground="{StaticResource TextPrimary}"/></Border>
                                 </StackPanel>
                                 <UniformGrid Columns="2" Margin="0,12,0,0">
-                                    <Button Click="CopyUrlClicked" Tag="{Binding}" ToolTip="{Binding Url}" Style="{StaticResource PrimaryButton}" Margin="0,0,4,0" Height="34" Padding="6,0">
+                                    <Button Click="CopyUrlClicked" Tag="{Binding}" IsEnabled="{Binding HasUrl}" ToolTip="{Binding Url}" Style="{StaticResource PrimaryButton}" Margin="0,0,4,0" Height="34" Padding="6,0">
                                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                             <icons:MaterialIcon Kind="ContentCopy" Width="14" Height="14" Margin="0,0,5,0" VerticalAlignment="Center"/>
                                             <TextBlock Text="COPY URL" FontSize="10" FontWeight="SemiBold" VerticalAlignment="Center"/>
