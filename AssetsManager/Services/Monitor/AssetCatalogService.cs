@@ -388,7 +388,7 @@ public sealed class AssetCatalogService
             IdentityText = article == null ? $"Image {id}" : $"{article.InventoryType} {article.ItemId} · Image {id}",
             TimingText = $"CDN: {FormatDate(image?.FirstSeen)} · API: {FormatDate(article?.FirstSeenApi)}"
         };
-        if (image == null && url == null) row.Status = "No CDN URL";
+        if (image == null && url == null) row.Status = "Image URL unavailable";
         return row;
     }
 

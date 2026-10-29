@@ -8,6 +8,7 @@ New Features
   - 3D Studio / Draw skin-defined character outlines with their colors, masks and camera-scaled widths in Lit mode.
 
 Improvements
+  - API Center / Clarify when a catalog item has no saved image URL and disable copying unavailable URLs.
 
 Changes
 
