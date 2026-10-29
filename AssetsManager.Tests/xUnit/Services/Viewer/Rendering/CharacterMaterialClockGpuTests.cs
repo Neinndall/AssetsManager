@@ -12,6 +12,7 @@ using AssetsManager.Services.Explorer;
 using AssetsManager.Services.Parsers;
 using AssetsManager.Services.Viewer.Animation;
 using AssetsManager.Services.Viewer.Rendering;
+using AssetsManager.Services.Viewer.Rendering.GameShaders;
 using AssetsManager.Services.Viewer.Resolvers;
 using AssetsManager.Services.Viewer.Runtime;
 using AssetsManager.Tests.Support;
@@ -26,6 +27,71 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering;
 [Collection("Viewport native graphics")]
 public sealed class CharacterMaterialClockGpuTests
 {
+    [InstalledChampionFact("Akali")]
+    public async Task NativeCharacterColorsKeepTheAuthoredWaistWaveMaskInBothRenderers()
+    {
+        await WithSkin((asset, skin, animation, clip, settings) =>
+        {
+            var body = asset.Mesh.Ranges.First(range => range.Name == "Body");
+            var vertices = asset.Mesh.Indices.Skip(body.StartIndex).Take(body.IndexCount).Distinct().ToArray();
+            Assert.Contains(vertices, index => asset.Mesh.Colors[index].X > 0);
+            Assert.All(vertices, index => Assert.Equal(0f, asset.Mesh.Colors[index].Z));
+            using var target = new Target();
+            using var model = Model(asset, skin);
+            model.SkinningMatrices = animation.EvaluateClip(asset, clip, 0);
+            var placement = new MapCharacterData(new MapPlaceableData(1, 1, 0, "mask", Matrix4x4.Identity,
+                255, null, null), "Characters/Akali/Skins/Skin102", null, null);
+            using var group = new MapCharacterRuntimeGroup(asset, animation, new[] { placement });
+            group.SetPreviewClip(clip, placement);
+            group.SetPreviewHiddenSubmeshes(asset.Vfx.OwnerSceneContext.InitialHiddenSubmeshHashes.ToHashSet());
+            byte[] Draw(bool map)
+            {
+                target.Clear();
+                if (map)
+                {
+                    using var renderer = new MapCharacterRenderer(settings);
+                    renderer.Initialize(target.Gl);
+                    renderer.Render(new[] { group }, target.ViewProjection, target.View, target.Projection, Target.Eye, 0, null);
+                }
+                else
+                {
+                    using var renderer = new GlMeshRenderer(settings) { SuppressBloom = true };
+                    renderer.Initialize(target.Gl);
+                    var light = GlMeshRenderer.ReferenceCharacterLighting();
+                    renderer.Render(model, target.ViewProjection, target.View, target.Projection, Target.Eye,
+                        light.LightDirection, light.LightColor, light.FillDirection, light.FillColor, light.AmbientColor,
+                        shadersEnabled: true, mirrorCharacterX: true, timeSeconds: 0);
+                }
+                Assert.Equal(GLEnum.NoError, target.Gl.GetError());
+                return target.Pixels();
+            }
+
+            byte[] studio = Draw(false), map = Draw(true);
+            var pass = Assert.Single(asset.Materials.ResolveMaterialDefinition("Body").Program.Passes);
+            var parameters = Assert.IsAssignableFrom<IList<GameMaterialParameter>>(pass.Parameters);
+            int wave = Enumerable.Range(0, parameters.Count).Single(index => parameters[index].Name == "Anim_Wave_Dir_Intensity");
+            Assert.Equal(1f, parameters[wave].Value.X);
+            // The stored blue mask is zero. Disabling the wave must have no effect on this material,
+            // even though the stored red channel is nonzero at the waist.
+            parameters[wave] = parameters[wave] with { Value = Vector4.Zero };
+            Assert.Equal(studio, Draw(false));
+            Assert.Equal(map, Draw(true));
+
+            Assert.True(model.GpuSkinningData.TryGetPart(model.Parts[0], out var part));
+            foreach (uint index in vertices)
+            {
+                Vector4 color = asset.Mesh.Colors[index];
+                color.Z = 1f;
+                asset.Mesh.Colors[index] = color;
+                part.Colors[index] = color;
+            }
+            byte[] maskedStudio = Draw(false), maskedMap = Draw(true);
+            parameters[wave] = parameters[wave] with { Value = Vector4.UnitX };
+            Assert.False(maskedStudio.SequenceEqual(Draw(false)), "An active packed blue mask must retain the original vertex wave.");
+            Assert.False(maskedMap.SequenceEqual(Draw(true)), "Map characters must retain authored vertex waves too.");
+        });
+    }
+
     [InstalledChampionFact("Akali")]
     public async Task StudioMaterialPausesSeeksAndUsesTheSuppliedActorClock()
     {

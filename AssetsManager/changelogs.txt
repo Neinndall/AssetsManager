@@ -13,6 +13,7 @@ Improvements
 Changes
 
 Bug Fixes
+  - 3D Studio / Correct character shader vertex masks that could separate the torso from the waist, including Akali Skin102.
   - 3D Studio / Keep animated character materials synchronized with playback, pause and timeline seeking.
   - 3D Studio / Keep ground VFX behind character surfaces, fixing the flat colored overlay in Akali Skin102 Dance.
 

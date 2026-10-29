@@ -783,7 +783,9 @@ namespace AssetsManager.Services.Viewer.Rendering
             if (mesh.HasTangents)
                 resources.TangentVbo = UploadVector4Attribute(3, mesh.Tangents);
             if (mesh.HasColors)
-                resources.ColorVbo = UploadVector4Attribute(4, mesh.Colors);
+                // Native DX11 shaders consume the packed SKN channels in BGRA order.
+                resources.ColorVbo = UploadVector4Attribute(4, mesh.Colors
+                    .Select(color => new Vector4(color.Z, color.Y, color.X, color.W)).ToArray());
             if (mesh.HasSkin)
             {
                 resources.SkinIndexVbo = UploadByte4Attribute(5, mesh.SkinIndices);
