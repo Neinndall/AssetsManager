@@ -693,7 +693,7 @@ namespace AssetsManager.Views.Controls.Viewer
             foreach ((StudioSceneActor actor, StudioSceneActorRuntime runtime) in _sceneActorRuntimes)
             {
                 if (actor.IsVisible)
-                    RenderCharacterMesh(runtime.Model, viewProjection, view, projection, eye);
+                    RenderCharacterMesh(runtime.Model, viewProjection, view, projection, eye, runtime.Session.PlaybackTime);
             }
         }
 
@@ -729,11 +729,13 @@ namespace AssetsManager.Views.Controls.Viewer
         /// Draws every prepared particle owner as one global pass: all colour draws land before any
         /// owner captures the frame used by distortion.
         /// </summary>
-        private void RenderPreparedParticlePasses()
+        private void RenderPreparedParticlePasses(Action renderCharacters = null, Action<Action> renderSceneDepth = null,
+            bool captureSceneBeforeGround = false)
         {
             try
             {
-                PreparedParticlePasses.Render(_preparedParticlePasses, _preparedParticleBatches);
+                PreparedParticlePasses.Render(_preparedParticlePasses, _preparedParticleBatches,
+                    renderCharacters, renderSceneDepth, captureSceneBeforeGround);
             }
             finally
             {

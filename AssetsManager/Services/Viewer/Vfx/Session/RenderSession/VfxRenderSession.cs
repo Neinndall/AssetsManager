@@ -81,6 +81,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
         private readonly List<IReadOnlyList<VfxPlaybackRuntime.EmitterState>> _renderSources = new();
         private readonly List<VfxRenderQueueEntry> _renderQueue = new();
         private readonly List<VfxRenderQueueEntry> _shadedRenderQueue = new();
+        private readonly List<VfxRenderQueueEntry> _groundRenderQueue = new();
         private readonly List<VfxRenderQueueEntry> _distortionRenderQueue = new();
         private readonly List<VfxRenderQueueEntry> _earlyDistortionRenderQueue = new();
         private readonly List<VfxRenderQueueEntry> _postColorRenderQueue = new();

@@ -369,6 +369,9 @@ namespace AssetsManager.Views.Controls.Viewer
             _terrainDepthCapture = null;
             _frameTerrainDepth = 0;
             RunReleaseStep("TerrainDepthCapture", () => terrainDepthCapture?.Dispose(), gpuBound: true);
+            var sceneDepthPass = _sceneDepthPass;
+            _sceneDepthPass = null;
+            RunReleaseStep("SceneDepthPass", () => sceneDepthPass?.Dispose(), gpuBound: true);
 
             var mapPostEffectsRenderer = _mapPostEffectsRenderer;
             _mapPostEffectsRenderer = null;

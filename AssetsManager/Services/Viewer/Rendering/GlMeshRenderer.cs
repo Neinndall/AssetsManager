@@ -1,7 +1,6 @@
 using AssetsManager.Services.Viewer.Resources;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Numerics;
 using System.Runtime.InteropServices;
@@ -23,6 +22,7 @@ namespace AssetsManager.Services.Viewer.Rendering
     {
         /// <summary>Environment cube PBR game shaders light from (IBL); the preview sky the viewport shows.</summary>
         internal CubeMapData ImageLight { get; set; }
+        internal bool SuppressBloom { get; set; }
 
         private static readonly Vector3 ReferenceCharacterLightDirection =
             Vector3.Normalize(new Vector3(0.25f, 0.75f, -0.05f));
@@ -41,7 +41,6 @@ namespace AssetsManager.Services.Viewer.Rendering
         private readonly List<ModelPart> _alphaRenderQueue = new();
         private readonly List<PartDraw> _opaqueDraws = new();
         private readonly List<PartDraw> _transparentDraws = new();
-        private readonly Dictionary<SceneModel, long> _materialTimeOrigins = new();
         private readonly Dictionary<SceneModel, Matrix4x4[]> _bindSkinningPalettes = new();
         private readonly Dictionary<SceneModel, Matrix4x4[]> _influenceSkinningPalettes = new();
         private int _uViewProj;
@@ -139,7 +138,8 @@ namespace AssetsManager.Services.Viewer.Rendering
             bool shadersEnabled = false,
             bool mirrorCharacterX = false,
             MapSunData mapSun = null,
-            MapLightGridData lightGrid = null)
+            MapLightGridData lightGrid = null,
+            double? timeSeconds = null)
         {
             if (!_ready || model == null || !model.IsVisible) return;
             _pbrBindings.View = view;
@@ -156,14 +156,9 @@ namespace AssetsManager.Services.Viewer.Rendering
             }
             if (UsesGameShaders(viewMode, shadersEnabled) && gameSkinningMatrices is { Count: > 0 })
                 gameSkinningMatrices = GetInfluenceSkinningPalette(model, gameSkinningMatrices);
-            long now = Stopwatch.GetTimestamp();
-            if (!_materialTimeOrigins.TryGetValue(model, out long materialTimeOrigin))
-            {
-                materialTimeOrigin = now;
-                _materialTimeOrigins[model] = materialTimeOrigin;
-            }
-            float materialTimeSeconds =
-                (float)((now - materialTimeOrigin) / (double)Stopwatch.Frequency);
+            double sceneTime = timeSeconds ?? model.AnimationTime;
+            float materialTimeSeconds = double.IsFinite(sceneTime)
+                ? (float)Math.Clamp(sceneTime, 0d, float.MaxValue) : 0f;
             var gameFrame = new GameShaderRuntime.Frame(
                 view,
                 projection,
@@ -445,7 +440,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                 }
             }
 
-            if (_bloom != null && UsesGameShaders(viewMode, shadersEnabled))
+            if (!SuppressBloom && _bloom != null && UsesGameShaders(viewMode, shadersEnabled))
                 RenderBloomPasses(model, world, in gameFrame, gameSkinningMatrices);
 
             _opaqueDraws.Clear();
@@ -1050,7 +1045,6 @@ namespace AssetsManager.Services.Viewer.Rendering
         {
             if (model != null)
             {
-                _materialTimeOrigins.Remove(model);
                 _bindSkinningPalettes.Remove(model);
                 _influenceSkinningPalettes.Remove(model);
             }
@@ -1076,7 +1070,6 @@ namespace AssetsManager.Services.Viewer.Rendering
                 _resources?.Dispose();
                 _pbrBindings?.Dispose();
                 _outlines?.Dispose();
-                _materialTimeOrigins.Clear();
                 _bindSkinningPalettes.Clear();
                 _influenceSkinningPalettes.Clear();
                 if (_boneBuffer != 0)

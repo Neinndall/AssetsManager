@@ -13,8 +13,13 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
     {
         private VfxStencilScene _preparedStencilScene;
         private bool _preparedSoftDepth;
-        public void CapturePreparedSceneDepth()
-            => _renderer.CaptureScene(_viewportWidth, _viewportHeight, false, _preparedSoftDepth);
+        private bool _preparedSceneColor;
+        bool IPreparedParticlePass.HasPreparedGroundPass => _preparedShaded && _groundRenderQueue.Exists(
+            entry => entry.Emitter.IsVisible && !entry.Emitter.Def.Disabled && entry.Emitter.InstanceCount > 0);
+        bool IPreparedParticlePass.HasPreparedEarlyDistortion => _preparedShaded && _earlyDistortionRenderQueue.Count > 0;
+        bool IPreparedParticlePass.NeedsPreparedSceneCapture => _preparedShaded && (_preparedSoftDepth || _preparedSceneColor);
+        public void CapturePreparedSceneInputs()
+            => _renderer.CaptureScene(_viewportWidth, _viewportHeight, _preparedSceneColor, _preparedSoftDepth);
         bool IPreparedParticlePass.HasPreparedShadowCasters => _preparedShaded && _renderQueue.Exists(e =>
             e.Emitter.IsVisible && !e.Emitter.Def.Disabled && e.Emitter.InstanceCount > 0 && VfxRenderPhaseSemantics.CastsShadow(e.Emitter.Def));
         void IPreparedParticlePass.RenderPreparedShadowPass(Matrix4x4 lightViewProjection, Matrix4x4 eyeView)
@@ -30,9 +35,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             if (!PrepareRenderFrame(viewProjection, view, viewMode, wireOverlay)) return;
 
             using IDisposable renderBatch = BeginPreparedRenderBatch();
-            CapturePreparedSceneDepth();
+            CapturePreparedSceneInputs();
             CapturePreparedEarlyDistortionFrame();
             RenderPreparedEarlyDistortionPass();
+            RenderPreparedGroundPass();
             RenderPreparedColorPass();
             CapturePreparedDistortionFrame();
             RenderPreparedDistortionPass();
@@ -101,11 +107,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             }
 
             _preparedSoftDepth = needsSoftParticles;
-            _renderer.CaptureScene(
-                _viewportWidth,
-                _viewportHeight,
-                needsSceneColor,
-                needsSoftParticles);
+            _preparedSceneColor = needsSceneColor;
             VfxRenderQueue.BuildInto(_renderSources, _renderQueue, _renderGraphOrders);
 
             var previewPasses = ResolvePreviewPasses(viewMode, wireOverlay, _renderer.SupportsWireframe);
@@ -116,6 +118,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             _preparedWireOpacity = previewPasses.WireOpacity;
 
             _shadedRenderQueue.Clear();
+            _groundRenderQueue.Clear();
             _distortionRenderQueue.Clear();
             _earlyDistortionRenderQueue.Clear();
             _postColorRenderQueue.Clear();
@@ -124,7 +127,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                 VfxRenderPhases phases = VfxRenderPhaseSemantics.Resolve(entry.Emitter.Def, entry.Emitter.HudLayer);
                 if (phases.EarlyDistortion) _earlyDistortionRenderQueue.Add(entry);
                 if (phases.LateDistortion) _distortionRenderQueue.Add(entry);
-                if (phases.Under) _shadedRenderQueue.Add(entry);
+                if (phases.Under)
+                {
+                    if (entry.Emitter.Def.IsGroundLayer) _groundRenderQueue.Add(entry);
+                    else _shadedRenderQueue.Add(entry);
+                }
                 if (phases.Over) _postColorRenderQueue.Add(entry);
             }
             return _renderQueue.Count > 0;
@@ -181,6 +188,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                 _renderer.Render(_shadedRenderQueue, _preparedViewProjection, _preparedView);
         }
 
+        public void RenderPreparedGroundPass()
+        {
+            if (_preparedShaded && _groundRenderQueue.Count > 0)
+                _renderer.Render(_groundRenderQueue, _preparedViewProjection, _preparedView);
+        }
+
         internal bool HasPreparedDistortionPass =>
             _preparedShaded && _distortionRenderQueue.Count > 0;
 
@@ -231,6 +244,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             _renderSources.Clear();
             _renderQueue.Clear();
             _shadedRenderQueue.Clear();
+            _groundRenderQueue.Clear();
             _distortionRenderQueue.Clear();
             _earlyDistortionRenderQueue.Clear();
             _postColorRenderQueue.Clear();

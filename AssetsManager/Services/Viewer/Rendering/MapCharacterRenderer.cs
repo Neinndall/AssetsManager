@@ -364,7 +364,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                                 previewPlacement ? previewPalette : authoredPalette,
                                 cameraPosition,
                                 hidden,
-                                timeSeconds,
+                                previewPlacement ? group.PreviewTimeSeconds : timeSeconds,
                                 previewPlacement);
                         }
                     }
@@ -514,6 +514,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                 Matrix4x4 world = command.World;
                 var drawFrame = gameFrame with
                 {
+                    TimeSeconds = command.TimeSeconds,
                     CharacterPosition = Vector3.Transform(command.Resources.BoundsCenter, world)
                 };
                 _gl.FrontFace(world.GetDeterminant() < 0f
@@ -584,7 +585,11 @@ namespace AssetsManager.Services.Viewer.Rendering
                     _gameShaderRuntime.GetSkinnedPassCount(outline.Material) > 0)
                 {
                     var outlined = command with { Range = command.Range with { Material = outline.Material }, PassIndex = 0 };
-                    var drawFrame = frame with { CharacterPosition = Vector3.Transform(command.Resources.BoundsCenter, command.World) };
+                    var drawFrame = frame with
+                    {
+                        TimeSeconds = command.TimeSeconds,
+                        CharacterPosition = Vector3.Transform(command.Resources.BoundsCenter, command.World)
+                    };
                     if (TryDrawGamePass(outlined, in drawFrame)) { ResetGameBindings(); continue; }
                     ResetGameBindings();
                 }
@@ -656,6 +661,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                 _gl.FrontFace(command.World.GetDeterminant() < 0f ? FrontFaceDirection.CW : FrontFaceDirection.Ccw);
                 var drawFrame = gameFrame with
                 {
+                    TimeSeconds = command.TimeSeconds,
                     CharacterPosition = Vector3.Transform(command.Resources.BoundsCenter, command.World)
                 };
                 TryDrawGamePass(command, in drawFrame);
