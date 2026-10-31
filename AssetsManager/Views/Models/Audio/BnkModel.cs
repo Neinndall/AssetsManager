@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
 
 namespace AssetsManager.Views.Models.Audio
 {
@@ -25,6 +26,18 @@ namespace AssetsManager.Views.Models.Audio
         AuxiliaryBus = 19
     }
 
+    [JsonDerivedType(typeof(SoundBnkObjectData))]
+    [JsonDerivedType(typeof(EventBnkObjectData))]
+    [JsonDerivedType(typeof(ActionBnkObjectData))]
+    [JsonDerivedType(typeof(RandomOrSequenceContainerBnkObjectData))]
+    [JsonDerivedType(typeof(SwitchContainerBnkObjectData))]
+    [JsonDerivedType(typeof(ActorMixerBnkObjectData))]
+    [JsonDerivedType(typeof(BlendContainerBnkObjectData))]
+    [JsonDerivedType(typeof(DialogueEventBnkObjectData))]
+    [JsonDerivedType(typeof(MusicTrackBnkObjectData))]
+    [JsonDerivedType(typeof(MusicSegmentBnkObjectData))]
+    [JsonDerivedType(typeof(MusicSwitchContainerBnkObjectData))]
+    [JsonDerivedType(typeof(MusicPlaylistContainerBnkObjectData))]
     public class BnkObjectData { }
 
     public interface IHircContainer

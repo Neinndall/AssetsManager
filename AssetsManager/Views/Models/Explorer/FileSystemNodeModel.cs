@@ -14,7 +14,7 @@ namespace AssetsManager.Views.Models.Explorer
 {
     public enum NodeType { RealDirectory, RealFile, WadFile, VirtualDirectory, VirtualFile, AudioEvent, WemFile, SoundBank }
     public enum DiffStatus { Unchanged, New, Modified, Renamed, Removed, Dependency }
-    public enum AudioSourceType { Wpk, Bnk }
+    public enum AudioSourceType { Wpk, Bnk, EventsBnk }
 
     public class FileSystemNodeModel : INotifyPropertyChanged, IDisposable, ISelectableTreeNode
     {

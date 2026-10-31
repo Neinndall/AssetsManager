@@ -16,6 +16,9 @@ using AssetsManager.Services.Viewer.Resolvers;
 using LeagueToolkit.Core.Mesh;
 using AssetsManager.Services.Viewer.Rendering;
 using AssetsManager.Services.Viewer.Rendering.GameShaders;
+using AssetsManager.Services.Viewer.Vfx.Resources;
+using AssetsManager.Services.Viewer.Vfx.Session;
+using AssetsManager.Services.Viewer.Vfx.Rendering;
 using AssetsManager.Shaders;
 using AssetsManager.Tests.Support;
 using AssetsManager.Utils;
@@ -30,6 +33,7 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
     /// submeshes in bind pose through the viewer's GlMeshRenderer with the Studio reference lighting,
     /// optionally with game programs enabled by `--shaders`,
     /// framed on the focus submesh and seen from the side the toward submesh sits on.
+    /// `--studio-loader --vfx=name` adds one authored system at 0.35s; `--align-surface-effects` uses Studio's surface alignment.
     /// </summary>
     internal static class SkinPartRenderDiagnostic
     {
@@ -43,12 +47,16 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
             bool shaders = args.Contains("--shaders"), isolate = args.Contains("--isolate"), studio = args.Contains("--studio");
             bool studioLoader = args.Contains("--studio-loader");
             bool dumpShader = args.Contains("--dump-shader");
+            string vfx = args.FirstOrDefault(arg => arg.StartsWith("--vfx=", StringComparison.Ordinal))?[6..];
+            bool alignSurfaceEffects = args.Contains("--align-surface-effects");
+            if (vfx != null && !studioLoader)
+                throw new ArgumentException("--vfx requires --studio-loader.");
             string shaderRoot = args.FirstOrDefault(arg => arg.StartsWith("--shader-root=", StringComparison.Ordinal))?[14..];
             studio |= studioLoader;
             args = args.Where(arg => !arg.StartsWith("--", StringComparison.Ordinal)).ToArray();
             if (args.Length < 4)
             {
-                Console.WriteLine("Usage: skin-part-render <skin-path> <focus-submesh> <toward-submesh> <out.png> [size] [distance] [--shaders] [--isolate] [--studio] [--studio-loader] [--parameter=name=value]");
+                Console.WriteLine("Usage: skin-part-render <skin-path> <focus-submesh> <toward-submesh> <out.png> [size] [distance] [--shaders] [--isolate] [--studio] [--studio-loader] [--parameter=name=value] [--vfx=name] [--align-surface-effects]");
                 return;
             }
 
@@ -124,7 +132,7 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                                     string key = SknMaterialTextureResolver.MatchTextureKey(path, part.AllTextures.Keys.ToArray());
                                     Console.WriteLine($"[StudioTexture] {part.Name} {texture.Name}: path={path} key={key} loaded={!string.IsNullOrWhiteSpace(key)}");
                                 }
-                            Render(asset, args[1], args[2], args[3], size, args.Length > 5 ? float.Parse(args[5], System.Globalization.CultureInfo.InvariantCulture) : 3.2f, renderSettings, skin, shaders, isolate, parameters: parameters, studio: studio, loadedModel: model);
+                            Render(asset, args[1], args[2], args[3], size, args.Length > 5 ? float.Parse(args[5], System.Globalization.CultureInfo.InvariantCulture) : 3.2f, renderSettings, skin, shaders, isolate, parameters: parameters, studio: studio, loadedModel: model, vfx: vfx, alignSurfaceEffects: alignSurfaceEffects);
                         }
                         catch (Exception ex) { failure = ex; }
                         finally { app.Dispatcher.BeginInvokeShutdown(System.Windows.Threading.DispatcherPriority.Normal); }
@@ -141,7 +149,7 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
             if (failure != null) Console.WriteLine($"[PartRender] failed: {failure}");
         }
 
-        internal static int Render(MapCharacterAssetData asset, string focusName, string towardName, string output, int size, float distance, AppSettings settings, SkinnedMesh skin, bool shaders, bool isolateFocus = false, Matrix4x4[] pose = null, IReadOnlyDictionary<string, float> parameters = null, bool studio = false, SceneModel loadedModel = null)
+        internal static int Render(MapCharacterAssetData asset, string focusName, string towardName, string output, int size, float distance, AppSettings settings, SkinnedMesh skin, bool shaders, bool isolateFocus = false, Matrix4x4[] pose = null, IReadOnlyDictionary<string, float> parameters = null, bool studio = false, SceneModel loadedModel = null, string vfx = null, bool alignSurfaceEffects = false)
         {
             MapCharacterMeshData mesh = asset.Mesh;
             var hidden = asset.Materials.InitialHiddenSubmeshes?.ToHashSet(StringComparer.OrdinalIgnoreCase) ?? new();
@@ -217,6 +225,39 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
             renderer.Render(model, view * projection, view, projection, eye,
                 lighting.LightDirection, lighting.LightColor, lighting.FillDirection, lighting.FillColor, lighting.AmbientColor, shadersEnabled: shaders, mirrorCharacterX: studio);
             if (studio) renderer.ComposeBloom();
+
+            if (vfx != null)
+            {
+                var catalog = asset.Vfx ?? throw new InvalidOperationException("Skin has no VFX catalog.");
+                var system = catalog.Systems.Values.Single(system => string.Equals(system.Name, vfx, StringComparison.OrdinalIgnoreCase));
+                using var logger = new Serilog.LoggerConfiguration().CreateLogger();
+                var log = new LogService(logger);
+                var provider = new WadContentProvider(log, new WadNodeLoaderService(null, log), new DirectoriesCreator(), new SvgParser());
+                var resolver = new MapAssetResolver(provider, settings);
+                var reachable = VfxSceneResourceContext.ReachableSystems(catalog.Systems, catalog.ResourceMap, new[] { system });
+                // Resource extraction must not wait on the WPF dispatcher that owns this diagnostic draw.
+                using var resources = System.Threading.Tasks.Task.Run(() => VfxSceneResourceContext.CreateAsync(reachable, null, resolver, null, log,
+                    ownerSceneContext: catalog.OwnerSceneContext)).GetAwaiter().GetResult();
+                using var session = new VfxRenderSession(log) { AlignSurfaceEffects = alignSurfaceEffects };
+                session.Initialize(gl, shaders ? settings : null);
+                session.SetViewportSize(size, size);
+                session.SetSystem(new VfxSystemModel
+                {
+                    Name = system.Name, Definition = system, SystemCatalog = catalog.Systems,
+                    ResourceMap = catalog.ResourceMap, OwnerSceneContext = catalog.OwnerSceneContext,
+                    SearchDirectory = resources.SearchDirectory, PlaybackSeed = VfxRenderSession.IdleEffectSeed,
+                    TotalDuration = 3, Speed = 1
+                });
+                session.SetWorldTransform(Matrix4x4.CreateScale(1f / catalog.OwnerSceneContext.SkinScale) * GlMeshRenderer.CreateWorldMatrix(model, studio));
+                session.SetOwnerSkinningMatrices(pose);
+                session.Seek(.35);
+                for (int pump = 0; pump < 256 && VfxGpuResourceUploader.HasPendingResources(session.Graphs); pump++)
+                    session.PrepareRenderFrame(view * projection, view);
+                gl.BindFramebuffer(FramebufferTarget.Framebuffer, framebuffer);
+                gl.Viewport(0, 0, (uint)size, (uint)size);
+                session.Render(view * projection, view);
+                Console.WriteLine($"[PartRender] VFX={system.Name} alignSurfaceEffects={alignSurfaceEffects}");
+            }
 
             byte[] rgba = new byte[size * size * 4];
             gl.ReadPixels(0, 0, (uint)size, (uint)size, Silk.NET.OpenGL.PixelFormat.Rgba, PixelType.UnsignedByte, rgba.AsSpan());

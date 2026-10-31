@@ -19,6 +19,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         private readonly HashSet<uint> _cameraPrograms = new();
         private readonly Dictionary<uint, VfxShaderUniforms> _gameUniforms = new();
         private readonly Dictionary<string, Vector4> _particleParameters = new(StringComparer.Ordinal);
+        internal bool AlignSurfaceEffects { get; set; }
 
         internal (bool Depth, bool Color) SceneInputsFor(VfxEmitterDefinition emitter)
         {
@@ -109,7 +110,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             var uniforms = mesh ? _meshUniforms : _particleUniforms;
             uniforms.Uniform1(uniforms.HasTexMult, HasTextureMultLayer(emitter.Def) ? 1 : 0);
             _particleParameters.Clear();
-            VfxShaderParameterUtils.PopulateNativeParameters(_particleParameters, emitter.Def, phase);
+            VfxShaderParameterUtils.PopulateNativeParameters(_particleParameters, emitter.Def, phase, AlignSurfaceEffects);
             var frame = _gameFrame with { TimeSeconds = emitter.RenderTime };
             _gameShaders.BindParticle(emitter.Def, mesh, pass, frame, _particleParameters, name => ParticleTexture(emitter, name));
             // LTK quad/ribbon preludes draw in WORLD; mesh preludes draw in mirrored ENGINE_WORLD.

@@ -705,6 +705,7 @@ namespace AssetsManager.Views.Controls.Viewer
             int width,
             int height)
         {
+            session.AlignSurfaceEffects = _model.IsSkinWorkspace;
             session.SetEffectsQuality((VfxEffectsQuality)(AppSettings?.StudioParameters?.EffectsQuality ?? 3));
             session.SetFlexChannels(_model.IsRawSystemsMode ? new Vector3(_model.VfxFlex0, _model.VfxFlex1, _model.VfxFlex2) : Vector3.Zero);
             if (_model.IsRawSystemsMode) _model.VfxFlexMask = session.FlexChannelMask;

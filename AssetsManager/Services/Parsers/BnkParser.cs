@@ -11,48 +11,57 @@ namespace AssetsManager.Services.Parsers
         {
             logService.LogDebug($"[BNK DIAGNOSTIC] Stream received. Length: {stream.Length} bytes.");
             var bnk = new BnkFile();
-            using var reader = new BinaryReader(stream, System.Text.Encoding.UTF8, true);
+            using var sectionReader = new BinaryReader(stream, System.Text.Encoding.UTF8, true);
 
-            while (reader.BaseStream.Position + 8 <= reader.BaseStream.Length)
+            while (stream.Position < stream.Length)
             {
-                long sectionStartPos = reader.BaseStream.Position;
-                string signature = System.Text.Encoding.ASCII.GetString(reader.ReadBytes(4));
-                uint sectionSize = reader.ReadUInt32();
-                long nextSectionStart = reader.BaseStream.Position + sectionSize;
+                BnkParseHelper.RequireBytes(sectionReader, 8);
+                long sectionStartPos = stream.Position;
+                string signature = System.Text.Encoding.ASCII.GetString(sectionReader.ReadBytes(4));
+                uint sectionSize = sectionReader.ReadUInt32();
+                long nextSectionStart = stream.Position + sectionSize;
 
                 logService.LogDebug($"[BNK DEBUG] Found section: {signature}, Size: {sectionSize}, Pos: {sectionStartPos}");
-                if (nextSectionStart > reader.BaseStream.Length)
-                {
-                    logService.LogDebug($"[BNK ERROR] Invalid section size for {signature}. Aborting.");
-                    break;
-                }
+                if (nextSectionStart > stream.Length)
+                    throw new InvalidDataException($"Section {signature} exceeds the bank boundary.");
 
                 switch (signature)
                 {
                     case "BKHD":
+                        if (sectionSize < 8) throw new InvalidDataException("BKHD is shorter than its version and ID.");
                         bnk.Bkhd = new BkhdSectionData
                         {
-                            Version = reader.ReadUInt32(),
-                            Id = reader.ReadUInt32()
+                            Version = sectionReader.ReadUInt32(),
+                            Id = sectionReader.ReadUInt32()
                         };
-                        reader.BaseStream.Seek(nextSectionStart, SeekOrigin.Begin);
+                        stream.Position = nextSectionStart;
                         break;
 
                     case "HIRC":
+                        if (bnk.Bkhd == null) throw new InvalidDataException("HIRC precedes BKHD.");
+                        if (sectionSize < 4) throw new InvalidDataException("HIRC is shorter than its object count.");
                         bnk.Hirc = new HircSectionData();
-                        uint objectCount = reader.ReadUInt32();
+                        uint objectCount = sectionReader.ReadUInt32();
+                        if (objectCount > (nextSectionStart - stream.Position) / 9)
+                            throw new InvalidDataException("HIRC object count exceeds its section.");
                         logService.LogDebug($"[BNK DEBUG] HIRC section has {objectCount} objects.");
 
                         for (int i = 0; i < objectCount; i++)
                         {
-                            long objPos = reader.BaseStream.Position;
+                            if (nextSectionStart - stream.Position < 9)
+                                throw new InvalidDataException("HIRC object header exceeds its section.");
                             var bnkObject = new BnkObject
                             {
-                                Type = (BnkObjectType)reader.ReadByte(),
-                                Size = reader.ReadUInt32(),
-                                Id = reader.ReadUInt32()
+                                Type = (BnkObjectType)sectionReader.ReadByte(),
+                                Size = sectionReader.ReadUInt32()
                             };
-                            long objEnd = reader.BaseStream.Position + bnkObject.Size - 4;
+                            if (bnkObject.Size < 4 || bnkObject.Size > nextSectionStart - stream.Position || bnkObject.Size > int.MaxValue)
+                                throw new InvalidDataException("HIRC object payload exceeds its section or lacks an ID.");
+                            bnkObject.Id = sectionReader.ReadUInt32();
+                            // Typed reads stay inside this object, including when a layout is incomplete.
+                            using var payload = new MemoryStream(sectionReader.ReadBytes((int)bnkObject.Size - 4), false);
+                            using var reader = new BinaryReader(payload);
+                            long objEnd = payload.Length;
 
                             logService.LogDebug($"[BNK HIRC Object] Type: {(byte)bnkObject.Type} ({bnkObject.Type}), ID: {bnkObject.Id}");
 
@@ -87,7 +96,9 @@ namespace AssetsManager.Services.Parsers
 
                                 case BnkObjectType.Event:
                                     var eventData = new EventBnkObjectData();
-                                    uint actionCount = bnk.Bkhd.Version == 58 ? reader.ReadUInt32() : reader.ReadByte();
+                                    uint actionCount = bnk.Bkhd.Version == 58 ? reader.ReadUInt32()
+                                        : bnk.Bkhd.Version >= 132 ? BnkParseHelper.ReadVariableCount(reader) : reader.ReadByte();
+                                    BnkParseHelper.RequireBytes(reader, (long)actionCount * sizeof(uint));
                                     for (int j = 0; j < actionCount; j++) eventData.ActionIds.Add(reader.ReadUInt32());
                                     bnkObject.Data = eventData;
                                     break;
@@ -100,7 +111,6 @@ namespace AssetsManager.Services.Parsers
                                     
                                     logService.LogDebug($"[BNK PARSER] Parsing {bnkObject.Type} (Type {(byte)bnkObject.Type}), ID: {bnkObject.Id}");
                                     
-                                    var parentIdField = containerData is ActorMixerBnkObjectData am ? am : (object)(containerData as BlendContainerBnkObjectData);
                                     var childrenList = containerData is ActorMixerBnkObjectData am2 ? am2.Children : (containerData as BlendContainerBnkObjectData).Children;
 
                                     uint pId;
@@ -179,8 +189,6 @@ namespace AssetsManager.Services.Parsers
                                          randContainerData.Children.AddRange(rawChildren);
                                      }
                                      
-                                     // Force stream position to the exact end of the object to avoid corruption
-                                     reader.BaseStream.Seek(objEnd, SeekOrigin.Begin);
                                      bnkObject.Data = randContainerData;
                                      break;
 
@@ -251,12 +259,15 @@ namespace AssetsManager.Services.Parsers
                                     break;
                             }
                             bnk.Hirc.Objects.Add(bnkObject);
-                            if (reader.BaseStream.Position != objEnd) reader.BaseStream.Seek(objEnd, SeekOrigin.Begin);
+                            if (payload.Position > objEnd)
+                                throw new InvalidDataException($"HIRC object {bnkObject.Id} read beyond its payload.");
                         }
-                        reader.BaseStream.Seek(nextSectionStart, SeekOrigin.Begin);
+                        if (stream.Position != nextSectionStart)
+                            throw new InvalidDataException("HIRC contains bytes outside its declared object list.");
                         break;
 
                     case "DIDX":
+                        if (sectionSize % 12 != 0) throw new InvalidDataException("DIDX contains an incomplete media index entry.");
                         // Data Index: Contains the ID, offset, and size of each WEM file in the DATA section.
                         bnk.Didx = new DidxSectionData();
                         int wemCount = (int)sectionSize / 12;
@@ -264,34 +275,54 @@ namespace AssetsManager.Services.Parsers
                         {
                             bnk.Didx.Wems.Add(new WemInfo
                             {
-                                Id = reader.ReadUInt32(),
-                                Offset = reader.ReadUInt32(),
-                                Size = reader.ReadUInt32()
+                                Id = sectionReader.ReadUInt32(),
+                                Offset = sectionReader.ReadUInt32(),
+                                Size = sectionReader.ReadUInt32()
                             });
                         }
-                        reader.BaseStream.Seek(nextSectionStart, SeekOrigin.Begin);
+                        stream.Position = nextSectionStart;
                         break;
 
                     case "DATA":
                         // Data: A large block containing all the raw WEM file data, concatenated.
                         // We only need to store the starting offset of this section to calculate absolute WEM offsets.
-                        bnk.Data = new DataSectionData { Offset = reader.BaseStream.Position };
-                        reader.BaseStream.Seek(nextSectionStart, SeekOrigin.Begin);
+                        bnk.Data = new DataSectionData { Offset = stream.Position };
+                        stream.Position = nextSectionStart;
                         break;
 
                     default:
                         logService.LogDebug($"[BNK DEBUG] Skipping section: {signature}");
-                        reader.BaseStream.Seek(nextSectionStart, SeekOrigin.Begin);
+                        stream.Position = nextSectionStart;
                         break;
                 }
             }
-            logService.LogDebug($"[BNK DIAGNOSTIC] Finished parsing. Final stream position: {reader.BaseStream.Position}");
+            logService.LogDebug($"[BNK DIAGNOSTIC] Finished parsing. Final stream position: {stream.Position}");
             return bnk;
         }
     }
 
     internal static class BnkParseHelper
     {
+        internal static void RequireBytes(BinaryReader reader, long count)
+        {
+            if (count < 0 || count > reader.BaseStream.Length - reader.BaseStream.Position)
+                throw new InvalidDataException("BNK field exceeds its containing payload.");
+        }
+
+        internal static uint ReadVariableCount(BinaryReader reader)
+        {
+            uint value = 0;
+            for (int i = 0; i < 5; i++)
+            {
+                byte next = reader.ReadByte();
+                if (value > uint.MaxValue >> 7)
+                    throw new InvalidDataException("BNK variable-length count overflows UInt32.");
+                value = (value << 7) | (uint)(next & 0x7F);
+                if ((next & 0x80) == 0) return value;
+            }
+            throw new InvalidDataException("BNK variable-length count is unterminated.");
+        }
+
         public static void SkipFx(BinaryReader reader, uint bkhdVersion)
         {
             reader.BaseStream.Seek(1, SeekOrigin.Current);
@@ -331,7 +362,8 @@ namespace AssetsManager.Services.Parsers
             }
             if (hasPos && has3d)
             {
-                hasAutomation = ((posBits >> 5) & 3) != 0;
+                int mode = (posBits >> 5) & 3;
+                hasAutomation = bkhdVersion >= 132 ? mode is 1 or 2 : mode != 0;
                 reader.BaseStream.Seek(1, SeekOrigin.Current);
             }
             if (hasAutomation)
@@ -349,9 +381,29 @@ namespace AssetsManager.Services.Parsers
             if (bkhdVersion > 135) reader.BaseStream.Seek(4, SeekOrigin.Current);
         }
 
-        public static void SkipStateGroups(BinaryReader reader)
+        public static void SkipStateGroups(BinaryReader reader, uint bkhdVersion)
         {
             reader.BaseStream.Seek(6, SeekOrigin.Current);
+            if (bkhdVersion >= 132)
+            {
+                uint groups = ReadVariableCount(reader);
+                for (uint i = 0; i < groups; i++)
+                {
+                    ReadVariableCount(reader);
+                    RequireBytes(reader, 2);
+                    reader.BaseStream.Seek(2, SeekOrigin.Current);
+                }
+                uint properties = ReadVariableCount(reader);
+                for (uint i = 0; i < properties; i++)
+                {
+                    RequireBytes(reader, 5);
+                    reader.BaseStream.Seek(5, SeekOrigin.Current);
+                    long valuesSize = (long)ReadVariableCount(reader) * 8;
+                    RequireBytes(reader, valuesSize);
+                    reader.BaseStream.Seek(valuesSize, SeekOrigin.Current);
+                }
+                return;
+            }
             reader.BaseStream.Seek(3 * reader.ReadByte(), SeekOrigin.Current);
             byte count = reader.ReadByte();
             for (int i = 0; i < count; i++)
@@ -366,7 +418,13 @@ namespace AssetsManager.Services.Parsers
             ushort rtpcCount = reader.ReadUInt16();
             for (int i = 0; i < rtpcCount; i++)
             {
-                reader.BaseStream.Seek(bkhdVersion <= 89 ? 13 : 12, SeekOrigin.Current);
+                if (bkhdVersion >= 132)
+                {
+                    reader.BaseStream.Seek(6, SeekOrigin.Current);
+                    ReadVariableCount(reader);
+                    reader.BaseStream.Seek(5, SeekOrigin.Current);
+                }
+                else reader.BaseStream.Seek(bkhdVersion <= 89 ? 13 : 12, SeekOrigin.Current);
                 reader.BaseStream.Seek(12 * reader.ReadUInt16(), SeekOrigin.Current);
             }
         }
@@ -380,7 +438,7 @@ namespace AssetsManager.Services.Parsers
             SkipInitParams(reader);
             SkipPosParams(reader, bkhdVersion);
             SkipAux(reader, bkhdVersion);
-            SkipStateGroups(reader);
+            SkipStateGroups(reader, bkhdVersion);
             SkipRtpc(reader, bkhdVersion);
             return (parentId, busId);
         }

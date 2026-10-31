@@ -108,14 +108,18 @@ namespace AssetsManager.Utils.Rendering
         public static void PopulateNativeParameters(
             IDictionary<string, Vector4> parameters,
             VfxEmitterDefinition definition,
-            float phase)
+            float phase,
+            bool alignSurfaceEffects = false)
         {
             ArgumentNullException.ThrowIfNull(parameters);
             ArgumentNullException.ThrowIfNull(definition);
 
             parameters["TEXTURE_INFO"] = new Vector4(1f, 1f, 1f, 0f);
             parameters["TEXTURE_INFO_2"] = new Vector4(1f, 1f, 1f, 0f);
-            parameters["PARTICLE_DEPTH_PUSH_PULL"] = new Vector4(definition.DepthPushPull, 0f, 0f, 0f);
+            // Studio can keep surface overlays on the skin without changing authored data or simulation.
+            bool align = alignSurfaceEffects && definition.PrimitiveKind == VfxPrimitiveKind.AttachedMesh &&
+                !definition.HasResolvedCustomMaterial && !definition.DrawsAsDistortion;
+            parameters["PARTICLE_DEPTH_PUSH_PULL"] = new Vector4(align ? 0f : definition.DepthPushPull, 0f, 0f, 0f);
 
             if (!definition.HasResolvedCustomMaterial)
             {

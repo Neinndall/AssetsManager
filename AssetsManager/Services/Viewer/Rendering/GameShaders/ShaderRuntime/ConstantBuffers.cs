@@ -58,7 +58,8 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                         break;
                     case "VFXDynamicPerParticleInstanceCBVS" when particle != null:
                         WriteVector4(block.Data, 4, 4, Vector4.One);
-                        Set(block.Data, 10, particle.DepthPushPull);
+                        Set(block.Data, 10, overrides != null && overrides.TryGetValue("PARTICLE_DEPTH_PUSH_PULL", out var pushPull)
+                            ? pushPull.X : particle.DepthPushPull);
                         break;
                     case "VFXDynamicPerParticleInstanceCBPS":
                         // PARTICLE_COLOR_FACTOR scales colour and alpha (VFX_Uber_StaticMesh_Unlit with

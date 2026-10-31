@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Threading;
@@ -251,11 +252,7 @@ namespace AssetsManager.Services.Formatting
                             foreach (var eventNode in audioTree)
                             {
                                 if (eventNode.IsTechnicalNode) continue;
-                                soundsCount += eventNode.Sounds.Count;
-                                foreach (var containerNode in eventNode.Containers)
-                                {
-                                    soundsCount += containerNode.Sounds.Count;
-                                }
+                                soundsCount += eventNode.EnumerateSounds().Count();
                             }
 
                             count += (soundsCount > 0) ? soundsCount : 1;
@@ -615,15 +612,13 @@ namespace AssetsManager.Services.Formatting
 
             async Task ExportSoundNodeAsync(WemFileNode soundNode, string eventPath)
             {
-                byte[] wemData = null;
-                if (soundNode.Source == AudioSourceType.Wpk && wpkData != null)
+                byte[] source = soundNode.Source switch
                 {
-                    wemData = wpkData.AsSpan((int)soundNode.Offset, (int)soundNode.Size).ToArray();
-                }
-                else if (audioBnkFileData != null)
-                {
-                    wemData = audioBnkFileData.AsSpan((int)soundNode.Offset, (int)soundNode.Size).ToArray();
-                }
+                    AudioSourceType.Wpk => wpkData,
+                    AudioSourceType.EventsBnk => eventsData,
+                    _ => audioBnkFileData
+                };
+                byte[] wemData = source == null ? null : source.AsSpan((int)soundNode.Offset, (int)soundNode.Size).ToArray();
 
                 if (wemData != null)
                 {
@@ -651,15 +646,19 @@ namespace AssetsManager.Services.Formatting
                     await ExportSoundNodeAsync(soundNode, eventPath);
                 }
 
-                // Export sounds in sub-containers (families)
-                foreach (var containerNode in eventNode.Containers)
+                var families = new Stack<(AudioContainerNode Family, string ParentPath)>();
+                for (int i = eventNode.Containers.Count - 1; i >= 0; i--)
+                    families.Push((eventNode.Containers[i], eventPath));
+                while (families.TryPop(out var family))
                 {
-                    string containerPath = Path.Combine(eventPath, PathUtils.SanitizeName(containerNode.Name));
+                    string containerPath = Path.Combine(family.ParentPath, PathUtils.SanitizeName(family.Family.Name));
                     _directoriesCreator.CreateDirectory(containerPath);
-                    foreach (var soundNode in containerNode.Sounds)
+                    foreach (var soundNode in family.Family.Sounds)
                     {
                         await ExportSoundNodeAsync(soundNode, containerPath);
                     }
+                    for (int i = family.Family.Containers.Count - 1; i >= 0; i--)
+                        families.Push((family.Family.Containers[i], containerPath));
                 }
             }
         }
