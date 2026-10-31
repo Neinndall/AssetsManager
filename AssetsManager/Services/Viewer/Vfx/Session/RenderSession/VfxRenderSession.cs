@@ -32,6 +32,16 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
         private long? _initialResourceWaitStarted;
         internal static readonly TimeSpan InitialResourceWaitLimit = TimeSpan.FromSeconds(4);
         private VfxOpenGlRenderer _renderer;
+        private bool _alignSurfaceEffects;
+        internal bool AlignSurfaceEffects
+        {
+            get => _alignSurfaceEffects;
+            set
+            {
+                _alignSurfaceEffects = value;
+                if (_renderer != null) _renderer.AlignSurfaceEffects = value;
+            }
+        }
         private VfxPlaybackGraphRuntime _graph;
         private bool _purgeGpuResourcesBeforeNextFrame;
         private sealed class GraphAttachmentInfo
@@ -237,6 +247,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
         public void Initialize(GL gl, AssetsManager.Utils.AppSettings settings = null)
         {
             _renderer = new VfxOpenGlRenderer();
+            _renderer.AlignSurfaceEffects = _alignSurfaceEffects;
             _renderer.Initialize(gl, settings);
             _renderer.SetOwnerWorldTransform(_worldTransform);
             _ready = true;

@@ -5,6 +5,7 @@ HOTFIX UPDATE
 New Features
 
 Improvements
+  - 3D Studio / Keep surface effects aligned with characters to prevent displaced eye rings and hair overlaps in skin previews.
   - Audio Banks / Preserve nested sound families in Explorer, parsed comparisons, and audio exports.
 
 Changes
