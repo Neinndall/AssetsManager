@@ -17,7 +17,8 @@ namespace AssetsManager.Services.Viewer.Animation
             IEnumerable<BinTree> documents,
             uint graphPathHash,
             Func<uint, string> hashNameResolver,
-            Func<uint, string> classNameResolver)
+            Func<uint, string> classNameResolver,
+            Func<ulong, string> wadChunkPathResolver = null)
         {
             if (graphPathHash == 0 || documents == null)
                 return null;
@@ -26,7 +27,7 @@ namespace AssetsManager.Services.Viewer.Animation
             {
                 if (document == null) continue;
                 AnimationGraphDefinition graph = VfxAnimationParser
-                    .ExtractAnimationGraphs(document, hashNameResolver, classNameResolver)
+                    .ExtractAnimationGraphs(document, hashNameResolver, classNameResolver, wadChunkPathResolver)
                     .FirstOrDefault(candidate => candidate.PathHash == graphPathHash);
                 if (graph != null)
                     return graph;

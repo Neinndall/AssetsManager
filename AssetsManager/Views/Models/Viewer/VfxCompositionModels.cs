@@ -7,7 +7,10 @@ using LeagueToolkit.Core.Animation;
 namespace AssetsManager.Views.Models.Viewer
 {
     /// <summary>Base event authored on an AnimationGraph clip.</summary>
-    public abstract record AnimationClipEventDefinition(uint EventHash, float StartFrame, float EndFrame);
+    public abstract record AnimationClipEventDefinition(uint EventHash, float StartFrame, float EndFrame)
+    {
+        public string Name { get; init; } = $"0x{EventHash:x8}";
+    }
 
     public sealed record AnimationSubmeshVisibilityEventDefinition(
         uint EventHash,

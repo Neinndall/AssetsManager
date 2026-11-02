@@ -160,9 +160,10 @@ namespace AssetsManager.Services.Viewer.Loading
             SknMaterialTextureResolution materials = SknMaterialTextureResolver.Resolve(
                 metadata,
                 textures.Keys);
+            // Graph keys use value names; class, field, object and asset hashes retain their own resolvers.
             Func<uint, string> graphHashNameResolver = _hashResolver == null
                 ? hash => hash.ToString("x8")
-                : _hashResolver.ResolveBinHashGeneral;
+                : _hashResolver.ResolveBinHash;
             Func<uint, string> graphClassNameResolver = _hashResolver == null
                 ? hash => hash.ToString("x8")
                 : _hashResolver.ResolveBinType;
@@ -170,7 +171,8 @@ namespace AssetsManager.Services.Viewer.Loading
                 documents,
                 skin.AnimationGraphHash,
                 graphHashNameResolver,
-                graphClassNameResolver);
+                graphClassNameResolver,
+                wadChunkPathResolver);
             MapCharacterVfxCatalog vfx = BuildVfxCatalog(
                 documents,
                 graphHashNameResolver,

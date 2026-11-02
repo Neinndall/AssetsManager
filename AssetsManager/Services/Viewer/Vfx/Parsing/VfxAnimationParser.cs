@@ -190,7 +190,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
         internal static IReadOnlyList<AnimationGraphDefinition> ExtractAnimationGraphs(
             BinTree tree,
             Func<uint, string> graphHashNameResolver,
-            Func<uint, string> graphClassNameResolver)
+            Func<uint, string> graphClassNameResolver,
+            Func<ulong, string> wadChunkPathResolver = null)
         {
             var graphs = new List<AnimationGraphDefinition>();
             foreach (BinTreeObject owner in tree.Objects.Values)
@@ -198,17 +199,24 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 if (Get(owner.Properties, F_clipDataMap) is not BinTreeMap clipMap)
                     continue;
 
+                var ownNames = ReadGraphOwnNames(clipMap, wadChunkPathResolver);
+                string ResolveName(uint hash)
+                {
+                    string named = ResolveGraphHashName(hash, graphHashNameResolver);
+                    return named != $"0x{hash:x8}" ? named : ownNames.GetValueOrDefault(hash);
+                }
+
                 IReadOnlyList<AnimationTrackDefinition> tracks =
-                    ReadAnimationTracks(owner.Properties, graphHashNameResolver);
+                    ReadAnimationTracks(owner.Properties, ResolveName);
                 IReadOnlyList<AnimationMaskDefinition> masks =
-                    ReadAnimationMasks(owner.Properties, graphHashNameResolver);
+                    ReadAnimationMasks(owner.Properties, ResolveName);
                 IReadOnlyList<AnimationSyncGroupDefinition> syncGroups =
-                    ReadAnimationSyncGroups(owner.Properties, graphHashNameResolver);
+                    ReadAnimationSyncGroups(owner.Properties, ResolveName);
 
                 var clipNames = new Dictionary<uint, string>();
                 foreach (var pair in clipMap)
                 {
-                    (uint hash, string name) = ReadGraphMapKey(pair.Key, graphHashNameResolver);
+                    (uint hash, string name) = ReadGraphMapKey(pair.Key, ResolveName);
                     if (hash != 0u) clipNames.TryAdd(hash, name);
                 }
 
@@ -228,7 +236,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                     if (clipPair.Value is not BinTreeStruct clip) continue;
 
                     (uint clipHash, string clipName) =
-                        ReadGraphMapKey(clipPair.Key, graphHashNameResolver);
+                        ReadGraphMapKey(clipPair.Key, ResolveName);
                     if (clipHash == 0u) continue;
 
                     string animationFilePath = null;
@@ -254,28 +262,29 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                         CreateGraphKeyReference(
                             Get(clip.Properties, F_trackDataName),
                             trackNames,
-                            graphHashNameResolver),
+                            ResolveName),
                         CreateGraphKeyReference(
                             Get(clip.Properties, F_clipMaskDataName),
                             maskNames,
-                            graphHashNameResolver),
+                            ResolveName),
                         CreateGraphKeyReference(
                             Get(clip.Properties, F_syncGroupDataName),
                             syncGroupNames,
-                            graphHashNameResolver),
+                            ResolveName),
                         childHashes
                             .Select(hash => CreateGraphKeyReference(
                                 hash,
                                 clipNames,
-                                graphHashNameResolver))
+                                ResolveName))
                             .ToArray(),
                         ReadNamedHashList(
                             Get(clip.Properties, F_interruptionGroups),
-                            graphHashNameResolver),
+                            ResolveName),
                         ReadUnsigned(Get(clip.Properties, F_clipFlags)),
                         parametricValues,
                         ResolveGraphClassName(clip.ClassHash, graphClassNameResolver),
-                        includeEmpty: true);
+                        includeEmpty: true,
+                        graphHashNameResolver: ResolveName);
                     if (definition != null)
                     {
                         definition = definition with
@@ -297,6 +306,55 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                     ReadAnimationBlends(owner.Properties)));
             }
             return graphs;
+        }
+
+        private static Dictionary<uint, string> ReadGraphOwnNames(BinTreeMap clips, Func<ulong, string> paths)
+        {
+            var names = new Dictionary<uint, string>();
+            foreach (var pair in clips)
+            {
+                if (pair.Value is not BinTreeStruct clip) continue;
+                uint key = AsU32(pair.Key) ?? 0u;
+                if (Get(clip.Properties, F_animationResourceData) is BinTreeStruct resource)
+                {
+                    BinTreeProperty file = Get(resource.Properties, F_animationFilePath);
+                    if (file is BinTreeOptional optional) file = optional.Value;
+                    string path = file switch
+                    {
+                        BinTreeWadChunkLink link => paths?.Invoke(link.Value),
+                        BinTreeU64 hash => paths?.Invoke(hash.Value),
+                        _ => null
+                    };
+                    path ??= ReadAsset(file, ".anm");
+                    if (!string.IsNullOrEmpty(path))
+                    {
+                        string stem = path.Replace('\\', '/').Split('/').Last().Split('.')[0];
+                        // A file name is evidence only when the candidate hashes to the graph key.
+                        for (int at = 0; at < stem.Length;)
+                        {
+                            string candidate = stem[at..];
+                            if (VfxParsingHash.Fnv1a(candidate) == key)
+                            {
+                                names[key] = candidate;
+                                break;
+                            }
+                            int underscore = stem.IndexOf('_', at);
+                            if (underscore < 0) break;
+                            at = underscore + 1;
+                        }
+                    }
+                }
+                if (Get(clip.Properties, F_eventDataMap) is not BinTreeMap events) continue;
+                foreach (var entry in events)
+                {
+                    if (entry.Value is not BinTreeStruct data) continue;
+                    uint eventKey = AsU32(entry.Key) ?? 0u;
+                    string name = GetString(data.Properties, F_eventName);
+                    if (!string.IsNullOrEmpty(name) && VfxParsingHash.Fnv1a(name) == eventKey)
+                        names[eventKey] = name;
+                }
+            }
+            return names;
         }
 
         private static IReadOnlyList<AnimationBlendDefinition> ReadAnimationBlends(
@@ -456,7 +514,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
         {
             if (hash == 0u) return string.Empty;
             string resolved = graphHashNameResolver?.Invoke(hash);
-            return string.IsNullOrWhiteSpace(resolved)
+            return string.IsNullOrWhiteSpace(resolved) ||
+                   resolved.Equals(hash.ToString("x8"), StringComparison.OrdinalIgnoreCase) ||
+                   resolved.Equals($"0x{hash:x8}", StringComparison.OrdinalIgnoreCase)
                 ? $"0x{hash:x8}"
                 : resolved;
         }
@@ -536,7 +596,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             uint flags = 0,
             IReadOnlyList<float?> parametricValues = null,
             string className = null,
-            bool includeEmpty = false)
+            bool includeEmpty = false,
+            Func<uint, string> graphHashNameResolver = null)
         {
             var events = new List<AnimationClipEventDefinition>();
             if (Get(properties, F_eventDataMap) is BinTreeMap eventMap)
@@ -544,7 +605,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 foreach (var pair in eventMap)
                 {
                     if (pair.Value is not BinTreeStruct eventData) continue;
-                    events.Add(ParseClipEvent(AsU32(pair.Key) ?? 0u, eventData));
+                    uint hash = AsU32(pair.Key) ?? 0u;
+                    events.Add(ParseClipEvent(hash, eventData) with
+                    {
+                        Name = ResolveGraphHashName(hash, graphHashNameResolver)
+                    });
                 }
             }
             if (events.Count == 0 && !includeEmpty) return null;
