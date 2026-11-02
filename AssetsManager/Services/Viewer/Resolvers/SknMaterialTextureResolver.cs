@@ -674,8 +674,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
             {
                 defaultMaterialDefinition = ModelMaterialDefinition.TextureOnly(
                     skinTextureKey,
-                    metadata.Pbr?.Rma != null ? null :
-                        GameShaderProgramResolver.CreateDefaultSkinnedProgram(skinTextureKey, emissiveTextureKey))
+                    GameShaderProgramResolver.CreateDefaultSkinnedProgram(skinTextureKey, emissiveTextureKey))
                     with { Pbr = metadata.Pbr?.Rma != null ? metadata.Pbr : null,
                         EmissiveTexturePath = metadata.EmissiveTexturePath };
             }
@@ -720,7 +719,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
                     };
                 materialDefinitions[submesh] = ModelMaterialDefinition.TextureOnly(
                     textureFallback,
-                    maps.Rma != null ? null : GameShaderProgramResolver.CreateDefaultSkinnedProgram(textureFallback, emissiveTextureKey))
+                    GameShaderProgramResolver.CreateDefaultSkinnedProgram(textureFallback, emissiveTextureKey))
                     with { Pbr = maps.Rma != null || maps.RmaPaths?.Count > 0 ? maps : null,
                         EmissiveTexturePath = metadata.EmissiveTexturePath };
             }

@@ -42,7 +42,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                         WritePerFrameVertex(block.Data, frame, skinned);
                         break;
                     case "PerFramePixelCB":
-                        WritePerFramePixel(block.Data, frame, skinned);
+                        WritePerFramePixel(block.Data, frame, skinned, character.HasValue);
                         break;
                     case "GrassDisortVS":
                         // With no actors pushing the brush, origin spheres can make its pivot divide by zero.
@@ -186,7 +186,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             WriteVector3(data, 132, direction);
         }
 
-        private static void WritePerFramePixel(float[] data, in Frame frame, bool skinned)
+        internal static void WritePerFramePixel(float[] data, in Frame frame, bool skinned, bool characterLighting = false)
         {
             ResolveSun(frame.Sun, out Vector3 color, out float intensity, out Vector3 sky, out float skyScale,
                 out Vector3 direction, out float lightMapScale, out bool fogEnabled, out Vector3 fog,
@@ -212,7 +212,8 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             Set(data, 20, depth.X);
             Set(data, 21, depth.Y);
             WriteVector3(data, 24, sun);
-            Set(data, 27, 1f);
+            // The PBR sun multiplier is a character-lighting setting, not a particle gain.
+            Set(data, 27, characterLighting ? frame.Sun?.PbrSunAdditionalScale ?? 10f : 1f);
             WriteVector3(data, 29, direction);
             Set(data, 32, lightMapScale);
             if (fogEnabled)
@@ -234,10 +235,12 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             WriteMatrixRows(data, 68, frame.View);
             // m[16]: LIGHT_GRID_TEXTURE_SCALE (x, PBR characters) and GRASS_INTERP (y, VertexDeform).
             // LIGHT_GRID_WORLD_TO_GRID (60) stays zero, so the one-texel grid texture is read at its origin.
-            Set(data, 64, frame.LightGrid?.RmaIntensityScale ?? MapLightGridData.DefaultRmaIntensityScale);
+            float gridScale = frame.LightGrid?.RmaIntensityScale ?? MapLightGridData.DefaultRmaIntensityScale;
+            // Skinned LIGHT_GRID_TEXTURE already contains pi; keep authored gains without counting it twice.
+            Set(data, 64, characterLighting ? gridScale / MathF.PI : gridScale);
             Set(data, 65, frame.Environment.GrassInterp);
             // HDR_ENV_DIFFUSE_SCALE (88): weight of the IBL diffuse term PBR shaders add to the light grid.
-            Set(data, 88, 1f);
+            Set(data, 88, frame.Sun?.HdrEnvDiffuseScale ?? 3f);
             WriteMatrixRows(data, 104, cameraWorld);
         }
 

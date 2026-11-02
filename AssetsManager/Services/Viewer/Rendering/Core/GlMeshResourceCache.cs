@@ -22,6 +22,7 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
             internal uint Vao;
             internal uint Vbo;
             internal uint Ebo;
+            internal GlMeshEdges Edges;
             internal int IndexCount;
             internal uint Texture;
             internal bool TextureResolved;
@@ -166,6 +167,7 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
 
                 _gl.BindVertexArray(0);
                 resources.IndexCount = indices.Count;
+                resources.Edges = new GlMeshEdges(_gl, indexData, positions.Select(p => new System.Numerics.Vector3((float)p.X, (float)p.Y, (float)p.Z)).ToArray());
             }
 
             return resources;
@@ -362,6 +364,7 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
             DeleteHandle(resources.Vao, _gl.DeleteVertexArray);
             DeleteHandle(resources.Vbo, _gl.DeleteBuffer);
             DeleteHandle(resources.Ebo, _gl.DeleteBuffer);
+            resources.Edges?.Dispose();
             ReleaseSkinningBuffers(resources);
             _liveResources.Remove(resources);
             _partResources.Remove(part);
@@ -506,6 +509,7 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
                     DeleteHandle(resources.Vao, _gl.DeleteVertexArray);
                     DeleteHandle(resources.Vbo, _gl.DeleteBuffer);
                     DeleteHandle(resources.Ebo, _gl.DeleteBuffer);
+                    resources.Edges?.Dispose();
                     ReleaseSkinningBuffers(resources);
                 }
                 _liveResources.Clear();

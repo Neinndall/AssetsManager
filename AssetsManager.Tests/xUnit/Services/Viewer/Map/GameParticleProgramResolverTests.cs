@@ -9,11 +9,51 @@ using AssetsManager.Views.Models.Viewer;
 using LeagueToolkit.Core.Wad;
 using AssetsManager.Tests.Support;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
 {
-    public sealed class GameParticleProgramResolverTests
+    public sealed class GameParticleProgramResolverTests(ITestOutputHelper output)
     {
+        [Theory]
+        [InlineData(3, VfxPrimitiveKind.Mesh)]
+        [InlineData(4, VfxPrimitiveKind.Mesh)]
+        [InlineData(5, VfxPrimitiveKind.Mesh)]
+        [InlineData(3, VfxPrimitiveKind.AttachedMesh)]
+        [InlineData(4, VfxPrimitiveKind.AttachedMesh)]
+        [InlineData(5, VfxPrimitiveKind.AttachedMesh)]
+        public void LocalSpaceUvVariantPreservesItsReflectedParameters(int mode, VfxPrimitiveKind primitive)
+        {
+            string root = FindInstalledShaderCacheRoot();
+            Assert.NotNull(root);
+            var emitter = Emitter() with
+            {
+                PrimitiveKind = primitive, IsMeshPrimitive = true, UvMode = (byte)mode,
+                TextureMultPath = "mult.tex"
+            };
+            var program = GameParticleProgramResolver.Create(emitter, true);
+            Assert.Contains(program.Passes[0].Defines, define => define.Name == "LOCAL_SPACE_UV");
+            Assert.Contains(program.Passes[0].Defines, define => define.Name == "MULT_PASS");
+            Assert.Empty(program.Passes[0].Parameters);
+            Assert.Equal(primitive == VfxPrimitiveKind.Mesh ? "ParticleSystem/MESH" : "SkinnedMesh/PARTICLE",
+                GameParticleProgramResolver.ResolvePair(emitter, true).Name);
+            string cache = Path.Combine(root, @"Game\DATA\FINAL\ShaderCache.dx11.wad.client");
+            using var wad = new WadFile(cache);
+            var bytecode = Assert.Single(GameShaderProgramResolver.ReadProgram(program, wad, cache).Passes).Bytecode;
+            Assert.True(bytecode.Ready, bytecode.Failure);
+            var translated = GameShaderTranslator.Translate(bytecode.Program.Vertex, bytecode.Program.VertexReflection,
+                bytecode.Program.Pixel, bytecode.Program.PixelReflection);
+            Assert.True(translated.Ready, translated.Failure);
+            foreach (string name in new[] { "vParticleUVTransform", "vParticleUVTransformMult" })
+            {
+                var member = Assert.Single(translated.Program.Vertex.Sidecar.Blocks
+                    .SelectMany(block => block.Members), member => member.Name == name);
+                Assert.Equal(48u, member.Size);
+                output.WriteLine($"{primitive}, mode={mode}: {name}: offset={member.Offset}, size={member.Size}");
+            }
+            if (mode == 3) output.WriteLine(translated.Program.Vertex.Glsl);
+        }
+
         [Fact]
         public void NativeBorderSelectionIncludesEveryAuthoredLayerAndExcludesCustomMaterials()
         {

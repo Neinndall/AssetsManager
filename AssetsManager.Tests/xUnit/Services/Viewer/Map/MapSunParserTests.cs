@@ -50,6 +50,21 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
             Assert.Equal(new Vector4(0.1f, 0.2f, 0.3f, 1f), parsed.FogAlternateColor);
             Assert.Equal(new Vector2(100f, -900f), parsed.FogStartEnd);
             Assert.Equal(2.1f, parsed.FogEmissiveRemap);
+            Assert.Equal(3f, parsed.HdrEnvDiffuseScale);
+            Assert.Equal(10f, parsed.PbrSunAdditionalScale);
+        }
+
+        [Fact]
+        public void AuthoredPbrLightScalesReachTheSunModel()
+        {
+            var sun = new BinTreeStruct(0, MapSunParser.SunPropertiesClass, new BinTreeProperty[]
+            {
+                new BinTreeF32(Fnv1a.HashLower("HdrEnvDiffuseScale"), 2.5f),
+                new BinTreeF32(Fnv1a.HashLower("PbrSunAdditionalScale"), 7f)
+            });
+            var parsed = MapSunParser.Parse(Tree(Container(BaseSrx, sun)), MapPath.FromEntryPath(BaseSrx));
+            Assert.Equal(2.5f, parsed.HdrEnvDiffuseScale);
+            Assert.Equal(7f, parsed.PbrSunAdditionalScale);
         }
 
         [Theory]

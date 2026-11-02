@@ -221,6 +221,7 @@ namespace AssetsManager.Views.Controls.Viewer
                      e.PropertyName == nameof(StudioModel.ShowPreviewStage) ||
                      e.PropertyName == nameof(StudioModel.PreviewViewMode) ||
                      e.PropertyName == nameof(StudioModel.PreviewWireOverlay) ||
+                     e.PropertyName == nameof(StudioModel.PreviewOutlines) ||
                      e.PropertyName == nameof(StudioModel.VfxFlex0) || e.PropertyName == nameof(StudioModel.VfxFlex1) || e.PropertyName == nameof(StudioModel.VfxFlex2))
             {
                 RequestEnvironmentPreparation();

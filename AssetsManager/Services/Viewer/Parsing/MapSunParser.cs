@@ -80,7 +80,9 @@ namespace AssetsManager.Services.Viewer.Parsing
                 ReadVector4(sun, FogColorField) ?? Defaults.FogColor,
                 ReadVector4(sun, FogAlternateColorField) ?? Defaults.FogAlternateColor,
                 ReadVector2(sun, FogStartEndField) ?? Defaults.FogStartEnd,
-                ReadFloat(sun, FogEmissiveRemapField) ?? Defaults.FogEmissiveRemap);
+                ReadFloat(sun, FogEmissiveRemapField) ?? Defaults.FogEmissiveRemap,
+                ReadFloat(sun, Fnv1a.HashLower("HdrEnvDiffuseScale")) ?? Defaults.HdrEnvDiffuseScale,
+                ReadFloat(sun, Fnv1a.HashLower("PbrSunAdditionalScale")) ?? Defaults.PbrSunAdditionalScale);
         }
 
         private static bool? ReadBool(BinTreeStruct holder, uint field) =>

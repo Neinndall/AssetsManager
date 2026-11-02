@@ -8,7 +8,7 @@ namespace AssetsManager.Services.Viewer.Rendering
     {
         internal const int MaximumBones = 512;
 
-        internal const string Vertex = @"
+        internal const string Vertex = Core.GlMeshEdges.Vertex + @"
 layout(location = 0) in vec3 aPosition;
 layout(location = 1) in vec3 aNormal;
 layout(location = 2) in vec2 aUv;
@@ -80,9 +80,10 @@ void main()
         + gridWeight.z * uLightGridCube[vNormal.z < 0.0 ? 5 : 4];
     vUv = aUv;
     gl_Position = uViewProjection * worldPosition;
+    edgePosition(worldPosition, gl_Position);
 }";
 
-        internal const string Fragment = @"
+        internal const string Fragment = @"in float vEdgeFade;
 in vec3 vStockLightFront;
 in vec3 vStockLightBack;
 in vec2 vUv;
@@ -128,7 +129,7 @@ void main()
 {
     if (uWireframePass != 0)
     {
-        FragColor = uWireframeColor;
+        FragColor = vec4(uWireframeColor.rgb, uWireframeColor.a * vEdgeFade);
         return;
     }
 

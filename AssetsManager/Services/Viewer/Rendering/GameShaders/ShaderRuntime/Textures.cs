@@ -33,7 +33,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
 
                 if (name == ImageLightTexture &&
                     sampler.Dimension == GameShaderTranslator.TextureDimension.CubeArray &&
-                    (_imageLight ??= new GameShaderImageLight(_gl)).Resolve(frame.ImageLight) is uint imageLight &&
+                    (_imageLight ??= new GameShaderImageLight(_gl)).Resolve(frame.ImageLight, frame.Sun) is uint imageLight &&
                     imageLight != 0)
                 {
                     texture = imageLight;

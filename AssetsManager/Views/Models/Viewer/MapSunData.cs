@@ -18,7 +18,9 @@ namespace AssetsManager.Views.Models.Viewer
         Vector4 FogColor,
         Vector4 FogAlternateColor,
         Vector2 FogStartEnd,
-        float FogEmissiveRemap)
+        float FogEmissiveRemap,
+        float HdrEnvDiffuseScale = 3f,
+        float PbrSunAdditionalScale = 10f)
     {
         public MapSunData(
             Vector3 direction,

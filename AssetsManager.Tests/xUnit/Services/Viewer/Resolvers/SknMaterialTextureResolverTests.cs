@@ -50,7 +50,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
             foreach (string path in new[] { rma, normal, hatRma, armNormal, emissive }) Assert.Contains(path, metadata.ReferencedTexturePaths);
             var resolved = SknResolver.Resolve(metadata, new[] { "body", "body_rma", "body_nm", "hat_rma", "arm_nm" });
             Assert.Equal(new CharacterPbrMaps(rma, normal), resolved.DefaultMaterialDefinition.Pbr);
-            Assert.Null(resolved.DefaultMaterialDefinition.Program);
+            Assert.NotNull(resolved.DefaultMaterialDefinition.Program);
             Assert.Equal(hatRma, resolved.ResolveMaterialDefinition("hAT").Pbr.Rma);
             Assert.Equal(normal, resolved.ResolveMaterialDefinition("hAT").Pbr.Normal);
             Assert.Equal(rma, resolved.ResolveMaterialDefinition("arm").Pbr.Rma);

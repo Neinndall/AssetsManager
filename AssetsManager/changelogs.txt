@@ -1,3 +1,19 @@
+AssetsManager - League of Legends | v4.1.0.7
+
+HOTFIX UPDATE
+
+New Features
+
+Improvements
+  - 3D Studio / Improve PBR skin lighting, wireframe clarity, and edge smoothing while retaining FXAA and SMAA.
+  - 3D Studio / Toggle character outlines independently for models and characters placed on maps.
+
+Changes
+
+Bug Fixes
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
 AssetsManager - League of Legends | v4.1.0.6
 
 HOTFIX UPDATE

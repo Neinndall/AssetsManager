@@ -274,6 +274,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                         ("NORMAL", _) => 1,
                         ("TEXCOORD", 0) => 2,
                         ("TANGENT", _) => 3,
+                        ("TEXCOORD", 6) => 3,
                         ("COLOR", _) => 4,
                         ("BLENDINDICES", _) => 5,
                         ("BLENDWEIGHT", _) => 6,

@@ -269,7 +269,7 @@ public sealed class CharacterPbrGpuTests
 
         internal byte[] HostPixel(bool map, byte occlusion, StudioViewMode mode, bool late = false,
             byte? emissive = null, bool pbr = true, bool lateEmissive = false,
-            CharacterOutlineDefinition outline = null, bool hidden = false)
+            CharacterOutlineDefinition outline = null, bool hidden = false, bool outlinesEnabled = true)
         {
             BitmapSource Bitmap(params byte[] bytes)
             {
@@ -303,7 +303,7 @@ public sealed class CharacterPbrGpuTests
                     new SknMaterialTextureResolution(material, new Dictionary<string, ModelMaterialDefinition>()), textures, null);
                 var placement = new MapCharacterData(new MapPlaceableData(1,1,0,"test",Matrix4x4.Identity,255,null,null), "test", null, null);
                 using var group = new MapCharacterRuntimeGroup(asset, new MapCharacterAnimationRuntime(null,null), new[] { placement });
-                using var renderer = new MapCharacterRenderer(); renderer.Initialize(Gl);
+                using var renderer = new MapCharacterRenderer { OutlinesEnabled = outlinesEnabled }; renderer.Initialize(Gl);
                 renderer.Render(new[] { group }, Matrix4x4.Identity, Matrix4x4.Identity, Matrix4x4.Identity,
                     new Vector3(0,0,3), 0, null, viewMode: mode, shadersEnabled: true);
                 if (late || lateEmissive)
@@ -325,7 +325,7 @@ public sealed class CharacterPbrGpuTests
                 using var model = new SceneModel();
                 model.Parts.Add(new ModelPart("Body", new GeometryModel3D { Geometry = geometry })
                     { AllTextures = textures, SelectedTextureName = "base", MaterialDefinition = material, IsVisible = !hidden });
-                using var renderer = new GlMeshRenderer(); renderer.Initialize(Gl);
+                using var renderer = new GlMeshRenderer { OutlinesEnabled = outlinesEnabled }; renderer.Initialize(Gl);
                 renderer.Render(model, Matrix4x4.Identity, Matrix4x4.Identity, Matrix4x4.Identity,
                     new Vector3(0,0,3), Vector3.UnitZ, Vector3.Zero, Vector3.UnitZ, Vector3.Zero, new Vector3(pbr ? MathF.PI : 0.2f),
                     viewMode: mode, shadersEnabled: true);

@@ -29,6 +29,7 @@ namespace AssetsManager.Services.Viewer.Rendering
     {
         /// <summary>Environment cube PBR game shaders light from (IBL); the preview sky the viewport shows.</summary>
         internal CubeMapData ImageLight { get; set; }
+        internal bool OutlinesEnabled { get; set; } = true;
 
         private sealed class SkinResources
         {
@@ -45,6 +46,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             internal uint SkinIndexVbo;
             internal uint SkinWeightVbo;
             internal uint Ebo;
+            internal GlMeshEdges Edges;
             internal bool HasSkin;
             internal int[] InfluenceJointSlots = Array.Empty<int>();
             internal IReadOnlyList<BoundRange> Ranges = Array.Empty<BoundRange>();
@@ -67,6 +69,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             ModelMaterialWrapMode WrapV);
 
         private bool _gameBindingsActive;
+        private bool _wireOverlay;
 
         private readonly record struct DrawCommand(
             SkinResources Resources,
@@ -79,7 +82,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             int PassIndex = -1,
             int Order = 0);
 
-        private static readonly Vector3 PreviewWireColor = new(92f / 255f, 133f / 255f, 1f);
+        private static readonly Vector3 PreviewWireColor = new(67f / 255f, 1f, 163f / 255f);
         private static readonly Vector3 DefaultUntextured = new(0.5f);
         private static readonly Vector3 DefaultErrored = new(1f, 0.08f, 0.16f);
 
@@ -269,7 +272,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                         DrawQueue(_transparent, viewProjection, in gameFrame, untextured, errored, solidMode, shadersEnabled, wireframePass: false, ref activePalette, ref activeVao);
                         if (glows)
                             DrawBloomPasses(_transparent, in gameFrame, ref activePalette, ref activeVao);
-                        if (viewMode == StudioViewMode.Lit)
+                        if (OutlinesEnabled && viewMode == StudioViewMode.Lit)
                             DrawOutlines(_opaque.Concat(_transparent), viewProjection, in gameFrame, shadersEnabled);
                     }
                 }
@@ -280,7 +283,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                     activeVao = 0;
                     ResetGameBindings();
                     UseStockProgram(viewProjection, gameFrame.Sun);
-                    _gl.PolygonMode(TriangleFace.FrontAndBack, PolygonMode.Line);
+                    _gl.PolygonMode(TriangleFace.FrontAndBack, PolygonMode.Fill);
                     _gl.Uniform1(_uWireframePass, 1);
                     _gl.Uniform4(
                         _uWireframeColor,
@@ -288,9 +291,10 @@ namespace AssetsManager.Services.Viewer.Rendering
                         PreviewWireColor.Y,
                         PreviewWireColor.Z,
                         wireOpacity);
+                    _wireOverlay = wireOpacity < 1f;
                     ApplyWireframeState(wireOpacity);
-                    DrawQueue(_opaque, viewProjection, in gameFrame, untextured, errored, solidMode, shadersEnabled: false, wireframePass: true, ref activePalette, ref activeVao);
-                    DrawQueue(_transparent, viewProjection, in gameFrame, untextured, errored, solidMode, shadersEnabled: false, wireframePass: true, ref activePalette, ref activeVao);
+                    // Each visible range draws once, regardless of its translated surface pass count.
+                    DrawQueue(_passSource, viewProjection, in gameFrame, untextured, errored, solidMode, shadersEnabled: false, wireframePass: true, ref activePalette, ref activeVao);
                 }
             }
             finally
@@ -451,8 +455,13 @@ namespace AssetsManager.Services.Viewer.Rendering
             _opaque.Clear();
             _transparent.Clear();
             int order = 0;
-            foreach (DrawCommand command in _passSource)
+            foreach (DrawCommand source in _passSource)
             {
+                var material = shadersEnabled
+                    ? CharacterPbrProgram.Resolve(source.Range.Material, source.Resources.TangentVbo != 0,
+                        source.Resources.ProgramTextureLookup ??= CreateProgramTextureLookup(source.Resources))
+                    : source.Range.Material;
+                var command = source with { Range = source.Range with { Material = material } };
                 int count = shadersEnabled && command.Resources.HasSkin
                     ? _gameShaderRuntime?.GetSkinnedPassCount(command.Range.Material) ?? 0
                     : 0;
@@ -555,6 +564,12 @@ namespace AssetsManager.Services.Viewer.Rendering
                     !wireframePass && viewMode == StudioViewMode.Lit && command.Range.Lit,
                     command.Range.Texture != null);
 
+                if (wireframePass)
+                {
+                    GlMeshEdges.Frame(_gl, _program, gameFrame.View, gameFrame.Projection, _wireOverlay);
+                    command.Resources.Edges.Draw(_program, command.Resources.Ebo, command.Range.StartIndex, command.Range.IndexCount);
+                    continue;
+                }
                 if (_gameShaderRuntime != null)
                     _gameShaderRuntime.DrawIndexedPass(
                         _drawElements, command.Range.IndexCount, new IntPtr(checked(command.Range.StartIndex * sizeof(uint))),
@@ -799,6 +814,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                 new ReadOnlySpan<uint>(mesh.Indices),
                 BufferUsageARB.StaticDraw);
             resources.Ranges = BindRanges(asset);
+            resources.Edges = new GlMeshEdges(_gl, mesh.Indices, mesh.Positions);
 
             _gl.BindVertexArray(0);
             _gl.BindBuffer(BufferTargetARB.ArrayBuffer, 0);
@@ -1272,6 +1288,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             DeleteBuffer(resources.SkinIndexVbo);
             DeleteBuffer(resources.SkinWeightVbo);
             DeleteBuffer(resources.Ebo);
+            resources.Edges?.Dispose();
             if (resources.Vao != 0) _gl.DeleteVertexArray(resources.Vao);
         }
 

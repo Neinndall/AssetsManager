@@ -579,6 +579,7 @@ namespace AssetsManager.Utils
         public string CameraPreset { get; set; } = "Orbit";
         public string ViewMode { get; set; } = "Lit";
         public bool WireOverlay { get; set; }
+        public bool CharacterOutlines { get; set; } = true;
     }
 
     public class ReportGenerationSettings

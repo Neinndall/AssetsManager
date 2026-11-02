@@ -10,6 +10,12 @@ namespace AssetsManager.Views.Models.Viewer
         private StudioViewMode _previewViewMode = StudioViewMode.Lit;
         private bool _previewWireOverlay;
         private bool _previewShaders;
+        private bool _previewOutlines = true;
+        public bool PreviewOutlines
+        {
+            get => _previewOutlines;
+            set { if (_previewOutlines == value) return; _previewOutlines = value; OnPropertyChanged(); }
+        }
         private float _vfxFlex0, _vfxFlex1, _vfxFlex2;
         private int _vfxFlexMask;
         public int VfxFlexMask

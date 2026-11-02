@@ -138,6 +138,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
 
             Assert.Equal("Lit", settings.Studio.ViewMode);
             Assert.False(settings.Studio.WireOverlay);
+            Assert.True(settings.Studio.CharacterOutlines);
             Assert.False(new StudioModel().TimelineVisible);
         }
 
@@ -145,7 +146,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
         public void StudioDisplayPreferencesRoundTripWithTheExistingSettingsKey()
         {
             const string savedJson = """
-                {"VfxStudio":{"CameraPreset":"Top","ViewMode":"Untextured","WireOverlay":true},"StudioParameters":{"StageVisible":true}}
+                {"VfxStudio":{"CameraPreset":"Top","ViewMode":"Untextured","WireOverlay":true,"CharacterOutlines":false},"StudioParameters":{"StageVisible":true}}
                 """;
             AppSettings settings = Newtonsoft.Json.JsonConvert.DeserializeObject<AppSettings>(savedJson);
 
@@ -153,6 +154,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
             Assert.True(settings.StudioParameters.StageVisible);
             Assert.Equal("Untextured", settings.Studio.ViewMode);
             Assert.True(settings.Studio.WireOverlay);
+            Assert.False(settings.Studio.CharacterOutlines);
 
             var saved = Newtonsoft.Json.Linq.JObject.Parse(Newtonsoft.Json.JsonConvert.SerializeObject(settings));
             Assert.Null(saved["Studio"]);
@@ -234,7 +236,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
 
             Assert.Contains("uniform vec4 uWireframeColor;", GlMeshShaderSource.Fragment);
             Assert.True(wire >= 0 && wire < materialUv);
-            Assert.Contains("fragColor = uWireframeColor;", GlMeshShaderSource.Fragment);
+            Assert.Contains("fragColor = vec4(uWireframeColor.rgb, uWireframeColor.a * vEdgeFade);", GlMeshShaderSource.Fragment);
         }
 
         [Fact]

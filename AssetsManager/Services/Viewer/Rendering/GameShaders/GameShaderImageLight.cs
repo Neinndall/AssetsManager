@@ -3,6 +3,8 @@ using System;
 using AssetsManager.Services.Viewer.Rendering.Core;
 using AssetsManager.Services.Viewer.Vfx.Resources;
 using Silk.NET.OpenGL;
+using System.Numerics;
+using AssetsManager.Views.Models.Viewer;
 
 namespace AssetsManager.Services.Viewer.Rendering.GameShaders
 {
@@ -19,8 +21,59 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
         private uint _texture;
         private CubeMapData _cubeSource;
         private uint _cube;
+        private uint _previewSky;
+        private MapSunData _previewSun;
 
         internal GameShaderImageLight(GL gl) => _gl = gl;
+
+        internal uint Resolve(CubeMapData cube, MapSunData sun)
+        {
+            if (cube?.IsValid == true) return Resolve(cube);
+            if (_previewSky != 0 && Equals(sun, _previewSun)) return _previewSky;
+            if (_previewSky != 0) _gl.DeleteTexture(_previewSky);
+            _previewSky = _gl.GenTexture();
+            _previewSun = sun;
+            _gl.BindTexture(TextureTarget.Texture2DArray, _previewSky);
+            _gl.TexImage3D(TextureTarget.Texture2DArray, 0, InternalFormat.Rgba16f,
+                16, 16, 6, 0, PixelFormat.Rgba, PixelType.Float, new ReadOnlySpan<float>(SkyTexels(sun)));
+            _gl.TexParameter(TextureTarget.Texture2DArray, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
+            _gl.TexParameter(TextureTarget.Texture2DArray, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
+            _gl.TexParameter(TextureTarget.Texture2DArray, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);
+            _gl.TexParameter(TextureTarget.Texture2DArray, TextureParameterName.TextureWrapT, (int)TextureWrapMode.ClampToEdge);
+            return _previewSky;
+        }
+
+        /// <summary>Preview substitute for a map probe; retains authored sky, horizon and ground hues.</summary>
+        internal static float[] SkyTexels(MapSunData sun, int size = 16)
+        {
+            Vector3 Rgb(Vector4 color) => new(color.X, color.Y, color.Z);
+            Vector3 sky = sun == null ? Vector3.One : Rgb(sun.SkyColor);
+            Vector3 ground = sun == null ? Vector3.One : Rgb(sun.GroundColor);
+            Vector3 horizon = sun == null ? Vector3.One : Rgb(sun.HorizonColor);
+            float ambientStrength = MathF.Max(sun?.SkyScale ?? 0f, 0f);
+            float totalStrength = ambientStrength + MathF.Max(sun?.Intensity ?? 0f, 0f);
+            float ambient = sun == null ? 0.6f : totalStrength > 0f ? ambientStrength / totalStrength : 0.5f;
+            float[] texels = new float[size * size * 6 * 4];
+            int at = 0;
+            for (int face = 0; face < 6; face++)
+            for (int row = 0; row < size; row++)
+            for (int column = 0; column < size; column++)
+            {
+                float u = (column + 0.5f) / size * 2f - 1f, v = (row + 0.5f) / size * 2f - 1f;
+                Vector3 direction = face switch
+                {
+                    0 => new(1, -v, -u), 1 => new(-1, -v, u), 2 => new(u, 1, v),
+                    3 => new(u, -1, -v), 4 => new(u, -v, 1), _ => new(-u, -v, -1)
+                };
+                float height = Vector3.Normalize(direction).Y;
+                Vector3 color = Vector3.Lerp(horizon, height > 0 ? sky : ground, MathF.Abs(height));
+                texels[at++] = MathF.Pow(MathF.Max(0, color.X), 2.2f) * ambient * 0.25f;
+                texels[at++] = MathF.Pow(MathF.Max(0, color.Y), 2.2f) * ambient * 0.25f;
+                texels[at++] = MathF.Pow(MathF.Max(0, color.Z), 2.2f) * ambient * 0.25f;
+                texels[at++] = 1;
+            }
+            return texels;
+        }
 
         /// <returns>The array texture of <paramref name="cube"/>, uploaded once per cube, or 0 without one.</returns>
         internal uint Resolve(CubeMapData cube)
@@ -103,6 +156,8 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
 
         public void Dispose()
         {
+            if (_previewSky != 0) _gl.DeleteTexture(_previewSky);
+            _previewSky = 0;
             Release();
             ReleaseCube();
         }

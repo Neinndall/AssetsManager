@@ -362,7 +362,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
         // The engine's default sampler state wraps on every axis (LTK SamplerState::default); critter UVs span 0..2.
         public static GameMaterialProgram CreateDefaultSkinnedProgram(
             string diffuseTextureKey,
-            string emissiveTextureKey = null)
+            string emissiveTextureKey = null, string rmaTextureKey = null, string normalTextureKey = null)
         {
             var textures = new List<GameMaterialTexture>
             {
@@ -381,7 +381,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                         FilterMag: true))
             };
 
-            if (!string.IsNullOrWhiteSpace(emissiveTextureKey))
+            if (string.IsNullOrWhiteSpace(rmaTextureKey) && !string.IsNullOrWhiteSpace(emissiveTextureKey))
             {
                 textures.Add(new(
                     LitUberEmissiveTexture,
@@ -396,10 +396,28 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                         FilterMag: true)));
             }
 
+            var defines = new List<GameMaterialDefine>();
+            void Map(string name, string path)
+            {
+                textures.Add(new(name, new MapTextureReference(path, XxHash64Ext.Hash(path)),
+                    GameMaterialTextureSource.Fallback, new GameMaterialSamplerState(null,
+                        MapTextureWrap.Repeat, MapTextureWrap.Repeat, MapTextureWrap.Repeat,
+                        FilterMin: true, FilterMag: true)));
+            }
+            if (!string.IsNullOrWhiteSpace(rmaTextureKey))
+            {
+                defines.Add(new("FEATURE_ROUGHNESS_METALLIC", "1", GameMaterialDefineSource.Skin));
+                Map("RMA_MAP", rmaTextureKey);
+                if (!string.IsNullOrWhiteSpace(normalTextureKey))
+                {
+                    defines.Add(new("FEATURE_TANGENT", "1", GameMaterialDefineSource.Skin));
+                    Map("NORMAL_MAP", normalTextureKey);
+                }
+            }
             var pass = new GameMaterialPass(
                 ShaderHash: 0,
                 ShaderPath: LitUberShaderName,
-                Defines: Array.Empty<GameMaterialDefine>(),
+                Defines: defines,
                 RuntimeSwitches: Array.Empty<KeyValuePair<string, bool>>(),
                 Textures: textures,
                 Parameters: Array.Empty<GameMaterialParameter>(),
