@@ -12,7 +12,11 @@ internal static class VfxClipCueEvaluator
 {
     internal sealed record VisibilityEntry(double AtSeconds, IReadOnlySet<uint> Hidden);
     private sealed record VisibilityChange(double At, int Order, IReadOnlyList<uint> Show,
-        IReadOnlyList<uint> Hide);
+        IReadOnlyList<uint> Hide, VisibilityChange Ends = null)
+    {
+        internal uint[] Shown { get; set; } = Array.Empty<uint>();
+        internal uint[] Hidden { get; set; } = Array.Empty<uint>();
+    }
 
     internal static IReadOnlyList<VisibilityEntry> BuildVisibilityTimeline(
         IReadOnlyList<AnimationClipTimedCue> cues,
@@ -30,9 +34,10 @@ internal static class VfxClipCueEvaluator
         int order = 0;
         foreach (AnimationSubmeshVisibilityCue cue in cues.OfType<AnimationSubmeshVisibilityCue>())
         {
-            changes.Add(new(cue.AtSeconds, order++, cue.ShowSubmeshHashes, cue.HideSubmeshHashes));
+            var start = new VisibilityChange(cue.AtSeconds, order++, cue.ShowSubmeshHashes, cue.HideSubmeshHashes);
+            changes.Add(start);
             if (cue.UntilSeconds is { } until)
-                changes.Add(new(until, order++, cue.HideSubmeshHashes, cue.ShowSubmeshHashes));
+                changes.Add(new(until, order++, Array.Empty<uint>(), Array.Empty<uint>(), start));
         }
         changes.Sort(static (left, right) =>
         {
@@ -47,8 +52,14 @@ internal static class VfxClipCueEvaluator
             do
             {
                 var change = changes[at++];
-                foreach (uint hash in change.Show) hidden.Remove(hash);
-                foreach (uint hash in change.Hide) hidden.Add(hash);
+                if (change.Ends == null)
+                {
+                    // An end must not invert commands that left the original state unchanged.
+                    change.Shown = change.Show.Where(hidden.Contains).Distinct().ToArray();
+                    change.Hidden = change.Hide.Where(hash => !hidden.Contains(hash)).Distinct().ToArray();
+                }
+                foreach (uint hash in change.Ends?.Hidden ?? change.Show) hidden.Remove(hash);
+                foreach (uint hash in change.Ends?.Shown ?? change.Hide) hidden.Add(hash);
             }
             while (at < changes.Count && changes[at].At == time);
 

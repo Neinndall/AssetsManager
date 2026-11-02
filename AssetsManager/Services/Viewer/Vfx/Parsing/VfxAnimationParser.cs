@@ -94,7 +94,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             var idleEffects = new List<VfxIdleEffectDefinition>();
             foreach (BinTreeObject owner in tree.Objects.Values)
             {
-                if (owner.ClassHash != SkinCharacterDataPropertiesClass) continue;
+                if (!AssetsManager.Services.Viewer.Parsing.CharacterSkinSchema.IsSkin(owner.ClassHash)) continue;
                 idleEffects.AddRange(ExtractIdleEffects(Get(owner.Properties, F_idleParticlesEffects)));
             }
             return idleEffects;
@@ -136,7 +136,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
         {
             foreach (BinTreeObject owner in tree.Objects.Values)
             {
-                if (owner.ClassHash != SkinCharacterDataPropertiesClass ||
+                if (!AssetsManager.Services.Viewer.Parsing.CharacterSkinSchema.IsSkin(owner.ClassHash) ||
                     Get(owner.Properties, F_skinMeshProperties) is not BinTreeStruct meshProperties)
                 {
                     continue;
@@ -587,7 +587,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             {
                 (0x2ec3ba66, 0xca2b847d), (0x512c9525, 0xca2b847d),
                 (0x4d7a54c0, 0), (0x24af5ac1, 0), (0x2329eec5, 0xca2b847d),
-                (0x078cafd9, 0), (0xd188b400, 0x68c14f60), (0x9a7f92cb, 0),
+                (0x078cafd9, 0), (0x9a7f92cb, 0), (0xd188b400, 0x68c14f60),
                 (0x8e5e6618, 0), (0x21328a43, 0xc6f291ed), (0x778d6dee, 0x68c14f60)
             })
             {

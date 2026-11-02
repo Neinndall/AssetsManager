@@ -71,11 +71,12 @@ namespace AssetsManager.Services.Viewer.Animation
 
             IReadOnlyList<AnimationClipDefinition> clips = asset.AnimationGraph?.Clips ??
                                                            Array.Empty<AnimationClipDefinition>();
+            var available = await AvailableAnimationsAsync(clips, projectRoot, cancellationToken);
             foreach (string key in requested)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 string requestedName = key == BindKey ? null : key;
-                AnimationClipDefinition clip = AnimationGraphPlayback.NamedOrOpeningClip(clips, requestedName);
+                AnimationClipDefinition clip = AnimationGraphPlayback.NamedOrOpeningClip(clips, requestedName, available.Contains);
                 if (clip == null)
                 {
                     _byRequested[key] = _bindState;
@@ -89,7 +90,7 @@ namespace AssetsManager.Services.Viewer.Animation
                 }
 
                 IReadOnlyList<AnimationClipDefinition> playlist =
-                    AnimationGraphPlayback.ResolvePlaylist(clip, clips);
+                    AnimationGraphPlayback.ResolvePlaylist(clip, clips, available: available.Contains);
                 var steps = new List<IAnimationAsset>(playlist.Count);
                 var preparedClips = new List<AnimationClipDefinition>(playlist.Count);
                 foreach (AnimationClipDefinition step in playlist)
@@ -151,8 +152,9 @@ namespace AssetsManager.Services.Viewer.Animation
 
             IReadOnlyList<AnimationClipDefinition> clips = asset.AnimationGraph?.Clips ??
                                                            Array.Empty<AnimationClipDefinition>();
+            var available = await AvailableAnimationsAsync(clips, _projectRoot, cancellationToken);
             IReadOnlyList<AnimationClipDefinition> playlist =
-                AnimationGraphPlayback.ResolvePlaylist(clip, clips, effectiveParameter);
+                AnimationGraphPlayback.ResolvePlaylist(clip, clips, effectiveParameter, available: available.Contains);
             var steps = new List<IAnimationAsset>(playlist.Count);
             var preparedSteps = new List<PreparedStep>(playlist.Count);
             foreach (AnimationClipDefinition step in playlist)
@@ -383,6 +385,18 @@ namespace AssetsManager.Services.Viewer.Animation
             }
 
             return new MapAssetReference(trimmed, 0);
+        }
+
+        private async Task<HashSet<string>> AvailableAnimationsAsync(
+            IReadOnlyList<AnimationClipDefinition> clips, string projectRoot, CancellationToken cancellationToken)
+        {
+            string[] paths = clips.Select(clip => clip.AnimationFilePath)
+                .Where(path => !string.IsNullOrWhiteSpace(path)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+            if (paths.Length == 0) return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var assets = await _assetResolver.ResolveReferencesAsync(
+                paths.Select(ReferenceFromAnimation), projectRoot, cancellationToken);
+            return paths.Where(path => _sources.ContainsKey(path) || assets.ContainsKey(ReferenceFromAnimation(path)))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
         }
 
         private async Task<IAnimationAsset> LoadSourceAsync(

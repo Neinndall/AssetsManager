@@ -66,7 +66,6 @@ internal static class StudioProjectCatalog
         var spells = new List<SpellDiscovery>();
         var mapDeclarations = new List<MapDeclaration>();
         var mapVariantParser = new MapVariantParser();
-        uint skinClass = Fnv1a.HashLower("SkinCharacterDataProperties");
         uint systemClass = Fnv1a.HashLower("VfxSystemDefinitionData");
         uint spellClass = Fnv1a.HashLower("SpellObject");
         Dictionary<(string Character, int Index), string> skinKinds = DiscoverSkinKinds(root, cancellationToken);
@@ -79,7 +78,7 @@ internal static class StudioProjectCatalog
                 using var stream = File.OpenRead(path);
                 var tree = new BinTree(stream);
                 bool skin = tree.Objects.Values.Any(item =>
-                    item.ClassHash == skinClass && HasPreviewableSkin(item));
+                    CharacterSkinSchema.IsSkin(item.ClassHash) && HasPreviewableSkin(item));
                 bool system = tree.Objects.Values.Any(item => item.ClassHash == systemClass);
 
                 foreach (BinTreeObject mapObject in tree.Objects.Values.Where(item =>

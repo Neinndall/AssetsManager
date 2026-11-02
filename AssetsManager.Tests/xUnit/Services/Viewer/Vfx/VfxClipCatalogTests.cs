@@ -14,6 +14,30 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx;
 public class VfxClipCatalogTests
 {
     [Fact]
+    public void PickingAnotherClipResetsItsParameterButSameClipAndGearKeepTheirSelection()
+    {
+        var first = Clip(1, 100, "First", "first.anm") with { ParametricValues = new float?[] { 5, 0 } };
+        var second = Clip(2, 100, "Second", "second.anm");
+        AnimationClipCatalogItem Item(AnimationClipDefinition clip) => new(
+            clip.ClipName, clip.ClipName, clip.AnimationFilePath, 0, null, clip, null,
+            Array.Empty<AnimationClipTimedCue>(), 0, false, "", new float[] { 0, 5 }, 0);
+        var model = new StudioModel();
+        model.PickAnimation(Item(first));
+        Assert.Equal(5f, model.SelectedAnimation.ParameterValue);
+        model.PickAnimation(model.SelectedAnimation with { ParameterValue = 0 });
+        Assert.Equal(0f, model.SelectedAnimation.ParameterValue);
+        model.PickAnimation(Item(second));
+        model.PickAnimation(Item(first));
+        Assert.Equal(5f, model.SelectedAnimation.ParameterValue);
+        model.PickAnimation(Item(second));
+        model.PickAnimation(Item(first with { UsesEquippedGearParameter = true }) with { ParameterValue = 0 });
+        Assert.Equal(0f, model.SelectedAnimation.ParameterValue);
+        model.SelectedAnimation = AnimationClipCatalogItem.CreateBindPoseItem();
+        model.SelectedAnimation = Item(first);
+        Assert.Equal(0f, model.SelectedAnimation.ParameterValue);
+    }
+
+    [Fact]
     public void SelectGraphClipsUsesOnlyTheSkinAnimationGraph()
     {
         AnimationClipDefinition wantedA = Clip(0x10, 0x100, "idle");
@@ -74,7 +98,7 @@ public class VfxClipCatalogTests
     }
 
     [Fact]
-    public void MetadataCatalogKeepsAuthoredClipWhenAnimationAssetIsUnavailable()
+    public void MetadataCatalogOmitsClipWhenAnimationAssetIsUnavailable()
     {
         var bundle = new VfxLoadingService.Bundle();
         bundle.Clips.Add(Clip(0x10, 0x100, "idle", "missing.anm"));
@@ -86,10 +110,26 @@ public class VfxClipCatalogTests
             Array.Empty<uint>());
         using var catalog = new VfxClipCatalog();
 
-        AnimationClipCatalogItem item = Assert.Single(catalog.BuildMetadata(bundle, _ => null));
+        Assert.Empty(catalog.BuildMetadata(bundle, _ => null));
+    }
 
-        Assert.Null(item.AnimationAsset);
-        Assert.Equal("missing.anm", item.FilePath);
+    [Fact]
+    public void MetadataSelectorSkipsMissingAnmAndKeepsTheNextAvailableChildWithoutDecoding()
+    {
+        var missing = Clip(1, 100, "Missing", "missing.anm");
+        var available = Clip(2, 100, "Available", "available.anm");
+        var selector = Clip(3, 100, "idle", null) with
+        {
+            OwnerClassHash = Fnv1a.HashLower("SelectorClipData"),
+            ChildClipHashes = new uint[] { 1, 2 }
+        };
+        var bundle = new VfxLoadingService.Bundle();
+        bundle.Clips.AddRange(new[] { selector, missing, available });
+        using var catalog = new VfxClipCatalog();
+        var items = catalog.BuildMetadata(bundle, path => path == "available.anm" ? path : null);
+        Assert.Equal(new uint[] { 3, 2 }, items.Select(item => item.Clip.OwnerPathHash));
+        Assert.Equal("available.anm", items[0].FilePath);
+        Assert.Null(items[0].AnimationAsset);
     }
 
     [Fact]

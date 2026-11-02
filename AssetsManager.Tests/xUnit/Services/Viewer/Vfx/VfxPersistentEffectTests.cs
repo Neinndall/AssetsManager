@@ -227,8 +227,10 @@ public sealed class VfxPersistentEffectTests(ITestOutputHelper output)
         }
     }
 
-    [Fact]
-    public void ParserKeepsEffectOnlyAndEmptyConditionsInAuthoredOrderAndHashesMissingKeys()
+    [Theory]
+    [InlineData("SkinCharacterDataProperties")]
+    [InlineData("TftSkinCharacterDataProperties")]
+    public void ParserKeepsEffectOnlyAndEmptyConditionsInAuthoredOrderAndHashesMissingKeys(string skinClass)
     {
         BinTreeStruct effect = new(0, H("PersistentVfxData"), new BinTreeProperty[]
         {
@@ -239,8 +241,9 @@ public sealed class VfxPersistentEffectTests(ITestOutputHelper output)
         {
             new BinTreeContainer(H("PersistentVfxs"), BinPropertyType.Struct, new BinTreeProperty[] { effect })
         });
-        var skin = Skin(new BinTreeContainer(H("persistentEffectConditions"), BinPropertyType.Struct,
-            new BinTreeProperty[] { new BinTreeStruct(0, H("PersistentEffectConditionData"), Array.Empty<BinTreeProperty>()), condition }));
+        var properties = Skin(new BinTreeContainer(H("persistentEffectConditions"), BinPropertyType.Struct,
+            new BinTreeProperty[] { new BinTreeStruct(0, H("PersistentEffectConditionData"), Array.Empty<BinTreeProperty>()), condition })).Properties.Values;
+        var skin = new BinTreeObject("Skin", skinClass, properties.ToArray());
         VfxOwnerSceneContext owner = VfxAnimationParser.ExtractOwnerSceneContext(new BinTree(new[] { skin }, Array.Empty<string>()));
         Assert.Equal(2, owner.SubmeshConditions.Count);
         Assert.Empty(owner.SubmeshConditions[0].Effects);
@@ -277,10 +280,13 @@ public sealed class VfxPersistentEffectTests(ITestOutputHelper output)
             GameMaterialState.From(-1, new[] { VfxPersistentEffectSemantics.PreviewKey(0) }, null)));
     }
 
-    [Fact]
-    public void LinkedResolverUsesTheReferencedObjectWithFirstDeclarationAndNullSuppression()
+    [Theory]
+    [InlineData("SkinCharacterDataProperties")]
+    [InlineData("TftSkinCharacterDataProperties")]
+    public void LinkedResolverUsesTheReferencedObjectWithFirstDeclarationAndNullSuppression(string skinClass)
     {
-        var primary = new BinTree(new[] { Skin(new BinTreeObjectLink(H("mResourceResolver"), 77)) }, Array.Empty<string>());
+        var primary = new BinTree(new[] { new BinTreeObject("Skin", skinClass,
+            new BinTreeProperty[] { new BinTreeObjectLink(H("mResourceResolver"), 77) }) }, Array.Empty<string>());
         BinTree first = Resolver(0), later = Resolver(9);
         Assert.Empty(VfxResourceParser.ExtractSkinResourceMap(primary));
         Assert.Equal(0u, VfxResourceParser.ExtractSkinResourceMap(primary, new[] { first, later })[1]);

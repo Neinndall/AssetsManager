@@ -56,6 +56,15 @@ namespace AssetsManager.Views.Models.Viewer
             }
         }
 
+        internal void PickAnimation(AnimationClipCatalogItem animation)
+        {
+            if (animation != null && (_selectedAnimation?.Clip?.OwnerPathHash != animation.Clip?.OwnerPathHash ||
+                _selectedAnimation?.Clip?.GraphPathHash != animation.Clip?.GraphPathHash ||
+                _selectedAnimation?.SharedSource != animation.SharedSource))
+                animation = animation.WithOpeningParameter();
+            SelectedAnimation = animation;
+        }
+
         public StudioSpellBrowserItem SelectedSpell
         {
             get => _selectedSpell;

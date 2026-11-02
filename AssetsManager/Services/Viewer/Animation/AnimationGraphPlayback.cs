@@ -27,11 +27,11 @@ namespace AssetsManager.Services.Viewer.Animation
         }
 
         internal static IReadOnlyList<AnimationClipDefinition> PlayableClips(
-            IReadOnlyList<AnimationClipDefinition> clips)
+            IReadOnlyList<AnimationClipDefinition> clips, Func<string, bool> available = null)
         {
             if (clips == null || clips.Count == 0)
                 return Array.Empty<AnimationClipDefinition>();
-            return clips.Where(clip => ResolvePlaylist(clip, clips).Count > 0).ToArray();
+            return clips.Where(clip => ResolvePlaylist(clip, clips, available: available).Count > 0).ToArray();
         }
 
         internal static AnimationClipDefinition OpeningClip(IReadOnlyList<AnimationClipDefinition> clips) =>
@@ -41,9 +41,9 @@ namespace AssetsManager.Services.Viewer.Animation
 
         internal static AnimationClipDefinition NamedOrOpeningClip(
             IReadOnlyList<AnimationClipDefinition> clips,
-            string requested)
+            string requested, Func<string, bool> available = null)
         {
-            IReadOnlyList<AnimationClipDefinition> playable = PlayableClips(clips);
+            IReadOnlyList<AnimationClipDefinition> playable = PlayableClips(clips, available);
             AnimationClipDefinition named = string.IsNullOrWhiteSpace(requested)
                 ? null
                 : playable.FirstOrDefault(clip =>
@@ -95,7 +95,7 @@ namespace AssetsManager.Services.Viewer.Animation
             AnimationClipDefinition clip,
             IReadOnlyList<AnimationClipDefinition> clips,
             float? parameter = null,
-            int? gearIndex = null)
+            int? gearIndex = null, Func<string, bool> available = null)
         {
             if (clip == null || clips == null)
                 return Array.Empty<AnimationClipDefinition>();
@@ -114,7 +114,8 @@ namespace AssetsManager.Services.Viewer.Animation
                 {
                     if (!string.IsNullOrWhiteSpace(current.AnimationFilePath))
                     {
-                        result.Add(current);
+                        if (available?.Invoke(current.AnimationFilePath) != false)
+                            result.Add(current);
                         return;
                     }
 
@@ -194,8 +195,8 @@ namespace AssetsManager.Services.Viewer.Animation
             double at,
             double? until)
         {
-            // LTK's visibility timeline always publishes the authored inverse change at mEndFrame,
-            // even when it is equal to or earlier than mStartFrame. Joint snaps instead normalize
+            // Visibility keeps the authored end, including non-forward ends; the timeline restores
+            // only the changes made by the start. Joint snaps instead normalize
             // a non-forward end to "hold through the pass"; keep the legacy normalization for
             // other non-rendered event kinds as well.
             if (authoredEvent is AnimationSubmeshVisibilityEventDefinition)

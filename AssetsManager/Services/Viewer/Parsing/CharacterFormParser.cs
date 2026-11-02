@@ -60,7 +60,7 @@ namespace AssetsManager.Services.Viewer.Parsing
             BinTreeEmbedded ownerMesh = null;
             foreach (BinTreeObject skin in tree.Objects.Values)
             {
-                if (skin.ClassHash != VfxParsingSchema.SkinCharacterDataPropertiesClass ||
+                if (!CharacterSkinSchema.IsSkin(skin.ClassHash) ||
                     Get(skin.Properties, F_skinUpgradeData) is not BinTreeEmbedded upgradeData ||
                     upgradeData.ClassHash != VfxParsingHash.Fnv1a("SkinUpgradeData"))
                     continue;

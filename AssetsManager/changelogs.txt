@@ -11,6 +11,9 @@ Improvements
 Changes
 
 Bug Fixes
+  - 3D Studio / Correct default animation selection, skip missing animation files, and reset preview parameters when switching clips.
+  - 3D Studio / Preserve submesh visibility after temporary events and retain skin materials under PBR-only overrides.
+  - 3D Studio / Recognize TFT skins throughout character and VFX previews.
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 

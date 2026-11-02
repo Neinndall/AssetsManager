@@ -439,6 +439,15 @@ namespace AssetsManager.Views.Models.Viewer
 
         public bool HasParameterValues => ParameterValues is { Count: > 1 };
 
+        internal AnimationClipCatalogItem WithOpeningParameter()
+        {
+            // Equipped gear owns its branch independently from the preview's manual parameter.
+            if (!HasParameterValues || Clip?.UsesEquippedGearParameter == true) return this;
+            float first = Clip?.ParametricValues?.FirstOrDefault() ?? ParameterValues[0];
+            float selected = ParameterValues.OrderBy(value => MathF.Abs(value - first)).First();
+            return ParameterValue == selected ? this : this with { ParameterValue = selected };
+        }
+
         public string GraphMetadataSummary
         {
             get
