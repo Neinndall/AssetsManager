@@ -102,10 +102,15 @@ namespace AssetsManager.Services.Viewer.Rendering
             ArgumentNullException.ThrowIfNull(renderScene);
             ImageExportUtils.ValidateDimensions(width, height);
 
-            gl.GetInteger(GLEnum.FramebufferBinding, out int previousFramebuffer);
+            gl.GetInteger(GLEnum.ReadFramebufferBinding, out int previousReadFramebuffer);
+            gl.GetInteger(GLEnum.DrawFramebufferBinding, out int previousDrawFramebuffer);
+            gl.GetInteger(GLEnum.RenderbufferBinding, out int previousRenderbuffer);
+            int samples = Math.Max(0, gl.GetInteger(GLEnum.Samples));
             uint framebuffer = 0;
             uint colorRenderbuffer = 0;
             uint depthRenderbuffer = 0;
+            uint resolveFramebuffer = 0;
+            uint resolveColor = 0;
 
             try
             {
@@ -116,19 +121,46 @@ namespace AssetsManager.Services.Viewer.Rendering
                     InternalFormat.Rgba8,
                     FramebufferAttachment.ColorAttachment0,
                     width,
-                    height);
+                    height,
+                    samples);
                 depthRenderbuffer = CreateAttachment(
                     gl,
                     InternalFormat.Depth24Stencil8,
                     FramebufferAttachment.DepthStencilAttachment,
                     width,
-                    height);
+                    height,
+                    samples);
 
                 GLEnum status = gl.CheckFramebufferStatus(FramebufferTarget.Framebuffer);
                 if (status != GLEnum.FramebufferComplete)
                     throw new InvalidOperationException($"OpenGL snapshot framebuffer is incomplete: {status}.");
 
                 renderScene();
+
+                if (samples > 0)
+                {
+                    // ReadPixels requires a single-sample source; keep scene MSAA through postprocessing.
+                    resolveFramebuffer = gl.GenFramebuffer();
+                    gl.BindFramebuffer(FramebufferTarget.DrawFramebuffer, resolveFramebuffer);
+                    resolveColor = CreateAttachment(gl, InternalFormat.Rgba8,
+                        FramebufferAttachment.ColorAttachment0, width, height, 0);
+                    status = gl.CheckFramebufferStatus(FramebufferTarget.DrawFramebuffer);
+                    if (status != GLEnum.FramebufferComplete)
+                        throw new InvalidOperationException($"OpenGL snapshot resolve framebuffer is incomplete: {status}.");
+                    gl.BindFramebuffer(FramebufferTarget.ReadFramebuffer, framebuffer);
+                    bool scissor = gl.IsEnabled(EnableCap.ScissorTest);
+                    if (scissor) gl.Disable(EnableCap.ScissorTest);
+                    try
+                    {
+                        gl.BlitFramebuffer(0, 0, width, height, 0, 0, width, height,
+                            ClearBufferMask.ColorBufferBit, BlitFramebufferFilter.Nearest);
+                    }
+                    finally
+                    {
+                        if (scissor) gl.Enable(EnableCap.ScissorTest);
+                    }
+                }
+                gl.BindFramebuffer(FramebufferTarget.ReadFramebuffer, samples > 0 ? resolveFramebuffer : framebuffer);
 
                 byte[] pixels = GC.AllocateUninitializedArray<byte>(checked(width * height * 4));
                 gl.ReadPixels<byte>(
@@ -155,7 +187,13 @@ namespace AssetsManager.Services.Viewer.Rendering
             }
             finally
             {
-                gl.BindFramebuffer(FramebufferTarget.Framebuffer, (uint)previousFramebuffer);
+                gl.BindFramebuffer(FramebufferTarget.ReadFramebuffer, (uint)previousReadFramebuffer);
+                gl.BindFramebuffer(FramebufferTarget.DrawFramebuffer, (uint)previousDrawFramebuffer);
+                gl.BindRenderbuffer(RenderbufferTarget.Renderbuffer, (uint)previousRenderbuffer);
+                if (resolveColor != 0)
+                    gl.DeleteRenderbuffer(resolveColor);
+                if (resolveFramebuffer != 0)
+                    gl.DeleteFramebuffer(resolveFramebuffer);
                 if (depthRenderbuffer != 0)
                     gl.DeleteRenderbuffer(depthRenderbuffer);
                 if (colorRenderbuffer != 0)
@@ -185,17 +223,18 @@ namespace AssetsManager.Services.Viewer.Rendering
             InternalFormat format,
             FramebufferAttachment attachment,
             int width,
-            int height)
+            int height,
+            int samples)
         {
             uint renderbuffer = gl.GenRenderbuffer();
             gl.BindRenderbuffer(RenderbufferTarget.Renderbuffer, renderbuffer);
-            gl.RenderbufferStorage(
-                RenderbufferTarget.Renderbuffer,
-                format,
-                (uint)width,
-                (uint)height);
+            if (samples > 0)
+                gl.RenderbufferStorageMultisample(RenderbufferTarget.Renderbuffer,
+                    (uint)samples, format, (uint)width, (uint)height);
+            else
+                gl.RenderbufferStorage(RenderbufferTarget.Renderbuffer, format, (uint)width, (uint)height);
             gl.FramebufferRenderbuffer(
-                FramebufferTarget.Framebuffer,
+                FramebufferTarget.DrawFramebuffer,
                 attachment,
                 RenderbufferTarget.Renderbuffer,
                 renderbuffer);

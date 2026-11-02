@@ -11,6 +11,7 @@ Improvements
 Changes
 
 Bug Fixes
+  - 3D Studio / Preserve viewport edge smoothing in UHD screenshots, including MSAA with FXAA or SMAA.
   - 3D Studio / Recover unknown clip and event names from matching animation filenames and graph data.
   - 3D Studio / Correct default animation selection, skip missing animation files, and reset preview parameters when switching clips.
   - 3D Studio / Preserve submesh visibility after temporary events and retain skin materials under PBR-only overrides.
