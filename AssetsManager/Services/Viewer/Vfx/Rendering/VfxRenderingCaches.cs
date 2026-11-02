@@ -18,16 +18,24 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
     internal sealed class VfxTextureResourceCache : IDisposable
     {
         private readonly GL _gl;
-        private readonly List<uint> _ownedTextures = new();
+        private readonly HashSet<uint> _ownedTextures = new();
+        private readonly GlRetainedTextureCache<object> _retained;
 
         internal VfxTextureResourceCache(GL gl)
         {
             _gl = gl;
+            _retained = new(id => { _gl.DeleteTexture(id); _ownedTextures.Remove(id); });
             FallbackTransparentTexture = CreateFallbackTexture();
             _ownedTextures.Add(FallbackTransparentTexture);
         }
 
         internal uint FallbackTransparentTexture { get; }
+
+        internal bool TryGet(object resource, out uint texture) => _retained.TryGet(resource, out texture);
+
+        internal uint Get(object resource, long bytes, Func<uint> upload) => _retained.Get(resource, bytes, upload);
+
+        internal void SetActive(IReadOnlySet<uint> textures) => _retained.SetActive(textures);
 
         internal uint Upload(ReadOnlySpan<byte> bgra, int width, int height)
         {
@@ -64,6 +72,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
 
         internal void Clear()
         {
+            _retained.Dispose();
             foreach (uint texture in _ownedTextures)
             {
                 if (texture != FallbackTransparentTexture)
@@ -76,6 +85,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
 
         public void Dispose()
         {
+            _retained.Dispose();
             foreach (uint texture in _ownedTextures)
                 _gl.DeleteTexture(texture);
             _ownedTextures.Clear();

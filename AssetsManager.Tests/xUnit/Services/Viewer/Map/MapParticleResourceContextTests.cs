@@ -106,6 +106,35 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
         }
 
         [Fact]
+        public async Task IndependentSceneOverlaysShareUnchangedTextureDecodesAndInvalidateSourceEdits()
+        {
+            string root = Path.Combine(Path.GetTempPath(), "AssetsManagerTests", Guid.NewGuid().ToString("N"));
+            const string authored = "assets/vfx/reuse.tex";
+            string source = Path.Combine(root, "assets", "vfx", "reuse.tex");
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(source));
+                await File.WriteAllBytesAsync(source, BlockTextureDataTests.Tex(10, 16, 8));
+                var catalog = Catalog(Emitter(authored, null));
+                var definition = Assert.Single(catalog.Systems).Value;
+                var resolver = new MapAssetResolver(null, null);
+                using var first = await VfxSceneResourceContext.CreateAsync(catalog.Systems, root, resolver, null, null);
+                using var second = await VfxSceneResourceContext.CreateAsync(catalog.Systems, root, resolver, null, null);
+                Assert.NotEqual(first.SearchDirectory, second.SearchDirectory);
+                object image = first.PreparePlaybackAtWorldTransform(definition, Matrix4x4.Identity, 1).Emitters[0].PendingTexture;
+                Assert.NotNull(image);
+                Assert.Same(image, second.PreparePlaybackAtWorldTransform(definition, Matrix4x4.Identity, 1).Emitters[0].PendingTexture);
+                File.SetLastWriteTimeUtc(source, DateTime.UtcNow.AddMinutes(1));
+                using var changed = await VfxSceneResourceContext.CreateAsync(catalog.Systems, root, resolver, null, null);
+                Assert.NotSame(image, changed.PreparePlaybackAtWorldTransform(definition, Matrix4x4.Identity, 1).Emitters[0].PendingTexture);
+            }
+            finally
+            {
+                if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+            }
+        }
+
+        [Fact]
         public void SharedSceneContextCollectsSkinnedVariantsEmissionSurfacesAndOwnerAssets()
         {
             VfxEmitterDefinition emitter = Emitter("assets/vfx/base.tex", "assets/vfx/mesh.skn") with

@@ -5,6 +5,7 @@ HOTFIX UPDATE
 New Features
 
 Improvements
+  - 3D Studio / Reuse unchanged textures when switching models and effects to reduce repeated loading.
   - 3D Studio / Improve PBR skin lighting, wireframe clarity, and edge smoothing while retaining FXAA and SMAA.
   - 3D Studio / Toggle character outlines independently for models and characters placed on maps.
 

@@ -56,9 +56,16 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
         internal void ProcessPendingGpuState()
         {
             if (!_ready || !_purgeGpuResourcesBeforeNextFrame) return;
-            _renderer.ClearTextures();
+            if (_graphs.Count == 0) _renderer.ClearTextures();
+            else _renderer.ResetGraphResources();
             _gpuResourceUploader.Clear();
             _purgeGpuResourcesBeforeNextFrame = false;
+        }
+
+        private IEnumerable<VfxPlaybackGraphRuntime> RetainedConditionGraphs()
+        {
+            foreach (var graphs in _persistentCache.Values)
+                foreach (var graph in graphs) yield return graph;
         }
 
         /// <summary>Why the emitter draws with the stock program, or null when it uses the game's.</summary>
@@ -84,7 +91,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             if (!_ready || _graphs.Count == 0)
                 return false;
 
-            _gpuResourceUploader.UploadPendingResources(_graphs, _renderer);
+            _gpuResourceUploader.UploadPendingResources(_graphs, _renderer, retainedGraphs: RetainedConditionGraphs());
             _renderSources.Clear();
             bool needsSoftParticles = false;
             bool needsSceneColor = false;

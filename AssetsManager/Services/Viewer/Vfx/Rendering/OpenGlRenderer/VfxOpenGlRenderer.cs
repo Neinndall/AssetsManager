@@ -213,6 +213,19 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         public uint UploadTexture(ReadOnlySpan<byte> bgra, int width, int height)
             => _textures.Upload(bgra, width, height);
 
+        internal bool TryGetTexture(object resource, out uint texture) => _textures.TryGet(resource, out texture);
+
+        internal uint CacheTexture(object resource, long bytes, Func<uint> upload) => _textures.Get(resource, bytes, upload);
+
+        internal void RetainActiveTextures(IReadOnlySet<uint> textures) => _textures.SetActive(textures);
+
+        internal void ResetGraphResources()
+        {
+            _gameShaders?.ClearParticlePrograms();
+            _gameUniforms.Clear();
+            if (_ready) ReleaseMeshes();
+        }
+
         internal uint UploadCubeMap(CubeMapData cube)
             => _textures.UploadCube(cube);
 
@@ -575,11 +588,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
 
         public void ClearTextures()
         {
-            _gameShaders?.ClearParticlePrograms();
-            _gameUniforms.Clear();
+            ResetGraphResources();
             if (!_ready) return;
             _textures.Clear();
-            ReleaseMeshes();
         }
 
         public void Dispose()

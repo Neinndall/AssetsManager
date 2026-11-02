@@ -69,9 +69,7 @@ namespace AssetsManager.Services.Viewer.Loading
                 cancellationToken);
             if (sky == null) return null;
 
-            await using Stream stream = await _assetResolver.OpenReadAsync(sky, cancellationToken);
-            cancellationToken.ThrowIfCancellationRequested();
-            return stream == null ? null : CubeMapDecoder.Decode(stream);
+            return await ViewerTextureLoadingCache.LoadCubeAsync(sky, _assetResolver, cancellationToken);
         }
 
         public Task<MapSceneData> LoadAsync(
@@ -248,10 +246,7 @@ namespace AssetsManager.Services.Viewer.Loading
                 if (asset == null)
                     continue;
 
-                await using Stream stream = await _assetResolver.OpenReadAsync(asset, cancellationToken);
-                if (stream == null)
-                    continue;
-                CubeMapData cube = await Task.Run(() => CubeMapDecoder.Decode(stream), cancellationToken);
+                CubeMapData cube = await ViewerTextureLoadingCache.LoadCubeAsync(asset, _assetResolver, cancellationToken);
                 if (cube?.IsValid == true)
                     cubes[reference] = cube;
                 else

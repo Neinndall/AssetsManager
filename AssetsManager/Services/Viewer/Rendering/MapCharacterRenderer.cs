@@ -89,10 +89,8 @@ namespace AssetsManager.Services.Viewer.Rendering
         private readonly AppSettings _appSettings;
         private readonly Dictionary<MapCharacterAssetData, SkinResources> _skins =
             new(ReferenceEqualityComparer.Instance);
-        private readonly Dictionary<BitmapSource, uint> _textures =
-            new(ReferenceEqualityComparer.Instance);
-        private readonly Dictionary<BitmapSource, uint> _rawProgramTextures =
-            new(ReferenceEqualityComparer.Instance);
+        private GlRetainedTextureCache<BitmapSource> _textures;
+        private GlRetainedTextureCache<BitmapSource> _rawProgramTextures;
         private readonly Dictionary<(ModelMaterialWrapMode U, ModelMaterialWrapMode V), uint> _samplers = new();
         private readonly List<DrawCommand> _passSource = new();
         private readonly List<DrawCommand> _opaque = new();
@@ -142,6 +140,8 @@ namespace AssetsManager.Services.Viewer.Rendering
             if (_ready) return;
 
             _gl = gl;
+            _textures = new(gl.DeleteTexture);
+            _rawProgramTextures = new(gl.DeleteTexture);
             IntPtr drawElements = gl.Context.GetProcAddress("glDrawElements");
             if (drawElements == IntPtr.Zero)
                 throw new InvalidOperationException("OpenGL glDrawElements is unavailable for MAP character rendering.");
@@ -223,7 +223,10 @@ namespace AssetsManager.Services.Viewer.Rendering
             MapLightGridData lightGrid = null,
             bool? transparentPass = null)
         {
-            if (!_ready || groups == null || groups.Count == 0)
+            if (!_ready) return;
+            _textures.Sweep();
+            _rawProgramTextures.Sweep();
+            if (groups == null || groups.Count == 0)
                 return;
 
             Vector3 untextured = untexturedLinear ?? DefaultUntextured;
@@ -1142,11 +1145,13 @@ namespace AssetsManager.Services.Viewer.Rendering
 
         private uint AcquireTexture(
             BitmapSource source,
-            Dictionary<BitmapSource, uint> cache,
+            GlRetainedTextureCache<BitmapSource> cache,
             InternalFormat internalFormat)
-        {
-            if (cache.TryGetValue(source, out uint existing)) return existing;
+            => cache.GetPinned(source, GlRetainedTextureCache<BitmapSource>.MipChainBytes(source.PixelWidth, source.PixelHeight),
+                () => UploadTexture(source, internalFormat));
 
+        private uint UploadTexture(BitmapSource source, InternalFormat internalFormat)
+        {
             BitmapSource bitmap = source;
             if (bitmap.Format != PixelFormats.Bgra32)
             {
@@ -1181,7 +1186,6 @@ namespace AssetsManager.Services.Viewer.Rendering
             _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.LinearMipmapLinear);
             _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
             _gl.BindTexture(TextureTarget.Texture2D, 0);
-            cache[source] = texture;
             return texture;
         }
 
@@ -1226,12 +1230,8 @@ namespace AssetsManager.Services.Viewer.Rendering
             foreach (SkinResources resources in _skins.Values)
                 ReleaseResources(resources);
             _skins.Clear();
-            foreach (uint texture in _textures.Values)
-                if (texture != 0) _gl.DeleteTexture(texture);
-            _textures.Clear();
-            foreach (uint texture in _rawProgramTextures.Values)
-                if (texture != 0) _gl.DeleteTexture(texture);
-            _rawProgramTextures.Clear();
+            _textures.Dispose();
+            _rawProgramTextures.Dispose();
             _opaque.Clear();
             _transparent.Clear();
             _passSource.Clear();
@@ -1261,21 +1261,11 @@ namespace AssetsManager.Services.Viewer.Rendering
                 ReleaseResources(_skins[asset]);
                 _skins.Remove(asset);
             }
-            ReleaseTexturesExcept(_textures, liveBitmaps);
-            ReleaseTexturesExcept(_rawProgramTextures, liveBitmaps);
+            _textures.SetActiveKeys(liveBitmaps);
+            _rawProgramTextures.SetActiveKeys(liveBitmaps);
             _opaque.Clear();
             _transparent.Clear();
             _passSource.Clear();
-        }
-
-        private void ReleaseTexturesExcept(Dictionary<BitmapSource, uint> cache, HashSet<BitmapSource> keep)
-        {
-            foreach (BitmapSource bitmap in cache.Keys.Where(bitmap => !keep.Contains(bitmap)).ToArray())
-            {
-                uint texture = cache[bitmap];
-                if (texture != 0) _gl.DeleteTexture(texture);
-                cache.Remove(bitmap);
-            }
         }
 
         private void ReleaseResources(SkinResources resources)
@@ -1305,12 +1295,8 @@ namespace AssetsManager.Services.Viewer.Rendering
                 foreach (SkinResources resources in _skins.Values)
                     ReleaseResources(resources);
                 _skins.Clear();
-                foreach (uint texture in _textures.Values)
-                    if (texture != 0) _gl.DeleteTexture(texture);
-                _textures.Clear();
-                foreach (uint texture in _rawProgramTextures.Values)
-                    if (texture != 0) _gl.DeleteTexture(texture);
-                _rawProgramTextures.Clear();
+                _textures.Dispose();
+                _rawProgramTextures.Dispose();
                 _pbrBindings?.Dispose();
                 _outlines?.Dispose();
                 _gameShaderRuntime?.Dispose();
@@ -1331,8 +1317,8 @@ namespace AssetsManager.Services.Viewer.Rendering
             finally
             {
                 _skins.Clear();
-                _textures.Clear();
-                _rawProgramTextures.Clear();
+                _textures.Abandon();
+                _rawProgramTextures.Abandon();
                 _samplers.Clear();
                 _gameShaderRuntime = null;
                 _boneBuffer = 0;

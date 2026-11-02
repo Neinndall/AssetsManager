@@ -20,18 +20,15 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         internal const int DefaultMaxNewUploadsPerFrame = 4;
         internal const long DefaultMaxUploadBytesPerFrame = 16L * 1024L * 1024L;
 
-        private readonly Dictionary<BitmapSource, uint> _textures =
-            new(ReferenceEqualityComparer.Instance);
-        private readonly Dictionary<CubeMapData, uint> _cubeMaps =
-            new(ReferenceEqualityComparer.Instance);
-
+        private readonly HashSet<uint> _activeTextures = new();
         private readonly List<string> _pendingProgramKeys = new();
 
         internal void UploadPendingResources(
             IEnumerable<VfxPlaybackGraphRuntime> graphs,
             VfxOpenGlRenderer renderer,
             int maxNewUploads = DefaultMaxNewUploadsPerFrame,
-            long maxUploadBytes = DefaultMaxUploadBytesPerFrame)
+            long maxUploadBytes = DefaultMaxUploadBytesPerFrame,
+            IEnumerable<VfxPlaybackGraphRuntime> retainedGraphs = null)
         {
             ArgumentNullException.ThrowIfNull(renderer);
             if (graphs == null) return;
@@ -39,6 +36,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             var budget = new UploadBudget(
                 Math.Max(1, maxNewUploads),
                 Math.Max(1L, maxUploadBytes));
+            _activeTextures.Clear();
             foreach (VfxPlaybackGraphRuntime graph in graphs)
             {
                 if (graph?.Runtimes == null) continue;
@@ -46,9 +44,31 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 {
                     if (runtime?.Emitters == null) continue;
                     foreach (VfxPlaybackRuntime.EmitterState emitter in runtime.Emitters)
+                    {
                         UploadEmitter(emitter, renderer, ref budget);
+                        RetainEmitter(emitter);
+                    }
                 }
             }
+            if (retainedGraphs != null)
+                foreach (var graph in retainedGraphs)
+                    foreach (var runtime in graph.Runtimes)
+                        foreach (var emitter in runtime.Emitters) RetainEmitter(emitter);
+            renderer.RetainActiveTextures(_activeTextures);
+        }
+
+        private void RetainEmitter(VfxPlaybackRuntime.EmitterState emitter)
+        {
+            if (emitter == null) return;
+            // Hidden emitters and deferred replacements still own their current handles.
+            _activeTextures.Add(emitter.Texture);
+            _activeTextures.Add(emitter.TextureMult);
+            _activeTextures.Add(emitter.DistortionTexture);
+            _activeTextures.Add(emitter.ErosionTexture);
+            _activeTextures.Add(emitter.ReflectionTexture);
+            _activeTextures.Add(emitter.ColorGradientTexture);
+            _activeTextures.Add(emitter.PaletteTexture);
+            foreach (uint texture in emitter.ProgramTextures.Values) _activeTextures.Add(texture);
         }
 
         internal static bool HasPendingResources(IEnumerable<VfxPlaybackGraphRuntime> graphs)
@@ -74,8 +94,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             return false;
         }
 
-        internal void Clear() =>
-            ClearHandlesOnly();
+        internal void Clear()
+        {
+            _activeTextures.Clear();
+            _pendingProgramKeys.Clear();
+        }
 
         private void UploadEmitter(
             VfxPlaybackRuntime.EmitterState emitter,
@@ -170,12 +193,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             if (pending is not BitmapSource bitmap)
                 return currentTexture;
 
-            if (!_textures.TryGetValue(bitmap, out uint texture))
+            if (!renderer.TryGetTexture(bitmap, out uint texture))
             {
                 if (!budget.TryTake(EstimateTextureBytes(bitmap)))
                     return currentTexture;
-                texture = UploadBitmap(bitmap, renderer);
-                _textures[bitmap] = texture;
+                texture = renderer.CacheTexture(bitmap, EstimateTextureBytes(bitmap), () => UploadBitmap(bitmap, renderer));
             }
             pending = null;
             return texture;
@@ -190,13 +212,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             if (pending is not CubeMapData cube || !cube.IsValid)
                 return currentTexture;
 
-            if (!_cubeMaps.TryGetValue(cube, out uint texture))
+            if (!renderer.TryGetTexture(cube, out uint texture))
             {
                 long bytes = checked((long)cube.Width * cube.Height * 4L * 6L);
                 if (!budget.TryTake(bytes))
                     return currentTexture;
-                texture = renderer.UploadCubeMap(cube);
-                _cubeMaps[cube] = texture;
+                texture = renderer.CacheTexture(cube, bytes, () => renderer.UploadCubeMap(cube));
             }
             pending = null;
             return texture;
@@ -241,12 +262,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             long vertexBytes = checked(vertexCount * VfxMeshResourceCache.VertexStride * sizeof(float));
             long indexBytes = checked((mesh.Indices?.LongLength ?? 0L) * sizeof(uint));
             return checked(vertexBytes + indexBytes);
-        }
-
-        private void ClearHandlesOnly()
-        {
-            _textures.Clear();
-            _cubeMaps.Clear();
         }
 
         internal struct UploadBudget

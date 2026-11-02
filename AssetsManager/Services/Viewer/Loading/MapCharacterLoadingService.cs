@@ -1,3 +1,4 @@
+using AssetsManager.Services.Viewer.Resources;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -328,15 +329,8 @@ namespace AssetsManager.Services.Viewer.Loading
                     await gate.WaitAsync(cancellationToken);
                     try
                     {
-                        await using Stream stream = await _assetResolver.OpenReadAsync(asset, cancellationToken);
-                        if (stream == null)
-                            return;
-                        string extension = MapTextureLoadingService.DetectTextureExtension(
-                            stream,
-                            reference.VirtualPath ?? asset.VirtualPath);
-                        BitmapSource bitmap = await Task.Run(
-                            () => TextureUtils.LoadViewerTexture(stream, extension),
-                            cancellationToken);
+                        BitmapSource bitmap = await ViewerTextureLoadingCache.LoadAssetAsync(
+                            asset, _assetResolver, reference.VirtualPath ?? asset.VirtualPath, cancellationToken);
                         if (bitmap == null)
                             return;
 
