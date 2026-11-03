@@ -121,6 +121,7 @@ public sealed class CharacterOutlineGpuTests
                 var full = Pixel(StudioViewMode.Lit, outline);
                 Check(full, 26, 204, 51);
                 var baseline = Pixel(StudioViewMode.Lit);
+                Assert.Equal(baseline, draw.HostPixel(map,0,StudioViewMode.Lit,pbr:false,outline:outline,outlinesEnabled:false));
                 Assert.Equal(baseline, Pixel(StudioViewMode.Lit, outline with { Alpha = 0 }));
                 Assert.Equal(baseline, Pixel(StudioViewMode.Lit, outline with { MaskPath = "mask" }));
                 var half = Pixel(StudioViewMode.Lit, outline with { MaskPath = "mask", MaskChannels = new(0, 1, 0, 0) });

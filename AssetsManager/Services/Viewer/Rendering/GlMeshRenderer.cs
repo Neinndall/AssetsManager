@@ -22,13 +22,14 @@ namespace AssetsManager.Services.Viewer.Rendering
     {
         /// <summary>Environment cube PBR game shaders light from (IBL); the preview sky the viewport shows.</summary>
         internal CubeMapData ImageLight { get; set; }
+        internal bool OutlinesEnabled { get; set; } = true;
         internal bool SuppressBloom { get; set; }
 
         private static readonly Vector3 ReferenceCharacterLightDirection =
             Vector3.Normalize(new Vector3(0.25f, 0.75f, -0.05f));
         private static readonly Vector3 ReferenceCharacterLightColor = new(0.4f, 0.4f, 0.4f);
         private static readonly Vector3 ReferenceCharacterAmbientColor = new(0.6f, 0.6f, 0.6f);
-        private static readonly Vector3 PreviewWireColor = new(92f / 255f, 133f / 255f, 1f);
+        private static readonly Vector3 PreviewWireColor = new(67f / 255f, 1f, 163f / 255f);
         private static readonly Vector3 DefaultUntexturedColor = new(0.5f);
 
         private readonly AppSettings _appSettings;
@@ -204,7 +205,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                     RenderSolidParts(model, cameraPosition, world, viewProj, in gameFrame,
                         lightDir, lightColor, lightDir2, lightColor2, ambientColor, materialTimeSeconds,
                         solidMode, shadersEnabled, gameSkinningMatrices);
-                    if (viewMode == StudioViewMode.Lit)
+                    if (OutlinesEnabled && viewMode == StudioViewMode.Lit)
                         RenderOutlines(model, world, viewProj, in gameFrame, shadersEnabled, gameSkinningMatrices);
                 }
 
@@ -222,7 +223,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                         ambientColor,
                         materialTimeSeconds,
                         model.SelfIllumination);
-                    _gl.PolygonMode(TriangleFace.FrontAndBack, PolygonMode.Line);
+                    _gl.PolygonMode(TriangleFace.FrontAndBack, PolygonMode.Fill);
                     _gl.Uniform1(_uWireframePass, 1);
                     _gl.Uniform4(
                         _uWireframeColor,
@@ -230,6 +231,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                         PreviewWireColor.Y,
                         PreviewWireColor.Z,
                         wireOpacity);
+                    GlMeshEdges.Frame(_gl, _program, view, projection, wireOpacity < 1f);
                     ApplyWireframeState(wireOpacity);
                     RenderParts(model, false, cameraPosition, world, viewProj,
                         lightDir, lightColor, lightDir2, lightColor2, ambientColor, materialTimeSeconds,
@@ -345,7 +347,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             GlMeshResourceCache.PartResources Resources,
             int PassIndex,
             float DistanceSquared,
-            int Order);
+            int Order, ModelMaterialDefinition Material);
 
         /// <summary>
         /// Solid parts as LTK draws a skin: every translated pass is its own draw, opaque or
@@ -380,7 +382,10 @@ namespace AssetsManager.Services.Viewer.Rendering
                 if (resources.Vao == 0)
                     continue;
 
-                ModelMaterialDefinition material = part.MaterialDefinition;
+                ModelMaterialDefinition material = UsesGameShaders(viewMode, shadersEnabled)
+                    ? CharacterPbrProgram.Resolve(part.MaterialDefinition,
+                        resources.TangentVbo != 0, path => _resources.ResolveProgramTexture(part, resources, path))
+                    : part.MaterialDefinition;
                 bool wantsGameProgram = UsesGameShaders(viewMode, shadersEnabled) &&
                                         resources.IsGpuSkinned &&
                                         gameSkinningMatrices is { Count: > 0 } &&
@@ -394,7 +399,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                     bool blended = IsPreviewAlphaBlended(part, viewMode, wireframePass: false);
                     float distance = blended ? GetRenderDistanceSquared(part, cameraPosition, world) : 0f;
                     (blended ? _transparentDraws : _opaqueDraws)
-                        .Add(new PartDraw(part, resources, -1, distance, order++));
+                        .Add(new PartDraw(part, resources, -1, distance, order++, material));
                     continue;
                 }
 
@@ -404,7 +409,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                     bool blended = state?.BlendEnabled == true && !material.BlendsPassInDrawOrder(state);
                     float distance = blended ? GetRenderDistanceSquared(part, cameraPosition, world) : 0f;
                     (blended ? _transparentDraws : _opaqueDraws)
-                        .Add(new PartDraw(part, resources, passIndex, distance, order++));
+                        .Add(new PartDraw(part, resources, passIndex, distance, order++, material));
                 }
             }
 
@@ -460,7 +465,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             {
                 foreach (PartDraw draw in queueIndex == 0 ? _opaqueDraws : _transparentDraws)
                 {
-                    if (draw.PassIndex < 0 || !_gameShaderRuntime.WritesBloom(draw.Part.MaterialDefinition, draw.PassIndex))
+                    if (draw.PassIndex < 0 || !_gameShaderRuntime.WritesBloom(draw.Material, draw.PassIndex))
                         continue;
                     if (!begun)
                     {
@@ -493,7 +498,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             GlMeshResourceCache.PartResources resources = draw.Resources;
             ConfigureSkinIndexAttribute(resources, integer: true);
             if (!_gameShaderRuntime.TryBindSkinned(
-                    part.MaterialDefinition,
+                    draw.Material,
                     draw.PassIndex,
                     world,
                     gameSkinningMatrices,
@@ -706,6 +711,11 @@ namespace AssetsManager.Services.Viewer.Rendering
                 }
             }
 
+            if (wireframePass)
+            {
+                resources.Edges?.Draw(_program, resources.Ebo, 0, resources.IndexCount);
+                return;
+            }
             _drawElements?.Invoke(
                 (uint)PrimitiveType.Triangles,
                 resources.IndexCount,

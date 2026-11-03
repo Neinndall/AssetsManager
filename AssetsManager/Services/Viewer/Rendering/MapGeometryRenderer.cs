@@ -30,7 +30,7 @@ namespace AssetsManager.Services.Viewer.Rendering
 
         private static readonly Vector3 StoneSrgb = new(154f / 255f, 149f / 255f, 140f / 255f);
         private static readonly Vector3 StoneLinear = VectorMathUtils.SrgbToLinear(StoneSrgb);
-        private static readonly Vector3 PreviewWireColor = new(92f / 255f, 133f / 255f, 1f);
+        private static readonly Vector3 PreviewWireColor = new(67f / 255f, 1f, 163f / 255f);
         private static readonly Vector3 DefaultSunDirection = Vector3.Normalize(new Vector3(0.25f, 0.75f, -0.05f));
         private static readonly Regex IndicatorShader = new(IndicatorPattern, RegexOptions.IgnoreCase | RegexOptions.Compiled);
         private static readonly MapMaterialRenderState UnboundState = new(
@@ -95,6 +95,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             internal uint ColorVbo;
             internal uint PivotVbo;
             internal uint Ebo;
+            internal GlMeshEdges Edges;
             internal int References;
             internal long ReleasedAtMs = -1;
         }
@@ -158,6 +159,7 @@ namespace AssetsManager.Services.Viewer.Rendering
         private uint _colorVbo;
         private uint _pivotVbo;
         private uint _ebo;
+        private GlMeshEdges _edges;
         private GeometryResources _activeGeometryResources;
         private uint _whiteTexture;
         private int _uViewProjection;
@@ -479,7 +481,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                 if (wireframe && transparentPass != false)
                 {
                     _gl.UseProgram(_program);
-                    _gl.PolygonMode(TriangleFace.FrontAndBack, PolygonMode.Line);
+                    _gl.PolygonMode(TriangleFace.FrontAndBack, PolygonMode.Fill);
                     _gl.Uniform1(_uWireframePass, 1);
                     _gl.Uniform4(
                         _uWireframeColor,
@@ -487,6 +489,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                         PreviewWireColor.Y,
                         PreviewWireColor.Z,
                         wireOpacity);
+                    GlMeshEdges.Frame(_gl, _program, view, projection, wireOpacity < 1f);
                     ApplyWireframeState(wireOpacity);
                     DrawWireGroups(_visibleDrawQueue.Opaque);
                     DrawWireGroups(_visibleDrawQueue.Transparent);
@@ -593,7 +596,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             bool overlayAllowed = viewMode == StudioViewMode.Lit || viewMode == StudioViewMode.Untextured;
             bool solids = !wireframeOnly || !supportsWireframe;
             bool wireframe = supportsWireframe && (wireframeOnly || (wireOverlay && overlayAllowed));
-            return (solids, wireframe, wireframeOnly ? 1f : 0.35f);
+            return (solids, wireframe, wireframeOnly ? 1f : 0.6f);
         }
 
         private void DrawGroups(
@@ -725,11 +728,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                 if (group.IndexCount <= 0)
                     continue;
 
-                _drawElements(
-                    (uint)PrimitiveType.Triangles,
-                    group.IndexCount,
-                    (uint)DrawElementsType.UnsignedInt,
-                    new IntPtr(checked(group.StartIndex * sizeof(uint))));
+                _edges.Draw(_program, _ebo, group.StartIndex, group.IndexCount);
             }
         }
 
@@ -861,6 +860,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                 ColorVbo = _colorVbo,
                 PivotVbo = _pivotVbo,
                 Ebo = _ebo,
+                Edges = _edges,
                 References = 1
             };
             _retainedGeometry[key.Value] = resources;
@@ -877,10 +877,12 @@ namespace AssetsManager.Services.Viewer.Rendering
             _colorVbo = resources.ColorVbo;
             _pivotVbo = resources.PivotVbo;
             _ebo = resources.Ebo;
+            _edges = resources.Edges;
         }
 
         private void UploadGeometry(MapGeometryData geometry)
         {
+            _edges = new GlMeshEdges(_gl, geometry.Indices, geometry.Positions);
             _vao = _gl.GenVertexArray();
             _gl.BindVertexArray(_vao);
 
@@ -1465,6 +1467,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                 _colorVbo = 0;
                 _pivotVbo = 0;
                 _ebo = 0;
+                _edges = null;
                 return;
             }
 
@@ -1474,6 +1477,8 @@ namespace AssetsManager.Services.Viewer.Rendering
             DeleteBuffer(ref _uv1Vbo);
             DeleteBuffer(ref _colorVbo);
             DeleteBuffer(ref _pivotVbo);
+            _edges?.Dispose();
+            _edges = null;
             DeleteBuffer(ref _ebo);
             if (_vao != 0)
             {
@@ -1493,6 +1498,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             DeleteBuffer(ref resources.Uv1Vbo);
             DeleteBuffer(ref resources.ColorVbo);
             DeleteBuffer(ref resources.PivotVbo);
+            resources.Edges?.Dispose();
             DeleteBuffer(ref resources.Ebo);
             if (resources.Vao != 0)
             {

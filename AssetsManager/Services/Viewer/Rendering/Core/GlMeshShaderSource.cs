@@ -7,7 +7,7 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
         internal const int PortableAuxiliaryTextureCount = 0;
         internal const int MaximumAuxiliaryTextureCount = 0;
 
-        internal const string Vertex = @"
+        internal const string Vertex = GlMeshEdges.Vertex + @"
                     layout(location=0) in vec3 aPos;
                     layout(location=1) in vec3 aNormal;
                     layout(location=2) in vec2 aUv;
@@ -45,6 +45,7 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
                             }
                             vec4 worldPos = uWorld * vec4(animatedPosition, 1.0);
                             gl_Position = uViewProj * worldPos;
+                            edgePosition(worldPos, gl_Position);
                             vNormal = normalize(mat3(uWorld) * animatedNormal);
                             vec3 tangent = mat3(uWorld) * animatedTangent;
                             vPbrTangent = vec4(tangent / max(length(tangent), 1e-6),
@@ -57,7 +58,8 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
                             vUv = aUv;
                     }";
 
-        internal const string Fragment = @"
+        internal const string Fragment = @"in float vEdgeFade;
+
                     in vec3 vNormal;
                     in vec3 vWorldPosition;
                     in vec2 vUv;
@@ -101,7 +103,7 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
                     void main(){
                             if (uWireframePass != 0)
                             {
-                                fragColor = uWireframeColor;
+                                fragColor = vec4(uWireframeColor.rgb, uWireframeColor.a * vEdgeFade);
                                 return;
                             }
                             vec2 materialUv = vUv * uMaterialUvRepeat + uMaterialUvScroll * uEffectTime;

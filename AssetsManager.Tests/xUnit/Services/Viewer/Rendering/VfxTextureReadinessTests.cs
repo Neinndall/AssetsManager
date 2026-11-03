@@ -17,6 +17,99 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
     public sealed class VfxTextureReadinessTests
     {
         [Theory]
+        [InlineData(VfxPrimitiveKind.CameraQuad, false, true)]
+        [InlineData(VfxPrimitiveKind.Mesh, false, true)]
+        [InlineData(VfxPrimitiveKind.Mesh, true, true)]
+        [InlineData(VfxPrimitiveKind.Mesh, true, false)]
+        public void SamplerRejectsIncompatibleTextureTargetsAndRecoversOnTheSameEmitter(VfxPrimitiveKind primitive, bool cubeSampler, bool custom)
+        {
+            string install = InstalledSkins.FindInstall();
+            Assert.False(string.IsNullOrWhiteSpace(install), "An installed client is required for this GPU regression.");
+            using var context = new HiddenWglContext();
+            using GL gl = GL.GetApi(context.GetProcAddress);
+            using var renderer = new VfxOpenGlRenderer();
+            renderer.Initialize(gl, InstalledSkins.Settings(install));
+            uint target = CreateTexture(gl, 64, 64, new byte[64 * 64 * 4]);
+            uint framebuffer = gl.GenFramebuffer();
+            gl.BindFramebuffer(FramebufferTarget.Framebuffer, framebuffer);
+            gl.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment0,
+                TextureTarget.Texture2D, target, 0);
+            bool mesh = primitive == VfxPrimitiveKind.Mesh;
+            var definition = new VfxEmitterDefinition("texture target", VfxCurveF.Const(1), VfxCurveF.Const(1),
+                null, 0, 0, false, false, 4, VfxCurve3.Const(Vector3.One), null,
+                VfxCurve4.Const(Vector4.One), null, null, null, null, VfxCurve3.Const(Vector3.Zero),
+                "base.tex", Vector2.One, 1, false, mesh, PrimitiveKind: primitive,
+                RenderState: VfxEmitterRenderState.Default with { DisableBackfaceCull = true });
+            if (cubeSampler) definition = definition with
+            {
+                Reflection = new VfxReflectionDefinition(1, 1, 1, 1, Vector4.Zero, Vector4.One, "reflection.dds")
+            };
+            var parameters = new Dictionary<string, Vector4>();
+            VfxShaderParameterUtils.PopulateNativeParameters(parameters, definition, 0);
+            var program = GameParticleProgramResolver.Create(definition, mesh);
+            program = program with { Passes = program.Passes.Select(pass => pass with
+            {
+                State = pass.State with { CullEnabled = false },
+                Parameters = parameters.Select(pair => new GameMaterialParameter(pair.Key, pair.Value,
+                    GameMaterialParamSource.Material)).ToArray(),
+                Textures = cubeSampler
+                    ? new[] { new GameMaterialTexture("TEXTURE", new MapTextureReference("base.tex", 0),
+                        GameMaterialTextureSource.Material, null),
+                        new GameMaterialTexture("REFLECTION_MAP", new MapTextureReference("custom.tex", 0),
+                        GameMaterialTextureSource.Material, null) }
+                    : new[] { new GameMaterialTexture("TEXTURE", new MapTextureReference("custom.tex", 0),
+                        GameMaterialTextureSource.Material, null) }
+            }).ToArray() };
+            if (custom) definition = definition with { CustomMaterial = ModelMaterialDefinition.TextureOnly("custom.tex") with { Program = program } };
+            float[] instance = new float[VfxPlaybackRuntime.InstanceStride];
+            instance[3] = instance[4] = instance[18] = .75f;
+            instance[5] = instance[6] = instance[7] = instance[8] = 1;
+            instance[21] = instance[22] = instance[31] = instance[32] = 1;
+            instance[36] = instance[40] = instance[44] = 1;
+            var emitter = new VfxPlaybackRuntime.EmitterState
+            {
+                Def = definition, Instances = instance, InstanceCount = 1, TextureWidth = 1, TextureHeight = 1
+            };
+            if (mesh) renderer.UploadEmitterMesh(emitter, new float[] { -1, -1, 0, 1, -1, 0, 0, 1, 0 },
+                new float[] { 0, 0, 1, 0, 0, 1, 0, 0, 1 }, new float[] { 0, 0, 1, 0, .5f, 1 }, null);
+            uint color = renderer.UploadTexture(new byte[] { 0, 0, 255, 255 }, 1, 1);
+            var faces = Enumerable.Range(0, 6).Select(_ => new byte[] { 0, 255, 0, 255 }).ToArray();
+            uint cube = renderer.UploadCubeMap(new AssetsManager.Services.Viewer.Resources.CubeMapData(1, 1, faces));
+            if (cubeSampler)
+            {
+                emitter.Texture = renderer.UploadTexture(new byte[] { 0, 0, 0, 255 }, 1, 1);
+                emitter.ProgramTextures["base.tex"] = emitter.Texture;
+            }
+            void Bind(uint texture)
+            {
+                if (custom) emitter.ProgramTextures["custom.tex"] = texture;
+                else emitter.ReflectionTexture = texture;
+            }
+            try
+            {
+                byte[] missing = Draw(gl, renderer, emitter, framebuffer);
+                Assert.Null(renderer.GameParticleFallback(emitter, mesh));
+                Bind(cubeSampler ? cube : color);
+                byte[] expected = Draw(gl, renderer, emitter, framebuffer);
+                int channel = cubeSampler ? 1 : 0;
+                Assert.Contains(Enumerable.Range(0, 64 * 64), at => expected[at * 4 + channel] > expected[at * 4 + 1 - channel] + 32);
+                Bind(cubeSampler ? color : cube);
+                byte[] incompatible = Draw(gl, renderer, emitter, framebuffer);
+                Assert.Equal(GLEnum.NoError, gl.GetError());
+                Assert.Equal(missing, incompatible);
+                Bind(cubeSampler ? cube : color);
+                Assert.Equal(expected, Draw(gl, renderer, emitter, framebuffer));
+                Assert.Equal(GLEnum.NoError, gl.GetError());
+            }
+            finally
+            {
+                gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+                gl.DeleteFramebuffer(framebuffer);
+                gl.DeleteTexture(target);
+            }
+        }
+
+        [Theory]
         [InlineData(VfxPrimitiveKind.CameraQuad, true, false)]
         [InlineData(VfxPrimitiveKind.Mesh, true, false)]
         [InlineData(VfxPrimitiveKind.AttachedMesh, true, false)]

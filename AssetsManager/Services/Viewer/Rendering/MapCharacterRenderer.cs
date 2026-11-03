@@ -29,6 +29,7 @@ namespace AssetsManager.Services.Viewer.Rendering
     {
         /// <summary>Environment cube PBR game shaders light from (IBL); the preview sky the viewport shows.</summary>
         internal CubeMapData ImageLight { get; set; }
+        internal bool OutlinesEnabled { get; set; } = true;
 
         private sealed class SkinResources
         {
@@ -45,6 +46,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             internal uint SkinIndexVbo;
             internal uint SkinWeightVbo;
             internal uint Ebo;
+            internal GlMeshEdges Edges;
             internal bool HasSkin;
             internal int[] InfluenceJointSlots = Array.Empty<int>();
             internal IReadOnlyList<BoundRange> Ranges = Array.Empty<BoundRange>();
@@ -67,6 +69,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             ModelMaterialWrapMode WrapV);
 
         private bool _gameBindingsActive;
+        private bool _wireOverlay;
 
         private readonly record struct DrawCommand(
             SkinResources Resources,
@@ -79,17 +82,15 @@ namespace AssetsManager.Services.Viewer.Rendering
             int PassIndex = -1,
             int Order = 0);
 
-        private static readonly Vector3 PreviewWireColor = new(92f / 255f, 133f / 255f, 1f);
+        private static readonly Vector3 PreviewWireColor = new(67f / 255f, 1f, 163f / 255f);
         private static readonly Vector3 DefaultUntextured = new(0.5f);
         private static readonly Vector3 DefaultErrored = new(1f, 0.08f, 0.16f);
 
         private readonly AppSettings _appSettings;
         private readonly Dictionary<MapCharacterAssetData, SkinResources> _skins =
             new(ReferenceEqualityComparer.Instance);
-        private readonly Dictionary<BitmapSource, uint> _textures =
-            new(ReferenceEqualityComparer.Instance);
-        private readonly Dictionary<BitmapSource, uint> _rawProgramTextures =
-            new(ReferenceEqualityComparer.Instance);
+        private GlRetainedTextureCache<BitmapSource> _textures;
+        private GlRetainedTextureCache<BitmapSource> _rawProgramTextures;
         private readonly Dictionary<(ModelMaterialWrapMode U, ModelMaterialWrapMode V), uint> _samplers = new();
         private readonly List<DrawCommand> _passSource = new();
         private readonly List<DrawCommand> _opaque = new();
@@ -139,6 +140,8 @@ namespace AssetsManager.Services.Viewer.Rendering
             if (_ready) return;
 
             _gl = gl;
+            _textures = new(gl.DeleteTexture);
+            _rawProgramTextures = new(gl.DeleteTexture);
             IntPtr drawElements = gl.Context.GetProcAddress("glDrawElements");
             if (drawElements == IntPtr.Zero)
                 throw new InvalidOperationException("OpenGL glDrawElements is unavailable for MAP character rendering.");
@@ -220,7 +223,10 @@ namespace AssetsManager.Services.Viewer.Rendering
             MapLightGridData lightGrid = null,
             bool? transparentPass = null)
         {
-            if (!_ready || groups == null || groups.Count == 0)
+            if (!_ready) return;
+            _textures.Sweep();
+            _rawProgramTextures.Sweep();
+            if (groups == null || groups.Count == 0)
                 return;
 
             Vector3 untextured = untexturedLinear ?? DefaultUntextured;
@@ -269,7 +275,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                         DrawQueue(_transparent, viewProjection, in gameFrame, untextured, errored, solidMode, shadersEnabled, wireframePass: false, ref activePalette, ref activeVao);
                         if (glows)
                             DrawBloomPasses(_transparent, in gameFrame, ref activePalette, ref activeVao);
-                        if (viewMode == StudioViewMode.Lit)
+                        if (OutlinesEnabled && viewMode == StudioViewMode.Lit)
                             DrawOutlines(_opaque.Concat(_transparent), viewProjection, in gameFrame, shadersEnabled);
                     }
                 }
@@ -280,7 +286,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                     activeVao = 0;
                     ResetGameBindings();
                     UseStockProgram(viewProjection, gameFrame.Sun);
-                    _gl.PolygonMode(TriangleFace.FrontAndBack, PolygonMode.Line);
+                    _gl.PolygonMode(TriangleFace.FrontAndBack, PolygonMode.Fill);
                     _gl.Uniform1(_uWireframePass, 1);
                     _gl.Uniform4(
                         _uWireframeColor,
@@ -288,9 +294,10 @@ namespace AssetsManager.Services.Viewer.Rendering
                         PreviewWireColor.Y,
                         PreviewWireColor.Z,
                         wireOpacity);
+                    _wireOverlay = wireOpacity < 1f;
                     ApplyWireframeState(wireOpacity);
-                    DrawQueue(_opaque, viewProjection, in gameFrame, untextured, errored, solidMode, shadersEnabled: false, wireframePass: true, ref activePalette, ref activeVao);
-                    DrawQueue(_transparent, viewProjection, in gameFrame, untextured, errored, solidMode, shadersEnabled: false, wireframePass: true, ref activePalette, ref activeVao);
+                    // Each visible range draws once, regardless of its translated surface pass count.
+                    DrawQueue(_passSource, viewProjection, in gameFrame, untextured, errored, solidMode, shadersEnabled: false, wireframePass: true, ref activePalette, ref activeVao);
                 }
             }
             finally
@@ -451,8 +458,13 @@ namespace AssetsManager.Services.Viewer.Rendering
             _opaque.Clear();
             _transparent.Clear();
             int order = 0;
-            foreach (DrawCommand command in _passSource)
+            foreach (DrawCommand source in _passSource)
             {
+                var material = shadersEnabled
+                    ? CharacterPbrProgram.Resolve(source.Range.Material, source.Resources.TangentVbo != 0,
+                        source.Resources.ProgramTextureLookup ??= CreateProgramTextureLookup(source.Resources))
+                    : source.Range.Material;
+                var command = source with { Range = source.Range with { Material = material } };
                 int count = shadersEnabled && command.Resources.HasSkin
                     ? _gameShaderRuntime?.GetSkinnedPassCount(command.Range.Material) ?? 0
                     : 0;
@@ -555,6 +567,12 @@ namespace AssetsManager.Services.Viewer.Rendering
                     !wireframePass && viewMode == StudioViewMode.Lit && command.Range.Lit,
                     command.Range.Texture != null);
 
+                if (wireframePass)
+                {
+                    GlMeshEdges.Frame(_gl, _program, gameFrame.View, gameFrame.Projection, _wireOverlay);
+                    command.Resources.Edges.Draw(_program, command.Resources.Ebo, command.Range.StartIndex, command.Range.IndexCount);
+                    continue;
+                }
                 if (_gameShaderRuntime != null)
                     _gameShaderRuntime.DrawIndexedPass(
                         _drawElements, command.Range.IndexCount, new IntPtr(checked(command.Range.StartIndex * sizeof(uint))),
@@ -799,6 +817,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                 new ReadOnlySpan<uint>(mesh.Indices),
                 BufferUsageARB.StaticDraw);
             resources.Ranges = BindRanges(asset);
+            resources.Edges = new GlMeshEdges(_gl, mesh.Indices, mesh.Positions);
 
             _gl.BindVertexArray(0);
             _gl.BindBuffer(BufferTargetARB.ArrayBuffer, 0);
@@ -1126,11 +1145,13 @@ namespace AssetsManager.Services.Viewer.Rendering
 
         private uint AcquireTexture(
             BitmapSource source,
-            Dictionary<BitmapSource, uint> cache,
+            GlRetainedTextureCache<BitmapSource> cache,
             InternalFormat internalFormat)
-        {
-            if (cache.TryGetValue(source, out uint existing)) return existing;
+            => cache.GetPinned(source, GlRetainedTextureCache<BitmapSource>.MipChainBytes(source.PixelWidth, source.PixelHeight),
+                () => UploadTexture(source, internalFormat));
 
+        private uint UploadTexture(BitmapSource source, InternalFormat internalFormat)
+        {
             BitmapSource bitmap = source;
             if (bitmap.Format != PixelFormats.Bgra32)
             {
@@ -1165,7 +1186,6 @@ namespace AssetsManager.Services.Viewer.Rendering
             _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.LinearMipmapLinear);
             _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
             _gl.BindTexture(TextureTarget.Texture2D, 0);
-            cache[source] = texture;
             return texture;
         }
 
@@ -1210,12 +1230,8 @@ namespace AssetsManager.Services.Viewer.Rendering
             foreach (SkinResources resources in _skins.Values)
                 ReleaseResources(resources);
             _skins.Clear();
-            foreach (uint texture in _textures.Values)
-                if (texture != 0) _gl.DeleteTexture(texture);
-            _textures.Clear();
-            foreach (uint texture in _rawProgramTextures.Values)
-                if (texture != 0) _gl.DeleteTexture(texture);
-            _rawProgramTextures.Clear();
+            _textures.Dispose();
+            _rawProgramTextures.Dispose();
             _opaque.Clear();
             _transparent.Clear();
             _passSource.Clear();
@@ -1245,21 +1261,11 @@ namespace AssetsManager.Services.Viewer.Rendering
                 ReleaseResources(_skins[asset]);
                 _skins.Remove(asset);
             }
-            ReleaseTexturesExcept(_textures, liveBitmaps);
-            ReleaseTexturesExcept(_rawProgramTextures, liveBitmaps);
+            _textures.SetActiveKeys(liveBitmaps);
+            _rawProgramTextures.SetActiveKeys(liveBitmaps);
             _opaque.Clear();
             _transparent.Clear();
             _passSource.Clear();
-        }
-
-        private void ReleaseTexturesExcept(Dictionary<BitmapSource, uint> cache, HashSet<BitmapSource> keep)
-        {
-            foreach (BitmapSource bitmap in cache.Keys.Where(bitmap => !keep.Contains(bitmap)).ToArray())
-            {
-                uint texture = cache[bitmap];
-                if (texture != 0) _gl.DeleteTexture(texture);
-                cache.Remove(bitmap);
-            }
         }
 
         private void ReleaseResources(SkinResources resources)
@@ -1272,6 +1278,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             DeleteBuffer(resources.SkinIndexVbo);
             DeleteBuffer(resources.SkinWeightVbo);
             DeleteBuffer(resources.Ebo);
+            resources.Edges?.Dispose();
             if (resources.Vao != 0) _gl.DeleteVertexArray(resources.Vao);
         }
 
@@ -1288,12 +1295,8 @@ namespace AssetsManager.Services.Viewer.Rendering
                 foreach (SkinResources resources in _skins.Values)
                     ReleaseResources(resources);
                 _skins.Clear();
-                foreach (uint texture in _textures.Values)
-                    if (texture != 0) _gl.DeleteTexture(texture);
-                _textures.Clear();
-                foreach (uint texture in _rawProgramTextures.Values)
-                    if (texture != 0) _gl.DeleteTexture(texture);
-                _rawProgramTextures.Clear();
+                _textures.Dispose();
+                _rawProgramTextures.Dispose();
                 _pbrBindings?.Dispose();
                 _outlines?.Dispose();
                 _gameShaderRuntime?.Dispose();
@@ -1314,8 +1317,8 @@ namespace AssetsManager.Services.Viewer.Rendering
             finally
             {
                 _skins.Clear();
-                _textures.Clear();
-                _rawProgramTextures.Clear();
+                _textures.Abandon();
+                _rawProgramTextures.Abandon();
                 _samplers.Clear();
                 _gameShaderRuntime = null;
                 _boneBuffer = 0;

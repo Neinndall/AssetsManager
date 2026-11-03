@@ -87,6 +87,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 if (Enum.TryParse(studioSettings.ViewMode, ignoreCase: true, out StudioViewMode viewMode))
                     _model.PreviewViewMode = viewMode;
                 _model.PreviewWireOverlay = studioSettings.WireOverlay;
+                _model.PreviewOutlines = studioSettings.CharacterOutlines;
             }
             finally
             {
@@ -106,6 +107,7 @@ namespace AssetsManager.Views.Controls.Viewer
             AppSettings.StudioParameters.GroundVisible = _model.ShowPreviewGround;
             AppSettings.Studio.ViewMode = _model.PreviewViewMode.ToString();
             AppSettings.Studio.WireOverlay = _model.PreviewWireOverlay;
+            AppSettings.Studio.CharacterOutlines = _model.PreviewOutlines;
             AppSettings.StudioParameters.StageVisible = _model.ShowPreviewStage;
             AppSettings.Studio.CameraPreset = _model.PreviewCameraPreset.ToString();
             _ = SavePreviewDisplayPreferencesAsync();
@@ -215,6 +217,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 {
                     MajorVersion = 3,
                     MinorVersion = 3,
+                    Samples = 4,
                     RenderContinuously = false
                 };
                 StudioViewportView.OpenTkControl.Start(settings);

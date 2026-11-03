@@ -1,3 +1,4 @@
+using AssetsManager.Services.Viewer.Resources;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -160,9 +161,10 @@ namespace AssetsManager.Services.Viewer.Loading
             SknMaterialTextureResolution materials = SknMaterialTextureResolver.Resolve(
                 metadata,
                 textures.Keys);
+            // Graph keys use value names; class, field, object and asset hashes retain their own resolvers.
             Func<uint, string> graphHashNameResolver = _hashResolver == null
                 ? hash => hash.ToString("x8")
-                : _hashResolver.ResolveBinHashGeneral;
+                : _hashResolver.ResolveBinHash;
             Func<uint, string> graphClassNameResolver = _hashResolver == null
                 ? hash => hash.ToString("x8")
                 : _hashResolver.ResolveBinType;
@@ -170,7 +172,8 @@ namespace AssetsManager.Services.Viewer.Loading
                 documents,
                 skin.AnimationGraphHash,
                 graphHashNameResolver,
-                graphClassNameResolver);
+                graphClassNameResolver,
+                wadChunkPathResolver);
             MapCharacterVfxCatalog vfx = BuildVfxCatalog(
                 documents,
                 graphHashNameResolver,
@@ -326,15 +329,8 @@ namespace AssetsManager.Services.Viewer.Loading
                     await gate.WaitAsync(cancellationToken);
                     try
                     {
-                        await using Stream stream = await _assetResolver.OpenReadAsync(asset, cancellationToken);
-                        if (stream == null)
-                            return;
-                        string extension = MapTextureLoadingService.DetectTextureExtension(
-                            stream,
-                            reference.VirtualPath ?? asset.VirtualPath);
-                        BitmapSource bitmap = await Task.Run(
-                            () => TextureUtils.LoadViewerTexture(stream, extension),
-                            cancellationToken);
+                        BitmapSource bitmap = await ViewerTextureLoadingCache.LoadAssetAsync(
+                            asset, _assetResolver, reference.VirtualPath ?? asset.VirtualPath, cancellationToken);
                         if (bitmap == null)
                             return;
 

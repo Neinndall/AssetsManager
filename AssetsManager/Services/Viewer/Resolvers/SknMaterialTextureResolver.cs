@@ -223,7 +223,6 @@ namespace AssetsManager.Services.Viewer.Resolvers
 
     internal static class SknMaterialTextureResolver
     {
-        private static readonly uint SkinPropertiesClass = Fnv1a.HashLower("SkinCharacterDataProperties");
         private static readonly uint CustomShaderClass = Fnv1a.HashLower("CustomShaderDef");
         private static readonly uint SkinMeshProperties = Fnv1a.HashLower("skinMeshProperties");
         private const uint GearData = 0x639b0013;
@@ -347,7 +346,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
             // LTK resolves skinMeshProperties only from the selected skin object. Dependency
             // BINs are walked solely to fill material links that the primary skin leaves missing.
             List<BinTreeObject> primarySkins = primaryTree.Objects.Values
-                .Where(obj => obj.ClassHash == SkinPropertiesClass)
+                .Where(obj => CharacterSkinSchema.IsSkin(obj.ClassHash))
                 .ToList();
             if (!string.IsNullOrWhiteSpace(targetSknPath))
             {
@@ -674,8 +673,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
             {
                 defaultMaterialDefinition = ModelMaterialDefinition.TextureOnly(
                     skinTextureKey,
-                    metadata.Pbr?.Rma != null ? null :
-                        GameShaderProgramResolver.CreateDefaultSkinnedProgram(skinTextureKey, emissiveTextureKey))
+                    GameShaderProgramResolver.CreateDefaultSkinnedProgram(skinTextureKey, emissiveTextureKey))
                     with { Pbr = metadata.Pbr?.Rma != null ? metadata.Pbr : null,
                         EmissiveTexturePath = metadata.EmissiveTexturePath };
             }
@@ -706,6 +704,13 @@ namespace AssetsManager.Services.Viewer.Resolvers
                     continue;
                 }
 
+                bool hasTextureOverride = metadata.DirectOverrideTexturePaths.ContainsKey(submesh);
+                if (!hasTextureOverride && metadata.HasDefaultMaterialLink)
+                {
+                    materialDefinitions[submesh] = defaultMaterialDefinition;
+                    continue;
+                }
+
                 // A texture-only override falls back to the skin texture if its asset is unavailable.
                 metadata.PbrOverrides.TryGetValue(submesh, out CharacterPbrMaps overridePbr);
                 var maps = new CharacterPbrMaps(overridePbr?.Rma ?? metadata.Pbr?.Rma,
@@ -720,7 +725,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
                     };
                 materialDefinitions[submesh] = ModelMaterialDefinition.TextureOnly(
                     textureFallback,
-                    maps.Rma != null ? null : GameShaderProgramResolver.CreateDefaultSkinnedProgram(textureFallback, emissiveTextureKey))
+                    GameShaderProgramResolver.CreateDefaultSkinnedProgram(textureFallback, emissiveTextureKey))
                     with { Pbr = maps.Rma != null || maps.RmaPaths?.Count > 0 ? maps : null,
                         EmissiveTexturePath = metadata.EmissiveTexturePath };
             }
@@ -1248,7 +1253,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
         private static bool TryGetSimpleSkin(BinTreeObject obj, out BinTreeProperty simpleSkinProperty)
         {
             simpleSkinProperty = null;
-            return obj.ClassHash == SkinPropertiesClass &&
+            return CharacterSkinSchema.IsSkin(obj.ClassHash) &&
                    obj.Properties.TryGetValue(SkinMeshProperties, out BinTreeProperty meshProperty) &&
                    meshProperty is BinTreeStruct meshProperties &&
                    meshProperties.Properties.TryGetValue(SimpleSkin, out simpleSkinProperty);

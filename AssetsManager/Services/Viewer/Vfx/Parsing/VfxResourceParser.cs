@@ -43,7 +43,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
         {
             foreach (BinTreeObject skin in tree.Objects.Values)
             {
-                if (skin.ClassHash != SkinCharacterDataPropertiesClass) continue;
+                if (!AssetsManager.Services.Viewer.Parsing.CharacterSkinSchema.IsSkin(skin.ClassHash)) continue;
                 uint resolverHash = AsU32(Get(skin.Properties, F_mResourceResolver)) ?? 0u;
                 BinTreeObject resolver = resolverHash == 0 ? null :
                     tree.Objects.GetValueOrDefault(resolverHash) ?? linkedTrees?

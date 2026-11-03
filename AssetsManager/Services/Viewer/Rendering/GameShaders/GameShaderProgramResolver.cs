@@ -193,30 +193,32 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             string pixelPath = ShaderPathForStage(pass, vertexStage: false);
             try
             {
-                // The pixel stage declares the most switches, so it picks any fallback first and the vertex
-                // stage follows those defines, keeping the varyings both stages agree on.
-                StageRead pixel = ReadStage(wad, pixelPath, "ps", defines);
-                IReadOnlyList<GameMaterialDefine> resolved = Apply(defines, pixel.Match);
-                StageRead vertex = ReadStage(wad, vertexPath, "vs", resolved);
-                if (!vertex.Match.Exact)
-                {
-                    resolved = Apply(resolved, vertex.Match);
-                    StageRead aligned = ReadStage(wad, pixelPath, "ps", resolved, fallback: false);
-                    if (aligned != null)
-                        pixel = aligned;
-                }
+                string vertexTocPath = TocPath(vertexPath, "vs");
+                string pixelTocPath = TocPath(pixelPath, "ps");
+                ShaderToc vertexToc = ReadToc(wad, vertexTocPath);
+                ShaderToc pixelToc = ReadToc(wad, pixelTocPath);
+                var pairs = defines.Select(d => new KeyValuePair<string, string>(d.Name, d.Value));
+                // Native HLSL pairs require their authored features. Only generated materials use nearest fallback.
+                bool fallback = vertexTocPath.StartsWith("assets/shaders/generated/", StringComparison.Ordinal) &&
+                                pixelTocPath.StartsWith("assets/shaders/generated/", StringComparison.Ordinal);
+                var match = GameShaderPermutationLookup.FindPair(vertexToc, pixelToc, pairs, fallback);
+                if (match == null)
+                    return new ShaderBytecodeRead(null, $"No common shader permutation for {vertexPath} / {pixelPath}.");
+                IReadOnlyList<GameMaterialDefine> resolved = Apply(defines, match.Selection);
+                byte[] vertex = ReadStage(wad, vertexTocPath, vertexToc.ShaderIds[match.VertexIndex]);
+                byte[] pixel = ReadStage(wad, pixelTocPath, pixelToc.ShaderIds[match.PixelIndex]);
 
-                ShaderReflectionData vertexReflection = DxbcReflection.Reflect(vertex.Bytecode);
-                ShaderReflectionData pixelReflection = DxbcReflection.Reflect(pixel.Bytecode);
-                string[] changes = pixel.Match.Changes.Concat(vertex.Match.Changes)
+                ShaderReflectionData vertexReflection = DxbcReflection.Reflect(vertex);
+                ShaderReflectionData pixelReflection = DxbcReflection.Reflect(pixel);
+                string[] changes = match.Selection.Changes
                     .Select(change => change.ToString())
                     .Distinct(StringComparer.Ordinal)
                     .ToArray();
                 return new ShaderBytecodeRead(
                     new ShaderBytecodeProgram(
                         resolved,
-                        vertex.Bytecode,
-                        pixel.Bytecode,
+                        vertex,
+                        pixel,
                         vertexReflection,
                         pixelReflection,
                         cachePath,
@@ -288,38 +290,18 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
         internal static string BundlePath(string tocPath, uint shaderId) =>
             $"{tocPath}_{RecordsPerBundle * (shaderId / RecordsPerBundle)}";
 
-        private sealed record StageRead(byte[] Bytecode, GameShaderPermutationLookup.Match Match);
-
-        /// <returns>
-        /// The stage bytecode of the exact permutation, or of the nearest one when the game never compiled the
-        /// requested define set. Without <paramref name="fallback"/>, a missing exact permutation returns null.
-        /// </returns>
-        private static StageRead ReadStage(
-            WadFile wad,
-            string shaderObjectPath,
-            string stage,
-            IReadOnlyList<GameMaterialDefine> defines,
-            bool fallback = true)
+        private static ShaderToc ReadToc(WadFile wad, string tocPath)
         {
-            string tocPath = TocPath(shaderObjectPath, stage);
             using var tocBytes = wad.LoadChunkDecompressed(XxHash64Ext.Hash(tocPath));
             using var tocStream = new MemoryStream(tocBytes.Span.ToArray(), writable: false);
-            var toc = new ShaderToc(tocStream);
+            return new ShaderToc(tocStream);
+        }
 
-            var pairs = defines.Select(define => new KeyValuePair<string, string>(define.Name, define.Value)).ToArray();
-            GameShaderPermutationLookup.Match match = GameShaderPermutationLookup.Find(toc, pairs, fallback);
-            if (match == null)
-            {
-                if (!fallback)
-                    return null;
-                throw new InvalidOperationException(
-                    $"Shader permutation not found for {shaderObjectPath}.{stage}: {GameShaderPermutationLookup.Key(pairs, toc.BaseDefines)}");
-            }
-
-            uint shaderId = toc.ShaderIds[match.Index];
+        private static byte[] ReadStage(WadFile wad, string tocPath, uint shaderId)
+        {
             string bundlePath = BundlePath(tocPath, shaderId);
             using var bundleBytes = wad.LoadChunkDecompressed(XxHash64Ext.Hash(bundlePath));
-            return new StageRead(ReadBundleRecord(bundleBytes.Span, shaderId % RecordsPerBundle), match);
+            return ReadBundleRecord(bundleBytes.Span, shaderId % RecordsPerBundle);
         }
 
         /// <returns><paramref name="defines"/> with the define changes a permutation fallback made.</returns>
@@ -362,7 +344,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
         // The engine's default sampler state wraps on every axis (LTK SamplerState::default); critter UVs span 0..2.
         public static GameMaterialProgram CreateDefaultSkinnedProgram(
             string diffuseTextureKey,
-            string emissiveTextureKey = null)
+            string emissiveTextureKey = null, string rmaTextureKey = null, string normalTextureKey = null)
         {
             var textures = new List<GameMaterialTexture>
             {
@@ -381,7 +363,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                         FilterMag: true))
             };
 
-            if (!string.IsNullOrWhiteSpace(emissiveTextureKey))
+            if (string.IsNullOrWhiteSpace(rmaTextureKey) && !string.IsNullOrWhiteSpace(emissiveTextureKey))
             {
                 textures.Add(new(
                     LitUberEmissiveTexture,
@@ -396,10 +378,28 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                         FilterMag: true)));
             }
 
+            var defines = new List<GameMaterialDefine>();
+            void Map(string name, string path)
+            {
+                textures.Add(new(name, new MapTextureReference(path, XxHash64Ext.Hash(path)),
+                    GameMaterialTextureSource.Fallback, new GameMaterialSamplerState(null,
+                        MapTextureWrap.Repeat, MapTextureWrap.Repeat, MapTextureWrap.Repeat,
+                        FilterMin: true, FilterMag: true)));
+            }
+            if (!string.IsNullOrWhiteSpace(rmaTextureKey))
+            {
+                defines.Add(new("FEATURE_ROUGHNESS_METALLIC", "1", GameMaterialDefineSource.Skin));
+                Map("RMA_MAP", rmaTextureKey);
+                if (!string.IsNullOrWhiteSpace(normalTextureKey))
+                {
+                    defines.Add(new("FEATURE_TANGENT", "1", GameMaterialDefineSource.Skin));
+                    Map("NORMAL_MAP", normalTextureKey);
+                }
+            }
             var pass = new GameMaterialPass(
                 ShaderHash: 0,
                 ShaderPath: LitUberShaderName,
-                Defines: Array.Empty<GameMaterialDefine>(),
+                Defines: defines,
                 RuntimeSwitches: Array.Empty<KeyValuePair<string, bool>>(),
                 Textures: textures,
                 Parameters: Array.Empty<GameMaterialParameter>(),

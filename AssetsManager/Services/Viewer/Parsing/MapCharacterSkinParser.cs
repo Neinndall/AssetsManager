@@ -29,7 +29,7 @@ namespace AssetsManager.Services.Viewer.Parsing
                 return null;
 
             uint entryHash = Fnv1a.HashLower(skinPath);
-            if (!document.Objects.TryGetValue(entryHash, out BinTreeObject skin) || skin.ClassHash != SkinClass)
+            if (!document.Objects.TryGetValue(entryHash, out BinTreeObject skin) || !CharacterSkinSchema.IsSkin(skin.ClassHash))
                 return null;
 
             BinTreeStruct mesh = skin.Properties.TryGetValue(MeshPropertiesField, out BinTreeProperty meshProperty)

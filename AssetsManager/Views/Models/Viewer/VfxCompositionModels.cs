@@ -7,7 +7,10 @@ using LeagueToolkit.Core.Animation;
 namespace AssetsManager.Views.Models.Viewer
 {
     /// <summary>Base event authored on an AnimationGraph clip.</summary>
-    public abstract record AnimationClipEventDefinition(uint EventHash, float StartFrame, float EndFrame);
+    public abstract record AnimationClipEventDefinition(uint EventHash, float StartFrame, float EndFrame)
+    {
+        public string Name { get; init; } = $"0x{EventHash:x8}";
+    }
 
     public sealed record AnimationSubmeshVisibilityEventDefinition(
         uint EventHash,
@@ -438,6 +441,15 @@ namespace AssetsManager.Views.Models.Viewer
         public int VfxEventCount => Composition?.Events.Count(eventCue => !eventCue.Event.IsKillEvent) ?? 0;
 
         public bool HasParameterValues => ParameterValues is { Count: > 1 };
+
+        internal AnimationClipCatalogItem WithOpeningParameter()
+        {
+            // Equipped gear owns its branch independently from the preview's manual parameter.
+            if (!HasParameterValues || Clip?.UsesEquippedGearParameter == true) return this;
+            float first = Clip?.ParametricValues?.FirstOrDefault() ?? ParameterValues[0];
+            float selected = ParameterValues.OrderBy(value => MathF.Abs(value - first)).First();
+            return ParameterValue == selected ? this : this with { ParameterValue = selected };
+        }
 
         public string GraphMetadataSummary
         {

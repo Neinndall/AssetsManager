@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using System.Reflection;
+using AssetsManager.Services.Viewer.Resources;
 using AssetsManager.Services.Viewer.Vfx.Rendering;
 using AssetsManager.Services.Viewer.Vfx.Resources;
 using AssetsManager.Services.Viewer.Vfx.Runtime;
@@ -68,6 +69,67 @@ public sealed class VfxSharedDrawGpuTests
             scene.Gl.Viewport(0, 0, 64, 64);
             session.Render(Matrix4x4.Identity, Matrix4x4.CreateTranslation(0, 0, -2));
         }
+    }
+
+    [Fact]
+    public void SessionReplacementReusesUnchangedSamplersAndReleasesEverythingOnClear()
+    {
+        using var scene = new Scene(false);
+        using var session = new AssetsManager.Services.Viewer.Vfx.Session.VfxRenderSession();
+        session.Initialize(scene.Gl);
+        session.SetViewportSize(64, 64);
+        var definition = Definition(VfxPrimitiveKind.CameraUnitQuad) with { TexturePath = "" };
+        var systems = new Dictionary<uint, VfxSystemDefinition> { [9] = new(9, "reuse", "reuse", new[] { definition }) };
+        var effect = new VfxIdleEffectDefinition(1, "", "", 0, "", 0, Vector3.Zero);
+        var image = System.Windows.Media.Imaging.BitmapSource.Create(1, 1, 96, 96,
+            System.Windows.Media.PixelFormats.Bgra32, null, new byte[] { 255, 255, 255, 255 }, 4);
+        image.Freeze();
+        var cube = new CubeMapData(1, 1, new byte[][]
+        {
+            new byte[4], new byte[4], new byte[4], new byte[4], new byte[4], new byte[4]
+        });
+        var first = Replace();
+        session.Render(Matrix4x4.Identity, Matrix4x4.Identity);
+        uint texture = first.Texture, reflection = first.ReflectionTexture;
+        Assert.NotEqual(0u, texture);
+        Assert.NotEqual(0u, reflection);
+        var second = Replace();
+        session.ProcessPendingGpuState();
+        Assert.True(scene.Gl.IsTexture(texture));
+        Assert.True(scene.Gl.IsTexture(reflection));
+        // All cache hits fit even a one-upload budget; they do not consume it.
+        var uploader = new VfxGpuResourceUploader();
+        uploader.UploadPendingResources(session.Graphs, Renderer(session), maxNewUploads: 1);
+        Assert.Equal(texture, second.Texture);
+        Assert.Equal(texture, second.TextureMult);
+        Assert.Equal(texture, second.DistortionTexture);
+        Assert.Equal(texture, second.ErosionTexture);
+        Assert.Equal(texture, second.PaletteTexture);
+        Assert.Equal(texture, second.ColorGradientTexture);
+        Assert.Equal(texture, second.ProgramTextures["same"]);
+        Assert.Equal(reflection, second.ReflectionTexture);
+        Assert.Equal(reflection, second.ProgramTextures["cube"]);
+        session.SetSystem(null);
+        session.ProcessPendingGpuState();
+        Assert.False(scene.Gl.IsTexture(texture));
+        Assert.False(scene.Gl.IsTexture(reflection));
+        Assert.Equal(GLEnum.NoError, scene.Gl.GetError());
+
+        VfxPlaybackRuntime.EmitterState Replace()
+        {
+            session.SetAnimationSession(null, new[] { effect }, systems, new Dictionary<uint, uint> { [1] = 9 },
+                System.IO.Path.GetTempPath(), 7, 3, new VfxOwnerSceneContext("", "", 1));
+            var emitter = session.Graphs[0].Root.Emitters[0];
+            emitter.PendingTexture = emitter.PendingTextureMult = emitter.PendingDistortionTexture =
+                emitter.PendingErosionTexture = emitter.PendingPaletteTexture = emitter.PendingColorGradient = image;
+            emitter.PendingReflectionTexture = cube;
+            emitter.PendingProgramTextures["same"] = image;
+            emitter.PendingProgramTextures["cube"] = cube;
+            return emitter;
+        }
+        static VfxOpenGlRenderer Renderer(AssetsManager.Services.Viewer.Vfx.Session.VfxRenderSession owner)
+            => (VfxOpenGlRenderer)typeof(AssetsManager.Services.Viewer.Vfx.Session.VfxRenderSession)
+                .GetField("_renderer", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(owner);
     }
 
     [Theory]

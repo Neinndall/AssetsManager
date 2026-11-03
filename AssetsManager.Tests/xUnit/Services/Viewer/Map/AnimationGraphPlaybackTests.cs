@@ -15,6 +15,22 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
         private static readonly uint Sequencer = Fnv1a.HashLower("SequencerClipData");
 
         [Fact]
+        public void AvailableChildrenKeepGraphIsolationCycleProtectionAndSequenceOrder()
+        {
+            var missing = Clip(1, Atomic, "Missing", "missing.anm");
+            var held = Clip(2, Atomic, "Held", "held.anm");
+            var otherGraph = Clip(2, Atomic, "OtherGraph", "other.anm") with { GraphPathHash = 999 };
+            var selector = Clip(3, Fnv1a.HashLower("SelectorClipData"), "idle", null, 3, 1, 2);
+            var sequence = Clip(4, Sequencer, "Sequence", null, 1, 3, 2);
+            var clips = new[] { missing, otherGraph, selector, held, sequence };
+            bool Available(string path) => path == "held.anm";
+            Assert.Equal(new[] { held }, AnimationGraphPlayback.ResolvePlaylist(selector, clips, available: Available));
+            Assert.Equal(new[] { held, held }, AnimationGraphPlayback.ResolvePlaylist(sequence, clips, available: Available));
+            Assert.DoesNotContain(missing, AnimationGraphPlayback.PlayableClips(clips, Available));
+            Assert.Same(selector, AnimationGraphPlayback.NamedOrOpeningClip(clips, "Missing", Available));
+        }
+
+        [Fact]
         public void GearIndexSelectsOnlyGearDrivenParametricBranchesInsideSequences()
         {
             uint parametric = Fnv1a.HashLower("ParametricClipData");

@@ -22,6 +22,7 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
             internal uint Vao;
             internal uint Vbo;
             internal uint Ebo;
+            internal GlMeshEdges Edges;
             internal int IndexCount;
             internal uint Texture;
             internal bool TextureResolved;
@@ -45,24 +46,18 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
             internal int VertexCount;
         }
 
-        private sealed class SharedTexture
-        {
-            internal uint Id;
-            internal int ReferenceCount;
-        }
-
         private readonly GL _gl;
         private readonly ConditionalWeakTable<ModelPart, PartResources> _partResources = new();
         private readonly HashSet<PartResources> _liveResources = new();
-        private readonly Dictionary<BitmapSource, SharedTexture> _sharedTextures =
-            new(ReferenceEqualityComparer.Instance);
-        private readonly Dictionary<BitmapSource, SharedTexture> _sharedSrgbTextures =
-            new(ReferenceEqualityComparer.Instance);
+        private readonly GlRetainedTextureCache<BitmapSource> _sharedTextures;
+        private readonly GlRetainedTextureCache<BitmapSource> _sharedSrgbTextures;
         private readonly HashSet<ModelPart> _pendingReleases = new();
 
         internal GlMeshResourceCache(GL gl)
         {
             _gl = gl;
+            _sharedTextures = new(gl.DeleteTexture);
+            _sharedSrgbTextures = new(gl.DeleteTexture);
             WhiteTexture = CreateWhiteTexture();
             BlackTexture = CreateBlackTexture();
         }
@@ -99,10 +94,15 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
             }
             if (string.IsNullOrWhiteSpace(key))
                 return null;
-            if (resources.ProgramTextures.TryGetValue(key, out uint cached))
-                return cached;
-
             BitmapSource bitmap = TextureUtils.ResolveTexture(part.AllTextures, key);
+            if (resources.ProgramTextures.TryGetValue(key, out uint cached) &&
+                resources.LoadedProgramBitmaps.TryGetValue(key, out BitmapSource previous))
+            {
+                if (ReferenceEquals(previous, bitmap)) return cached;
+                _sharedTextures.Release(previous);
+                resources.ProgramTextures.Remove(key);
+                resources.LoadedProgramBitmaps.Remove(key);
+            }
             if (bitmap == null)
                 return null;
             uint texture = AcquireTexture(_sharedTextures, bitmap, () => UploadTexture(bitmap));
@@ -123,6 +123,8 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
             foreach (ModelPart part in _pendingReleases)
                 ReleasePart(part);
             _pendingReleases.Clear();
+            _sharedTextures.Sweep();
+            _sharedSrgbTextures.Sweep();
         }
 
         private PartResources EnsureMeshBuffers(ModelPart part, PartResources resources)
@@ -166,6 +168,7 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
 
                 _gl.BindVertexArray(0);
                 resources.IndexCount = indices.Count;
+                resources.Edges = new GlMeshEdges(_gl, indexData, positions.Select(p => new System.Numerics.Vector3((float)p.X, (float)p.Y, (float)p.Z)).ToArray());
             }
 
             return resources;
@@ -312,9 +315,10 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
         {
             string selectedTexture = part.SelectedTextureName;
             bool srgb = part.UsesSrgbBaseTexture;
+            BitmapSource bitmap = TextureUtils.ResolveTexture(part.AllTextures, selectedTexture);
             if (resources.TextureResolved &&
                 resources.LoadedTextureKey == selectedTexture &&
-                resources.LoadedBitmapSrgb == srgb)
+                resources.LoadedBitmapSrgb == srgb && ReferenceEquals(resources.LoadedBitmap, bitmap))
             {
                 return;
             }
@@ -323,10 +327,10 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
             resources.TextureResolved = true;
             resources.LoadedTextureKey = selectedTexture;
             resources.LoadedBitmapSrgb = srgb;
-            resources.LoadedBitmap = TextureUtils.ResolveTexture(part.AllTextures, selectedTexture);
+            resources.LoadedBitmap = bitmap;
             if (resources.LoadedBitmap == null) return;
 
-            Dictionary<BitmapSource, SharedTexture> cache = srgb ? _sharedSrgbTextures : _sharedTextures;
+            GlRetainedTextureCache<BitmapSource> cache = srgb ? _sharedSrgbTextures : _sharedTextures;
             resources.Texture = AcquireTexture(
                 cache,
                 resources.LoadedBitmap,
@@ -339,18 +343,12 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
             srgb ? InternalFormat.Srgb8Alpha8 : InternalFormat.Rgba8;
 
         private static uint AcquireTexture(
-            Dictionary<BitmapSource, SharedTexture> textures,
+            GlRetainedTextureCache<BitmapSource> textures,
             BitmapSource bitmap,
             Func<uint> upload)
         {
-            if (!textures.TryGetValue(bitmap, out SharedTexture sharedTexture))
-            {
-                sharedTexture = new SharedTexture { Id = upload() };
-                textures.Add(bitmap, sharedTexture);
-            }
-
-            sharedTexture.ReferenceCount++;
-            return sharedTexture.Id;
+            // Include the generated mip chain in the idle-memory budget.
+            return textures.Acquire(bitmap, GlRetainedTextureCache<BitmapSource>.MipChainBytes(bitmap.PixelWidth, bitmap.PixelHeight), upload);
         }
 
         private void ReleasePart(ModelPart part)
@@ -362,6 +360,7 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
             DeleteHandle(resources.Vao, _gl.DeleteVertexArray);
             DeleteHandle(resources.Vbo, _gl.DeleteBuffer);
             DeleteHandle(resources.Ebo, _gl.DeleteBuffer);
+            resources.Edges?.Dispose();
             ReleaseSkinningBuffers(resources);
             _liveResources.Remove(resources);
             _partResources.Remove(part);
@@ -374,9 +373,9 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
 
         private void ReleaseBaseTexture(PartResources resources)
         {
-            Dictionary<BitmapSource, SharedTexture> cache =
+            GlRetainedTextureCache<BitmapSource> cache =
                 resources.LoadedBitmapSrgb ? _sharedSrgbTextures : _sharedTextures;
-            ReleaseSharedTexture(cache, resources.LoadedBitmap);
+            cache.Release(resources.LoadedBitmap);
             resources.Texture = 0;
             resources.LoadedBitmap = null;
             resources.LoadedBitmapSrgb = false;
@@ -385,24 +384,10 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
         private void ReleaseProgramTextures(PartResources resources)
         {
             foreach (BitmapSource bitmap in resources.LoadedProgramBitmaps.Values)
-                ReleaseSharedTexture(_sharedTextures, bitmap);
+                _sharedTextures.Release(bitmap);
             resources.ProgramTextures.Clear();
             resources.ProgramTextureKeyByPath.Clear();
             resources.LoadedProgramBitmaps.Clear();
-        }
-
-        private void ReleaseSharedTexture(
-            Dictionary<BitmapSource, SharedTexture> textures,
-            BitmapSource bitmap)
-        {
-            if (bitmap == null || !textures.TryGetValue(bitmap, out SharedTexture sharedTexture))
-                return;
-
-            sharedTexture.ReferenceCount--;
-            if (sharedTexture.ReferenceCount > 0) return;
-
-            _gl.DeleteTexture(sharedTexture.Id);
-            textures.Remove(bitmap);
         }
 
         private uint CreateWhiteTexture()
@@ -493,19 +478,15 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
         {
             try
             {
-                foreach (SharedTexture texture in _sharedTextures.Values)
-                    _gl.DeleteTexture(texture.Id);
-                _sharedTextures.Clear();
-
-                foreach (SharedTexture texture in _sharedSrgbTextures.Values)
-                    _gl.DeleteTexture(texture.Id);
-                _sharedSrgbTextures.Clear();
+                _sharedTextures.Dispose();
+                _sharedSrgbTextures.Dispose();
 
                 foreach (PartResources resources in _liveResources)
                 {
                     DeleteHandle(resources.Vao, _gl.DeleteVertexArray);
                     DeleteHandle(resources.Vbo, _gl.DeleteBuffer);
                     DeleteHandle(resources.Ebo, _gl.DeleteBuffer);
+                    resources.Edges?.Dispose();
                     ReleaseSkinningBuffers(resources);
                 }
                 _liveResources.Clear();
@@ -525,8 +506,8 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
             }
             finally
             {
-                _sharedTextures.Clear();
-                _sharedSrgbTextures.Clear();
+                _sharedTextures.Abandon();
+                _sharedSrgbTextures.Abandon();
                 _liveResources.Clear();
                 _pendingReleases.Clear();
             }

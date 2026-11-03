@@ -102,7 +102,7 @@ namespace AssetsManager.Views.Controls.Viewer
                     _model.SelectedSpell = null;
                     _model.SelectedSystem = null;
                     _model.IsAnimationMode = true;
-                    _model.SelectedAnimation = animation;
+                    _model.PickAnimation(animation);
                     break;
                 case StudioSpellBrowserItem spell:
                     if (!TrySelectSceneSkin(spell.Owner)) break;

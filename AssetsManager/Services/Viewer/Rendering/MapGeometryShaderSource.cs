@@ -7,7 +7,7 @@ namespace AssetsManager.Services.Viewer.Rendering
     /// </summary>
     internal static class MapGeometryShaderSource
     {
-        internal const string Vertex = @"
+        internal const string Vertex = AssetsManager.Services.Viewer.Rendering.Core.GlMeshEdges.Vertex + @"
 layout(location = 0) in vec3 aPosition;
 layout(location = 1) in vec3 aNormal;
 layout(location = 2) in vec2 aUv0;
@@ -44,9 +44,11 @@ void main()
     vUv = aUv0;
     vUv1 = aUv1;
     gl_Position = uViewProjection * vec4(position, 1.0);
+    edgePosition(vec4(position, 1.0), gl_Position);
 }";
 
-        internal const string Fragment = @"
+        internal const string Fragment = @"in float vEdgeFade;
+
 in vec3 vStockLightFront;
 in vec3 vStockLightBack;
 in vec2 vUv;
@@ -77,7 +79,7 @@ void main()
 {
     if (uWireframePass != 0)
     {
-        FragColor = uWireframeColor;
+        FragColor = vec4(uWireframeColor.rgb, uWireframeColor.a * vEdgeFade);
         return;
     }
 

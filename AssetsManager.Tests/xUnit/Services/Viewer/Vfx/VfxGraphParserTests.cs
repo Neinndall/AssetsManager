@@ -13,6 +13,27 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
 {
     public sealed class VfxGraphParserTests
     {
+        [Fact]
+        public void EventControlledSelectorTriesDefaultBeforeEventPairs()
+        {
+            var selector = new BinTreeStruct(0, Fnv1a.HashLower("EventControlledSelectorClipData"), new BinTreeProperty[]
+            {
+                new BinTreeContainer(Fnv1a.HashLower("SelectorPairDataList"), BinPropertyType.Struct, new BinTreeProperty[]
+                {
+                    new BinTreeStruct(0, Fnv1a.HashLower("SelectorPairData"), new BinTreeProperty[]
+                    { new BinTreeHash(Fnv1a.HashLower("ClipName"), 2) })
+                }),
+                new BinTreeHash(Fnv1a.HashLower("DefaultClipName"), 1)
+            });
+            var map = new BinTreeMap(Fnv1a.HashLower("mClipDataMap"), BinPropertyType.Hash, BinPropertyType.Struct,
+                new[] { new KeyValuePair<BinTreeProperty, BinTreeProperty>(new BinTreeHash(0, 3), selector) });
+            var tree = new BinTree(new[] { new BinTreeObject("Animations/TestGraph", "AnimationGraphData", new BinTreeProperty[] { map }) }, System.Array.Empty<string>());
+            using var stream = new MemoryStream();
+            tree.Write(stream);
+            var clip = Assert.Single(Assert.Single(VfxGraphParser.ParseDocument(stream.ToArray()).AnimationGraphs).Clips);
+            Assert.Equal(new uint[] { 1, 2 }, clip.ChildClipHashes);
+        }
+
         [Theory]
         [InlineData(-1, 0)]
         [InlineData(0, 0)]
@@ -145,8 +166,10 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.Equal(0u, parsed.ResourceMap[key]);
         }
 
-        [Fact]
-        public void IdleEffectsUseCharacterIdleEffectFieldNamesInsteadOfParticleEventFields()
+        [Theory]
+        [InlineData("SkinCharacterDataProperties")]
+        [InlineData("TftSkinCharacterDataProperties")]
+        public void IdleEffectsUseCharacterIdleEffectFieldNamesInsteadOfParticleEventFields(string skinClass)
         {
             const uint effectKey = 0x12345678;
             var idle = new BinTreeStruct(
@@ -162,7 +185,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 });
             var skin = new BinTreeObject(
                 "Characters/Test/Skins/Skin0",
-                "SkinCharacterDataProperties",
+                skinClass,
                 new BinTreeProperty[]
                 {
                     new BinTreeContainer(
@@ -1954,8 +1977,10 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
             Assert.Equal(new Vector2(0.25f, 0.75f), parsedEmitter.LegacyParticleBind);
         }
 
-        [Fact]
-        public void ExtractsOwnerSceneAndAttachedSubmeshContext()
+        [Theory]
+        [InlineData("SkinCharacterDataProperties")]
+        [InlineData("TftSkinCharacterDataProperties")]
+        public void ExtractsOwnerSceneAndAttachedSubmeshContext(string skinClass)
         {
             var meshDefinition = new BinTreeStruct(
                 0x0d89732d,
@@ -1995,7 +2020,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 });
             var owner = new BinTreeObject(
                 "Characters/Test/Skins/0",
-                "SkinCharacterDataProperties",
+                skinClass,
                 new BinTreeProperty[]
                 {
                     new BinTreeStruct(

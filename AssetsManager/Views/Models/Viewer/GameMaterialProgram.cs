@@ -18,7 +18,8 @@ namespace AssetsManager.Views.Models.Viewer
         Material,
         Feature,
         Switch,
-        Pass
+        Pass,
+        Skin
     }
 
     internal sealed record GameMaterialDefine(

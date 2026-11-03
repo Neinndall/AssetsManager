@@ -306,6 +306,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
                 try
                 {
                     MapResolvedAsset asset = resolved[candidate.Reference];
+                    MapResolvedAssetCacheKey sourceIdentity = MapResolvedAssetCacheKey.From(asset);
                     byte[] bytes = await _assetResolver.ReadBytesAsync(asset, cancellationToken);
                     if (bytes == null || bytes.Length == 0)
                         return;
@@ -316,6 +317,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
                     if (!string.IsNullOrWhiteSpace(directory))
                         Directory.CreateDirectory(directory);
                     await File.WriteAllBytesAsync(destination, bytes, cancellationToken);
+                    if (TextureExtensions.Contains(Path.GetExtension(destination), StringComparer.OrdinalIgnoreCase) &&
+                        sourceIdentity == MapResolvedAssetCacheKey.From(asset))
+                        _loadingService.RegisterMaterializedTextureSource(destination, sourceIdentity);
                     MarkMaterialized(candidate.CandidatePath);
                 }
                 finally

@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using AssetsManager.Services.Viewer.Resolvers;
+using AssetsManager.Services.Viewer.Parsing;
 using AssetsManager.Views.Models.Viewer;
 using LeagueToolkit.Core.Meta;
 using LeagueToolkit.Core.Meta.Properties;
@@ -20,7 +21,7 @@ namespace AssetsManager.Services.Viewer.Loading
         {
             if (resolver == null) return;
             var meshes = documents.FirstOrDefault()?.Objects.Values
-                .Where(obj => obj.ClassHash == Fnv1a.HashLower("SkinCharacterDataProperties"))
+                .Where(obj => CharacterSkinSchema.IsSkin(obj.ClassHash))
                 .Select(obj => obj.Properties.GetValueOrDefault(Fnv1a.HashLower("skinMeshProperties")) as BinTreeStruct)
                 ?? Enumerable.Empty<BinTreeStruct>();
             meshes = meshes.Concat(documents.SelectMany(tree => tree.Objects.Values)

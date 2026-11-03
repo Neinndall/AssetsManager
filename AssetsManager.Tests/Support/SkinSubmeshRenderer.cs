@@ -144,6 +144,8 @@ namespace AssetsManager.Tests.Support
             Buffer(0, positions.SelectMany(p => new[] { p.X, p.Y, p.Z }).ToArray(), 3);
             Buffer(1, corners.SelectMany(v => new[] { asset.Mesh.Normals[v].X, asset.Mesh.Normals[v].Y, asset.Mesh.Normals[v].Z }).ToArray(), 3);
             Buffer(2, corners.SelectMany(v => new[] { asset.Mesh.Uv[v].X, asset.Mesh.Uv[v].Y }).ToArray(), 2);
+            if (asset.Mesh.HasTangents)
+                Buffer(3, corners.SelectMany(v => new[] { asset.Mesh.Tangents[v].X, asset.Mesh.Tangents[v].Y, asset.Mesh.Tangents[v].Z, asset.Mesh.Tangents[v].W }).ToArray(), 4);
             Buffer(6, corners.SelectMany(v => asset.Mesh.SkinWeights.Skip((int)v * 4).Take(4)).ToArray(), 4);
             if (asset.Mesh.HasColors)
                 Buffer(4, corners.SelectMany(v => new[] { asset.Mesh.Colors[v].X, asset.Mesh.Colors[v].Y, asset.Mesh.Colors[v].Z, asset.Mesh.Colors[v].W }).ToArray(), 4);
@@ -157,7 +159,7 @@ namespace AssetsManager.Tests.Support
             _gl.VertexAttribIPointer(5, 4, VertexAttribIType.UnsignedByte, 0, IntPtr.Zero);
 
             var missing = new List<string>();
-            bool bound = _runtime.TryBindSkinned(material, 0, Matrix4x4.Identity, bones ?? BindPose, false, in frame, path => Texture(path, missing), state: state,
+            bool bound = _runtime.TryBindSkinned(material, 0, Matrix4x4.Identity, bones ?? BindPose, asset.Mesh.HasTangents, in frame, path => Texture(path, missing), state: state,
                 hasColors: asset.Mesh.HasColors);
             if (bound)
             {
@@ -174,7 +176,7 @@ namespace AssetsManager.Tests.Support
                         _bloom.Initialize(_gl);
                     }
                     _bloom.BeginPasses();
-                    _runtime.TryBindSkinned(material, 0, Matrix4x4.Identity, bones ?? BindPose, false, in frame, path => Texture(path, missing), state: state);
+                    _runtime.TryBindSkinned(material, 0, Matrix4x4.Identity, bones ?? BindPose, asset.Mesh.HasTangents, in frame, path => Texture(path, missing), state: state);
                     _gl.BindVertexArray(vao);
                     _gl.DrawArrays(PrimitiveType.Triangles, 0, (uint)corners.Length);
                     _bloom.EndPasses();

@@ -12,14 +12,16 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
     {
         private const string SkinPath = "Characters/Turret/Skins/Skin0";
 
-        [Fact]
-        public void ParserKeepsPathAndHashAssetsAndAuthoredSkinState()
+        [Theory]
+        [InlineData("SkinCharacterDataProperties")]
+        [InlineData("TftSkinCharacterDataProperties")]
+        public void ParserKeepsPathAndHashAssetsAndAuthoredSkinState(string skinClass)
         {
             const ulong skeletonHash = 0x123456789abcdef0;
             uint graphHash = Fnv1a.HashLower("Characters/Turret/Animations/Graph");
             BinTree tree = Tree(new BinTreeObject(
                 Fnv1a.HashLower(SkinPath),
-                MapCharacterSkinParser.SkinClass,
+                Fnv1a.HashLower(skinClass),
                 new BinTreeProperty[]
                 {
                     new BinTreeEmbedded(

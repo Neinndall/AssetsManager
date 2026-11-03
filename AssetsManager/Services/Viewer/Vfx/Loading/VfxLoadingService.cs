@@ -66,6 +66,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
         internal string ResolveGamePath(ulong pathHash)
             => _hashResolverService?.ResolveHash(pathHash);
 
+        internal void RegisterMaterializedTextureSource(string path, MapResolvedAssetCacheKey source)
+            => _resources.RegisterMaterializedSource(path, source);
+
         public sealed class Bundle
         {
             public string PrimaryBinPath { get; internal set; }

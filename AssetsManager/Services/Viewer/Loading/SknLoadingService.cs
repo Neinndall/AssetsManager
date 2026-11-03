@@ -1,3 +1,4 @@
+using AssetsManager.Services.Viewer.Resources;
 using System;
 using System.IO;
 using System.Linq;
@@ -220,12 +221,7 @@ namespace AssetsManager.Services.Viewer.Loading
         {
             try
             {
-                using Stream fileStream = File.OpenRead(texturePath);
-                BitmapSource loadedTexture = TextureUtils.LoadViewerTexture(
-                    fileStream,
-                    Path.GetExtension(texturePath),
-                    _logService,
-                    texturePath);
+                BitmapSource loadedTexture = ViewerTextureLoadingCache.LoadFile(texturePath, viewer: true, _logService);
                 if (loadedTexture != null)
                 {
                     string textureKey = PathUtils.TruncateAtDot(Path.GetFileNameWithoutExtension(texturePath));
@@ -556,11 +552,8 @@ namespace AssetsManager.Services.Viewer.Loading
                                 cancellationToken);
                             if (textureAsset == null)
                                 continue;
-                            await using Stream textureStream = await _assetResolver.OpenReadAsync(textureAsset, cancellationToken);
-                            if (textureStream == null)
-                                continue;
-                            string extension = MapTextureLoadingService.DetectTextureExtension(textureStream, texturePath);
-                            BitmapSource bitmap = TextureUtils.LoadViewerTexture(textureStream, extension);
+                            BitmapSource bitmap = await ViewerTextureLoadingCache.LoadAssetAsync(
+                                textureAsset, _assetResolver, texturePath, cancellationToken);
                             if (bitmap == null)
                                 continue;
                             string textureKey = PathUtils.TruncateAtDot(Path.GetFileNameWithoutExtension(texturePath));

@@ -371,12 +371,16 @@ namespace AssetsManager.Views.Controls.Viewer
             // PBR game shaders light characters and structures from the same environment the sky shows.
             CubeMapData imageLight = ActiveSkyCube;
             if (_championMeshRenderer != null)
+            {
                 _championMeshRenderer.ImageLight = imageLight;
+                _championMeshRenderer.OutlinesEnabled = _model.PreviewOutlines;
+            }
             if (_mapCharacterRenderer != null)
             {
                 _mapCharacterRenderer.ImageLight = imageLight;
                 // Map characters add their glow to the champion's bloom, composed once per frame.
                 _mapCharacterRenderer.Bloom = _championMeshRenderer?.Bloom;
+                _mapCharacterRenderer.OutlinesEnabled = _model.PreviewOutlines;
             }
 
             // Ground navigation belongs to the MAP workspace; a Character backdrop keeps orbiting its subject.

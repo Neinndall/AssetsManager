@@ -17,6 +17,28 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
 {
     public class SknMaterialTextureResolverTests
     {
+        [Theory]
+        [InlineData(false, true)]
+        [InlineData(true, true)]
+        [InlineData(false, false)]
+        [InlineData(true, false)]
+        public void PbrOnlyOverrideInheritsDefaultLinkedMaterialEvenWhenTheLinkIsMissing(bool directTexture, bool missing)
+        {
+            var metadata = new SknMaterialTextureMetadata("body.tex", null, new Dictionary<string, SknMaterialDefinition>())
+            {
+                HasDefaultMaterialLink = true,
+                DefaultMaterial = missing ? null : new SknMaterialDefinition(Array.Empty<SknMaterialSampler>(), new Dictionary<string, Vector4>()),
+                PbrOverrides = new Dictionary<string, CharacterPbrMaps> { ["cape"] = new(null, "normal.tex") },
+                DirectOverrideTexturePaths = directTexture
+                    ? new Dictionary<string, string> { ["cape"] = "unavailable.tex" }
+                    : new Dictionary<string, string>()
+            };
+            var resolution = SknResolver.Resolve(metadata, new[] { "body" });
+            Assert.Equal(directTexture ? ModelMaterialBindingKind.TextureOnly : missing ? ModelMaterialBindingKind.Missing : ModelMaterialBindingKind.Authored,
+                resolution.ResolveMaterialDefinition("cape").BindingKind);
+            if (!directTexture) Assert.Same(resolution.DefaultMaterialDefinition, resolution.ResolveMaterialDefinition("cape"));
+        }
+
         private static readonly ConcurrentDictionary<ulong, string> TestTexturePaths = new();
         private static readonly string[] SeraphineBodyTextureKeys =
         {
@@ -27,8 +49,10 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
             "black"
         };
 
-        [Fact]
-        public void PbrMapsReachTextureRequestsAndMapOnlyOverridesInheritEachMissingMap()
+        [Theory]
+        [InlineData("SkinCharacterDataProperties")]
+        [InlineData("TftSkinCharacterDataProperties")]
+        public void PbrMapsReachTextureRequestsAndMapOnlyOverridesInheritEachMissingMap(string skinClass)
         {
             const string rma = "assets/test/body_rma.tex", normal = "assets/test/body_nm.tex";
             const string hatRma = "assets/test/hat_rma.tex", armNormal = "assets/test/arm_nm.tex";
@@ -45,12 +69,12 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
                     CreateOverride("Linked", new BinTreeObjectLink(Fnv1a.HashLower("Material"), 123))
                 })
             });
-            var tree = new BinTree(new[] { new BinTreeObject("Characters/Test/Skins/Skin1", "SkinCharacterDataProperties", new BinTreeProperty[] { mesh }) }, Array.Empty<string>());
+            var tree = new BinTree(new[] { new BinTreeObject("Characters/Test/Skins/Skin1", skinClass, new BinTreeProperty[] { mesh }) }, Array.Empty<string>());
             var metadata = SknMaterialTextureResolver.ReadMetadata(tree);
             foreach (string path in new[] { rma, normal, hatRma, armNormal, emissive }) Assert.Contains(path, metadata.ReferencedTexturePaths);
             var resolved = SknResolver.Resolve(metadata, new[] { "body", "body_rma", "body_nm", "hat_rma", "arm_nm" });
             Assert.Equal(new CharacterPbrMaps(rma, normal), resolved.DefaultMaterialDefinition.Pbr);
-            Assert.Null(resolved.DefaultMaterialDefinition.Program);
+            Assert.NotNull(resolved.DefaultMaterialDefinition.Program);
             Assert.Equal(hatRma, resolved.ResolveMaterialDefinition("hAT").Pbr.Rma);
             Assert.Equal(normal, resolved.ResolveMaterialDefinition("hAT").Pbr.Normal);
             Assert.Equal(rma, resolved.ResolveMaterialDefinition("arm").Pbr.Rma);

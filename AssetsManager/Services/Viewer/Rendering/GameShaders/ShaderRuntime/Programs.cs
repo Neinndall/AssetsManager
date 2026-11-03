@@ -183,7 +183,12 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                 foreach (GameShaderTranslator.TextureBinding texture in translated.Vertex.Sidecar.Textures
                              .Concat(translated.Pixel.Sidecar.Textures))
                 {
-                    foreach (GameShaderTranslator.SamplerBinding sampler in texture.Samplers)
+                    // Buffer loads may declare an image uniform without a combined sampler.
+                    // It still needs its own unit; sharing unit zero with a colour sampler changes the draw.
+                    IReadOnlyList<GameShaderTranslator.SamplerBinding> bindings = texture.Samplers.Count == 0
+                        ? new[] { new GameShaderTranslator.SamplerBinding(null, GameShaderTranslator.Ident(texture.Name)) }
+                        : texture.Samplers;
+                    foreach (GameShaderTranslator.SamplerBinding sampler in bindings)
                     {
                         if (!seen.Add(sampler.GlslName))
                             continue;
@@ -274,6 +279,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                         ("NORMAL", _) => 1,
                         ("TEXCOORD", 0) => 2,
                         ("TANGENT", _) => 3,
+                        ("TEXCOORD", 6) => 3,
                         ("COLOR", _) => 4,
                         ("BLENDINDICES", _) => 5,
                         ("BLENDWEIGHT", _) => 6,

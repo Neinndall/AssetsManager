@@ -71,6 +71,66 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
         private static KeyValuePair<string, string>[] Defines(params string[] pairs) =>
             pairs.Select(pair => pair.Split('=')).Select(parts => new KeyValuePair<string, string>(parts[0], parts[1])).ToArray();
 
+        [Fact]
+        public void PairFallbackUsesBothStageDeclarationsAndReportsOnlyFinalChanges()
+        {
+            ShaderToc vertex = Toc("A=0B=0");
+            ShaderToc pixel = Toc("A=0B=1", "A=0B=0");
+            var match = GameShaderPermutationLookup.FindPair(vertex, pixel, Defines("A=1", "B=1", "EXTRA=7"));
+
+            Assert.Equal(0, match.VertexIndex);
+            Assert.Equal(1, match.PixelIndex);
+            Assert.Equal(new[] { "A->0", "B->0" }, match.Selection.Changes.Select(c => c.ToString()));
+            Assert.Equal("7", match.Selection.Defines["EXTRA"]);
+        }
+
+        [Fact]
+        public void PairFallbackDoesNotAddAnAbsentEngineDefine()
+        {
+            var toc = new ShaderToc(new[] { new ShaderMacroDefinition("USE_DYNAMIC_LIGHTING", "1") },
+                new[] { XxHash64Ext.Hash("USE_DYNAMIC_LIGHTING=1") }, new uint[] { 0 });
+
+            Assert.Null(GameShaderPermutationLookup.FindPair(toc, toc, Defines()));
+        }
+
+        [Fact]
+        public void PairFallbackKeepsHexshadeDeclarationOrderForEqualDistances()
+        {
+            var toc = new ShaderToc(new[] { new ShaderMacroDefinition("B", "1"), new ShaderMacroDefinition("A", "1") },
+                new[] { XxHash64Ext.Hash("A=1"), XxHash64Ext.Hash("B=1") }, new uint[] { 0, 1 });
+
+            var match = GameShaderPermutationLookup.FindPair(toc, toc, Defines());
+
+            Assert.Equal(1, match.VertexIndex);
+            Assert.Equal(new[] { "+B=1" }, match.Selection.Changes.Select(c => c.ToString()));
+        }
+
+        [Fact]
+        public void PairFallbackCanUseADefineDeclaredOnlyByThePixelStage()
+        {
+            var vertex = new ShaderToc(System.Array.Empty<ShaderMacroDefinition>(),
+                new[] { XxHash64Ext.Hash("") }, new uint[] { 0 });
+            var pixel = new ShaderToc(new[] { new ShaderMacroDefinition("PIXEL", "1") },
+                new[] { XxHash64Ext.Hash("PIXEL=1") }, new uint[] { 0 });
+
+            var match = GameShaderPermutationLookup.FindPair(vertex, pixel, Defines());
+
+            Assert.Equal("1", match.Selection.Defines["PIXEL"]);
+            Assert.Equal(0, match.VertexIndex);
+            Assert.Equal(0, match.PixelIndex);
+        }
+
+        [Fact]
+        public void PairFallbackHonorsItsSearchBoundAndExactOnlyMode()
+        {
+            ShaderToc toc = Toc("A=0B=0C=0D=0");
+            var requested = Defines("A=1", "B=1", "C=1", "D=1");
+
+            Assert.Null(GameShaderPermutationLookup.FindPair(toc, toc, requested));
+            Assert.NotNull(GameShaderPermutationLookup.FindPair(toc, toc, requested, maxChanges: 4));
+            Assert.Null(GameShaderPermutationLookup.FindPair(toc, toc, requested, fallback: false));
+        }
+
         private static ShaderToc Toc(params string[] keys) =>
             new(
                 Switches.SelectMany(name => new[] { new ShaderMacroDefinition(name, "0"), new ShaderMacroDefinition(name, "1") }),

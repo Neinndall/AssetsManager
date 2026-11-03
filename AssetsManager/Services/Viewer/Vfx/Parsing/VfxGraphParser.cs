@@ -67,7 +67,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                         binEntryResolver,
                         shaderTrees));
             IReadOnlyList<AnimationGraphDefinition> animationGraphs =
-                VfxAnimationParser.ExtractAnimationGraphs(tree, graphHashNameResolver, graphClassNameResolver);
+                VfxAnimationParser.ExtractAnimationGraphs(tree, graphHashNameResolver, graphClassNameResolver, wadChunkPathResolver);
             return new VfxBinDocument(
                 systems,
                 resourceMap,

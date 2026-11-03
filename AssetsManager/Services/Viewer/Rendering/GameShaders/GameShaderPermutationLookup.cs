@@ -9,15 +9,98 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
     /// <summary>
     /// Finds the ShaderCache permutation of a define set. A permutation key concatenates the requested
     /// <c>NAME=VALUE</c> pairs the TOC declares as base defines, sorted by name, and hashes it with XxHash64.
-    /// Some skin materials request combinations the game never compiled (a base define the material leaves
-    /// out, or a switch pair no skin ships), so the lookup falls back to the nearest compiled permutation:
-    /// the fewest define changes, with adding a missing define tried before changing a value, and changing
-    /// a value before dropping one.
+    /// Runtime fallback requires one define list compiled in both stages and preserves engine defines.
+    /// Single-stage diagnostic lookup retains its weighted fallback policy.
     /// </summary>
     internal static class GameShaderPermutationLookup
     {
         // Three changes cover every fallback the skin sweep needs; each extra level multiplies the candidates by ~60.
         internal const int MaxChanges = 3;
+
+        private static readonly HashSet<string> KeptDefines = new(StringComparer.Ordinal)
+        {
+            "DISABLE_FOW", "DISABLE_SHADOWS", "NUM_BLEND_WEIGHTS", "LOW_QUALITY_MODE",
+            "FORCE_MANTIS_LIGHTING", "USE_DYNAMIC_LIGHTING", "GENERATE_SHADOW_MAP", "IS_AROUND_GAME"
+        };
+
+        internal sealed record PairMatch(int VertexIndex, int PixelIndex, Match Selection);
+
+        /// <summary>Finds one define list compiled in both stages; ties follow TOC declaration order, as in Hexshade.</summary>
+        internal static PairMatch FindPair(ShaderToc vertex, ShaderToc pixel,
+            IEnumerable<KeyValuePair<string, string>> defines, bool fallback = true, int maxChanges = MaxChanges)
+        {
+            var requested = new SortedDictionary<string, string>(StringComparer.Ordinal);
+            foreach (var define in defines) requested.TryAdd(define.Key, define.Value);
+            var vertexLookup = LookupFor(vertex);
+            var pixelLookup = LookupFor(pixel);
+
+            PairMatch Select(SortedDictionary<string, string> state, IReadOnlyList<Change> changes)
+            {
+                int vertexIndex = vertexLookup(state);
+                if (vertexIndex < 0) return null;
+                int pixelIndex = pixelLookup(state);
+                return pixelIndex < 0 ? null : new PairMatch(vertexIndex, pixelIndex,
+                    new Match(vertexIndex, state, changes));
+            }
+
+            PairMatch exact = Select(requested, Array.Empty<Change>());
+            if (exact != null || !fallback) return exact;
+
+            var moves = new List<Change>();
+            foreach (var group in vertex.BaseDefines.Concat(pixel.BaseDefines).GroupBy(d => d.Name, StringComparer.Ordinal))
+            {
+                if (KeptDefines.Contains(group.Key)) continue;
+                string[] values = group.Select(d => d.Value).Distinct(StringComparer.Ordinal).ToArray();
+                requested.TryGetValue(group.Key, out string current);
+                // An undeclared value does not contribute to either TOC's key.
+                if (!values.Contains(current, StringComparer.Ordinal)) current = null;
+                foreach (string value in values)
+                    if (value != current)
+                        moves.Add(new Change(group.Key, value, current == null ? ChangeKind.Add : ChangeKind.Change));
+                if (current != null) moves.Add(new Change(group.Key, null, ChangeKind.Drop));
+            }
+
+            var chosen = new List<Change>();
+            PairMatch SearchPair(int remaining, int start)
+            {
+                if (remaining == 0)
+                {
+                    var state = new SortedDictionary<string, string>(requested, StringComparer.Ordinal);
+                    foreach (Change move in chosen)
+                        if (move.Value == null) state.Remove(move.Name);
+                        else state[move.Name] = move.Value;
+                    return Select(state, chosen.ToArray());
+                }
+                for (int at = start; at < moves.Count; at++)
+                {
+                    if (chosen.Any(move => move.Name == moves[at].Name)) continue;
+                    chosen.Add(moves[at]);
+                    PairMatch found = SearchPair(remaining - 1, at + 1);
+                    chosen.RemoveAt(chosen.Count - 1);
+                    if (found != null) return found;
+                }
+                return null;
+            }
+            for (int changes = 1; changes <= maxChanges; changes++)
+            {
+                PairMatch found = SearchPair(changes, 0);
+                if (found != null) return found;
+            }
+            return null;
+        }
+
+        private static Func<SortedDictionary<string, string>, int> LookupFor(ShaderToc toc)
+        {
+            var indices = new Dictionary<ulong, int>();
+            for (int i = toc.ShaderHashes.Count - 1; i >= 0; i--) indices[toc.ShaderHashes[i]] = i;
+            var declared = new HashSet<uint>(toc.BaseDefines.Select(d => d.Hash));
+            return state =>
+            {
+                string key = string.Concat(state.Select(d => new ShaderMacroDefinition(d.Key, d.Value))
+                    .Where(d => declared.Contains(d.Hash)).Select(d => d.ToString()));
+                return indices.TryGetValue(XxHash64Ext.Hash(key), out int index) ? index : -1;
+            };
+        }
 
         internal sealed record Match(
             int Index,

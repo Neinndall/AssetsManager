@@ -62,7 +62,8 @@ internal sealed class VfxClipCatalog : IDisposable
                     parameterValues[0])
                 : null;
             IReadOnlyList<AnimationClipDefinition> playlist =
-                ResolvePlaylist(clip, graphClips, effectiveParameter, bundle.CharacterGearIndex);
+                AnimationGraphPlayback.ResolvePlaylist(clip, graphClips, effectiveParameter,
+                    bundle.CharacterGearIndex, path => resolve(path) != null);
             if (playlist.Count == 0) continue;
 
             string firstResolvedPath = null;
@@ -156,7 +157,8 @@ internal sealed class VfxClipCatalog : IDisposable
             bundle.Clips,
             bundle.OwnerSceneContext?.AnimationGraphPathHash ?? 0u);
         IReadOnlyList<AnimationClipDefinition> playlist =
-            ResolvePlaylist(item.Clip, graphClips, item.ParameterValue, bundle.CharacterGearIndex);
+            AnimationGraphPlayback.ResolvePlaylist(item.Clip, graphClips, item.ParameterValue,
+                bundle.CharacterGearIndex, path => resolve(path) != null);
         if (playlist.Count == 0)
             return null;
 

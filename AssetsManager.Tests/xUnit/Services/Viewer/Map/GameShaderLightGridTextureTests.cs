@@ -19,8 +19,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
 
             GameShaderLightGridTexture.Fill(cube, texels);
 
-            Assert.Equal(new[] { 1f, 0f, 0f, 1f }, texels[..4]);
-            Assert.Equal(new[] { 0f, 0.25f, 0f, 1f }, texels[20..24]);
+            Assert.Equal(new[] { MathF.PI, 0f, 0f, 1f }, texels[..4]);
+            Assert.Equal(new[] { 0f, MathF.PI * MathF.Pow(0.25f, 2.2f), 0f, 1f }, texels[20..24]);
             // Layer 6 is the sun visibility the PBR shaders multiply the direct light by.
             Assert.Equal(new[] { 1f, 1f, 1f, 1f }, texels[24..28]);
         }

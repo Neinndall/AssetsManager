@@ -15,7 +15,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
         // class hashes
         internal static readonly uint SystemClass  = VfxParsingHash.Fnv1a("VfxSystemDefinitionData");
         internal static readonly uint EmitterClass = VfxParsingHash.Fnv1a("VfxEmitterDefinitionData");
-        internal static readonly uint SkinCharacterDataPropertiesClass = VfxParsingHash.Fnv1a("SkinCharacterDataProperties");
 
         // system fields
         internal static readonly uint F_particleName = VfxParsingHash.Fnv1a("particleName");

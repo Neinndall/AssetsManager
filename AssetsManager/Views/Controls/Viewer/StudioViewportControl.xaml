@@ -528,6 +528,9 @@
                                                       IsChecked="{Binding PreviewWireOverlay, Mode=TwoWay}"
 
                                                       IsEnabled="{Binding CanPreviewWireOverlay}"/>
+                                            <CheckBox Content="Character outlines"
+                                                      Style="{StaticResource ModernCheckBox}"
+                                                      IsChecked="{Binding PreviewOutlines, Mode=TwoWay}"/>
 
                                         </StackPanel>
 

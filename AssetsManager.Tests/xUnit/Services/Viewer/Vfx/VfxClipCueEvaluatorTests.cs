@@ -10,6 +10,22 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx;
 public class VfxClipCueEvaluatorTests
 {
     [Theory]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    public void EndOfNoOpVisibilityEventPreservesTheOriginalStateDuringSeeking(bool initiallyHidden, bool show)
+    {
+        const uint mesh = 42;
+        var cues = new AnimationClipTimedCue[]
+        {
+            new AnimationSubmeshVisibilityCue(1, 2, show ? new[] { mesh } : Array.Empty<uint>(),
+                show ? Array.Empty<uint>() : new[] { mesh })
+        };
+        var timeline = VfxClipCueEvaluator.BuildVisibilityTimeline(cues, initiallyHidden ? new[] { mesh } : Array.Empty<uint>());
+        foreach (double time in new[] { 0d, 1d, 2d, 3d, 1.5d, 0d })
+            Assert.Equal(initiallyHidden, VfxClipCueEvaluator.HiddenSubmeshesAt(timeline, time).Contains(mesh));
+    }
+
+    [Theory]
     [InlineData(0.5, 0.5333333611488342)]
     [InlineData(6.133333683013916, 6.1666669845581055)]
     public void AdjacentVariantEventsKeepAuthoredTimesDuringForwardAndBackwardSeeking(double hideAt, double showAt)
@@ -107,7 +123,7 @@ public class VfxClipCueEvaluatorTests
     }
 
     [Fact]
-    public void BackwardVisibilityEndIsAppliedBeforeItsStartLikeLtkTimeline()
+    public void BackwardVisibilityEndCannotUndoAStartThatHasNotOccurred()
     {
         const uint mesh = 0x67;
         AnimationClipTimedCue[] cues =
@@ -118,7 +134,7 @@ public class VfxClipCueEvaluatorTests
         IReadOnlyList<VfxClipCueEvaluator.VisibilityEntry> timeline =
             VfxClipCueEvaluator.BuildVisibilityTimeline(cues, new[] { mesh });
 
-        Assert.DoesNotContain(mesh, VfxClipCueEvaluator.HiddenSubmeshesAt(timeline, 1.5d));
+        Assert.Contains(mesh, VfxClipCueEvaluator.HiddenSubmeshesAt(timeline, 1.5d));
         Assert.Contains(mesh, VfxClipCueEvaluator.HiddenSubmeshesAt(timeline, 2d));
     }
 

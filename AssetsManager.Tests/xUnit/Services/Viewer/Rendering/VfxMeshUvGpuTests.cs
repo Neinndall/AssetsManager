@@ -19,7 +19,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
         public static IEnumerable<object[]> UvCases()
         {
             foreach (VfxPrimitiveKind primitive in new[] { VfxPrimitiveKind.Mesh, VfxPrimitiveKind.AttachedMesh })
-            for (int mode = 0; mode < 4; mode++)
+            for (int mode = 0; mode < 6; mode++)
             foreach (bool mult in new[] { false, true })
             for (int flips = 0; flips < 4; flips++)
             foreach (bool perspective in new[] { false, true })
@@ -33,7 +33,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
             VfxPrimitiveKind primitive, int mode, bool mult, int flips, bool perspective, bool atlas)
         {
             string install = InstalledSkins.FindInstall();
-            if (install == null) return;
+            Assert.NotNull(install);
             using var context = new HiddenWglContext();
             using GL gl = GL.GetApi(context.GetProcAddress);
             using var renderer = new VfxOpenGlRenderer();
@@ -158,24 +158,27 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
         }
 
         [Theory]
-        [InlineData(null)]
-        [InlineData("vParticleUVTransform")]
-        [InlineData("vParticleUVTransformMult")]
-        public void CustomMeshAppliesItsUvTransformExactlyOnce(string member)
+        [InlineData(null, 0)]
+        [InlineData("vParticleUVTransform", 0)]
+        [InlineData("vParticleUVTransform", 1)]
+        [InlineData("vParticleUVTransformMult", 0)]
+        [InlineData("vParticleUVTransformMult", 1)]
+        public void CustomMeshAppliesItsUvTransformExactlyOnce(string member, int selector)
         {
             const string preamble = "#version 300 es\nprecision highp float;\nprecision highp int;\n";
             var blocks = member == null ? Array.Empty<GameShaderTranslator.UniformBlock>() :
-                new[] { new GameShaderTranslator.UniformBlock("TestUv", "TestUv_vs", 32,
-                    new[] { new GameShaderTranslator.BlockMember(member, 0, 32, true,
-                        GameShaderTranslator.MemberScalar.Float, 2, 4, 1, true) }) };
+                new[] { new GameShaderTranslator.UniformBlock("TestUv", "TestUv_vs", 48,
+                    new[] { new GameShaderTranslator.BlockMember(member, 0, 48, true,
+                        GameShaderTranslator.MemberScalar.Float, 3, 4, 1, true) }) };
             var vertexSidecar = new GameShaderTranslator.ShaderSidecar(blocks,
                 Array.Empty<GameShaderTranslator.TextureBinding>(), Array.Empty<GameShaderTranslator.AttributeBinding>());
             var pixelSidecar = vertexSidecar with { Blocks = Array.Empty<GameShaderTranslator.UniformBlock>() };
             string vertex = preamble + "in vec3 a_POSITION;\nin vec4 a_TEXCOORD;\nout vec2 uv;\n" +
-                (member == null ? string.Empty : "layout(std140) uniform TestUv_vs { vec4 m[2]; } TestUv_i;\n") +
+                (member == null ? string.Empty : "layout(std140) uniform TestUv_vs { vec4 m[3]; } TestUv_i;\n") +
                 "void main(){ gl_Position = vec4(a_POSITION, 1.0); uv = " +
                 (member == null ? "a_TEXCOORD.xy" :
-                    "vec2(dot(TestUv_i.m[0].xyz, vec3(a_TEXCOORD.xy, 1.0)), dot(TestUv_i.m[1].xyz, vec3(a_TEXCOORD.xy, 1.0)))") + "; }\n";
+                    "vec2(dot(TestUv_i.m[0].xyz, vec3(TestUv_i.m[2].z == 0.0 ? a_TEXCOORD.xy : a_POSITION.xz, 1.0)), " +
+                    "dot(TestUv_i.m[1].xyz, vec3(TestUv_i.m[2].z == 0.0 ? a_TEXCOORD.xy : a_POSITION.xz, 1.0)))") + "; }\n";
             string pixel = preamble + "in vec2 uv;\nout vec4 color;\nvoid main(){ color = vec4(uv, 0.0, 1.0); }\n";
             GameShaderTranslator.TranslatedStage Stage(string source, GameShaderTranslator.ShaderSidecar sidecar) =>
                 new(source, sidecar, Array.Empty<GameShaderTranslator.AppliedPatch>(),
@@ -189,6 +192,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
             uint framebuffer = gl.GenFramebuffer();
             uint vao = gl.GenVertexArray();
             uint buffer = gl.GenBuffer();
+            uint selectors = gl.GenBuffer();
             try
             {
                 gl.BindFramebuffer(FramebufferTarget.Framebuffer, framebuffer);
@@ -205,6 +209,16 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
                 gl.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, 5 * sizeof(float), IntPtr.Zero);
                 gl.VertexAttribPointer(1, 2, VertexAttribPointerType.Float, false, 5 * sizeof(float), new IntPtr(3 * sizeof(float)));
                 gl.UseProgram(program);
+                if (member != null)
+                {
+                    // The third row belongs to the bound program, beyond the two affine rows.
+                    var data = new float[12];
+                    data[10] = selector;
+                    gl.BindBuffer(BufferTargetARB.UniformBuffer, selectors);
+                    gl.BufferData(BufferTargetARB.UniformBuffer, new ReadOnlySpan<float>(data), BufferUsageARB.StaticDraw);
+                    gl.UniformBlockBinding(program, gl.GetUniformBlockIndex(program, "TestUv_vs"), 0);
+                    gl.BindBufferBase(BufferTargetARB.UniformBuffer, 0, selectors);
+                }
                 gl.Uniform3(gl.GetUniformLocation(program, "uScale"), 1f, 1f, 1f);
                 gl.Uniform3(gl.GetUniformLocation(program, "uPlacementRight"), 1f, 0f, 0f);
                 gl.Uniform3(gl.GetUniformLocation(program, "uPlacementUp"), 0f, 1f, 0f);
@@ -224,7 +238,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
                 gl.DrawArrays(PrimitiveType.Triangles, 0, 3);
                 var result = new byte[4];
                 gl.ReadPixels(32, 32, 1, 1, PixelFormat.Rgba, PixelType.UnsignedByte, result.AsSpan());
-                var raw = new Vector2(0.5f + (1f / 64) / 1.5f);
+                var raw = selector == 0 ? new Vector2(0.5f + (1f / 64) / 1.5f) : new Vector2(1f / 64, 0.2f);
                 Vector2 expected = Turn((raw - new Vector2(0.23f, 0.61f)) * new Vector2(0.6f, 0.8f), 0.3f) +
                     new Vector2(0.23f, 0.61f) + new Vector2(0.18f, 0.12f);
                 Assert.InRange(Math.Abs(result[0] - expected.X * 255), 0, 2);
@@ -238,6 +252,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
                 gl.DeleteFramebuffer(framebuffer);
                 gl.DeleteTexture(target);
                 gl.DeleteBuffer(buffer);
+                gl.DeleteBuffer(selectors);
                 gl.DeleteVertexArray(vao);
                 gl.DeleteProgram(program);
             }

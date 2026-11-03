@@ -1,12 +1,14 @@
 using AssetsManager.Services.Viewer.Resources;
 using System;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.IO;
 using System.Linq;
 using System.Windows.Media.Imaging;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Viewer.Vfx.Semantics;
 using AssetsManager.Utils;
+using AssetsManager.Views.Models.Viewer;
 
 namespace AssetsManager.Services.Viewer.Vfx.Resources
 {
@@ -19,20 +21,34 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
         private static readonly string[] BinExtensions = { ".bin" };
 
         private readonly Dictionary<string, ProjectResourceIndex> _indexes = new(StringComparer.OrdinalIgnoreCase);
-        private readonly Dictionary<string, BitmapSource> _textures = new(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> _missingTextures = new(StringComparer.OrdinalIgnoreCase);
-        private readonly Dictionary<string, CubeMapData> _cubeMaps = new(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> _missingCubeMaps = new(StringComparer.OrdinalIgnoreCase);
+        private readonly ConcurrentDictionary<string, (MapResolvedAssetCacheKey Copy, MapResolvedAssetCacheKey Source)> _materializedSources =
+            new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, VfxMeshData?> _meshes =
             new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, VfxAnimatedMesh> _meshAnimations =
             new(StringComparer.OrdinalIgnoreCase);
 
+        internal void RegisterMaterializedSource(string path, MapResolvedAssetCacheKey source)
+        {
+            _materializedSources[Path.GetFullPath(path)] = (PhysicalIdentity(path), source);
+        }
+
+        private MapResolvedAssetCacheKey SourceIdentity(string path)
+        {
+            MapResolvedAssetCacheKey physical = PhysicalIdentity(path);
+            return _materializedSources.TryGetValue(Path.GetFullPath(path), out var origin) && origin.Copy == physical
+                ? origin.Source : physical;
+        }
+
+        private static MapResolvedAssetCacheKey PhysicalIdentity(string path)
+            => MapResolvedAssetCacheKey.From(MapResolvedAsset.FromPhysical(path, path, MapAssetOrigin.SelectedFile));
+
         public BitmapSource ResolveTexture(string authoredPath, string searchDirectory)
         {
             if (string.IsNullOrWhiteSpace(authoredPath) || string.IsNullOrWhiteSpace(searchDirectory)) return null;
             string key = CreateKey(authoredPath, searchDirectory);
-            if (_textures.TryGetValue(key, out BitmapSource cached)) return cached;
             if (_missingTextures.Contains(key)) return null;
 
             string resolvedPath = ResolvePath(authoredPath, searchDirectory, TextureExtensions);
@@ -41,23 +57,21 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
             {
                 try
                 {
-                    texture = TextureUtils.LoadTextureFromFile(resolvedPath);
+                    texture = ViewerTextureLoadingCache.LoadFile(resolvedPath, sourceIdentity: SourceIdentity(resolvedPath));
                 }
                 catch
                 {
-                    // LTK treats a texture decode failure as one missing sampler. Keep the
-                    // rest of the effect alive and remember the failed lookup for this resolver.
+                    // A failed sampler must not prevent the remaining effect from loading.
                     texture = null;
                 }
             }
             if (texture == null)
             {
-                _missingTextures.Add(key);
+                if (resolvedPath == null) _missingTextures.Add(key);
                 return null;
             }
 
             if (texture.CanFreeze) texture.Freeze();
-            _textures[key] = texture;
             return texture;
         }
 
@@ -65,8 +79,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
         {
             if (string.IsNullOrWhiteSpace(authoredPath) || string.IsNullOrWhiteSpace(searchDirectory)) return null;
             string key = CreateKey(authoredPath, searchDirectory);
-            if (_cubeMaps.TryGetValue(key, out var cube)) return cube;
-            if (_textures.TryGetValue(key, out var texture)) return texture;
             if (_missingTextures.Contains(key)) return null;
             string resolved = ResolvePath(authoredPath, searchDirectory, TextureExtensions);
             return resolved != null && CubeMapDecoder.HasCubeHeader(resolved)
@@ -78,18 +90,18 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
         {
             if (string.IsNullOrWhiteSpace(authoredPath) || string.IsNullOrWhiteSpace(searchDirectory)) return null;
             string key = CreateKey(authoredPath, searchDirectory);
-            if (_cubeMaps.TryGetValue(key, out CubeMapData cached)) return cached;
             if (_missingCubeMaps.Contains(key)) return null;
 
             string resolvedPath = ResolvePath(authoredPath, searchDirectory, TextureExtensions);
-            CubeMapData cube = resolvedPath == null ? null : CubeMapDecoder.Decode(resolvedPath);
+            CubeMapData cube = resolvedPath == null ? null : ViewerDecodedResourceCache<CubeMapData>.Shared.Get(
+                new ViewerDecodeKey(SourceIdentity(resolvedPath), "cube"),
+                () => CubeMapDecoder.Decode(resolvedPath), value => checked((long)value.Width * value.Height * 4 * 6));
             if (cube?.IsValid != true)
             {
-                _missingCubeMaps.Add(key);
+                if (resolvedPath == null) _missingCubeMaps.Add(key);
                 return null;
             }
 
-            _cubeMaps[key] = cube;
             return cube;
         }
 
@@ -314,9 +326,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
             foreach (VfxAnimatedMesh animation in _meshAnimations.Values)
                 animation?.Dispose();
             _indexes.Clear();
-            _textures.Clear();
+            _materializedSources.Clear();
             _missingTextures.Clear();
-            _cubeMaps.Clear();
             _missingCubeMaps.Clear();
             _meshes.Clear();
             _meshAnimations.Clear();

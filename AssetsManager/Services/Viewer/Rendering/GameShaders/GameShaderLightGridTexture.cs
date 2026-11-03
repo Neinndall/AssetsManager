@@ -65,9 +65,9 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             for (int face = 0; face < 6; face++)
             {
                 Vector3 color = face < cube.Length ? cube[face] : Vector3.Zero;
-                texels[face * 4] = color.X;
-                texels[face * 4 + 1] = color.Y;
-                texels[face * 4 + 2] = color.Z;
+                texels[face * 4] = MathF.PI * MathF.Pow(Math.Clamp(color.X, 0f, 1f), 2.2f);
+                texels[face * 4 + 1] = MathF.PI * MathF.Pow(Math.Clamp(color.Y, 0f, 1f), 2.2f);
+                texels[face * 4 + 2] = MathF.PI * MathF.Pow(Math.Clamp(color.Z, 0f, 1f), 2.2f);
                 texels[face * 4 + 3] = 1f;
             }
             texels[24] = texels[25] = texels[26] = texels[27] = 1f;
