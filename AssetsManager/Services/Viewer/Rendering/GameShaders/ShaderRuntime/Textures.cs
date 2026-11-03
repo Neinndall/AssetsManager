@@ -137,7 +137,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                 {
                     texture = screen;
                     target = TextureTarget.Texture2D;
-                    samplerObject = ResolveNeutralSampler(clamp: true);
+                    samplerObject = ResolveNeutralSampler(clamp: true, nearest: name == SceneDepthTexture);
                 }
                 else if (name == EnvironmentCubeTexture &&
                          sampler.Dimension == GameShaderTranslator.TextureDimension.Cube &&
@@ -306,26 +306,28 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
 
         private uint ResolveNeutralSampler(
             bool clamp,
-            GameShaderTranslator.TextureDimension dimension = GameShaderTranslator.TextureDimension.Texture2D)
+            GameShaderTranslator.TextureDimension dimension = GameShaderTranslator.TextureDimension.Texture2D,
+            bool nearest = false)
         {
             bool integerBuffer = RequiresIntegerNeutral(dimension);
+            bool point = integerBuffer || nearest;
             var key = (
                 clamp ? MapTextureWrap.Clamp : MapTextureWrap.Repeat,
                 clamp ? MapTextureWrap.Clamp : MapTextureWrap.Repeat,
-                !integerBuffer,
-                !integerBuffer,
-                integerBuffer ? "neutral-buffer" : "neutral-no-mip");
+                !point,
+                !point,
+                integerBuffer ? "neutral-buffer" : nearest ? "neutral-point-no-mip" : "neutral-no-mip");
             if (_samplers.TryGetValue(key, out uint sampler))
                 return sampler;
             sampler = _gl.GenSampler();
             _gl.SamplerParameter(
                 sampler,
                 SamplerParameterI.MinFilter,
-                (int)(integerBuffer ? TextureMinFilter.Nearest : TextureMinFilter.Linear));
+                (int)(point ? TextureMinFilter.Nearest : TextureMinFilter.Linear));
             _gl.SamplerParameter(
                 sampler,
                 SamplerParameterI.MagFilter,
-                (int)(integerBuffer ? TextureMagFilter.Nearest : TextureMagFilter.Linear));
+                (int)(point ? TextureMagFilter.Nearest : TextureMagFilter.Linear));
             _gl.SamplerParameter(sampler, SamplerParameterI.WrapS, (int)(clamp ? TextureWrapMode.ClampToEdge : TextureWrapMode.Repeat));
             _gl.SamplerParameter(sampler, SamplerParameterI.WrapT, (int)(clamp ? TextureWrapMode.ClampToEdge : TextureWrapMode.Repeat));
             _samplers[key] = sampler;

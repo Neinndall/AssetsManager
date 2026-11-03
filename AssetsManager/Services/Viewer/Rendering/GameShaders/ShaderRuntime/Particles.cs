@@ -115,7 +115,10 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                 // VFX decoded textures carry one level, as in LTK's useVfxTextures.
                 int mode = GameParticleProgramResolver.TextureAddressMode(emitter, own);
                 uint samplerObject;
-                if (sampler.Dimension == GameShaderTranslator.TextureDimension.Buffer)
+                // The shared depth capture keeps point sampling; emitter samplers must not interpolate geometry depths.
+                if (sampler.TextureName == SceneDepthTexture && sampler.Dimension == GameShaderTranslator.TextureDimension.Texture2D)
+                    samplerObject = ResolveNeutralSampler(clamp: true, nearest: true);
+                else if (sampler.Dimension == GameShaderTranslator.TextureDimension.Buffer)
                     samplerObject = ResolveNeutralSampler(true, sampler.Dimension);
                 else if (emitter.HasResolvedCustomMaterial && declared?.Sampler != null)
                     samplerObject = ResolveParticleSampler(declared.Sampler);
