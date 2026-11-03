@@ -74,6 +74,7 @@ internal static class GameOriginDiagnostic
         var directories = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
         var virtualSprites = new Dictionary<ulong, HashSet<string>>();
         var atlasDirectories = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+        bool inspectAllAtlases = args.Contains("--all-atlases", StringComparer.Ordinal);
         foreach (string file in wads)
         {
             using var wad = new WadFile(file);
@@ -83,6 +84,27 @@ internal static class GameOriginDiagnostic
             {
                 if (chunk.Compression == WadChunkCompression.Satellite) continue;
                 if (pending.Contains(hash)) physical.TryAdd(hash, (file, chunk.Checksum, chunk.UncompressedSize));
+                if (inspectAllAtlases && chunk.UncompressedSize is >= 24 and <= 32_768)
+                {
+                    using var atlasData = wad.LoadChunkDecompressed(chunk);
+                    if (ImageAutoAtlas.IsAtlas(atlasData.Span) &&
+                        ImageAutoAtlas.TryRead(atlasData.Span.ToArray(), out var discoveredAtlas))
+                    {
+                        string source = catalog.GetValueOrDefault(hash, hash.ToString("x16"));
+                        var spriteFolders = discoveredAtlas.Sprites
+                            .Select(sprite => catalog.GetValueOrDefault(sprite.SpriteHash))
+                            .Where(path => path != null && path.Contains('/'))
+                            .Select(path => path[..path.LastIndexOf('/')])
+                            .ToHashSet(StringComparer.Ordinal);
+                        atlasDirectories[source] = spriteFolders;
+                        foreach (var sprite in discoveredAtlas.Sprites.Where(sprite => pending.Contains(sprite.SpriteHash)))
+                        {
+                            if (!virtualSprites.TryGetValue(sprite.SpriteHash, out var sources))
+                                virtualSprites[sprite.SpriteHash] = sources = new(StringComparer.Ordinal);
+                            sources.Add(source);
+                        }
+                    }
+                }
                 if (!catalog.TryGetValue(hash, out string path)) continue;
                 int slash = path.LastIndexOf('/');
                 if (slash >= 0) dirs.Add(path[..slash]);
@@ -91,7 +113,7 @@ internal static class GameOriginDiagnostic
                     if (!copies.TryGetValue(chunk.Checksum, out var names)) copies[chunk.Checksum] = names = new(StringComparer.Ordinal);
                     names.Add(path);
                 }
-                if (!path.EndsWith("atlas_info.bin", StringComparison.OrdinalIgnoreCase)) continue;
+                if (inspectAllAtlases || !path.EndsWith("atlas_info.bin", StringComparison.OrdinalIgnoreCase)) continue;
                 using var data = wad.LoadChunkDecompressed(chunk);
                 if (!ImageAutoAtlas.TryRead(data.Span.ToArray(), out var atlas)) continue;
                 var spriteDirs = new HashSet<string>(StringComparer.Ordinal);

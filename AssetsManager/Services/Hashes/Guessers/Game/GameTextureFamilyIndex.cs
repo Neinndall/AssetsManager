@@ -23,6 +23,10 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
         private readonly string[] _suffixes;
         private readonly string[] _allPrefixes;
         private readonly (string Prefix, string Extension)[] _particleTemplates;
+        private readonly string[] _particleModelTextureCandidates;
+        private readonly string[] _companionMaterialCandidates;
+        private readonly string[] _companionVariantPrefixes;
+        private readonly string[] _companionVariantStateSuffixes;
         private readonly ConditionalWeakTable<HashGuessEngine, ConcurrentDictionary<string, byte>> _scanned = new();
 
         internal GameTextureFamilyIndex(IEnumerable<string> paths, CancellationToken cancellationToken)
@@ -30,10 +34,56 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             var frequencies = new Dictionary<string, int>(StringComparer.Ordinal);
             var additionalFrequencies = new Dictionary<string, int>(StringComparer.Ordinal);
             var particleTemplates = new HashSet<(string Prefix, string Extension)>();
+            var particleTextures = new List<string>();
+            var particleModels = new List<string>();
+            var companionRoleSources = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+            var companionMaterialPrefixes = new HashSet<string>(StringComparer.Ordinal);
+            var particleModifiers = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+            var standaloneModifiers = new HashSet<string>(StringComparer.Ordinal);
+            var companionVariantPrefixes = new HashSet<string>(StringComparer.Ordinal);
             foreach (string value in paths)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 string path = PathUtils.NormalizePath(value);
+                if (path.StartsWith("assets/characters/", StringComparison.Ordinal) &&
+                    path.Contains("/particles/", StringComparison.Ordinal))
+                {
+                    if (path.EndsWith(".skl", StringComparison.Ordinal)) particleModels.Add(path[..^4]);
+                    else if (path.EndsWith(".tex", StringComparison.Ordinal) || path.EndsWith(".dds", StringComparison.Ordinal))
+                    {
+                        particleTextures.Add(path);
+                        if (path.EndsWith(".tex", StringComparison.Ordinal) &&
+                            TryGetParticleModifier(path, out string character, out string modifier, out bool standalone))
+                        {
+                            if (!particleModifiers.TryGetValue(modifier, out var characters))
+                                particleModifiers[modifier] = characters = new HashSet<string>(StringComparer.Ordinal);
+                            characters.Add(character);
+                            if (standalone) standaloneModifiers.Add(modifier);
+                        }
+                    }
+                }
+                if (TryGetClassicCompanionTexture(path, out string classicPrefix, out string role))
+                {
+                    if (role.Length is >= 2 and <= 32 && !role.Contains('_'))
+                    {
+                        if (!companionRoleSources.TryGetValue(role, out var sources))
+                            companionRoleSources[role] = sources = new HashSet<string>(StringComparer.Ordinal);
+                        sources.Add(path);
+                    }
+                    if (path.EndsWith("_material_tx_cm.tex", StringComparison.Ordinal) && classicPrefix != null)
+                        companionMaterialPrefixes.Add(classicPrefix);
+                }
+                if (path.StartsWith("assets/characters/", StringComparison.Ordinal) && path.EndsWith(".tex", StringComparison.Ordinal))
+                {
+                    if (path.Contains("/themes/", StringComparison.Ordinal) &&
+                        path.EndsWith("_tx_cm.tex", StringComparison.Ordinal))
+                    {
+                        int roleEnd = path.Length - "_tx_cm.tex".Length;
+                        int roleStart = path.LastIndexOf('_', roleEnd - 1);
+                        if (roleStart > path.LastIndexOf('/') && IsVariantPrefix(path.AsSpan(0, roleStart + 1)))
+                            companionVariantPrefixes.Add(path[..(roleStart + 1)]);
+                    }
+                }
                 if ((path.StartsWith("assets/characters/", StringComparison.Ordinal) && path.Contains("/particles/", StringComparison.Ordinal) ||
                      path.StartsWith("assets/maps/particles/", StringComparison.Ordinal)) &&
                     (path.EndsWith(".tex", StringComparison.Ordinal) || path.EndsWith(".dds", StringComparison.Ordinal)))
@@ -95,6 +145,121 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             _allPrefixes = allPrefixes.OrderBy(value => value, StringComparer.Ordinal).ToArray();
             _particleTemplates = particleTemplates.OrderBy(value => value.Prefix, StringComparer.Ordinal)
                 .ThenBy(value => value.Extension, StringComparer.Ordinal).ToArray();
+
+            // Build only the prefixes implied by skeleton models, then corroborate them with
+            // already named, numbered textures from the same particle directory.
+            var stemsByRequiredPrefix = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+            foreach (string model in particleModels)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                int filenameStart = model.LastIndexOf('/') + 1;
+                for (int separator = model.IndexOf('_', filenameStart); separator >= 0;
+                     separator = model.IndexOf('_', separator + 1))
+                {
+                    string joined = string.Concat(model.AsSpan(0, separator), model.AsSpan(separator + 1));
+                    int stemEnd = joined.LastIndexOf('_');
+                    if (stemEnd < filenameStart) continue;
+                    string requiredPrefix = joined[..(stemEnd + 1)];
+                    if (!stemsByRequiredPrefix.TryGetValue(requiredPrefix, out var stems))
+                        stemsByRequiredPrefix[requiredPrefix] = stems = new HashSet<string>(StringComparer.Ordinal);
+                    stems.Add(joined);
+                }
+            }
+            var modelCandidates = new HashSet<string>(StringComparer.Ordinal);
+            foreach (string texture in particleTextures)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                int stemEnd = texture.Length - 4, numberStart = stemEnd;
+                while (numberStart > texture.LastIndexOf('/') + 1 && char.IsAsciiDigit(texture[numberStart - 1])) numberStart--;
+                if (stemEnd - numberStart is < 1 or > 3) continue;
+                int separator = texture.LastIndexOf('_', numberStart - 1);
+                if (separator <= texture.LastIndexOf('/')) continue;
+                if (!stemsByRequiredPrefix.TryGetValue(texture[..(separator + 1)], out var stems)) continue;
+                foreach (string joined in stems)
+                    modelCandidates.Add(joined + texture[numberStart..]);
+            }
+            _particleModelTextureCandidates = modelCandidates.OrderBy(value => value, StringComparer.Ordinal).ToArray();
+
+            var materialCandidates = new HashSet<string>(StringComparer.Ordinal);
+            var supportedRoles = companionRoleSources.Where(pair => pair.Value.Count >= 2)
+                .Select(pair => pair.Key).OrderBy(value => value, StringComparer.Ordinal).ToArray();
+            foreach (string prefix in companionMaterialPrefixes)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                foreach (string role in supportedRoles)
+                    materialCandidates.Add(prefix + role + "_material_tx_cm.tex");
+            }
+            _companionMaterialCandidates = materialCandidates.OrderBy(value => value, StringComparer.Ordinal).ToArray();
+
+            // Repeated leading particle modifiers from different characters can describe a companion variant.
+            _companionVariantStateSuffixes = particleModifiers
+                .Where(pair => pair.Value.Count >= 2 && standaloneModifiers.Contains(pair.Key))
+                .OrderBy(pair => pair.Key, StringComparer.Ordinal)
+                .Select(pair => pair.Key + "_tx_cm.tex").ToArray();
+            _companionVariantPrefixes = companionVariantPrefixes.OrderBy(value => value, StringComparer.Ordinal).ToArray();
+        }
+
+        private static bool TryGetParticleModifier(string path, out string character, out string modifier, out bool standalone)
+        {
+            character = modifier = null;
+            standalone = false;
+            const string characterRoot = "assets/characters/";
+            int characterEnd = path.IndexOf('/', characterRoot.Length);
+            if (characterEnd <= characterRoot.Length) return false;
+            character = path[characterRoot.Length..characterEnd];
+
+            int start = path.LastIndexOf('/') + 1, end = path.Length - 4;
+            int firstEnd = path.IndexOf('_', start);
+            if (firstEnd < 0 || firstEnd > end) firstEnd = end;
+            bool hasCharacterPrefix = path.AsSpan(start, firstEnd - start).Equals(character, StringComparison.Ordinal);
+            if (hasCharacterPrefix)
+            {
+                start = firstEnd + 1;
+                if (start >= end) return false;
+            }
+            int modifierEnd = path.IndexOf('_', start);
+            if (modifierEnd < 0 || modifierEnd > end) modifierEnd = end;
+            ReadOnlySpan<char> word = path.AsSpan(start, modifierEnd - start);
+            if (word.Length is < 5 or > 18) return false;
+            foreach (char letter in word)
+                if (!char.IsAsciiLetterLower(letter)) return false;
+            modifier = word.ToString();
+            standalone = !hasCharacterPrefix;
+            return true;
+        }
+
+        private static bool IsVariantPrefix(ReadOnlySpan<char> prefix)
+        {
+            int marker = prefix.LastIndexOf("_variant", StringComparison.Ordinal);
+            if (marker < 0) return false;
+            ReadOnlySpan<char> variant = prefix[(marker + "_variant".Length)..];
+            if (variant.Length < 2 || variant[^1] != '_') return false;
+            foreach (char digit in variant[..^1])
+                if (!char.IsAsciiDigit(digit)) return false;
+            return true;
+        }
+
+        private static bool TryGetClassicCompanionTexture(string path, out string classicPrefix, out string role)
+        {
+            classicPrefix = role = null;
+            const string characterRoot = "assets/characters/";
+            if (!path.StartsWith(characterRoot, StringComparison.Ordinal) ||
+                !path.EndsWith(".tex", StringComparison.Ordinal) ||
+                !path.Contains("/themes/base/", StringComparison.Ordinal)) return false;
+
+            int characterEnd = path.IndexOf('/', characterRoot.Length);
+            if (characterEnd <= characterRoot.Length) return false;
+            int roleStart = path.IndexOf("_base_classic_", characterEnd, StringComparison.Ordinal);
+            if (roleStart < 0) return false;
+            roleStart += "_base_classic_".Length;
+            int end = path.Length - "_tx_cm.tex".Length;
+            if (!path.EndsWith("_tx_cm.tex", StringComparison.Ordinal) || end <= roleStart) return false;
+            string name = path[roleStart..end];
+            if (name.EndsWith("_mask", StringComparison.Ordinal)) name = name[..^5];
+            if (name.EndsWith("_material", StringComparison.Ordinal)) name = name[..^9];
+            classicPrefix = path[..roleStart];
+            role = name;
+            return true;
         }
 
         internal static bool HasUnresolvedContext(HashGuessEngine engine, BinTree tree, CancellationToken cancellationToken)
@@ -228,6 +393,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
 
             byte[][] prefixBytes = Array.ConvertAll(_allPrefixes, Encode);
             byte[][] suffixBytes = Array.ConvertAll(_suffixes, Encode);
+            bool checkedLearnedPatterns = false;
             for (int suffixOffset = 0; suffixOffset < _suffixes.Length; suffixOffset += suffixBatchSize)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -255,10 +421,41 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                     }
                     if (engine.RemainingUnknownCount == 0 || checkedCandidates >= candidateBudget) break;
                 }
+                // Keep the most frequent legacy suffix batch ahead of new hypotheses.
+                if (suffixOffset == 0)
+                {
+                    checkedLearnedPatterns = true;
+                    if (!CheckLearnedPatterns()) break;
+                }
             }
+
+            if (!checkedLearnedPatterns) CheckLearnedPatterns();
 
             progress?.Invoke(checkedCandidates);
             return checkedCandidates;
+
+            bool CheckLearnedPatterns()
+            {
+                foreach (string candidate in _particleModelTextureCandidates.Concat(_companionMaterialCandidates))
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (engine.RemainingUnknownCount == 0 || checkedCandidates >= candidateBudget) return false;
+                    engine.Check(candidate, HashGuessStrategy.WordlistVariant, "GAME Custom: texture build-list");
+                    checkedCandidates++;
+                    if ((checkedCandidates & 0x3fff) == 0) progress?.Invoke(checkedCandidates);
+                }
+                foreach (string prefix in _companionVariantPrefixes)
+                foreach (string suffix in _companionVariantStateSuffixes)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (engine.RemainingUnknownCount == 0 || checkedCandidates >= candidateBudget) return false;
+                    engine.CheckPrefixSuffix(prefix, suffix, HashGuessStrategy.WordlistVariant,
+                        "GAME Custom: texture build-list");
+                    checkedCandidates++;
+                    if ((checkedCandidates & 0x3fff) == 0) progress?.Invoke(checkedCandidates);
+                }
+                return true;
+            }
 
             byte[] Encode(string value)
             {

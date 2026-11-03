@@ -1,15 +1,27 @@
-AssetsManager - League of Legends | v4.1.0.7
+AssetsManager - League of Legends | v4.1.0.8
 
 HOTFIX UPDATE
 
 New Features
 
 Improvements
+  - Hash Guessing Lab / Improve GAME Custom Texture Build List with model-driven particle names, observed numeric suffixes, shared companion material roles, and cross-character variant modifiers; verify 3 unknown hashes while reducing memory use and preserving existing search priority.
+
+Changes
+
+Bug Fixes
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+AssetsManager - League of Legends | v4.1.0.7
+
+HOTFIX UPDATE
+This hotfix update focuses entirely on refining 3D Studio, optimizing texture management to speed up model and effect switching, enhancing visual fidelity across PBR lighting and anti-aliasing pipelines, and resolving critical issues with VFX shaders, animation playback, submesh visibility, and Teamfight Tactics (TFT) skin previews.
+
+Improvements
   - 3D Studio / Reuse unchanged textures when switching models and effects to reduce repeated loading.
   - 3D Studio / Improve PBR skin lighting, wireframe clarity, and edge smoothing while retaining FXAA and SMAA.
   - 3D Studio / Toggle character outlines independently for models and characters placed on maps.
-
-Changes
 
 Bug Fixes
   - 3D Studio / Correct scene-depth sampling in game shaders while preserving smooth sampling of scene color.
