@@ -112,7 +112,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _particleParameters.Clear();
             VfxShaderParameterUtils.PopulateNativeParameters(_particleParameters, emitter.Def, phase, AlignSurfaceEffects);
             var frame = _gameFrame with { TimeSeconds = emitter.RenderTime };
-            _gameShaders.BindParticle(emitter.Def, mesh, pass, frame, _particleParameters, name => ParticleTexture(emitter, name));
+            _gameShaders.BindParticle(emitter.Def, mesh, pass, frame, _particleParameters,
+                name => ParticleTexture(emitter, name), _textures.Targets);
             // LTK quad/ribbon preludes draw in WORLD; mesh preludes draw in mirrored ENGINE_WORLD.
             bool mirrored = mesh && (emitter.Def.PrimitiveKind != VfxPrimitiveKind.AttachedMesh ||
                 _ownerWorldTransform.GetDeterminant() < 0f);
@@ -131,7 +132,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             "sAlphaErosionTexture" => emitter.ErosionTexture != 0 ? emitter.ErosionTexture :
                 !string.IsNullOrWhiteSpace(emitter.Def.AlphaErosion?.TexturePath) ? _textures.FallbackTransparentTexture : null,
             "NORMAL_MAP" => emitter.DistortionTexture != 0 ? emitter.DistortionTexture : _textures.FallbackTransparentTexture,
-            "REFLECTION_MAP_TX" => emitter.ReflectionTexture != 0 ? emitter.ReflectionTexture : null,
+            "REFLECTION_MAP" or "REFLECTION_MAP_TX" => emitter.ReflectionTexture != 0 ? emitter.ReflectionTexture : null,
             "sDepthTexture_SharedTexture" => _capture.DepthTexture != 0 ? _capture.DepthTexture : null,
             "SAMPLER_BACK_BUFFER_COPY_SharedTexture" => _capture.ColorTexture != 0 ? _capture.ColorTexture : null,
             _ => emitter.ProgramTextures.TryGetValue(name, out uint texture) && texture != 0 ? texture : null

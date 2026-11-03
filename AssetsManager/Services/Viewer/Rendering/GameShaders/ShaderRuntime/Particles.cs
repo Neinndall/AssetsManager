@@ -78,7 +78,8 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
         }
 
         internal void BindParticle(VfxEmitterDefinition emitter, bool mesh, int index, in Frame frame,
-            IReadOnlyDictionary<string, Vector4> parameters, Func<string, uint?> textures)
+            IReadOnlyDictionary<string, Vector4> parameters, Func<string, uint?> textures,
+            IReadOnlyDictionary<uint, TextureTarget> textureTargets = null)
         {
             var entry = ParticleEntry(emitter, mesh).Cache.Passes[index];
             UpdateBlocks(entry.Program, entry.Globals, null, frame, null, emitter, parameters);
@@ -96,6 +97,10 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                     GameShaderTranslator.TextureDimension.Texture2DArray or GameShaderTranslator.TextureDimension.CubeArray => TextureTarget.Texture2DArray,
                     _ => TextureTarget.Texture2D
                 };
+                // Binding an existing texture under another target fails and leaves the previous draw's binding active.
+                if (texture.HasValue && textureTargets != null &&
+                    textureTargets.TryGetValue(texture.Value, out TextureTarget actual) && actual != target)
+                    texture = null;
                 if (!texture.HasValue || texture.Value == 0)
                 {
                     if (!emitter.HasResolvedCustomMaterial && sampler.Dimension == GameShaderTranslator.TextureDimension.Texture2D &&

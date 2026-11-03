@@ -18,7 +18,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
     internal sealed class VfxTextureResourceCache : IDisposable
     {
         private readonly GL _gl;
-        private readonly HashSet<uint> _ownedTextures = new();
+        private readonly Dictionary<uint, TextureTarget> _ownedTextures = new();
         private readonly GlRetainedTextureCache<object> _retained;
 
         internal VfxTextureResourceCache(GL gl)
@@ -26,10 +26,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _gl = gl;
             _retained = new(id => { _gl.DeleteTexture(id); _ownedTextures.Remove(id); });
             FallbackTransparentTexture = CreateFallbackTexture();
-            _ownedTextures.Add(FallbackTransparentTexture);
+            _ownedTextures.Add(FallbackTransparentTexture, TextureTarget.Texture2D);
         }
 
         internal uint FallbackTransparentTexture { get; }
+
+        internal IReadOnlyDictionary<uint, TextureTarget> Targets => _ownedTextures;
 
         internal bool TryGet(object resource, out uint texture) => _retained.TryGet(resource, out texture);
 
@@ -58,7 +60,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);
             _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.ClampToEdge);
             _gl.BindTexture(TextureTarget.Texture2D, 0);
-            _ownedTextures.Add(texture);
+            _ownedTextures.Add(texture, TextureTarget.Texture2D);
             return texture;
         }
 
@@ -66,27 +68,27 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         {
             uint texture = GlCubeMapUploader.Upload(_gl, cube, srgb: false);
             if (texture != 0)
-                _ownedTextures.Add(texture);
+                _ownedTextures.Add(texture, TextureTarget.TextureCubeMap);
             return texture;
         }
 
         internal void Clear()
         {
             _retained.Dispose();
-            foreach (uint texture in _ownedTextures)
+            foreach (uint texture in _ownedTextures.Keys)
             {
                 if (texture != FallbackTransparentTexture)
                     _gl.DeleteTexture(texture);
             }
 
             _ownedTextures.Clear();
-            _ownedTextures.Add(FallbackTransparentTexture);
+            _ownedTextures.Add(FallbackTransparentTexture, TextureTarget.Texture2D);
         }
 
         public void Dispose()
         {
             _retained.Dispose();
-            foreach (uint texture in _ownedTextures)
+            foreach (uint texture in _ownedTextures.Keys)
                 _gl.DeleteTexture(texture);
             _ownedTextures.Clear();
         }
