@@ -227,8 +227,9 @@ void particleFeed(){
                 string type = Regex.Match(declaration.Value, @"\b(uvec4|ivec4|vec4)\s+m\s*\[").Groups[1].Value;
                 if (type.Length == 0) type = "vec4";
                 string bits = type == "uvec4" ? "floatBitsToUint" : type == "ivec4" ? "floatBitsToInt" : string.Empty;
-                source = Regex.Replace(source, Regex.Escape(instance) + @"\.m\[([^\]\r\n]+)\]", accessor + "(int($1))");
                 source = source.Insert(declaration.Index + declaration.Length, $"\n{type} {accessor}(int index);\n");
+                source = RewriteBlockReads(source,
+                    new Regex(@"\b" + Regex.Escape(instance) + @"\.m\s*\[", RegexOptions.CultureInvariant), accessor);
                 definitions.AppendLine($"{type} {accessor}(int index){{ {type} value = {instance}.m[index];");
                 foreach (var member in selected)
                 {
@@ -246,6 +247,30 @@ void particleFeed(){
                 definitions.AppendLine("return value; }");
             }
             return source + "\n" + definitions;
+        }
+
+        private static string RewriteBlockReads(string source, Regex opening, string accessor)
+        {
+            var result = new StringBuilder(source.Length);
+            int from = 0;
+            for (Match match = opening.Match(source); match.Success; match = opening.Match(source, from))
+            {
+                int start = match.Index + match.Length;
+                int end = start;
+                int depth = 1;
+                // A dynamic index can itself read another buffer or this same block.
+                for (; end < source.Length; end++)
+                {
+                    if (source[end] == '[') depth++;
+                    else if (source[end] == ']' && --depth == 0) break;
+                }
+                if (depth != 0) break;
+                result.Append(source, from, match.Index - from)
+                    .Append(accessor).Append("(int(")
+                    .Append(RewriteBlockReads(source[start..end], opening, accessor)).Append("))");
+                from = end + 1;
+            }
+            return result.Append(source, from, source.Length - from).ToString();
         }
     }
 }
