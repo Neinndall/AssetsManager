@@ -10,6 +10,7 @@ Improvements
 Changes
 
 Bug Fixes
+  - 3D Studio / Prevent inherited clipping from leaving stale areas in scene captures used by effects and post-processing.
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 

@@ -26,9 +26,19 @@ internal sealed class GlSceneDepthPass(GL gl) : IDisposable
             Ensure(width, height, depthBits);
             gl.BindFramebuffer(FramebufferTarget.ReadFramebuffer, (uint)draw);
             gl.BindFramebuffer(FramebufferTarget.DrawFramebuffer, _framebuffer);
-            gl.BlitFramebuffer(0, 0, (int)width, (int)height, 0, 0, (int)width, (int)height,
-                ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit | ClearBufferMask.StencilBufferBit,
-                BlitFramebufferFilter.Nearest);
+            bool scissor = gl.IsEnabled(EnableCap.ScissorTest);
+            try
+            {
+                // Copy the whole backdrop before restoring clipping for the scene draw itself.
+                if (scissor) gl.Disable(EnableCap.ScissorTest);
+                gl.BlitFramebuffer(0, 0, (int)width, (int)height, 0, 0, (int)width, (int)height,
+                    ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit | ClearBufferMask.StencilBufferBit,
+                    BlitFramebufferFilter.Nearest);
+            }
+            finally
+            {
+                if (scissor) gl.Enable(EnableCap.ScissorTest);
+            }
             gl.BindFramebuffer(FramebufferTarget.Framebuffer, _framebuffer);
             drawScene();
             captureDepth();

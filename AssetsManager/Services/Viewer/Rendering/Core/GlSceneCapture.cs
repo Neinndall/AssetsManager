@@ -123,6 +123,7 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
                 if (multisampled)
                 {
                     if (_resolveFramebuffer == 0) _resolveFramebuffer = _gl.GenFramebuffer();
+                    bool scissor = _gl.IsEnabled(EnableCap.ScissorTest);
                     try
                     {
                         _gl.BindFramebuffer(FramebufferTarget.DrawFramebuffer, _resolveFramebuffer);
@@ -135,11 +136,14 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
                             throw new InvalidOperationException("Scene capture resolve framebuffer is incomplete.");
                         var mask = (captureColor ? ClearBufferMask.ColorBufferBit : 0) |
                                    (captureDepth ? ClearBufferMask.DepthBufferBit : 0);
+                        // Unlike CopyTexSubImage, a blit obeys the caller's scissor rectangle.
+                        if (scissor) _gl.Disable(EnableCap.ScissorTest);
                         _gl.BlitFramebuffer(0, 0, (int)width, (int)height, 0, 0, (int)width, (int)height,
                             mask, BlitFramebufferFilter.Nearest);
                     }
                     finally
                     {
+                        if (scissor) _gl.Enable(EnableCap.ScissorTest);
                         _gl.BindFramebuffer(FramebufferTarget.DrawFramebuffer, (uint)drawFramebuffer);
                     }
                 }
