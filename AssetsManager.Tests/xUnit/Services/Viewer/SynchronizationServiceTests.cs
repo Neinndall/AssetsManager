@@ -22,6 +22,46 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer;
 
 public sealed class SynchronizationServiceTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task BackgroundBindPosePreservesSkinVisibilityWithAndWithoutEffects(bool effects)
+    {
+        using var loading = new VfxLoadingService();
+        using var session = new VfxRenderSession(null, loading);
+        var bundle = new VfxLoadingService.Bundle
+        {
+            OwnerSceneContext = new VfxOwnerSceneContext(null, null, 1f,
+                InitialHiddenSubmeshHashes: new[] { Fnv1a.HashLower("AlternateEyes"), Fnv1a.HashLower("Accessory") })
+        };
+        if (effects)
+            bundle.IdleEffects.Add(new VfxIdleEffectDefinition(1, "Aura", null, 0, null, 0, Vector3.Zero));
+        var model = new SceneModel();
+        model.AddParts(new[] { new ModelPart { Name = "Body" }, new ModelPart { Name = "AlternateEyes" },
+            new ModelPart { Name = "Accessory" } });
+        var actor = Actor();
+        actor.ShowsBindPose = true;
+        var runtime = new StudioSceneActorRuntime(loading, bundle, null, model, null,
+            new AnimationService(), session, null, Path.GetTempPath());
+        try
+        {
+            await runtime.PlayRememberedClipAsync(actor, null, CancellationToken.None);
+            Assert.Equal(effects, session.ActiveSystem != null);
+            for (int frame = 0; frame < 3; frame++)
+            {
+                runtime.Advance(0.1f, false, 1f, actor);
+                Assert.True(model.Parts[0].IsVisible);
+                Assert.False(model.Parts[1].IsVisible);
+                Assert.False(model.Parts[2].IsVisible);
+            }
+            actor.SubmeshOverrides[Fnv1a.HashLower("Accessory")] = true;
+            runtime.Advance(0.1f, false, 1f, actor);
+            Assert.False(model.Parts[1].IsVisible);
+            Assert.True(model.Parts[2].IsVisible);
+        }
+        finally { runtime.ReleaseCpuState(); }
+    }
+
     [Fact]
     public void VisibilityMatchesNamesAndDoesNotReenterThroughPartEvents()
     {
@@ -199,7 +239,11 @@ public sealed class SynchronizationServiceTests
             using var session = new VfxRenderSession(null, loading);
             var catalog = new VfxClipCatalog();
             var actor = Actor();
-            var runtime = new StudioSceneActorRuntime(loading, bundle, null, new SceneModel(), "model.skn",
+            bundle.OwnerSceneContext = new VfxOwnerSceneContext(null, null, 1f,
+                InitialHiddenSubmeshHashes: new[] { Fnv1a.HashLower("AlternateEyes") });
+            var model = Model("Body");
+            model.AddParts(new[] { new ModelPart { Name = "AlternateEyes" } });
+            var runtime = new StudioSceneActorRuntime(loading, bundle, null, model, "model.skn",
                 new AnimationService(), session, catalog, directory);
             try
             {
@@ -207,9 +251,28 @@ public sealed class SynchronizationServiceTests
                 Assert.False(await runtime.PlaySynchronizedClipAsync(selected, actor, null, () => false));
                 Assert.Null(runtime.Clip);
                 Assert.True(await runtime.PlaySynchronizedClipAsync(selected, actor, null, () => true));
+                var playing = runtime.Clip with
+                {
+                    TimedCues = new AnimationClipTimedCue[]
+                    {
+                        new AnimationSubmeshVisibilityCue(0.5, null, Array.Empty<uint>(),
+                            new[] { Fnv1a.HashLower("Body") })
+                    }
+                };
+                runtime.AdoptPlayingClip(playing);
                 runtime.Seek(0.75, loop: false);
                 runtime.Advance(1f, false, 2f, actor, transportTime: 0.75);
                 Assert.Equal(0.75, session.PlaybackTime, 5);
+                for (int handover = 0; handover < 4; handover++)
+                {
+                    runtime.AdoptPlayingClip(playing);
+                    runtime.SetGameStates(actor.EnabledGameStates);
+                    runtime.Advance(1f, false, 1f, actor);
+                    Assert.Same(playing, runtime.Clip);
+                    Assert.Equal(0.75, session.PlaybackTime, 5);
+                    Assert.False(model.Parts[0].IsVisible);
+                    Assert.False(model.Parts[1].IsVisible);
+                }
                 runtime.Advance(0.1f, true, 2f, actor, transportTime: 0.85);
                 Assert.Equal(0.85, session.PlaybackTime, 5);
                 runtime.Advance(1f, true, 1f, actor, transportTime: 10d);
