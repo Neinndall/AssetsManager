@@ -415,6 +415,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _particleUniforms.Uniform3(_particleUniforms.CamRight, camRight.X, camRight.Y, camRight.Z);
             _particleUniforms.Uniform3(_particleUniforms.CamUp, camUp.X, camUp.Y, camUp.Z);
             _particleUniforms.Uniform3(_particleUniforms.CamPos, camPos.X, camPos.Y, camPos.Z);
+            _particleUniforms.Uniform1(_particleUniforms.Orthographic, projection.M34 == 0f ? 1 : 0);
             _particleUniforms.Uniform1(_particleUniforms.Tex, 0);
             _particleUniforms.Uniform1(_particleUniforms.TexMult, 1);
             _particleUniforms.Uniform1(_particleUniforms.ColorMap, 7);

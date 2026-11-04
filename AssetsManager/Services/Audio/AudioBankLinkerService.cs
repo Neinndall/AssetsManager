@@ -86,7 +86,7 @@ namespace AssetsManager.Services.Audio
                 byte[] binData = null;
                 if (binNode != null) binData = await _wadContentProvider.GetVirtualFileBytesAsync(binNode);
 
-                var siblingsResult = await FindSiblingFilesFromWadsInternalAsync(clickedNode, clickedNode.SourceWadPath, baseName);
+                var siblingsResult = await FindSiblingFilesFromWadsInternalAsync(clickedNode, clickedNode.SourceWadPath);
                 _logService.LogDebug($"[LinkAudioBankAsync] [CURRENT] Siblings: WPK={siblingsResult.WpkNode != null}, AudioBNK={siblingsResult.AudioBnkNode != null}, EventsBNK={siblingsResult.EventsBnkNode != null}");
 
                 return new LinkedAudioBank
@@ -101,15 +101,15 @@ namespace AssetsManager.Services.Audio
             }
         }
 
-        private async Task<(FileSystemNodeModel WpkNode, FileSystemNodeModel AudioBnkNode, FileSystemNodeModel EventsBnkNode)> FindSiblingFilesFromWadsInternalAsync(FileSystemNodeModel clickedNode, string wadPath, string baseName)
+        private async Task<(FileSystemNodeModel WpkNode, FileSystemNodeModel AudioBnkNode, FileSystemNodeModel EventsBnkNode)> FindSiblingFilesFromWadsInternalAsync(FileSystemNodeModel clickedNode, string wadPath)
         {
             if (!File.Exists(wadPath)) return (null, null, null);
 
             var wadContent = await _wadNodeLoaderService.LoadWadContentAsync(wadPath);
 
-            FileSystemNodeModel wpkNode = FindNodeByName(wadContent, baseName + "_audio.wpk");
-            FileSystemNodeModel audioBnkNode = FindNodeByName(wadContent, baseName + "_audio.bnk");
-            FileSystemNodeModel eventsBnkNode = FindNodeByName(wadContent, baseName + "_events.bnk");
+            FileSystemNodeModel wpkNode = FindNodeByName(wadContent, PathUtils.GetBankSiblingName(clickedNode.Name, "_audio.wpk"));
+            FileSystemNodeModel audioBnkNode = FindNodeByName(wadContent, PathUtils.GetBankSiblingName(clickedNode.Name, "_audio.bnk"));
+            FileSystemNodeModel eventsBnkNode = FindNodeByName(wadContent, PathUtils.GetBankSiblingName(clickedNode.Name, "_events.bnk"));
 
             return (wpkNode, audioBnkNode, eventsBnkNode);
         }
@@ -167,7 +167,7 @@ namespace AssetsManager.Services.Audio
             {
                 string champName = wadPrefix.ToLower();
 
-                // Si la ruta no coincide con el prefijo, lo sacamos de la ruta (caso de archivos sueltos en WADs globales)
+                // A form can have its own BIN path while belonging to another champion's WAD.
                 if (virtualPath.Contains("/characters/"))
                 {
                     var pathParts = virtualPath.Split('/');
@@ -218,8 +218,9 @@ namespace AssetsManager.Services.Audio
                     }
                 }
 
-                _logService.LogDebug($"[GetBinFileSearchStrategy] CHAMP Strategy: '{champName}' -> Linking to '{skinName}.bin' in '{champName}.wad.client'");
-                return new BinFileStrategy($"data/characters/{champName}/skins/{skinName}.bin", $"{champName}.wad.client", BinType.Champion);
+                string targetWadName = $"{wadPrefix.ToLowerInvariant()}.wad.client";
+                _logService.LogDebug($"[GetBinFileSearchStrategy] CHAMP Strategy: '{champName}' -> Linking to '{skinName}.bin' in '{targetWadName}'");
+                return new BinFileStrategy($"data/characters/{champName}/skins/{skinName}.bin", targetWadName, BinType.Champion);
             }
 
             // 4. ESTRATEGIAS POR RUTA (Companions)
@@ -265,25 +266,23 @@ namespace AssetsManager.Services.Audio
             if (string.IsNullOrEmpty(pathForStrategy) || string.IsNullOrEmpty(sourceWadFile)) return siblings;
 
             string fileName = Path.GetFileName(pathForStrategy);
+            string normalizedName = PathUtils.NormalizeBankFileName(fileName);
             List<(string siblingFileName, AudioDependencyType siblingType)> potential = new();
 
-            if (fileName.EndsWith("_events.bnk", StringComparison.OrdinalIgnoreCase))
+            if (normalizedName.EndsWith("_events.bnk", StringComparison.OrdinalIgnoreCase))
             {
-                string basePart = fileName.Substring(0, fileName.Length - 11);
-                potential.Add((basePart + "_audio.bnk", AudioDependencyType.AudioBnk));
-                potential.Add((basePart + "_audio.wpk", AudioDependencyType.AudioWpk));
+                potential.Add((PathUtils.GetBankSiblingName(fileName, "_audio.bnk"), AudioDependencyType.AudioBnk));
+                potential.Add((PathUtils.GetBankSiblingName(fileName, "_audio.wpk"), AudioDependencyType.AudioWpk));
             }
-            else if (fileName.EndsWith("_audio.bnk", StringComparison.OrdinalIgnoreCase))
+            else if (normalizedName.EndsWith("_audio.bnk", StringComparison.OrdinalIgnoreCase))
             {
-                string basePart = fileName.Substring(0, fileName.Length - 10);
-                potential.Add((basePart + "_events.bnk", AudioDependencyType.EventsBnk));
-                potential.Add((basePart + "_audio.wpk", AudioDependencyType.AudioWpk));
+                potential.Add((PathUtils.GetBankSiblingName(fileName, "_events.bnk"), AudioDependencyType.EventsBnk));
+                potential.Add((PathUtils.GetBankSiblingName(fileName, "_audio.wpk"), AudioDependencyType.AudioWpk));
             }
-            else if (fileName.EndsWith("_audio.wpk", StringComparison.OrdinalIgnoreCase))
+            else if (normalizedName.EndsWith("_audio.wpk", StringComparison.OrdinalIgnoreCase))
             {
-                string basePart = fileName.Substring(0, fileName.Length - 10);
-                potential.Add((basePart + "_events.bnk", AudioDependencyType.EventsBnk));
-                potential.Add((basePart + "_audio.bnk", AudioDependencyType.AudioBnk));
+                potential.Add((PathUtils.GetBankSiblingName(fileName, "_events.bnk"), AudioDependencyType.EventsBnk));
+                potential.Add((PathUtils.GetBankSiblingName(fileName, "_audio.bnk"), AudioDependencyType.AudioBnk));
             }
 
             string siblingDir = PathUtils.NormalizeSeparators(Path.GetDirectoryName(pathForStrategy));
@@ -351,10 +350,9 @@ namespace AssetsManager.Services.Audio
         private (FileSystemNodeModel WpkNode, FileSystemNodeModel AudioBnkNode, FileSystemNodeModel EventsBnkNode) FindSiblingFilesByName(FileSystemNodeModel clickedNode, ObservableRangeCollection<FileSystemNodeModel> rootNodes)
         {
             bool isBackupMode = clickedNode.ChunkDiff != null;
-            string baseName = PathUtils.StripBankSuffix(clickedNode.Name);
-            string expectedWpkName = baseName + "_audio.wpk";
-            string expectedAudioBnkName = baseName + "_audio.bnk";
-            string expectedEventsBnkName = baseName + "_events.bnk";
+            string expectedWpkName = PathUtils.GetBankSiblingName(clickedNode.Name, "_audio.wpk");
+            string expectedAudioBnkName = PathUtils.GetBankSiblingName(clickedNode.Name, "_audio.bnk");
+            string expectedEventsBnkName = PathUtils.GetBankSiblingName(clickedNode.Name, "_events.bnk");
 
             if (!isBackupMode)
             {
@@ -452,7 +450,7 @@ namespace AssetsManager.Services.Audio
             string sourceWadRelativePath = diff.SourceWadFile;
             string fileName = Path.GetFileName(diff.NewPath ?? diff.OldPath);
             string baseName = PathUtils.StripBankSuffix(fileName);
-            bool clickedIsEventsBnk = fileName.Contains("_events", StringComparison.OrdinalIgnoreCase);
+            bool clickedIsEventsBnk = PathUtils.NormalizeBankFileName(fileName).EndsWith("_events.bnk", StringComparison.OrdinalIgnoreCase);
 
             string pathForStrategy = diff.NewPath ?? diff.OldPath;
             var binStrategy = GetBinFileSearchStrategy(pathForStrategy, sourceWadRelativePath);
@@ -463,12 +461,12 @@ namespace AssetsManager.Services.Audio
             if (!string.IsNullOrEmpty(oldPbePath))
             {
                 (oldEventsBnk, oldAudioBnk, oldWpk, oldBin) = await ReadAudioBankSiblingsFromLocalWadAsync(
-                    oldPbePath, sourceWadRelativePath, baseName, binStrategy);
+                    oldPbePath, sourceWadRelativePath, fileName, binStrategy);
             }
             if (!string.IsNullOrEmpty(newPbePath))
             {
                 (newEventsBnk, newAudioBnk, newWpk, newBin) = await ReadAudioBankSiblingsFromLocalWadAsync(
-                    newPbePath, sourceWadRelativePath, baseName, binStrategy);
+                    newPbePath, sourceWadRelativePath, fileName, binStrategy);
             }
 
             if (clickedIsEventsBnk)
@@ -520,7 +518,7 @@ namespace AssetsManager.Services.Audio
 
             string fileName = Path.GetFileName(diff.NewPath ?? diff.OldPath);
             string baseName = PathUtils.StripBankSuffix(fileName);
-            bool clickedIsEventsBnk = fileName.Contains("_events", StringComparison.OrdinalIgnoreCase);
+            bool clickedIsEventsBnk = PathUtils.NormalizeBankFileName(fileName).EndsWith("_events.bnk", StringComparison.OrdinalIgnoreCase);
 
             var binStrategy = GetBinFileSearchStrategy(diff.NewPath ?? diff.OldPath, diff.SourceWadFile);
             byte[] oldEventsBnk = null, oldAudioBnk = null, oldWpk = null, oldBin = null;
@@ -589,7 +587,7 @@ namespace AssetsManager.Services.Audio
         // nulls when a sibling is absent (callers fall back to the clicked
         // file's bytes).
         private async Task<(byte[] eventsBnk, byte[] audioBnk, byte[] wpk, byte[] bin)> ReadAudioBankSiblingsFromLocalWadAsync(
-            string basePath, string sourceWadRelativePath, string baseName, BinFileStrategy binStrategy)
+            string basePath, string sourceWadRelativePath, string fileName, BinFileStrategy binStrategy)
         {
             byte[] eventsBnk = null, audioBnk = null, wpk = null, bin = null;
 
@@ -602,9 +600,9 @@ namespace AssetsManager.Services.Audio
             try
             {
                 var wadContent = await _wadNodeLoaderService.LoadWadContentAsync(sourceWadFullPath);
-                var wpkNode = FindNodeByName(wadContent, baseName + "_audio.wpk");
-                var audioBnkNode = FindNodeByName(wadContent, baseName + "_audio.bnk");
-                var eventsBnkNode = FindNodeByName(wadContent, baseName + "_events.bnk");
+                var wpkNode = FindNodeByName(wadContent, PathUtils.GetBankSiblingName(fileName, "_audio.wpk"));
+                var audioBnkNode = FindNodeByName(wadContent, PathUtils.GetBankSiblingName(fileName, "_audio.bnk"));
+                var eventsBnkNode = FindNodeByName(wadContent, PathUtils.GetBankSiblingName(fileName, "_events.bnk"));
 
                 if (wpkNode != null) wpk = await _wadContentProvider.GetVirtualFileBytesAsync(wpkNode);
                 if (audioBnkNode != null) audioBnk = await _wadContentProvider.GetVirtualFileBytesAsync(audioBnkNode);

@@ -1314,8 +1314,10 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
             Assert.True(inventory.Hashes.Count > 400, $"Expected > 400 hashes in inventory, got {inventory.Hashes.Count}");
         }
 
-        [Fact]
-        public void GameFromWadsExtractsImageAutoAtlasSprites()
+        [Theory]
+        [InlineData("assets/items/icons2d/autoatlas/largeicons/atlas_info.bin")]
+        [InlineData("ux/fonts/css/stylesheet")]
+        public void GameFromWadsExtractsImageAutoAtlasSprites(string atlasPath)
         {
             string directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(directory);
@@ -1343,7 +1345,7 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
             var entries = new[]
             {
                 new WadBakeEntry(
-                    "assets/items/icons2d/autoatlas/largeicons/atlas_info.bin",
+                    atlasPath,
                     () => new MemoryStream(imaaData),
                     WadChunkCompression.None)
             };
@@ -1356,7 +1358,7 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
 
                 Assert.Contains(spriteHash1, inventory.Hashes);
                 Assert.Contains(spriteHash2, inventory.Hashes);
-                Assert.Contains(XxHash64Ext.Hash("assets/items/icons2d/autoatlas/largeicons/atlas_info.bin"), inventory.Hashes);
+                Assert.Contains(XxHash64Ext.Hash(atlasPath), inventory.Hashes);
             }
             finally
             {

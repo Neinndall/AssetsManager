@@ -295,6 +295,17 @@ namespace AssetsManager.Views.Helpers
 
         private static void OnItemDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
+            if (sender is TreeViewItem treeItem)
+            {
+                // New rows temporarily inherit their parent's data context before the generator
+                // assigns their own node. That inherited value is not a previous selected item.
+                if (FindAncestor<TreeView>(treeItem) is TreeView tree)
+                {
+                    SynchronizeSelectionState(e.OldValue, ReferenceEquals(tree.SelectedItem, e.OldValue));
+                    SynchronizeSelectionState(e.NewValue, ReferenceEquals(tree.SelectedItem, e.NewValue));
+                }
+                return;
+            }
             SynchronizeSelectionState(e.OldValue, false);
             if (sender is FrameworkElement item)
             {

@@ -66,6 +66,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
         private static readonly uint F_parametricPairs = 0x2ec3ba66;
         private static readonly uint F_parametricPairClip = 0xca2b847d;
         private static readonly uint F_parametricPairValue = 0x24f2ec89;
+        // The installed schema leaves this skin-form integer driver unnamed.
+        private const uint SkinGearIntDriverClass = 0x608a3ee7;
         private static readonly uint F_idleParticlesEffects = 0x84186f3c;
         // SkinCharacterDataProperties_CharacterIdleEffect does not use ParticleEventData's
         // m-prefixed fields. Keep the two schemas separate, as LTK's skin reader does.
@@ -290,8 +292,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                         definition = definition with
                         {
                             UsesEquippedGearParameter =
-                                Get(clip.Properties, VfxParsingHash.Fnv1a("Updater")) is BinTreeStruct updater &&
-                                updater.ClassHash == VfxParsingHash.Fnv1a("EquippedGearParametricUpdater")
+                                (Get(clip.Properties, VfxParsingHash.Fnv1a("Updater")) is BinTreeStruct updater &&
+                                 updater.ClassHash == VfxParsingHash.Fnv1a("EquippedGearParametricUpdater")) ||
+                                (clip.ClassHash == VfxParsingHash.Fnv1a("SwitchIntClipData") &&
+                                 Get(clip.Properties, VfxParsingHash.Fnv1a("driver")) is BinTreeStruct { ClassHash: SkinGearIntDriverClass }),
+                            IntegerSwitchValues = ReadIntegerSwitchValues(clip.Properties)
                         };
                         clips.Add(definition);
                     }
@@ -665,6 +670,15 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 else Add(value);
             }
             return children;
+        }
+
+        private static IReadOnlyList<int> ReadIntegerSwitchValues(IReadOnlyDictionary<uint, BinTreeProperty> properties)
+        {
+            if (Get(properties, 0x778d6dee) is not BinTreeContainer pairs) return null;
+            return pairs.Elements.OfType<BinTreeStruct>()
+                .Where(pair => AsU32(Get(pair.Properties, 0x68c14f60)) is > 0)
+                .Select(pair => Get(pair.Properties, VfxParsingHash.Fnv1a("value")) is BinTreeI32 value ? value.Value : 0)
+                .ToArray();
         }
 
         private static IReadOnlyList<float?> ReadClipParameterValues(

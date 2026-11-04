@@ -175,7 +175,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Parsing
         [InlineData(false, false)]
         [InlineData(true, false)]
         [InlineData(false, true)]
-        public void OnlyDefaultGearMatchingOwnerAppearanceReplacesTheSyntheticBase(bool differentTexture, bool hidesSubmesh)
+        [InlineData(false, false, true)]
+        public void OnlyDefaultGearMatchingOwnerAppearanceReplacesTheSyntheticBase(bool differentTexture, bool hidesSubmesh, bool shadowOverride = false)
         {
             const uint gearHash = 0x12345678;
             uint meshField = Fnv1a.HashLower("skinMeshProperties");
@@ -193,6 +194,15 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Parsing
                     extra: new[] { Mesh(differentTexture ? "Other.tex" : "Base.tex", reverse: true) })));
             tree.Objects.Values.Single(obj => obj.ClassHash == Fnv1a.HashLower("SkinCharacterDataProperties"))
                 .Properties.Add(meshField, Mesh("Base.tex", reverse: false));
+            if (shadowOverride)
+            {
+                var ownerMesh = (BinTreeStruct)tree.Objects.Values.Single(obj => obj.ClassHash == Fnv1a.HashLower("SkinCharacterDataProperties")).Properties[meshField];
+                ownerMesh.Properties.Add(Fnv1a.HashLower("selfIllumination"), new BinTreeF32(Fnv1a.HashLower("selfIllumination"), .7f));
+                var gearData = (BinTreeStruct)tree.Objects[gearHash].Properties[GearDataField];
+                var gearMesh = (BinTreeStruct)gearData.Properties[meshField];
+                gearMesh.Properties.Add(Fnv1a.HashLower("initialSubmeshShadowsToHide"),
+                    new BinTreeString(Fnv1a.HashLower("initialSubmeshShadowsToHide"), "Hair"));
+            }
 
             var forms = CharacterFormParser.Resolve(new[] { CharacterFormParser.ParseDocument(tree) }, null,
                 new VfxOwnerSceneContext("ASSETS/Characters/Test/Skins/Skin0/Test.skn",

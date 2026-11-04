@@ -4,6 +4,7 @@ using System.Linq;
 using System.ComponentModel;
 using System.Collections.ObjectModel;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.Windows.Media;
 using System.Threading.Tasks;
 using AssetsManager.Utils.Framework;
@@ -76,11 +77,22 @@ namespace AssetsManager.Views.Models.Explorer
             {
                 if (_children == null && CanHaveChildren(Type))
                 {
-                    _children = new ObservableRangeCollection<FileSystemNodeModel>();
+                    Children = new ObservableRangeCollection<FileSystemNodeModel>();
                 }
                 return _children;
             }
-            set => _children = value;
+            set
+            {
+                if (ReferenceEquals(_children, value)) return;
+                if (_projectionSource != null) _projectionSource.CollectionChanged -= OnChildrenChanged;
+                _children = value;
+                _projectionSource = null;
+                if (_visibleChildren != null)
+                {
+                    ObserveChildren();
+                    if (!_isChildrenFiltered) ReconcileVisibleChildren(_children);
+                }
+            }
         }
 
         public ObservableRangeCollection<FileSystemNodeModel> LoadedChildren => _children;
@@ -161,14 +173,63 @@ namespace AssetsManager.Views.Models.Explorer
         }
 
         private ObservableRangeCollection<FileSystemNodeModel> _visibleChildren;
-        internal bool HasFilteredChildren => _visibleChildren != null && !ReferenceEquals(_visibleChildren, _children);
+        private ObservableRangeCollection<FileSystemNodeModel> _projectionSource;
+        private bool _isChildrenFiltered;
+        internal bool HasFilteredChildren => _isChildrenFiltered;
         public ObservableRangeCollection<FileSystemNodeModel> VisibleChildren
         {
-            get => _visibleChildren ?? Children;
-            set
+            get
             {
-                _visibleChildren = value;
-                OnPropertyChanged(nameof(VisibleChildren));
+                if (_visibleChildren == null && Children != null)
+                {
+                    _visibleChildren = new ObservableRangeCollection<FileSystemNodeModel>(_children);
+                    ObserveChildren();
+                }
+                return _visibleChildren;
+            }
+        }
+
+        internal void SetVisibleChildren(IReadOnlyList<FileSystemNodeModel> items)
+        {
+            _isChildrenFiltered = items != null;
+            if (VisibleChildren != null) ReconcileVisibleChildren(items ?? _children);
+        }
+
+        private void ObserveChildren()
+        {
+            _projectionSource = _children;
+            if (_projectionSource != null) _projectionSource.CollectionChanged += OnChildrenChanged;
+        }
+
+        private void OnChildrenChanged(object sender, NotifyCollectionChangedEventArgs e)
+        {
+            if (_isChildrenFiltered) return;
+            if (e.Action == NotifyCollectionChangedAction.Add)
+            {
+                for (int i = 0; i < e.NewItems.Count; i++)
+                    _visibleChildren.Insert(e.NewStartingIndex + i, (FileSystemNodeModel)e.NewItems[i]);
+            }
+            else if (e.Action == NotifyCollectionChangedAction.Remove)
+            {
+                for (int i = 0; i < e.OldItems.Count; i++) _visibleChildren.RemoveAt(e.OldStartingIndex);
+            }
+            else ReconcileVisibleChildren(_children);
+        }
+
+        private void ReconcileVisibleChildren(IReadOnlyList<FileSystemNodeModel> items)
+        {
+            items ??= Array.Empty<FileSystemNodeModel>();
+            if (_visibleChildren.Count == items.Count && _visibleChildren.SequenceEqual(items)) return;
+            // Keep the ItemsSource and surviving rows intact, including the selected container.
+            var wanted = new HashSet<FileSystemNodeModel>(items);
+            for (int i = _visibleChildren.Count - 1; i >= 0; i--)
+                if (!wanted.Contains(_visibleChildren[i])) _visibleChildren.RemoveAt(i);
+            var retained = new HashSet<FileSystemNodeModel>(_visibleChildren);
+            for (int i = 0; i < items.Count; i++)
+            {
+                if (i < _visibleChildren.Count && ReferenceEquals(_visibleChildren[i], items[i])) continue;
+                if (retained.Contains(items[i])) _visibleChildren.Move(_visibleChildren.IndexOf(items[i]), i);
+                else _visibleChildren.Insert(i, items[i]);
             }
         }
 
@@ -374,6 +435,8 @@ namespace AssetsManager.Views.Models.Explorer
 
         public void Dispose()
         {
+            if (_projectionSource != null) _projectionSource.CollectionChanged -= OnChildrenChanged;
+            _projectionSource = null;
             if (_visibleChildren != null && !ReferenceEquals(_visibleChildren, _children))
             {
                 _visibleChildren.Clear();

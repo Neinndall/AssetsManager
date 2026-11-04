@@ -196,6 +196,7 @@ internal sealed class VfxClipCatalog : IDisposable
         var steps = new List<IAnimationAsset>(playlist.Count);
         var particleEvents = new List<VfxCompositionEvent>();
         var timedCues = new List<AnimationClipTimedCue>();
+        var materialAnimations = new List<GameMaterialAnimation>();
         float passTime = 0f;
         int eventCount = 0;
 
@@ -206,6 +207,9 @@ internal sealed class VfxClipCatalog : IDisposable
             IAnimationAsset timedAsset = GraphPoseAnimationAsset.Wrap(RetimeForGraph(asset, atomic.TickDuration),
                 atomic, graph, basisPath == null ? null : GetOrLoadAsset(basisPath, cancellationToken));
             steps.Add(timedAsset);
+            materialAnimations.Add(new(atomic.OwnerPathHash, passTime, timedAsset.Duration));
+            if (!string.IsNullOrWhiteSpace(atomic.ClipName))
+                materialAnimations.Add(new(GameMaterialState.AnimationHash(atomic.ClipName), passTime, timedAsset.Duration));
             passTime += timedAsset.Duration;
         }
 
@@ -304,6 +308,7 @@ internal sealed class VfxClipCatalog : IDisposable
             FilePath = playlist[0].Path,
             Duration = passTime,
             AnimationAsset = AnimationGraphPlayback.CreatePlaylist(steps, playlist.Select(step => step.Clip).ToArray(), graph),
+            MaterialAnimations = materialAnimations.ToArray(),
             Composition = merged,
             TimedCues = timedCues.OrderBy(cue => cue.AtSeconds).ToArray(),
             EventCount = eventCount,

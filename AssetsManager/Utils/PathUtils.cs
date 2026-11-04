@@ -231,6 +231,7 @@ namespace AssetsManager.Utils
         public static string StripBankSuffix(string fileName)
         {
             if (string.IsNullOrEmpty(fileName)) return fileName;
+            fileName = NormalizeBankFileName(fileName);
 
             if (fileName.EndsWith("_events.bnk", StringComparison.OrdinalIgnoreCase))
                 return fileName.Substring(0, fileName.Length - 11);
@@ -244,6 +245,54 @@ namespace AssetsManager.Utils
                 return fileName.Substring(0, fileName.Length - 4);
 
             return fileName;
+        }
+
+        public static string NormalizeBankFileName(string fileName)
+        {
+            if (TryGetBankRole(fileName, out int roleStart, out int roleLength))
+                return fileName.Substring(0, roleStart + roleLength) + Path.GetExtension(fileName);
+            return fileName;
+        }
+
+        public static string GetBankSiblingName(string fileName, string suffix)
+        {
+            // Replace only the role and extension: unknown variant tokens remain part of the family.
+            if (TryGetBankRole(fileName, out int roleStart, out int roleLength))
+            {
+                int extensionStart = fileName.Length - Path.GetExtension(fileName).Length;
+                int targetExtensionStart = suffix.LastIndexOf('.');
+                return fileName.Substring(0, roleStart) + suffix.Substring(0, targetExtensionStart) +
+                    fileName.Substring(roleStart + roleLength, extensionStart - roleStart - roleLength) +
+                    suffix.Substring(targetExtensionStart);
+            }
+            return StripBankSuffix(fileName) + suffix;
+        }
+
+        private static bool TryGetBankRole(string fileName, out int roleStart, out int roleLength)
+        {
+            roleStart = roleLength = 0;
+            if (string.IsNullOrEmpty(fileName)) return false;
+            string extension = Path.GetExtension(fileName);
+            bool isBnk = extension.Equals(".bnk", StringComparison.OrdinalIgnoreCase);
+            if (!isBnk && !extension.Equals(".wpk", StringComparison.OrdinalIgnoreCase)) return false;
+
+            int fileStart = Math.Max(fileName.LastIndexOf('/'), fileName.LastIndexOf('\\')) + 1;
+            int tokenEnd = fileName.Length - extension.Length;
+            while (tokenEnd > fileStart)
+            {
+                int tokenStart = fileName.LastIndexOf('_', tokenEnd - 1);
+                if (tokenStart <= fileStart) break;
+                string token = fileName.Substring(tokenStart + 1, tokenEnd - tokenStart - 1);
+                if (token.Equals("audio", StringComparison.OrdinalIgnoreCase) ||
+                    (isBnk && token.Equals("events", StringComparison.OrdinalIgnoreCase)))
+                {
+                    roleStart = tokenStart;
+                    roleLength = tokenEnd - tokenStart;
+                    return true;
+                }
+                tokenEnd = tokenStart;
+            }
+            return false;
         }
 
         /// <summary>

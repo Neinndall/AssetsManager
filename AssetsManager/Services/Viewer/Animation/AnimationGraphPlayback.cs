@@ -9,8 +9,7 @@ using LeagueToolkit.Hashing;
 namespace AssetsManager.Services.Viewer.Animation
 {
     /// <summary>
-    /// Shared AnimationGraph playback semantics used by champion/VFX and MAP structures.
-    /// Composite resolution, idle selection and mTickDuration retiming mirror current LTK Manager MAIN.
+    /// Shared clip selection, idle selection and graph retiming for champion/VFX and MAP structures.
     /// </summary>
     internal static class AnimationGraphPlayback
     {
@@ -123,6 +122,11 @@ namespace AssetsManager.Services.Viewer.Animation
                     IEnumerable<int> order = Enumerable.Range(0, children.Count);
                     float? selectedParameter = current.UsesEquippedGearParameter && gearIndex.HasValue
                         ? gearIndex.Value : parameter;
+                    if (current.IntegerSwitchValues is { } switches && current.UsesEquippedGearParameter)
+                    {
+                        int selected = Math.Max(0, gearIndex ?? 0);
+                        order = order.Where(index => index < switches.Count && switches[index] == selected).Take(1);
+                    }
                     if (current.OwnerClassHash == ParametricClipClass &&
                         children.Count > 0 &&
                         selectedParameter.HasValue)

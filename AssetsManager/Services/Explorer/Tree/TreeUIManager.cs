@@ -26,6 +26,45 @@ namespace AssetsManager.Services.Explorer.Tree
             if (treeView != null && _navigation.TryGetValue(treeView, out var source)) source.Cancel();
         }
 
+        public async Task<bool> ScrollToStartAsync(ItemsControl treeView)
+        {
+            if (treeView == null) return false;
+            treeView.Dispatcher.VerifyAccess();
+            CancelNavigation(treeView);
+            using var source = new CancellationTokenSource();
+            _navigation.Remove(treeView);
+            _navigation.Add(treeView, source);
+            try
+            {
+                return await treeView.Dispatcher.InvokeAsync(() =>
+                {
+                    treeView.UpdateLayout();
+                    var scroll = FindScrollViewer(treeView);
+                    if (scroll == null) return false;
+                    scroll.ScrollToTop();
+                    return true;
+                }, DispatcherPriority.ContextIdle, source.Token);
+            }
+            catch (OperationCanceledException) when (source.IsCancellationRequested) { return false; }
+            finally
+            {
+                if (_navigation.TryGetValue(treeView, out var current) && ReferenceEquals(current, source))
+                    _navigation.Remove(treeView);
+            }
+        }
+
+        private static ScrollViewer FindScrollViewer(DependencyObject parent)
+        {
+            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
+            {
+                var child = VisualTreeHelper.GetChild(parent, i);
+                if (child is ScrollViewer scroll) return scroll;
+                var found = FindScrollViewer(child);
+                if (found != null) return found;
+            }
+            return null;
+        }
+
         public async Task<bool> SelectAndFocusNodeAsync(ItemsControl treeView,
             ObservableRangeCollection<FileSystemNodeModel> rootNodes, FileSystemNodeModel node,
             bool focusNode = true, CancellationToken cancellationToken = default)
@@ -79,6 +118,12 @@ namespace AssetsManager.Services.Explorer.Tree
                         cancellationToken.ThrowIfCancellationRequested();
                         if (container is TreeView tree && !ReferenceEquals(tree.SelectedItem, target)) return false;
                         target.IsSelected = true;
+                        // Selection and collection changes can trigger another virtualization pass.
+                        await container.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ContextIdle, cancellationToken);
+                        cancellationToken.ThrowIfCancellationRequested();
+                        container.UpdateLayout();
+                        if (!ReferenceEquals(GetGeneratedItem(container, path), selectedItem) || !selectedItem.IsSelected)
+                            break;
                         if (focus) selectedItem.Focus();
                         return true;
                     }

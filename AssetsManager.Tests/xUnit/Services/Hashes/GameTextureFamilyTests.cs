@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Hashes.Guessers;
@@ -197,6 +198,231 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
             cancellation.Cancel();
             Assert.Throws<OperationCanceledException>(() => index.RunBuildList(engine, cancellation.Token));
             Assert.Equal(2, engine.CheckedCandidates);
+        }
+
+        [Fact]
+        public void TextureBuildListLearnsNumberedParticleTextureFromMatchingModelAndTexturePrefix()
+        {
+            const string folder = "assets/characters/petchibijhin/skins/skin2/particles/";
+            const string target = folder + "petchibijhin_bloodmoonfinisher_flower01.tex";
+            var knownPaths = new[]
+            {
+                folder + "petchibijhin_bloodmoon_finisher_flower.skl",
+                folder + "petchibijhin_bloodmoonfinisher_colorbase.tex",
+                folder + "petchibijhin_bloodmoonfinisher_colorbase01.tex"
+            };
+            Assert.Equal(0x99145fe983438445UL, XxHash64Ext.Hash(target));
+            var index = new GameTextureFamilyIndex(knownPaths, CancellationToken.None);
+            var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong> { XxHash64Ext.Hash(target), 42 });
+
+            long attempts = index.RunBuildList(engine, CancellationToken.None, 200_000);
+
+            Assert.Equal(target, Assert.Single(engine.Matches).Value.Path);
+            Assert.Equal(attempts, engine.CheckedCandidates);
+            Assert.Contains(42UL, engine.UnknownHashes);
+        }
+
+        [Fact]
+        public void TextureBuildListRecombinesCompanionClassicMaterialRolesAcrossCharacters()
+        {
+            const string target = "assets/characters/petstyletwomordekaiser/themes/base/petstyletwomordekaiser_base_classic_scapula_material_tx_cm.tex";
+            var knownPaths = new[]
+            {
+                "assets/characters/petstyletwomordekaiser/themes/base/petstyletwomordekaiser_base_classic_body_material_tx_cm.tex",
+                "assets/characters/petstyletwogaren/themes/base/petstyletwogaren_base_classic_scapula_tx_cm.tex",
+                "assets/characters/petstyletwogaren/themes/base/petstyletwogaren_base_classic_scapula_mask_tx_cm.tex"
+            };
+            Assert.Equal(0x706e3efbe8aaec50UL, XxHash64Ext.Hash(target));
+            var index = new GameTextureFamilyIndex(knownPaths, CancellationToken.None);
+            var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong> { XxHash64Ext.Hash(target), 42 });
+
+            long attempts = index.RunBuildList(engine, CancellationToken.None, 200_000);
+
+            Assert.Equal(target, Assert.Single(engine.Matches).Value.Path);
+            Assert.Equal(attempts, engine.CheckedCandidates);
+            Assert.Contains(42UL, engine.UnknownHashes);
+        }
+
+        [Fact]
+        public void TextureBuildListLearnsCompanionVariantStateFromRepeatedCharacterTextureWords()
+        {
+            const string target = "assets/characters/petpineconehedgehog/themes/base/petpineconehedgehog_base_variant1_charred_tx_cm.tex";
+            var knownPaths = new[]
+            {
+                "assets/characters/petpineconehedgehog/themes/base/petpineconehedgehog_base_variant1_body_tx_cm.tex",
+                "assets/characters/petpineconehedgehog/themes/base/petpineconehedgehog_base_variant1_face_tx_cm.tex",
+                "assets/characters/maokai/skins/skin01/particles/maokai_charred_w_tar_root_tx.tex",
+                "assets/characters/rumble/skins/base/particles/charred_billow_03.tex"
+            };
+            Assert.Equal(0xc47130955064c823UL, XxHash64Ext.Hash(target));
+            var index = new GameTextureFamilyIndex(knownPaths, CancellationToken.None);
+            var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong> { XxHash64Ext.Hash(target), 42 });
+
+            long attempts = index.RunBuildList(engine, CancellationToken.None, 200_000);
+
+            Assert.Equal(target, Assert.Single(engine.Matches).Value.Path);
+            Assert.Equal(attempts, engine.CheckedCandidates);
+            Assert.Contains(42UL, engine.UnknownHashes);
+        }
+
+        [Fact]
+        public void TextureBuildListDoesNotGuessNewPatternsWithoutCorroboratingKnownNames()
+        {
+            const string flower = "assets/characters/petchibijhin/skins/skin2/particles/petchibijhin_bloodmoonfinisher_flower01.tex";
+            const string charred = "assets/characters/petpineconehedgehog/themes/base/petpineconehedgehog_base_variant1_charred_tx_cm.tex";
+            var knownPaths = new[]
+            {
+                "assets/characters/petchibijhin/skins/skin2/particles/petchibijhin_bloodmoon_finisher_flower.skl",
+                "assets/characters/unrelated/skins/skin2/particles/unrelated_bloodmoonfinisher_colorbase.tex",
+                "assets/characters/petpineconehedgehog/themes/base/petpineconehedgehog_base_variant1_body_tx_cm.tex",
+                "assets/characters/maokai/skins/skin01/particles/maokai_charred_w_tar_root_tx.tex"
+            };
+            var index = new GameTextureFamilyIndex(knownPaths, CancellationToken.None);
+            var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong>
+            {
+                XxHash64Ext.Hash(flower), XxHash64Ext.Hash(charred)
+            });
+
+            index.RunBuildList(engine, CancellationToken.None, 200_000);
+
+            Assert.Empty(engine.Matches);
+            Assert.Equal(2, engine.RemainingUnknownCount);
+        }
+
+        [Fact]
+        public void NewTextureRulesDoNotDisplaceLegacyParticleRolesWithinTightBudget()
+        {
+            const string folder = "assets/characters/companion/skins/skin2/particles/";
+            string[] corpus =
+            {
+                folder + "companion_bloodmoon_finisher_flower.skl",
+                folder + "companion_bloodmoonfinisher_colorbase01.tex",
+                folder + "companion_rocket_tx.tex"
+            };
+            string target = folder + "companion_rocket_m2.tex";
+            var index = new GameTextureFamilyIndex(corpus, CancellationToken.None);
+            var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong> { XxHash64Ext.Hash(target), 42 });
+
+            long attempts = index.RunBuildList(engine, CancellationToken.None, 4);
+
+            Assert.Equal(4L, attempts);
+            Assert.Equal(target, Assert.Single(engine.Matches).Value.Path);
+        }
+
+        [Fact]
+        public void NumberedParticleModelTextureLearnsObservedSuffixesInsteadOfFixedRange()
+        {
+            const string folder = "assets/characters/fox/skins/skin1/particles/";
+            string[] paths =
+            {
+                folder + "fox_night_festival_flower.skl",
+                folder + "fox_nightfestival_colorbase07.tex",
+                folder + "fox_nightfestival_colorbase12.tex"
+            };
+            const string target = folder + "fox_nightfestival_flower07.tex";
+            var index = new GameTextureFamilyIndex(paths, CancellationToken.None);
+            var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong> { XxHash64Ext.Hash(target) });
+
+            index.RunBuildList(engine, CancellationToken.None, 100_000);
+
+            Assert.Equal(target, Assert.Single(engine.Matches).Value.Path);
+        }
+
+        [Fact]
+        public void ClassicMaterialRolesGeneralizeBeyondSharedCharacterNamePrefixes()
+        {
+            const string target = "assets/characters/petcobalt/themes/base/petcobalt_base_classic_crest_material_tx_cm.tex";
+            string[] paths =
+            {
+                "assets/characters/petcobalt/themes/base/petcobalt_base_classic_body_material_tx_cm.tex",
+                "assets/characters/petamber/themes/base/petamber_base_classic_crest_tx_cm.tex",
+                "assets/characters/petamber/themes/base/petamber_base_classic_crest_mask_tx_cm.tex"
+            };
+            var index = new GameTextureFamilyIndex(paths, CancellationToken.None);
+            var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong> { XxHash64Ext.Hash(target) });
+
+            index.RunBuildList(engine, CancellationToken.None, 100_000);
+
+            Assert.Equal(target, Assert.Single(engine.Matches).Value.Path);
+        }
+
+        [Fact]
+        public void LegacyLearnedSuffixMatchesKeepTheirOriginalSmallBudget()
+        {
+            long minimumBudget = -1;
+            for (long budget = 1; budget <= 100; budget++)
+            {
+                var legacyIndex = new GameTextureFamilyIndex(Corpus, CancellationToken.None);
+                var legacyEngine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong> { XxHash64Ext.Hash(Target), 42 });
+                legacyIndex.RunBuildList(legacyEngine, CancellationToken.None, budget);
+                if (!legacyEngine.Matches.ContainsKey(XxHash64Ext.Hash(Target))) continue;
+                minimumBudget = budget;
+                break;
+            }
+            Assert.True(minimumBudget > 0, "The existing suffix pattern should fit within a small budget");
+
+            string[] withNewPatterns = Corpus.Concat(new[]
+            {
+                "assets/characters/companion/skins/skin2/particles/companion_bloodmoon_finisher_flower.skl",
+                "assets/characters/companion/skins/skin2/particles/companion_bloodmoonfinisher_colorbase01.tex"
+            }).ToArray();
+            var index = new GameTextureFamilyIndex(withNewPatterns, CancellationToken.None);
+            var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong> { XxHash64Ext.Hash(Target), 42 });
+
+            long checkedCandidates = index.RunBuildList(engine, CancellationToken.None, minimumBudget);
+
+            Assert.Equal(minimumBudget, checkedCandidates);
+            Assert.Equal(Target, Assert.Single(engine.Matches).Value.Path);
+        }
+
+        [Fact]
+        public void VariantModifierVocabularyRequiresEvidenceFromDifferentCharacters()
+        {
+            const string target = "assets/characters/petcobalt/themes/base/petcobalt_base_variant1_cracked_tx_cm.tex";
+            string[] paths =
+            {
+                "assets/characters/petcobalt/themes/base/petcobalt_base_variant1_body_tx_cm.tex",
+                "assets/characters/maokai/skins/skin01/particles/maokai_cracked_cracked_01.tex"
+            };
+            var index = new GameTextureFamilyIndex(paths, CancellationToken.None);
+            var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong> { XxHash64Ext.Hash(target) });
+
+            index.RunBuildList(engine, CancellationToken.None, 100_000);
+
+            Assert.Empty(engine.Matches);
+        }
+
+        [Fact]
+        public void VariantModifiersGeneralizeToCrossCharacterWordsWithoutEdSuffix()
+        {
+            const string target = "assets/characters/petcobalt/themes/base/petcobalt_base_variant1_frozen_tx_cm.tex";
+            string[] paths =
+            {
+                "assets/characters/petcobalt/themes/base/petcobalt_base_variant1_body_tx_cm.tex",
+                "assets/characters/maokai/skins/skin01/particles/maokai_frozen_thorns_01.tex",
+                "assets/characters/rumble/skins/base/particles/frozen_billow_03.tex"
+            };
+            var index = new GameTextureFamilyIndex(paths, CancellationToken.None);
+            var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong> { XxHash64Ext.Hash(target) });
+
+            index.RunBuildList(engine, CancellationToken.None, 100_000);
+
+            Assert.Equal(target, Assert.Single(engine.Matches).Value.Path);
+        }
+
+        [Fact]
+        public void ParticleIndexConstructionHasBoundedAllocationWhenNoModelsNeedPrefixes()
+        {
+            string[] paths = Enumerable.Range(0, 20_000)
+                .Select(index => $"assets/characters/example/skins/skin1/particles/example_skin1_effect_{index:D5}_trail_mask_tx.tex")
+                .ToArray();
+            // No .skl references: the extra model-derived index has no work to do.
+            long before = GC.GetAllocatedBytesForCurrentThread();
+
+            _ = new GameTextureFamilyIndex(paths, CancellationToken.None);
+
+            long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+            Assert.True(allocated < 15_000_000, $"Index construction allocated {allocated:N0} bytes without model evidence");
         }
     }
 }

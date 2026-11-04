@@ -151,6 +151,10 @@ void main()
                 return;
             _pending = false;
 
+            _gl.ActiveTexture(TextureUnit.Texture0);
+            _gl.GetInteger(GLEnum.SamplerBinding, out int previousSampler);
+            // Bloom's single-level targets use their own linear/clamp settings, not the last material's sampler.
+            _gl.BindSampler(0, 0);
             _gl.GetInteger(GLEnum.FramebufferBinding, out int target);
             _gl.GetInteger(GLEnum.Viewport, _previousViewport);
             _gl.Disable(EnableCap.DepthTest);
@@ -191,6 +195,7 @@ void main()
             _gl.BindVertexArray(0);
             _gl.UseProgram(0);
             _gl.ActiveTexture(TextureUnit.Texture0);
+            _gl.BindSampler(0, (uint)previousSampler);
         }
 
         // Filters `source` into `into`; UVStep is one texel of the source, as the game sets it.

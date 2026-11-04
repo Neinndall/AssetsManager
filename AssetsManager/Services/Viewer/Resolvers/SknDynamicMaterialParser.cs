@@ -244,9 +244,14 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 conditions.Add(buff);
                 return state => new Vector4(buff.Evaluate(state) == true ? FullStacks : 0f);
             }
-            // The resting preview: no death or ability animation has progressed, health is full and the character stands still.
-            if (driver.ClassHash == Hash("AnimationFractionDynamicMaterialFloatDriver") ||
-                driver.ClassHash == Hash("VelocityDynamicMaterialFloatDriver"))
+            if (driver.ClassHash == Hash("AnimationFractionDynamicMaterialFloatDriver"))
+            {
+                uint animation = fields.TryGetValue(Hash("mAnimationName"), out var name) && name is BinTreeHash hash
+                    ? hash.Value : 0u;
+                return state => new Vector4(state.AnimationFraction(animation));
+            }
+            // Preview characters have no gameplay velocity or damage.
+            if (driver.ClassHash == Hash("VelocityDynamicMaterialFloatDriver"))
                 return _ => Vector4.Zero;
             if (driver.ClassHash == Hash("HealthDynamicMaterialFloatDriver"))
                 return _ => Vector4.One;

@@ -176,6 +176,7 @@ namespace AssetsManager.Views.Models.Viewer
         string ClassName = null)
     {
         public bool UsesEquippedGearParameter { get; init; }
+        public IReadOnlyList<int> IntegerSwitchValues { get; init; }
         public bool PlaysOwnEvents { get; init; }
 
         public IEnumerable<VfxParticleEventDefinition> ParticleEvents
@@ -421,6 +422,7 @@ namespace AssetsManager.Views.Models.Viewer
     {
         public const string BindPoseName = "Bind pose";
         internal SynchronizedAnimationSource SharedSource { get; init; }
+        internal IReadOnlyList<GameMaterialAnimation> MaterialAnimations { get; init; }
 
         public bool IsBindPose => string.Equals(Name, BindPoseName, StringComparison.OrdinalIgnoreCase);
 

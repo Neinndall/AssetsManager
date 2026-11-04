@@ -1070,19 +1070,12 @@ namespace AssetsManager.Views.Controls.Explorer
             long treeVersion = _treeLoader.Version;
             long selectionVersion = _selectionVersion;
             string searchText = _viewModel.Toolbar.SearchText;
+            bool hasQuery = !string.IsNullOrWhiteSpace(searchText);
 
-            // CRITICAL: Immediate UI feedback when clearing search
-            if (string.IsNullOrWhiteSpace(searchText))
-            {
-                _viewModel.IsNoResultsFound = false;
-            }
+            _viewModel.IsNoResultsFound = false;
+            FilePreviewer?.SetSearchFilter(searchText);
 
-            if (FilePreviewer != null)
-            {
-                FilePreviewer.SetSearchFilter(searchText);
-            }
-
-            if (!string.IsNullOrWhiteSpace(searchText))
+            if (hasQuery)
             {
                 Toolbar?.AddSearchToHistory(searchText);
             }
@@ -1091,27 +1084,17 @@ namespace AssetsManager.Views.Controls.Explorer
             var nodeToSelect = await WadSearchBoxService.PerformSearchAsync(searchText, _viewModel.RootNodes, selectedNode);
             if (_treeLoader.IsDisposed || treeVersion != _treeLoader.Version || searchVersion != _searchVersion) return;
 
-            // Update No Results found UI after search completes
-            if (!string.IsNullOrWhiteSpace(searchText))
-            {
-                _viewModel.IsNoResultsFound = _viewModel.RootNodes.All(n => !n.IsVisible);
-            }
-            else
-            {
-                // Already set above, but ensuring consistency
-                _viewModel.IsNoResultsFound = false;
-            }
+            _viewModel.IsNoResultsFound = hasQuery && _viewModel.RootNodes.All(n => !n.IsVisible);
 
             if (selectionVersion != _selectionVersion) return;
 
-            if (nodeToSelect != null)
+            if (hasQuery && !searchText.Contains('/'))
+            {
+                await TreeUIManager.ScrollToStartAsync(FileTreeView);
+            }
+            else if (nodeToSelect != null)
             {
                 await TreeUIManager.SelectAndFocusNodeAsync(FileTreeView, _viewModel.RootNodes, nodeToSelect, false);
-            }
-            else if (selectedNode != null && string.IsNullOrWhiteSpace(searchText))
-            {
-                // If search was cleared, ensure the previously selected node is still in view
-                await TreeUIManager.SelectAndFocusNodeAsync(FileTreeView, _viewModel.RootNodes, selectedNode, false);
             }
         }
 
