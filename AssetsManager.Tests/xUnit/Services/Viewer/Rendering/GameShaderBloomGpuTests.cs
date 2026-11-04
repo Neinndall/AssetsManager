@@ -10,6 +10,95 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering;
 [Collection("Viewport native graphics")]
 public sealed class GameShaderBloomGpuTests
 {
+    public static System.Collections.Generic.IEnumerable<object[]> WriteMaskCases()
+    {
+        foreach (bool composeMask in new[] { false, true })
+        for (int mask = 0; mask < 3; mask++)
+        foreach (bool hidden in new[] { false, true })
+            yield return new object[] { composeMask, mask, hidden };
+    }
+
+    [Theory]
+    [MemberData(nameof(WriteMaskCases))]
+    public void BloomClearsPreviousGlowAndRespectsSceneDepthWithInheritedWriteMasks(bool composeMask, int mask, bool hidden)
+    {
+        using var context = new HiddenWglContext();
+        using GL gl = GL.GetApi(context.GetProcAddress);
+        using var bloom = new GameShaderBloom();
+        bloom.Initialize(gl);
+        uint program = GlShaderCompiler.CreateProgram(gl, false,
+            "void main(){ vec2 p=vec2((gl_VertexID << 1) & 2,gl_VertexID & 2); gl_Position=vec4(p*2.0-1.0,0.0,1.0); }",
+            "uniform vec3 tint;\nlayout(location=0) out vec4 color;\nlayout(location=1) out vec4 glow;\n" +
+            "void main(){ color=vec4(0.0); glow=vec4(tint,1.0); }");
+        uint framebuffer = gl.GenFramebuffer(), texture = gl.GenTexture(), depth = gl.GenRenderbuffer(), vao = gl.GenVertexArray();
+        try
+        {
+            gl.BindTexture(TextureTarget.Texture2D, texture);
+            gl.TexImage2D<float>(TextureTarget.Texture2D, 0, InternalFormat.Rgba32f, 32, 32, 0,
+                PixelFormat.Rgba, PixelType.Float, ReadOnlySpan<float>.Empty);
+            gl.BindFramebuffer(FramebufferTarget.Framebuffer, framebuffer);
+            gl.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment0, TextureTarget.Texture2D, texture, 0);
+            gl.BindRenderbuffer(RenderbufferTarget.Renderbuffer, depth);
+            gl.RenderbufferStorage(RenderbufferTarget.Renderbuffer, InternalFormat.DepthComponent24, 32, 32);
+            gl.FramebufferRenderbuffer(FramebufferTarget.Framebuffer, FramebufferAttachment.DepthAttachment, RenderbufferTarget.Renderbuffer, depth);
+            Assert.Equal(GLEnum.FramebufferComplete, gl.CheckFramebufferStatus(FramebufferTarget.Framebuffer));
+            void WriteMask(int value) => gl.ColorMask(value != 1, value == 0, value == 0, value == 0);
+            void Draw(bool seed)
+            {
+                gl.BindFramebuffer(FramebufferTarget.Framebuffer, framebuffer);
+                gl.Viewport(0, 0, 32, 32);
+                WriteMask(0);
+                gl.DepthMask(true);
+                gl.ClearColor(.0625f, .125f, .1875f, .375f);
+                gl.ClearDepth(!seed && hidden ? .2 : 1);
+                gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
+                int clearMask = !seed && !composeMask ? mask : 0;
+                WriteMask(clearMask);
+                Assert.True(bloom.BeginPasses());
+                var restored = new int[4];
+                gl.GetInteger(GLEnum.ColorWritemask, restored);
+                Assert.Equal(new[] { clearMask != 1 ? 1 : 0, clearMask == 0 ? 1 : 0,
+                    clearMask == 0 ? 1 : 0, clearMask == 0 ? 1 : 0 }, restored);
+                WriteMask(0);
+                gl.Enable(EnableCap.DepthTest);
+                gl.DepthFunc(DepthFunction.Lequal);
+                gl.DepthMask(false);
+                gl.Disable(EnableCap.Blend);
+                gl.Disable(EnableCap.CullFace);
+                gl.BindVertexArray(vao);
+                gl.UseProgram(program);
+                gl.Uniform3(gl.GetUniformLocation(program, "tint"), seed ? .25f : 0f, seed ? .5f : 0f, seed ? 0f : .75f);
+                gl.DrawArrays(PrimitiveType.Triangles, 0, 3);
+                bloom.EndPasses();
+                WriteMask(!seed && composeMask ? mask : 0);
+                bloom.Compose();
+            }
+            Draw(true);
+            Draw(false);
+            var pixels = new float[32 * 32 * 4];
+            gl.ReadPixels<float>(0, 0, 32, 32, PixelFormat.Rgba, PixelType.Float, pixels);
+            for (int at = 0; at < pixels.Length; at += 4)
+            {
+                Assert.InRange(MathF.Abs(pixels[at] - .0625f), 0, .005f);
+                Assert.InRange(MathF.Abs(pixels[at + 1] - .125f), 0, .005f);
+                Assert.InRange(MathF.Abs(pixels[at + 2] - (.1875f + (hidden ? 0f : .75f))), 0, .005f);
+                Assert.InRange(MathF.Abs(pixels[at + 3] - .375f), 0, .00001f);
+            }
+            Assert.Equal(GLEnum.NoError, gl.GetError());
+        }
+        finally
+        {
+            gl.ColorMask(true, true, true, true);
+            gl.UseProgram(0);
+            gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+            gl.DeleteFramebuffer(framebuffer);
+            gl.DeleteTexture(texture);
+            gl.DeleteRenderbuffer(depth);
+            gl.DeleteVertexArray(vao);
+            gl.DeleteProgram(program);
+        }
+    }
+
     [Theory]
     [InlineData(0, false)]
     [InlineData(0, true)]

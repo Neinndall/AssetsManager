@@ -1,3 +1,18 @@
+AssetsManager - League of Legends | v4.1.0.9
+
+HOTFIX UPDATE
+
+New Features
+
+Improvements
+
+Changes
+
+Bug Fixes
+  - 3D Studio / Prevent stale or incorrect glow when preceding materials disable color writes.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
 AssetsManager - League of Legends | v4.1.0.8
 
 HOTFIX UPDATE
