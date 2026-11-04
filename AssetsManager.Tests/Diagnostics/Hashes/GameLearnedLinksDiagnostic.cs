@@ -10,6 +10,7 @@ using AssetsManager.Services.Hashes.Guessers;
 using AssetsManager.Services.Hashes.Guessers.Game;
 using AssetsManager.Views.Models.Hashes;
 using AssetsManager.Services.Parsers;
+using AssetsManager.Utils;
 using LeagueToolkit.Core.Meta;
 using LeagueToolkit.Core.Meta.Properties;
 using LeagueToolkit.Core.Wad;
@@ -53,6 +54,19 @@ internal static class GameLearnedLinksDiagnostic
             if (space > 0 && ulong.TryParse(line.AsSpan(0, space), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out ulong h))
                 names.TryAdd(h, line[(space + 1)..]);
         }
+        string extraNames = args.FirstOrDefault(a => a.StartsWith("--bin-names=", StringComparison.Ordinal))?[12..];
+        if (extraNames != null)
+            foreach (string line in File.ReadLines(extraNames))
+            {
+                int separator = line.IndexOf(' ');
+                if (separator <= 0) continue;
+                string value = line[(separator + 1)..];
+                ulong hash = ulong.Parse(line.AsSpan(0, separator), NumberStyles.HexNumber, CultureInfo.InvariantCulture);
+                if (System.IO.Hashing.XxHash3.HashToUInt64(System.Text.Encoding.UTF8.GetBytes(value.ToLowerInvariant())) != hash)
+                    throw new InvalidDataException("Additional BIN name does not match its XXH3 hash.");
+                names[hash] = value;
+                names[Fnv1a.HashLower(value)] = value;
+            }
         string Resolve(uint h) => names.GetValueOrDefault(h, h.ToString("x8"));
         string ResolveWide(ulong h) => names.GetValueOrDefault(h, h.ToString("x16"));
         var guesser = new GameHashGuesser(resolvedFile == null ? hashFile : new HashFile(HashGuessDomain.Game, known.Values),
@@ -84,14 +98,15 @@ internal static class GameLearnedLinksDiagnostic
             foreach (var chunk in wad.Chunks.Values)
             {
                 known.TryGetValue(chunk.PathHash, out string path);
-                if (!atlas && (path == null || !path.EndsWith(".bin", StringComparison.Ordinal))) continue;
+                if (!atlas && (path == null ? !grep || !unknown.Contains(chunk.PathHash) : !path.EndsWith(".bin", StringComparison.Ordinal))) continue;
                 if (atlas && (chunk.Compression == WadChunkCompression.Satellite || chunk.UncompressedSize < 24 || chunk.UncompressedSize > 32_768)) continue;
                 if (!visited.Add((chunk.PathHash, chunk.Checksum))) continue;
                 try
                 {
                     using var data = wad.LoadChunkDecompressed(chunk);
                     if (atlas && !ImageAutoAtlas.IsAtlas(data.Span)) continue;
-                    path ??= chunk.PathHash.ToString("x16");
+                    if (path == null && grep && !FileTypeDetector.IsPropertyBin(data.Span)) continue;
+                    path ??= chunk.PathHash.ToString("x16") + (grep ? ".bin" : "");
                     if (grep || atlas)
                         guesser.GrepWad(engine, data.DangerousGetArray(), path, wadPath, chunk.PathHash, CancellationToken.None);
                     else

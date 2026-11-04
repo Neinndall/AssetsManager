@@ -16,6 +16,42 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes;
 public sealed class GameUiPortraitTests
 {
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void UnknownSceneBinsUseTheirDeclaredNameAndAnObservedNamespace(bool hashedName)
+    {
+        const string entry = "ClientStates/Gameplay/UX/LoL/Future/FutureTracker";
+        const string expected = "battle.futuretracker.bin";
+        ulong target = XxHash64Ext.Hash(expected);
+        var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[] { "battle.seed.bin" }),
+            resolveBinHash: hash => hash == Fnv1a.HashLower(entry) ? entry : null);
+        BinTreeProperty name = hashedName ? new BinTreeHash(Fnv1a.HashLower("name"), Fnv1a.HashLower(entry)) :
+            new BinTreeString(Fnv1a.HashLower("name"), entry);
+        var tree = new BinTree(new[] { new BinTreeObject(Fnv1a.HashLower(entry), 123, new[] { name }) }, Array.Empty<string>());
+        using var stream = new MemoryStream();
+        tree.Write(stream);
+        var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong> { target, 42 });
+        game.GrepWad(engine, new ArraySegment<byte>(stream.ToArray()), $"{target:x16}.bin", "UI.wad.client", target);
+        Assert.Equal(expected, Assert.Single(engine.Matches.Values).Path);
+        Assert.Contains(42UL, engine.UnknownHashes);
+    }
+
+    [Fact]
+    public void SceneFilenameEvidenceCannotResolveAnotherChunk()
+    {
+        const string entry = "ClientStates/Gameplay/UX/LoL/Future/FutureTracker";
+        ulong target = XxHash64Ext.Hash("battle.futuretracker.bin");
+        var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[] { "battle.seed.bin" }));
+        var tree = new BinTree(new[] { new BinTreeObject(1, 2, new BinTreeProperty[]
+        { new BinTreeString(Fnv1a.HashLower("name"), entry) }) }, Array.Empty<string>());
+        using var stream = new MemoryStream();
+        tree.Write(stream);
+        var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong> { target, 42 });
+        game.GrepWad(engine, new ArraySegment<byte>(stream.ToArray()), "unknown.bin", "UI.wad.client", 42);
+        Assert.Empty(engine.Matches);
+    }
+
+    [Theory]
     [InlineData("Jade", "Background", "wheel_default.png", 0x22761269e893db46UL, true)]
     [InlineData("Jade", "Center_BG", "wheel_center_default.png", 0xc6b783ffc9bdda9eUL, true)]
     [InlineData("Jade", "1N_ButtonHover", "wheel_highlight_01.png", 0x20ee9ead5cfe5b09UL, true)]

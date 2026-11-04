@@ -1,3 +1,18 @@
+AssetsManager - League of Legends | v4.1.0.10
+
+HOTFIX UPDATE
+
+New Features
+
+Improvements
+  - Hash Guessing Lab / Recover unknown UI BIN filenames from their declared scene names.
+
+Changes
+
+Bug Fixes
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
 AssetsManager - League of Legends | v4.1.0.9
 
 HOTFIX UPDATE
