@@ -9,6 +9,7 @@ Improvements
 Changes
 
 Bug Fixes
+  - 3D Studio / Prevent earlier rendering passes from altering or clipping FXAA edge smoothing.
   - 3D Studio / Preserve hidden model parts in T-Pose and reuse loaded characters when changing selection in the scene tree.
   - 3D Studio / Restore particle shadows lost when slice effects combine erosion with a transparent color ramp.
   - 3D Studio / Keep particle shadow depth offsets aligned with the light when rotating the view.

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using AssetsManager.Services.Viewer.Rendering;
+using AssetsManager.Services.Viewer.Rendering.Core;
 using AssetsManager.Services.Viewer.Rendering.GameShaders;
 using AssetsManager.Services.Viewer.Vfx.Rendering;
 using AssetsManager.Services.Viewer.Vfx.Runtime;
@@ -215,6 +216,119 @@ public sealed class VfxStencilGpuTests
         var writer = frame.Emitter(1, 5, new(1, 0, 0, 1), 2);
         frame.Renderer.Render(new[] { new VfxRenderQueueEntry(writer, 0, 0) }, frame.ViewProjection, frame.View, true);
         for (int x = 0; x < 64; x++) Assert.Equal(192, frame.Stencil(x));
+    }
+
+    public static IEnumerable<object[]> PatternMaskCases()
+    {
+        foreach (byte writerMode in new byte[] { 1, 4 })
+        foreach (byte reference in new byte[] { 0, 5, 63, 127 })
+        foreach (byte testerMode in new byte[] { 2, 3, 4 })
+        foreach (bool native in new[] { false, true })
+            yield return new object[] { writerMode, reference, testerMode, native };
+    }
+
+    [Theory]
+    [MemberData(nameof(PatternMaskCases))]
+    public void AlphaCutoutMasksKeepTheirHolesAndClearBetweenFrames(byte writerMode, byte reference, byte testerMode, bool native)
+    {
+        using var frame = new Frame(native);
+        GL gl = frame.Gl;
+        uint pattern = gl.GenTexture();
+        try
+        {
+            gl.BindTexture(TextureTarget.Texture2D, pattern);
+            gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
+            gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
+            var writer = frame.Emitter(writerMode, reference, Vector4.One, 1);
+            writer.Texture = pattern;
+            writer.TextureWidth = 4;
+            writer.Def = writer.Def with
+            {
+                RenderState = writer.Def.RenderState with { AlphaReference = 128 }
+            };
+            var tester = frame.Emitter(testerMode, reference, new(0, 1, 0, 1), 1);
+            for (int currentFrame = 0; currentFrame < 2; currentFrame++)
+            {
+                // The second frame swaps transparent and opaque stripes on the same texture and framebuffer.
+                byte[] texels = new byte[16];
+                for (int stripe = 0; stripe < 4; stripe++)
+                {
+                    texels[stripe * 4] = 255;
+                    texels[stripe * 4 + 3] = (stripe + currentFrame) % 2 == 1 ? (byte)255 : (byte)0;
+                }
+                gl.ActiveTexture(TextureUnit.Texture0);
+                gl.BindTexture(TextureTarget.Texture2D, pattern);
+                gl.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.Rgba8, 4, 1, 0,
+                    PixelFormat.Rgba, PixelType.UnsignedByte, texels.AsSpan());
+                frame.Clear();
+                frame.Draw(writer, tester);
+                int maskedReference = reference & 63;
+                for (int stripe = 0; stripe < 4; stripe++)
+                {
+                    int x = stripe * 16 + 8;
+                    bool opaque = (stripe + currentFrame) % 2 == 1;
+                    bool writerPasses = opaque && (writerMode == 1 || maskedReference != 0);
+                    int stencilBeforeTest = writerPasses ? maskedReference : 0;
+                    bool testerPasses = testerMode == 2
+                        ? stencilBeforeTest == maskedReference : stencilBeforeTest != maskedReference;
+                    int finalStencil = testerMode == 4 && testerPasses ? maskedReference : stencilBeforeTest;
+                    byte[] pixel = frame.Pixel(x);
+                    Assert.Equal(testerPasses ? 255 : 0, pixel[1]);
+                    Assert.Equal(!testerPasses && writerPasses ? 255 : 0, pixel[0]);
+                    Assert.Equal(0, pixel[2]);
+                    Assert.Equal(192 | finalStencil, frame.Stencil(x));
+                }
+                if (native) Assert.Null(frame.Renderer.GameParticleFallback(writer, false));
+            }
+        }
+        finally { gl.DeleteTexture(pattern); }
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void SceneDepthPrepassCopiesStencilWithoutChangingTheVisibleMask(bool scissor, bool fail)
+    {
+        using var frame = new Frame(false);
+        GL gl = frame.Gl;
+        using var prepass = new GlSceneDepthPass(gl);
+        frame.Draw(frame.Emitter(1, 5, new(1, 0, 0, 1), .4f));
+        var before = new byte[64];
+        for (int x = 0; x < before.Length; x++) before[x] = frame.Stencil(x);
+        gl.StencilFuncSeparate(TriangleFace.Front, StencilFunction.Never, 8, 0xa5);
+        gl.StencilFuncSeparate(TriangleFace.Back, StencilFunction.Greater, 9, 0x5a);
+        gl.StencilMaskSeparate(TriangleFace.Front, 0x05);
+        gl.StencilMaskSeparate(TriangleFace.Back, 0x0a);
+        gl.Enable(EnableCap.StencilTest);
+        gl.Scissor(16, 0, 32, 64);
+        if (scissor) gl.Enable(EnableCap.ScissorTest);
+        else gl.Disable(EnableCap.ScissorTest);
+        int framebuffer = gl.GetInteger(GLEnum.DrawFramebufferBinding);
+        Action render = () => prepass.Render(64, 64, () =>
+        {
+            for (int x = 0; x < before.Length; x++) Assert.Equal(before[x], frame.Stencil(x));
+            frame.Draw(frame.Emitter(1, 9, new(0, 0, 1, 1), 1));
+            Assert.Equal(201, frame.Stencil(32));
+            Assert.Equal(255, frame.Pixel(32)[2]);
+        }, () =>
+        {
+            if (fail) throw new InvalidOperationException("controlled capture failure");
+        });
+        if (fail) Assert.Throws<InvalidOperationException>(render);
+        else render();
+        Assert.Equal(framebuffer, gl.GetInteger(GLEnum.DrawFramebufferBinding));
+        Assert.Equal(framebuffer, gl.GetInteger(GLEnum.ReadFramebufferBinding));
+        for (int x = 0; x < before.Length; x++) Assert.Equal(before[x], frame.Stencil(x));
+        Assert.Equal(255, frame.Pixel(32)[0]);
+        Assert.Equal(0, frame.Pixel(32)[2]);
+        Assert.Equal(scissor, gl.IsEnabled(EnableCap.ScissorTest));
+        Assert.True(gl.IsEnabled(EnableCap.StencilTest));
+        Assert.Equal(0x05, gl.GetInteger(GLEnum.StencilWritemask));
+        Assert.Equal(0x0a, gl.GetInteger(GLEnum.StencilBackWritemask));
+        Assert.Equal((int)StencilFunction.Never, gl.GetInteger(GLEnum.StencilFunc));
+        Assert.Equal((int)StencilFunction.Greater, gl.GetInteger(GLEnum.StencilBackFunc));
     }
 
     private sealed class ParticlePass(VfxOpenGlRenderer renderer, VfxPlaybackRuntime.EmitterState emitter,
