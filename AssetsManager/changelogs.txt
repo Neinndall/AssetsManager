@@ -1,13 +1,10 @@
 AssetsManager - League of Legends | v4.1.0.8
 
 HOTFIX UPDATE
-
-New Features
+This hotfix addresses critical visual rendering and animation issues in 3D Studio, resolves the loss of audio events for skins with multiple forms (such as DJ Sona), improves navigation stability in the Explorer, and optimizes memory usage in the Hash Guessing Lab, alongside the verification of new hashes.
 
 Improvements
   - Hash Guessing Lab / Improve GAME Custom Texture Build List with model-driven particle names, observed numeric suffixes, shared companion material roles, and cross-character variant modifiers; verify 3 unknown hashes while reducing memory use and preserving existing search priority.
-
-Changes
 
 Bug Fixes
   - Explorer / Preserve selection without flicker when clearing filters and start new searches at the top of the results.
