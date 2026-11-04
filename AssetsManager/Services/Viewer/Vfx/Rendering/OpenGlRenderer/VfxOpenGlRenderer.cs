@@ -416,6 +416,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _particleUniforms.Uniform3(_particleUniforms.CamUp, camUp.X, camUp.Y, camUp.Z);
             _particleUniforms.Uniform3(_particleUniforms.CamPos, camPos.X, camPos.Y, camPos.Z);
             _particleUniforms.Uniform1(_particleUniforms.Orthographic, projection.M34 == 0f ? 1 : 0);
+            // Shadow corners face the scene eye, but their orthographic depth push follows the light.
+            var depthPushDirection = _drawingShadows
+                ? Vector3.Normalize(new Vector3(viewProj.M13, viewProj.M23, viewProj.M33))
+                : -Vector3.Cross(camRight, camUp);
+            _particleUniforms.Uniform3(_particleUniforms.DepthPushDirection,
+                depthPushDirection.X, depthPushDirection.Y, depthPushDirection.Z);
             _particleUniforms.Uniform1(_particleUniforms.Tex, 0);
             _particleUniforms.Uniform1(_particleUniforms.TexMult, 1);
             _particleUniforms.Uniform1(_particleUniforms.ColorMap, 7);
