@@ -25,6 +25,93 @@ namespace AssetsManager.Tests.xUnit.Services.Explorer;
 
 public sealed class ExplorerSearchNavigationTests
 {
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    public void ClearingExpandedLargeWadThenSearchingAgainKeepsTheSelectedRowInView(int selectionDepth) => Run(async () =>
+    {
+        using var fixture = new TreeFixture(4, 160, productionStyle: true);
+        fixture.Target.Name = "Sona.wad.client";
+        fixture.Target.Type = NodeType.WadFile;
+        for (int i = 0; i < 20000; i++)
+            fixture.Target.Children.Add(new FileSystemNodeModel($"{i:x16}.bin", NodeType.VirtualFile) { Parent = fixture.Target });
+        var assets = new FileSystemNodeModel("assets", NodeType.VirtualDirectory) { Parent = fixture.Target };
+        var sound = new FileSystemNodeModel("sona_skin06_sfx_audio.bnk", NodeType.VirtualFile) { Parent = assets };
+        assets.Children.Add(sound);
+        fixture.Target.Children.Add(assets);
+        var other = new FileSystemNodeModel("Aatrox.wad.client", NodeType.WadFile) { Parent = fixture.Target.Parent };
+        fixture.Target.Parent.Children.Insert(0, other);
+        var search = new WadSearchBoxService(null, new LogService(Log.Logger));
+        var navigation = new TreeUIManager();
+        try
+        {
+            var first = selectionDepth == 0 ? fixture.Target : selectionDepth == 1 ? assets : sound;
+            foreach (var target in new[] { first, other, fixture.Target, other, first })
+            {
+                string query = ReferenceEquals(target, other) ? "aatrox" : "sona";
+                await search.PerformSearchAsync(query, fixture.Roots, fixture.Tree.SelectedItem as FileSystemNodeModel);
+                Assert.True(await navigation.SelectAndFocusNodeAsync(fixture.Tree, fixture.Roots, target, false));
+                var path = navigation.FindNodePath(fixture.Roots, target);
+                var item = GetItem(fixture.Tree, path);
+                if (!item.IsExpanded && item.HasItems) item.IsExpanded = true;
+                item.IsSelected = true;
+                await Dispatcher.Yield(DispatcherPriority.ContextIdle);
+                var restored = await search.PerformSearchAsync("", fixture.Roots, target);
+                Assert.Same(target, restored);
+                Assert.True(await navigation.SelectAndFocusNodeAsync(fixture.Tree, fixture.Roots, target, false));
+                await Task.Delay(200);
+                fixture.Tree.UpdateLayout();
+                Assert.Same(target, fixture.Tree.SelectedItem);
+                Assert.True(target.IsSelected, $"Selection was cleared for {target.Name}.");
+                Assert.True(GetItem(fixture.Tree, path).IsSelected);
+                AssertHeaderInViewport(fixture.Tree, path);
+            }
+        }
+        finally { search.InvalidateIndex(fixture.Roots); }
+    });
+
+    [Fact]
+    public void ClearingSearchRestoresCollapsedDescendantsBeforeReturning() => Run(async () =>
+    {
+        var root = new FileSystemNodeModel("Sona.wad.client", NodeType.WadFile);
+        var child = new FileSystemNodeModel("assets", NodeType.VirtualDirectory) { Parent = root };
+        var leaf = new FileSystemNodeModel("unknown.bin", NodeType.VirtualFile) { Parent = child };
+        child.Children.Add(leaf);
+        root.Children.Add(child);
+        var roots = new ObservableRangeCollection<FileSystemNodeModel> { root };
+        var search = new WadSearchBoxService(null, new LogService(Log.Logger));
+        try
+        {
+            await search.PerformSearchAsync("sona", roots);
+            Assert.False(leaf.IsVisible);
+            await search.PerformSearchAsync("", roots, root);
+            Assert.True(leaf.IsVisible);
+            Assert.Same(root.LoadedChildren, root.VisibleChildren);
+            Assert.Same(child.LoadedChildren, child.VisibleChildren);
+            Assert.False(root.IsExpanded);
+            Assert.False(child.IsExpanded);
+        }
+        finally { search.InvalidateIndex(roots); }
+    });
+
+    private static TreeViewItem GetItem(TreeView tree, IReadOnlyList<FileSystemNodeModel> path)
+    {
+        ItemsControl owner = tree;
+        foreach (var node in path)
+            owner = Assert.IsType<TreeViewItem>(owner.ItemContainerGenerator.ContainerFromItem(node));
+        return (TreeViewItem)owner;
+    }
+
+    private static void AssertHeaderInViewport(TreeView tree, IReadOnlyList<FileSystemNodeModel> path)
+    {
+        var item = GetItem(tree, path);
+        var header = Assert.IsAssignableFrom<FrameworkElement>(item.Template.FindName("PART_Header", item));
+        var bounds = header.TransformToAncestor(tree).TransformBounds(new Rect(header.RenderSize));
+        Assert.True(bounds.Height > 0 && bounds.Bottom > 0 && bounds.Top < tree.ActualHeight,
+            $"Selected header is outside the viewport: {bounds}, tree height {tree.ActualHeight}.");
+    }
+
     [Fact]
     public void FilteringAllowsInputToCancelBeforeTheRemainingRowsAreUpdated() => Run(async () =>
     {
@@ -433,7 +520,7 @@ public sealed class ExplorerSearchNavigationTests
                 Tree.ItemsPanel = new ItemsPanelTemplate(new FrameworkElementFactory(typeof(DeferredPanel)));
             }
             _window = new Window { Width = 430, Height = 310, Content = Tree, ShowActivated = false,
-                ShowInTaskbar = false, Opacity = 0, WindowStyle = WindowStyle.None };
+                ShowInTaskbar = false, Opacity = 0, WindowStyle = WindowStyle.None, Left = -32000, Top = -32000 };
             _window.Show();
             _window.UpdateLayout();
         }

@@ -144,7 +144,7 @@ namespace AssetsManager.Services.Explorer
 
                 if (string.IsNullOrWhiteSpace(searchText))
                 {
-                    await PerformResetAsync(nodes, allNodes, activeNode, cancellationToken);
+                    await PerformResetAsync(allNodes, cancellationToken);
                     return activeNode; // Return activeNode so the UI takes the user to it after clearing
                 }
 
@@ -155,7 +155,7 @@ namespace AssetsManager.Services.Explorer
 
                 if (keywords.Length == 0)
                 {
-                    await PerformResetAsync(nodes, allNodes, activeNode, cancellationToken);
+                    await PerformResetAsync(allNodes, cancellationToken);
                     return activeNode;
                 }
 
@@ -383,66 +383,22 @@ namespace AssetsManager.Services.Explorer
 
         #region --- Reset Logic ---
 
-        private async Task PerformResetAsync(ObservableRangeCollection<FileSystemNodeModel> nodes, IReadOnlyList<FileSystemNodeModel> allNodes, FileSystemNodeModel activeNode, CancellationToken cancellationToken)
+        private async Task PerformResetAsync(IReadOnlyList<FileSystemNodeModel> allNodes, CancellationToken cancellationToken)
         {
-            var prioritizedNodes = new HashSet<FileSystemNodeModel>();
-            foreach (var root in nodes) prioritizedNodes.Add(root);
-
-            if (activeNode != null)
-            {
-                var current = activeNode;
-                while (current != null)
-                {
-                    prioritizedNodes.Add(current);
-                    if (current.Parent != null && current.Parent.LoadedChildren != null)
-                        foreach (var sibling in current.Parent.LoadedChildren) prioritizedNodes.Add(sibling);
-                    current = current.Parent;
-                }
-            }
-
-            foreach (var node in allNodes)
-            {
-                if (node.IsExpanded)
-                {
-                    prioritizedNodes.Add(node);
-                    var children = node.LoadedChildren;
-                    if (children != null)
-                        foreach (var child in children) prioritizedNodes.Add(child);
-                }
-            }
-
+            // Restore descendants before exposing their parent collections. Navigation must wait
+            // for the complete projection so later resets cannot move the selected row again.
             var sw = System.Diagnostics.Stopwatch.StartNew();
-            foreach (var node in prioritizedNodes)
+            for (int i = allNodes.Count - 1; i >= 0; i--)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                ResetNodeState(node);
-                if (sw.ElapsedMilliseconds > 16) { await Dispatcher.Yield(DispatcherPriority.Background); sw.Restart(); }
+                ResetNodeState(allNodes[i]);
+                if (sw.ElapsedMilliseconds > 16)
+                {
+                    await Dispatcher.Yield(DispatcherPriority.Background);
+                    sw.Restart();
+                }
             }
-
-            _ = (Application.Current?.Dispatcher ?? Dispatcher.CurrentDispatcher).InvokeAsync(async () =>
-            {
-                try
-                {
-                    await Task.Delay(50, cancellationToken);
-                    var bgSw = System.Diagnostics.Stopwatch.StartNew();
-                    foreach (var node in allNodes)
-                    {
-                        if (cancellationToken.IsCancellationRequested) break;
-                        if (prioritizedNodes.Contains(node)) continue;
-
-                        if (!node.IsVisible || node.HasMatch || node.HasFilteredChildren)
-                        {
-                            ResetNodeState(node);
-                            if (bgSw.ElapsedMilliseconds > 16) { await Dispatcher.Yield(DispatcherPriority.Background); bgSw.Restart(); }
-                        }
-                    }
-                }
-                catch (OperationCanceledException) { }
-                catch (Exception ex)
-                {
-                    _logService.LogError(ex, "An error occurred during background search reset.");
-                }
-            }, DispatcherPriority.Background).Task.Unwrap();
+            cancellationToken.ThrowIfCancellationRequested();
         }
 
         private void ResetNodeState(FileSystemNodeModel node)

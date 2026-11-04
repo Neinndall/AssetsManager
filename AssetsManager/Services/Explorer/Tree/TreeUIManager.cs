@@ -79,6 +79,12 @@ namespace AssetsManager.Services.Explorer.Tree
                         cancellationToken.ThrowIfCancellationRequested();
                         if (container is TreeView tree && !ReferenceEquals(tree.SelectedItem, target)) return false;
                         target.IsSelected = true;
+                        // Selection and collection changes can trigger another virtualization pass.
+                        await container.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ContextIdle, cancellationToken);
+                        cancellationToken.ThrowIfCancellationRequested();
+                        container.UpdateLayout();
+                        if (!ReferenceEquals(GetGeneratedItem(container, path), selectedItem) || !selectedItem.IsSelected)
+                            break;
                         if (focus) selectedItem.Focus();
                         return true;
                     }
