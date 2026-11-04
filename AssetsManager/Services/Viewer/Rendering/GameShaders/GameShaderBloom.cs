@@ -131,8 +131,13 @@ void main()
             _gl.Viewport(0, 0, width, height);
             if (!_pending)
             {
+                Span<int> colorMask = stackalloc int[4];
+                _gl.GetInteger(GLEnum.ColorWritemask, colorMask);
+                // Clear every channel even when the preceding material disabled colour writes.
+                _gl.ColorMask(true, true, true, true);
                 _gl.ClearColor(0f, 0f, 0f, 0f);
                 _gl.Clear(ClearBufferMask.ColorBufferBit);
+                _gl.ColorMask(colorMask[0] != 0, colorMask[1] != 0, colorMask[2] != 0, colorMask[3] != 0);
                 _pending = true;
             }
             return true;
@@ -157,6 +162,7 @@ void main()
             _gl.BindSampler(0, 0);
             _gl.GetInteger(GLEnum.FramebufferBinding, out int target);
             _gl.GetInteger(GLEnum.Viewport, _previousViewport);
+            _gl.ColorMask(true, true, true, true);
             _gl.Disable(EnableCap.DepthTest);
             _gl.DepthMask(false);
             _gl.Disable(EnableCap.CullFace);

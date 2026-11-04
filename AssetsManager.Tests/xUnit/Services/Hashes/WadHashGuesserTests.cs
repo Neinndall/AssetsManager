@@ -2088,11 +2088,12 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
                 "assets/test/icon12.dds"
             }));
 
-            var candidates = game.SubstituteBasicNumbers(3).Select(candidate => candidate.Path).ToHashSet();
-
-            Assert.Contains("assets/test/icon2.dds", candidates);
-            Assert.Contains("assets/test/icon02.dds", candidates);
-            Assert.DoesNotContain("assets/test/icon002.dds", candidates);
+            var engine = CreateEngine(HashGuessDomain.Game, "assets/test/icon2.dds", "assets/test/icon02.dds", "assets/test/icon002.dds");
+            game.SubstituteNumbers(engine, CancellationToken.None, maximum: 3);
+            game.SubstituteBasicPaddedNumbers(engine, CancellationToken.None, maximum: 3);
+            Assert.Equal("assets/test/icon2.dds", engine.Matches[XxHash64Ext.Hash("assets/test/icon2.dds")].Path);
+            Assert.Equal("assets/test/icon02.dds", engine.Matches[XxHash64Ext.Hash("assets/test/icon02.dds")].Path);
+            Assert.Contains(XxHash64Ext.Hash("assets/test/icon002.dds"), engine.UnknownHashes);
         }
 
         [Fact]
@@ -2103,27 +2104,11 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
                 "assets/test/icon12.dds"
             }));
 
-            var candidates = game.SubstituteBasicNumbers(100).Select(candidate => candidate.Path).ToList();
-
-            Assert.Equal(110, candidates.Count);
-            Assert.Equal(candidates.Count, candidates.Distinct(StringComparer.Ordinal).Count());
-        }
-
-        [Fact]
-        public void BinEntryBasenamesGenerateFilteredGameExtensionCandidates()
-        {
-            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
-            {
-                "assets/test/source.dds",
-                "assets/shaders/source.glsl_100"
-            }));
-
-            var candidates = game.GuessFromBinEntryBasenames(new[] { "Characters/Ahri/Spells/Orb" })
-                .Select(candidate => candidate.Path)
-                .ToList();
-
-            Assert.Contains("orb.dds", candidates);
-            Assert.DoesNotContain("orb.glsl_100", candidates);
+            var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong> { 42 });
+            int unpadded = game.SubstituteNumbers(engine, CancellationToken.None, maximum: 100);
+            int padded = game.SubstituteBasicPaddedNumbers(engine, CancellationToken.None, maximum: 100);
+            Assert.Equal(110, unpadded + padded);
+            Assert.Equal(110L, engine.CheckedCandidates);
         }
 
         [Fact]

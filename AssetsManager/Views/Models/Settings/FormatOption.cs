@@ -28,6 +28,12 @@ namespace AssetsManager.Views.Models.Settings
         };
     }
 
+    public enum VideoExportFormat
+    {
+        Original,
+        Mp4
+    }
+
     public enum ImageExportFormat
     {
         Original,

@@ -344,9 +344,7 @@ namespace AssetsManager.Services.Viewer.Runtime
             Model.GameState = GameMaterialState.Preview(_gameStates, clip, PlaybackBundle.SpellPreviews);
             Session.SetOwnerGameState((Model.GameState ?? GameMaterialState.Resting) with { Gear = Form?.GearIndex ?? -1 });
             _formHiddenSubmeshes = null;
-            _visibilityTimeline = clip == null
-                ? Array.Empty<VfxClipCueEvaluator.VisibilityEntry>()
-                : VfxClipCueEvaluator.BuildVisibilityTimeline(clip.TimedCues, FormHiddenSubmeshes);
+            _visibilityTimeline = VfxClipCueEvaluator.BuildVisibilityTimeline(clip?.TimedCues, FormHiddenSubmeshes);
             Animation.SetPoseCues(clip?.TimedCues,
                 Bundle.AnimationGraphs.FirstOrDefault(graph => graph.PathHash == clip?.Clip?.GraphPathHash)?.Masks);
             _hiddenDirty = true;

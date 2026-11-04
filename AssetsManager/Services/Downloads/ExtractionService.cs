@@ -122,7 +122,7 @@ namespace AssetsManager.Services.Downloads
             return await ExtractDiffsCoreAsync(
                 diffs, oldLolPath, newLolPath, cancellationToken,
                 diff => GetModeForSmartExport(diff),
-                ExportFormats.ExplorerSmart(_appSettings.AudioExportFormat));
+                ExportFormats.ExplorerSmart(_appSettings.AudioExportFormat, _appSettings.VideoExportFormat));
         }
 
         public WadExportMode GetModeFromSettings(SerializableChunkDiff diff)
@@ -350,7 +350,7 @@ namespace AssetsManager.Services.Downloads
                         SavingProgressChanged?.Invoke(processed, total, currentFile);
                     },
                     onFileSavedCallback,
-                    ExportFormats.ExplorerSmart(_appSettings.AudioExportFormat));
+                    ExportFormats.ExplorerSmart(_appSettings.AudioExportFormat, _appSettings.VideoExportFormat));
             }
             catch (OperationCanceledException)
             {

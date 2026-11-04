@@ -27,6 +27,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
         private readonly ConditionalWeakTable<HashGuessEngine, ConcurrentDictionary<string, byte>> _scannedWadCharacters = new();
         private readonly ConditionalWeakTable<HashGuessEngine, RegaliaMatchIndex> _regaliaMatches = new();
         private readonly ConditionalWeakTable<HashGuessEngine, GameBinLinkTemplateIndex> _linkTemplates = new();
+        private readonly ConditionalWeakTable<HashGuessEngine, GameAnimationFormIndex> _animationForms = new();
         private sealed record RegaliaMatchIndex(HashSet<ulong> Targets, Dictionary<ulong, string> Paths);
 
         internal override void ReleaseMemory()
@@ -35,6 +36,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             _scannedWadCharacters.Clear();
             _regaliaMatches.Clear();
             _linkTemplates.Clear();
+            _animationForms.Clear();
         }
 
         internal override bool ShouldGrepExtension(string extension) =>
@@ -209,8 +211,13 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                     GuessSiblingLinkPaths(engine, sourceWadPath, sourceChunkHash, cancellationToken, GetCachedBinTree);
                     BinTree linkTree = GetCachedBinTree();
                     if (linkTree != null)
+                    {
                         _linkTemplates.GetValue(engine, static _ => new GameBinLinkTemplateIndex()).Guess(engine, linkTree, HashFile.Load(),
                             _resolveBinHash, _resolveBinHash64, sourceWadPath, sourceChunkHash, cancellationToken);
+                        _animationForms.GetValue(engine, static _ => new GameAnimationFormIndex()).Guess(
+                            engine, linkTree, sourcePath, character => GetAnimationNames(character, cancellationToken),
+                            sourceWadPath, sourceChunkHash, cancellationToken);
+                    }
                 }
 
                 GuessChampionSpecialBins(engine, sourceWadPath, cancellationToken);
@@ -1488,7 +1495,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
         private static readonly Regex SkinBinFileRegex = new(
             @"^(?:assets|data)/characters/(?<champ>[^/]+)/(?<folder>skins|themes)/(?<skin>(?:skin|theme)\d+|base)\.bin$",
             RegexOptions.Compiled | RegexOptions.IgnoreCase);
-        private static readonly uint SkinPropertiesClassHash = Fnv1a.HashLower("SkinCharacterDataProperties");
+        private static readonly uint SkinMeshClassHash = Fnv1a.HashLower("SkinMeshDataProperties");
         private static readonly uint StaticMaterialClassHash = Fnv1a.HashLower("StaticMaterialDef");
         private static readonly uint SkinMeshPropertiesHash = Fnv1a.HashLower("skinMeshProperties");
         private static readonly uint MaterialOverrideHash = Fnv1a.HashLower("materialOverride");
@@ -1618,12 +1625,12 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             var directTargets = new HashSet<ulong>();
             var roles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-            foreach (BinTreeObject obj in tree.Objects.Values)
+            var meshRoots = tree.Objects.Values.SelectMany(obj => obj.Properties.Values)
+                .Concat(tree.DataOverrides.Select(overrideData => overrideData.Property));
+            foreach (BinTreeStruct mesh in meshRoots.SelectMany(root => FindProperties(root, SkinMeshPropertiesHash))
+                         .OfType<BinTreeStruct>().Where(mesh => mesh.ClassHash == SkinMeshClassHash))
             {
-                if (obj.ClassHash != SkinPropertiesClassHash ||
-                    !obj.Properties.TryGetValue(SkinMeshPropertiesHash, out BinTreeProperty meshProperty) ||
-                    meshProperty is not BinTreeStruct mesh ||
-                    !mesh.Properties.TryGetValue(MaterialOverrideHash, out BinTreeProperty overrideProperty) ||
+                if (!mesh.Properties.TryGetValue(MaterialOverrideHash, out BinTreeProperty overrideProperty) ||
                     overrideProperty is not BinTreeContainer overrides)
                     continue;
 

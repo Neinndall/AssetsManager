@@ -159,6 +159,7 @@ void main() {
         private int _rcpFrameLocation;
         private int _optionsLocation;
         private bool _ready;
+        private bool _embedded;
 
         public bool IsReady => _ready;
 
@@ -173,6 +174,7 @@ void main() {
 
             _gl = gl;
             bool embedded = GlShaderCompiler.UsesEmbeddedProfile(gl);
+            _embedded = embedded;
             _program = GlShaderCompiler.CreateProgram(gl, embedded, VertexShader, FragmentShader);
             _vao = gl.GenVertexArray();
             _capture = new GlSceneCapture(gl);
@@ -206,33 +208,67 @@ void main() {
             if (!_ready || sourceTexture == 0 || width <= 0 || height <= 0)
                 return;
 
-            _gl.Viewport(0, 0, (uint)width, (uint)height);
-            _gl.Disable(EnableCap.DepthTest);
-            _gl.DepthMask(false);
-            _gl.Disable(EnableCap.Blend);
-            _gl.Disable(EnableCap.CullFace);
-            _gl.ColorMask(true, true, true, true);
-
-            _gl.UseProgram(_program);
+            _gl.GetInteger(GLEnum.CurrentProgram, out int program);
+            _gl.GetInteger(GLEnum.VertexArrayBinding, out int vao);
+            _gl.GetInteger(GLEnum.ActiveTexture, out int active);
+            _gl.GetInteger(GLEnum.DepthWritemask, out int depthWrite);
+            Span<int> viewport = stackalloc int[4];
+            Span<int> colorMask = stackalloc int[4];
+            _gl.GetInteger(GLEnum.Viewport, viewport);
+            _gl.GetInteger(GLEnum.ColorWritemask, colorMask);
+            bool depth = _gl.IsEnabled(EnableCap.DepthTest), blend = _gl.IsEnabled(EnableCap.Blend);
+            bool cull = _gl.IsEnabled(EnableCap.CullFace), scissor = _gl.IsEnabled(EnableCap.ScissorTest);
+            bool stencil = _gl.IsEnabled(EnableCap.StencilTest), srgb = !_embedded && _gl.IsEnabled(EnableCap.FramebufferSrgb);
             _gl.ActiveTexture(TextureUnit.Texture0);
-            _gl.BindTexture(TextureTarget.Texture2D, sourceTexture);
-            if (_frameLocation >= 0)
-                _gl.Uniform1(_frameLocation, 0);
-            if (_rcpFrameLocation >= 0)
-                _gl.Uniform2(_rcpFrameLocation, 1f / width, 1f / height);
-            if (_optionsLocation >= 0)
-                _gl.Uniform3(_optionsLocation, DefaultOptions.X, DefaultOptions.Y, DefaultOptions.Z);
+            _gl.GetInteger(GLEnum.TextureBinding2D, out int texture);
+            _gl.GetInteger(GLEnum.SamplerBinding, out int sampler);
+            try
+            {
+                // The captured frame already carries encoded colour; material sampling, masks and
+                // framebuffer encoding must not change this full-screen filter's result.
+                _gl.BindSampler(0, 0);
+                _gl.Disable(EnableCap.ScissorTest);
+                _gl.Disable(EnableCap.StencilTest);
+                if (!_embedded) _gl.Disable(EnableCap.FramebufferSrgb);
+                _gl.Viewport(0, 0, (uint)width, (uint)height);
+                _gl.Disable(EnableCap.DepthTest);
+                _gl.DepthMask(false);
+                _gl.Disable(EnableCap.Blend);
+                _gl.Disable(EnableCap.CullFace);
+                _gl.ColorMask(true, true, true, true);
 
-            _gl.BindVertexArray(_vao);
-            _gl.DrawArrays(PrimitiveType.Triangles, 0, 3);
+                _gl.UseProgram(_program);
+                _gl.BindTexture(TextureTarget.Texture2D, sourceTexture);
+                if (_frameLocation >= 0)
+                    _gl.Uniform1(_frameLocation, 0);
+                if (_rcpFrameLocation >= 0)
+                    _gl.Uniform2(_rcpFrameLocation, 1f / width, 1f / height);
+                if (_optionsLocation >= 0)
+                    _gl.Uniform3(_optionsLocation, DefaultOptions.X, DefaultOptions.Y, DefaultOptions.Z);
 
-            _gl.BindVertexArray(0);
-            _gl.BindTexture(TextureTarget.Texture2D, 0);
-            _gl.UseProgram(0);
+                _gl.BindVertexArray(_vao);
+                _gl.DrawArrays(PrimitiveType.Triangles, 0, 3);
+            }
+            finally
+            {
+                _gl.Viewport(viewport[0], viewport[1], (uint)viewport[2], (uint)viewport[3]);
+                _gl.UseProgram((uint)program);
+                _gl.BindVertexArray((uint)vao);
+                _gl.DepthMask(depthWrite != 0);
+                _gl.ColorMask(colorMask[0] != 0, colorMask[1] != 0, colorMask[2] != 0, colorMask[3] != 0);
+                Restore(EnableCap.DepthTest, depth); Restore(EnableCap.Blend, blend);
+                Restore(EnableCap.CullFace, cull); Restore(EnableCap.ScissorTest, scissor);
+                Restore(EnableCap.StencilTest, stencil); if (!_embedded) Restore(EnableCap.FramebufferSrgb, srgb);
+                _gl.ActiveTexture(TextureUnit.Texture0);
+                _gl.BindTexture(TextureTarget.Texture2D, (uint)texture);
+                _gl.BindSampler(0, (uint)sampler);
+                _gl.ActiveTexture((TextureUnit)active);
+            }
+        }
 
-            _gl.Enable(EnableCap.DepthTest);
-            _gl.DepthFunc(DepthFunction.Lequal);
-            _gl.DepthMask(true);
+        private void Restore(EnableCap cap, bool enabled)
+        {
+            if (enabled) _gl.Enable(cap); else _gl.Disable(cap);
         }
 
         public void Dispose()

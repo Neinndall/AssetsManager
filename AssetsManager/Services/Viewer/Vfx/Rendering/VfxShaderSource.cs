@@ -223,6 +223,7 @@ uniform vec3 uCamUp;
 uniform vec3 uCamPos;
 uniform float uDepthPushPull;
 uniform int uOrthographic;
+uniform vec3 uDepthPushDirection;
 uniform vec2 uTexDiv;
 uniform vec2 uTexSize;
 uniform vec2 uEmitterUvOffset;
@@ -331,7 +332,7 @@ void main(){
         world = aCenter + right * (rc.x * aSize.x) + up * (rc.y * aSize.y);
     }
     // Orthographic rays are parallel, including away from the screen centre.
-    vec3 eyeRay = uOrthographic != 0 ? -cross(uCamRight, uCamUp) : world - uCamPos;
+    vec3 eyeRay = uOrthographic != 0 ? uDepthPushDirection : world - uCamPos;
     if (uDepthPushPull != 0.0 && dot(eyeRay, eyeRay) > 0.000001)
         world += normalize(eyeRay) * uDepthPushPull;
     gl_Position = uViewProj * vec4(world, 1.0);

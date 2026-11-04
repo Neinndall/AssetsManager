@@ -517,7 +517,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 _championAnimationService,
                 session,
                 _clipCatalog,
-                ResolvePreviewSearchDirectory()) { SourceIdentity = _model.SelectedSkin?.IdentityPath };
+                _championSearchDir ?? ResolvePreviewSearchDirectory()) { SourceIdentity = FocusedActor?.Skin.IdentityPath };
 
             _championModel = null;
             _championBundle = null;

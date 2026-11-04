@@ -4,6 +4,8 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Numerics;
+using System.Reflection;
+using System.Text.Json;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using AssetsManager.Services.Core;
@@ -18,6 +20,7 @@ using AssetsManager.Services.Viewer.Vfx.Rendering;
 using AssetsManager.Services.Viewer.Vfx.Resources;
 using AssetsManager.Services.Viewer.Vfx.Runtime;
 using AssetsManager.Services.Viewer.Vfx.Session;
+using AssetsManager.Services.Viewer.Vfx.Semantics;
 using AssetsManager.Tests.Support;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.Viewer;
@@ -31,7 +34,7 @@ using AssetsManager.Utils.Viewport;
 namespace AssetsManager.Tests.Diagnostics.Viewer
 {
     /// <summary>
-    /// `vfx-snapshot <bin-path-in-wad> <system-name|0xhash> <outDir> [--times 0.25,0.5,1] [--size 512] [--per-emitter] [--keep-resources] [--dump-emitter NAME] [--no-shader-definitions] [--stock-shaders] [--orthographic] [--trace-emitter NAME] [--no-owner] [--rig Still|Trail|Missile] [--trace-layout] [--frame-scale 1] [--preview-stage] [--single-burst-emitter NAME,NAME]`:
+    /// `vfx-snapshot <bin-path-in-wad> <system-name|0xhash> <outDir> [--times 0.25,0.5,1] [--size 512] [--per-emitter] [--keep-resources] [--dump-emitter NAME] [--no-shader-definitions] [--stock-shaders] [--orthographic] [--trace-emitter NAME] [--no-owner] [--rig Still|Trail|Missile] [--trace-layout] [--frame-scale 1] [--preview-stage] [--single-burst-emitter NAME,NAME] [--compare-draw-order]`:
     /// plays one VFX system of an installed BIN the way 3D Studio does (VfxRenderSession, game particle shaders,
     /// resources extracted from the WADs) and writes a PNG per time over a mid-grey backdrop. With --per-emitter
     /// each root emitter is also drawn alone and measured: how much of the frame it darkens or brightens.
@@ -79,6 +82,30 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
             {
                 Console.WriteLine($"[Snapshot] no system matches '{systemKey}' in {binPath} ({systems.Count} systems).");
                 return;
+            }
+            if (args.Contains("--compare-draw-order"))
+                File.WriteAllText(Path.Combine(output, "definition-tree.json"),
+                    JsonSerializer.Serialize(DefinitionTree(system, 0), new JsonSerializerOptions { WriteIndented = true }));
+
+            object DefinitionTree(VfxSystemDefinition definition, int depth)
+            {
+                if (definition == null || depth > 4) return null;
+                return new
+                {
+                    name = definition.Name,
+                    emitters = definition.Emitters.Select((emitter, index) => new
+                    {
+                        index, name = emitter.Name, disabled = emitter.Disabled, pass = emitter.RenderState?.RenderPass ?? 0,
+                        simple = emitter.IsSimpleEmitter, blendMode = emitter.BlendMode,
+                        miscRenderFlags = emitter.MiscRenderFlags, groundLayer = emitter.IsGroundLayer,
+                        childSet = emitter.ChildParticleSet == null ? null : new
+                        {
+                            bones = emitter.ChildParticleSet.Bones ?? Array.Empty<string>(),
+                            children = emitter.ChildParticleSet.Children.Select(child => DefinitionTree(
+                                VfxPlaybackGraphRuntime.ResolveSystem(child, systems, definition.ResourceMap ?? resourceMap), depth + 1)).ToArray()
+                        }
+                    }).ToArray()
+                };
             }
 
             if (Option(args, "--single-burst-emitter") is { } burstNames)
@@ -221,6 +248,8 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
                 float[] pixels = Draw(gl, session, framebuffer, size, time, viewProjection, view, surface);
                 string file = Path.Combine(output, $"{stem}_t{time.ToString("0.00", CultureInfo.InvariantCulture)}.png");
                 SavePng(pixels, size, file);
+                if (args.Contains("--compare-draw-order"))
+                    CompareDrawOrders(gl, session, framebuffer, size, time, viewProjection, view, output, stem, pixels);
                 (float darker, float brighter) = Coverage(pixels);
                 Console.WriteLine($"[Snapshot] t={time:0.00}s live={session.LiveParticleCount} darker={darker:P1} brighter={brighter:P1} -> {file}");
 
@@ -251,6 +280,96 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
             gl.DeleteTexture(colour);
             gl.DeleteRenderbuffer(depth);
         }
+
+        private static void CompareDrawOrders(GL gl, VfxRenderSession session, uint framebuffer, uint size,
+            double time, Matrix4x4 viewProjection, Matrix4x4 view, string output, string stem, float[] sessionPixels)
+        {
+            var renderer = (VfxOpenGlRenderer)typeof(VfxRenderSession)
+                .GetField("_renderer", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(session)!;
+            var sources = session.Graphs.SelectMany(graph => graph.Runtimes).Select(runtime => runtime.Emitters).ToArray();
+            var queue = VfxRenderQueue.Build(sources).Where(entry => entry.Emitter.InstanceCount > 0 &&
+                entry.Emitter.IsVisible && !entry.Emitter.Def.Disabled).ToArray();
+            if (queue.Any(entry => entry.Emitter.Def.HasResolvedCustomMaterial ||
+                    VfxRenderPhaseSemantics.Resolve(entry.Emitter.Def, entry.Emitter.HudLayer).Distorts))
+                throw new InvalidOperationException("The colour-order probe requires stock emitter definitions without active distortion.");
+            var phases = new[]
+            {
+                queue.Where(entry => entry.Emitter.Def.IsGroundLayer && Phase(entry).Under).ToArray(),
+                queue.Where(entry => !entry.Emitter.Def.IsGroundLayer && Phase(entry).Under).ToArray(),
+                queue.Where(entry => Phase(entry).Over).ToArray()
+            };
+            var claims = new VfxStencilScene();
+            foreach (var entry in queue) claims.Add(entry.Emitter.Def, true);
+            var order = new List<object>();
+            float[] full = Render(grouped: false, definitionOrder: false);
+            float[] grouped = Render(grouped: true, definitionOrder: false);
+            float[] reference = Render(grouped: true, definitionOrder: true);
+            if (Difference(sessionPixels, full).ChangedPixelsAboveTwoLevels != 0 ||
+                Difference(full, grouped).ChangedPixelsAboveTwoLevels != 0)
+                throw new InvalidOperationException("The colour replay controls differ; this frame cannot establish an order-only difference.");
+            string prefix = Path.Combine(output, $"{stem}_t{time.ToString("0.00", CultureInfo.InvariantCulture)}_order");
+            SavePng(full, size, prefix + "_am.png");
+            SavePng(reference, size, prefix + "_definition.png");
+            File.WriteAllText(prefix + ".json", JsonSerializer.Serialize(new
+            {
+                Time = time, Scope = "Same AM simulation and renderer; alternative LTK definition ranks, not a full LTK application.",
+                SessionVsColourReplay = Difference(sessionPixels, full), GroupingControl = Difference(full, grouped),
+                OrderDifference = Difference(grouped, reference), Orders = order
+            }, new JsonSerializerOptions { WriteIndented = true }));
+            Console.WriteLine($"[DrawOrder] t={time:0.00} {JsonSerializer.Serialize(Difference(grouped, reference))}; grouping={JsonSerializer.Serialize(Difference(full, grouped))}");
+
+            VfxRenderPhases Phase(VfxRenderQueueEntry entry) => VfxRenderPhaseSemantics.Resolve(entry.Emitter.Def, entry.Emitter.HudLayer);
+            float[] Render(bool grouped, bool definitionOrder)
+            {
+                gl.BindFramebuffer(FramebufferTarget.Framebuffer, framebuffer); gl.Viewport(0, 0, size, size);
+                gl.ColorMask(true, true, true, true); gl.DepthMask(true); gl.StencilMask(uint.MaxValue);
+                gl.Disable(EnableCap.ScissorTest); gl.ClearDepth(1); gl.ClearStencil(0);
+                gl.ClearColor(Backdrop, Backdrop, Backdrop, 1);
+                gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit | ClearBufferMask.StencilBufferBit);
+                using (renderer.BeginRenderBatch(claims))
+                for (int phase = 0; phase < phases.Length; phase++)
+                {
+                    var entries = phases[phase];
+                    if (!grouped) { renderer.Render(entries, viewProjection, view); continue; }
+                    var groups = entries.GroupBy(entry => (entry.GraphOrder, entry.Emitter.RenderPath, entry.Emitter.SourceOrder)).ToArray();
+                    IEnumerable<IGrouping<(int GraphOrder, string RenderPath, int SourceOrder), VfxRenderQueueEntry>> ordered = groups;
+                    // The emitter's blending/depth/material state is kept intact. Only whole draw groups move.
+                    if (definitionOrder)
+                        ordered = groups.OrderBy(group => VfxOpenGlRenderer.IsParticlePassTransparent(group.First().Emitter.Def, false))
+                            .ThenBy(group => group.First().GraphOrder).ThenBy(group => group.First().Emitter.RenderRank);
+                    var listed = ordered.ToArray();
+                    order.Add(new
+                    {
+                        Grouped = grouped, DefinitionOrder = definitionOrder, Phase = phase,
+                        Entries = listed.Select(group => new
+                        {
+                            group.Key.RenderPath, group.Key.SourceOrder, group.First().Emitter.RenderRank,
+                            group.First().Emitter.Def.Name, Pass = group.First().Emitter.Def.RenderState?.RenderPass ?? 0,
+                            group.First().Emitter.Def.BlendMode, Instances = group.Sum(entry => entry.Emitter.InstanceCount)
+                        }).ToArray()
+                    });
+                    foreach (var group in listed) renderer.Render(group.ToArray(), viewProjection, view);
+                }
+                var pixels = new float[size * size * 4];
+                gl.ReadPixels(0, 0, size, size, PixelFormat.Rgba, PixelType.Float, pixels.AsSpan());
+                if (gl.GetError() != GLEnum.NoError) throw new InvalidOperationException("The draw-order comparison produced an OpenGL error.");
+                return pixels;
+            }
+            DrawOrderDifference Difference(float[] left, float[] right)
+            {
+                int changed = 0; float maximum = 0;
+                for (int at = 0; at < left.Length; at += 4)
+                {
+                    float delta = 0;
+                    for (int channel = 0; channel < 4; channel++) delta = Math.Max(delta, Math.Abs(left[at + channel] - right[at + channel]));
+                    maximum = Math.Max(maximum, delta);
+                    if (delta > 2f / 255f) changed++;
+                }
+                return new DrawOrderDifference(changed, maximum, left.Length / 4);
+            }
+        }
+
+        private sealed record DrawOrderDifference(int ChangedPixelsAboveTwoLevels, float MaximumChannelDelta, int TotalPixels);
 
         /// <summary>Constant block members of every pass of a material program, read from the installed shader cache.</summary>
         private static IEnumerable<string> ShaderMembers(GameMaterialProgram program, AppSettings settings)
@@ -325,7 +444,7 @@ namespace AssetsManager.Tests.Diagnostics.Viewer
             return (framebuffer, colour, depth);
         }
 
-        private static BinTree LoadBin(string install, string binPath)
+        internal static BinTree LoadBin(string install, string binPath)
         {
             ulong hash = XxHash64Ext.Hash(binPath);
             // BIN definitions live in the core WADs; localized audio WADs are irrelevant here.

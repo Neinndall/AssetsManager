@@ -1,9 +1,7 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Text;
-using System.Text.RegularExpressions;
 using AssetsManager.Services.Core;
 using AssetsManager.Views.Models.Hashes;
 
@@ -38,26 +36,6 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
         internal override IReadOnlyList<string> BuildWordlist() =>
             Corpus.GetOrCreate("wordlist", HashGuessEngine.BuildWordlist);
 
-
-        internal IEnumerable<HashGuessCandidate> GuessFromBinEntryBasenames(IEnumerable<string> binEntryPaths)
-        {
-            var basenames = binEntryPaths.Select(Path.GetFileName)
-                .Where(value => !string.IsNullOrWhiteSpace(value))
-                .Select(value => value.ToLowerInvariant())
-                .Distinct(StringComparer.Ordinal)
-                .OrderBy(value => value, StringComparer.Ordinal)
-                .ToList();
-            var extensions = KnownPaths.Select(Path.GetExtension)
-                .Where(extension => extension.Length > 0)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .Where(extension => !Regex.IsMatch(extension, @"(?:glsl|dx9|dx9sm3|dx11|metal)_", RegexOptions.IgnoreCase))
-                .OrderBy(value => value, StringComparer.Ordinal)
-                .ToList();
-
-            foreach (string extension in extensions)
-            foreach (string basename in basenames)
-                yield return new HashGuessCandidate(basename + extension, HashGuessStrategy.CrossDomainGame);
-        }
 
         private static bool IsShaderReference(StringBuilder value)
         {

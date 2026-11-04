@@ -173,16 +173,6 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             int Finish() { progress?.Invoke(checkedCount); return checkedCount; }
         }
 
-        internal IEnumerable<HashGuessCandidate> SubstituteBasicNumbers(int maximum = 100)
-        {
-            foreach (HashGuessCandidate candidate in SubstituteNumbers(maximum))
-                yield return candidate;
-
-            // Two-digit values above 9 are identical to their unpadded form.
-            foreach (HashGuessCandidate candidate in SubstituteNumbers(Math.Min(maximum, 10), digits: 2))
-                yield return candidate;
-        }
-
         internal int CheckBasenamePrefixes(
             HashGuessEngine engine,
             CancellationToken cancellationToken,

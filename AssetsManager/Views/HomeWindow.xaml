@@ -476,7 +476,7 @@
                         </Button>
 
                         <!-- Converter -->
-                        <Button Style="{StaticResource DashboardTileStyle}" Click="Converter_Click" Tag="{StaticResource AccentTeal}" Height="48" Width="48" Margin="4" ToolTip="Asset Converter">
+                        <Button Style="{StaticResource DashboardTileStyle}" Click="Converter_Click" Tag="{StaticResource AccentTeal}" Height="48" Width="48" Margin="4" ToolTip="Universal Converter">
                             <materialIcons:MaterialIcon Kind="AutoFix" Width="20" Height="20" Foreground="{StaticResource AccentTeal}"/>
                         </Button>
                     </StackPanel>

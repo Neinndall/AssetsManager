@@ -60,6 +60,8 @@ internal static class GameLearnedLinksDiagnostic
         bool grep = args.Contains("--grep");
         bool atlas = args.Contains("--atlas");
         bool animationStructure = args.Contains("--animation-structure");
+        bool animationForms = args.Contains("--animation-forms");
+        var formIndex = animationForms ? new GameAnimationFormIndex() : null;
         int animationLinks = 0, secondaryPendingLinks = 0, patchCount = 0;
         var clipKeys = new Dictionary<BinPropertyType, int>();
         string root = args.FirstOrDefault(a => a.StartsWith("--root="))?[7..]
@@ -98,6 +100,9 @@ internal static class GameLearnedLinksDiagnostic
                         using var stream = new MemoryStream(segment.Array, segment.Offset, segment.Count, false);
                         var tree = new BinTree(stream);
                         if (animationStructure) AuditAnimations(tree, path);
+                        else if (animationForms) formIndex.Guess(engine, tree, path,
+                            character => guesser.GetAnimationNames(character, CancellationToken.None), wadPath,
+                            chunk.PathHash, CancellationToken.None);
                         else index.Guess(engine, tree, known, Resolve, ResolveWide, wadPath, chunk.PathHash, CancellationToken.None);
                     }
                     count++;
@@ -106,7 +111,7 @@ internal static class GameLearnedLinksDiagnostic
             }
             Console.WriteLine($"WAD {Path.GetFileName(wadPath)}: {count} BINs; {engine.CheckedCandidates} candidates; {engine.Matches.Count} matches");
         }
-        string summary = $"{(basic ? "Character files" : atlas ? "GrepWad atlas cohort" : grep ? "GrepWad BIN cohort" : animationStructure ? "Animation structure" : "Learned links")}: {unknown.Count} initial; {engine.CheckedCandidates} candidates; {engine.Matches.Count} matches; {engine.RemainingUnknownCount} remaining; {watch.Elapsed}. Nothing persisted.";
+        string summary = $"{(basic ? "Character files" : atlas ? "GrepWad atlas cohort" : grep ? "GrepWad BIN cohort" : animationStructure ? "Animation structure" : animationForms ? "Animation form context" : "Learned links")}: {unknown.Count} initial; {engine.CheckedCandidates} candidates; {engine.Matches.Count} matches; {engine.RemainingUnknownCount} remaining; {watch.Elapsed}. Nothing persisted.";
         Console.WriteLine(summary);
         if (animationStructure)
             Console.WriteLine($"Animation structure: {animationLinks} pending link occurrences; {secondaryPendingLinks} secondary resources; {patchCount} overrides; clip key types: {string.Join(", ", clipKeys.Select(pair => $"{pair.Key}={pair.Value}"))}");

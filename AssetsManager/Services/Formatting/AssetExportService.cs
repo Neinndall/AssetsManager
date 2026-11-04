@@ -33,16 +33,17 @@ namespace AssetsManager.Services.Formatting
     }
 
     /// <summary>
-    /// Per-type target formats for a smart export (audio, texture, data).
+    /// Per-type target formats for a smart export (audio, texture, data, video).
     /// </summary>
     public readonly record struct ExportFormats(
         WadExportMode AudioMode,
         AudioExportFormat AudioTarget,
         ImageExportFormat Image,
-        DataExportFormat Data)
+        DataExportFormat Data,
+        VideoExportFormat Video = VideoExportFormat.Original)
     {
-        public static ExportFormats ExplorerSmart(AudioExportFormat audio) => new(
-            WadExportMode.Smart, audio, ImageExportFormat.Png, DataExportFormat.Json);
+        public static ExportFormats ExplorerSmart(AudioExportFormat audio, VideoExportFormat video = VideoExportFormat.Original) => new(
+            WadExportMode.Smart, audio, ImageExportFormat.Png, DataExportFormat.Json, video);
     }
 
     /// <summary>
@@ -393,6 +394,10 @@ namespace AssetsManager.Services.Formatting
             string extension = Path.GetExtension(node.Name).ToLower();
             switch (extension)
             {
+                case ".webm":
+                    await HandleVideoFileAsync(node, destinationPath, formats.Video, cancellationToken, onFileSavedCallback);
+                    break;
+
                 case ".wpk":
                 case ".bnk":
                     if (SupportedFileTypes.IsExpandableAudioBank(node.Name) && node.Children.Count > 0)
@@ -460,6 +465,43 @@ namespace AssetsManager.Services.Formatting
                     await ExportAsync(node, destinationPath, cancellationToken, onFileSavedCallback);
                     break;
             }
+        }
+
+        private async Task HandleVideoFileAsync(FileSystemNodeModel node, string destinationPath, VideoExportFormat format, CancellationToken cancellationToken, Action<string> onFileSavedCallback)
+        {
+            if (format != VideoExportFormat.Mp4)
+            {
+                await ExportAsync(node, destinationPath, cancellationToken, onFileSavedCallback);
+                return;
+            }
+
+            var fileBytes = node.Type == NodeType.RealFile
+                ? await File.ReadAllBytesAsync(node.VirtualPath, cancellationToken)
+                : await _wadContentProvider.GetVirtualFileBytesAsync(node, cancellationToken);
+            if (fileBytes == null) throw new IOException($"Could not read video '{node.Name}'.");
+
+            _directoriesCreator.CreateDirectory(destinationPath);
+            string inputPath = Path.Combine(Path.GetTempPath(), $"AssetsManager-video-{Guid.NewGuid():N}.webm");
+            string outputPath = PathUtils.GetUniqueFilePath(destinationPath, Path.ChangeExtension(node.Name, ".mp4"));
+            try
+            {
+                await File.WriteAllBytesAsync(inputPath, fileBytes, cancellationToken);
+                await WindowsVideoTranscoder.ConvertFileAsync(inputPath, outputPath, cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                throw new IOException($"Windows could not convert '{node.Name}' to MP4. The required media codec may be unavailable. Select Original in Settings to save the source WebM video. {ex.Message}", ex);
+            }
+            finally
+            {
+                try { File.Delete(inputPath); }
+                catch (Exception ex) { _logService.LogWarning($"Could not remove temporary video file '{inputPath}': {ex.Message}"); }
+            }
+            onFileSavedCallback?.Invoke(outputPath);
         }
 
         private async Task HandleTextureFile(FileSystemNodeModel node, string destinationPath, ImageExportFormat format, CancellationToken cancellationToken, Action<string> onFileSavedCallback)

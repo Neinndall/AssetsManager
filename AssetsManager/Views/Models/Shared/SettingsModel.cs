@@ -33,6 +33,12 @@ namespace AssetsManager.Views.Models.Shared
             new FormatOption<AudioExportFormat> { Name = "FLAC", Value = AudioExportFormat.Flac }
         };
 
+        public List<FormatOption<VideoExportFormat>> VideoFormatOptions { get; } = new List<FormatOption<VideoExportFormat>>
+        {
+            new FormatOption<VideoExportFormat> { Name = "Original", Value = VideoExportFormat.Original },
+            new FormatOption<VideoExportFormat> { Name = "MP4", Value = VideoExportFormat.Mp4 }
+        };
+
         public List<FormatOption<ImageExportFormat>> ImageFormatOptions { get; } = new List<FormatOption<ImageExportFormat>>
         {
             new FormatOption<ImageExportFormat> { Name = "Original", Value = ImageExportFormat.Original },

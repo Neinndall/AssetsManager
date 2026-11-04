@@ -120,8 +120,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         internal static bool HasTextureMultLayer(VfxEmitterDefinition definition)
             => VfxGeometryUtils.HasTextureMultLayer(definition);
 
-        internal static bool ShouldUseColorRamp(VfxEmitterDefinition definition, bool hasColorRampTexture)
-            => VfxGeometryUtils.ShouldUseColorRamp(definition, hasColorRampTexture);
+        internal static bool ShouldUseColorRamp(VfxEmitterDefinition definition, bool hasColorRampTexture, bool shadowPass = false)
+            => VfxGeometryUtils.ShouldUseColorRamp(definition, hasColorRampTexture, shadowPass);
 
         internal static bool ShouldUseSoftParticles(VfxEmitterDefinition definition, bool hasSceneDepth)
             => VfxGeometryUtils.ShouldUseSoftParticles(definition, hasSceneDepth);

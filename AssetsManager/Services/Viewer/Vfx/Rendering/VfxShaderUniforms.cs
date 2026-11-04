@@ -85,6 +85,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         internal readonly int DepthProjection;
         internal readonly int DepthPushPull;
         internal readonly int Orthographic;
+        internal readonly int DepthPushDirection;
         internal readonly int DirectionOriented;
         internal readonly int DistortionStrength;
         internal readonly int DistortionTex;
@@ -202,6 +203,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             DepthProjection = gl.GetUniformLocation(program, "uDepthProjection");
             DepthPushPull = gl.GetUniformLocation(program, "uDepthPushPull");
             Orthographic = gl.GetUniformLocation(program, "uOrthographic");
+            DepthPushDirection = gl.GetUniformLocation(program, "uDepthPushDirection");
             DirectionOriented = gl.GetUniformLocation(program, "uDirectionOriented");
             DistortionStrength = gl.GetUniformLocation(program, "uDistortionStrength");
             DistortionTex = gl.GetUniformLocation(program, "uDistortionTex");
