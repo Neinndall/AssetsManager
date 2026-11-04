@@ -50,10 +50,11 @@ namespace AssetsManager.Utils.Rendering
                (definition.AuthoredFeatures?.HasTextureMultLayer == true ||
                 !string.IsNullOrWhiteSpace(definition.TextureMultPath));
 
-        public static bool ShouldUseColorRamp(VfxEmitterDefinition definition, bool hasColorRampTexture)
+        public static bool ShouldUseColorRamp(VfxEmitterDefinition definition, bool hasColorRampTexture, bool shadowPass = false)
         {
             if (!hasColorRampTexture || definition is null) return false;
-            if (definition.SliceRange > 0f) return true;
+            // Slice's colour pass reads its ramp separately; shadow coverage keeps the regular exclusions.
+            if (definition.SliceRange > 0f && !shadowPass) return true;
 
             bool mesh = definition.PrimitiveKind is VfxPrimitiveKind.Mesh or VfxPrimitiveKind.AttachedMesh;
             bool fixedAlphaUv = definition.UvMode == 2 && !mesh;

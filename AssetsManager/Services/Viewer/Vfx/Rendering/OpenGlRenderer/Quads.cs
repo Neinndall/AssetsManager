@@ -85,7 +85,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                     : (VfxBlendModes.ShouldAlphaTest(es.Def.BlendMode, renderState.AlphaReference) ? 1 : 0));
             _particleUniforms.Uniform1(_particleUniforms.EmissiveStrength, VfxBlendModes.ResolveEmissiveStrength(es.Def.BlendMode));
             bool hasMultLayer = HasTextureMultLayer(es.Def);
-            bool useColorRamp = ShouldUseColorRamp(es.Def, es.ColorGradientTexture != 0);
+            bool useColorRamp = ShouldUseColorRamp(es.Def, es.ColorGradientTexture != 0, _drawingShadows);
             _particleUniforms.Uniform1(_particleUniforms.HasColor, useColorRamp ? 1 : 0);
             _particleUniforms.Uniform1(_particleUniforms.RampAtMult, useColorRamp && hasMultLayer ? 1 : 0);
             _particleUniforms.Uniform1(_particleUniforms.UvMode, es.Def.UvMode);
