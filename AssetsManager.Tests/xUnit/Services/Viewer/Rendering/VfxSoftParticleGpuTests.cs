@@ -87,6 +87,22 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
             => RenderAndAssert(primitive, mode, 4, false, fallback, 1, 401, 200,
                 new VfxSoftParticleDefinition(5, 0, 20, 0, 2), 0, alphaReference: 0);
 
+        public static IEnumerable<object[]> OcclusionCases()
+        {
+            foreach (VfxPrimitiveKind primitive in new[] { VfxPrimitiveKind.CameraQuad, VfxPrimitiveKind.Mesh, VfxPrimitiveKind.AttachedMesh })
+            foreach (int mode in new[] { 0, 1, 3, 5 })
+            foreach (bool orthographic in new[] { false, true })
+            foreach (bool fallback in new[] { false, true })
+                yield return new object[] { primitive, mode, orthographic, fallback };
+        }
+
+        [Theory]
+        [MemberData(nameof(OcclusionCases))]
+        public void SceneDepthOccludesSoftParticlesEvenWhenAlphaTestingIsDisabled(
+            VfxPrimitiveKind primitive, int mode, bool orthographic, bool fallback)
+            => RenderAndAssert(primitive, mode, -2, orthographic, fallback, 1, 201, 60,
+                new VfxSoftParticleDefinition(0, 10, 100, 10, 0), 0, alphaReference: 0);
+
         private static void RenderAndAssert(VfxPrimitiveKind primitive, int mode, float gap, bool orthographic,
             bool fallback, float near, float far, float distance, VfxSoftParticleDefinition soft, float fade, byte? alphaReference = null)
         {
@@ -202,7 +218,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
                 gl.ReadPixels(32, 32, 1, 1, PixelFormat.Rgba, PixelType.UnsignedByte, pixel.AsSpan());
 
                 // Attached meshes have no soft fade in the original shader. Other paths fade over a ten-unit gap.
-                Vector4 expected = ComposeSoft(mode, prepared, background, fade, soft.Target, definition.RenderState.AlphaReference);
+                Vector4 expected = gap < 0 ? background
+                    : ComposeSoft(mode, prepared, background, fade, soft.Target, definition.RenderState.AlphaReference);
                 for (int channel = 0; channel < 4; channel++)
                     Assert.True(Math.Abs(pixel[channel] - MathF.Round(expected[channel] * 255)) <= 2,
                         $"{primitive}, mode={mode}, gap={gap}, ortho={orthographic}, fallback={fallback}, range={near}..{far}, distance={distance}: " +
