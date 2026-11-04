@@ -5,6 +5,7 @@ HOTFIX UPDATE
 New Features
 
 Improvements
+  - Hash Guessing Lab / Use skin form metadata to discover animation names and include nested equipment meshes when guessing textures.
 
 Changes
 
