@@ -325,11 +325,10 @@ namespace AssetsManager.Services.Explorer
                 string baseName = Path.GetFileNameWithoutExtension(name);
 
                 // CASE A: It's an events bank (e.g., ashe_base_vo_events.bnk)
-                if (name.EndsWith("_events.bnk", StringComparison.OrdinalIgnoreCase))
+                if (PathUtils.NormalizeBankFileName(name).EndsWith("_events.bnk", StringComparison.OrdinalIgnoreCase))
                 {
-                    string prefix = name.Replace("_events.bnk", "");
                     // Redundant if there's a corresponding audio container (_audio.wpk or _audio.bnk)
-                    if (nodeNames.Contains(prefix + "_audio.wpk") || nodeNames.Contains(prefix + "_audio.bnk"))
+                    if (nodeNames.Contains(PathUtils.GetBankSiblingName(name, "_audio.wpk")) || nodeNames.Contains(PathUtils.GetBankSiblingName(name, "_audio.bnk")))
                     {
                         node.Children.Clear();
                     }

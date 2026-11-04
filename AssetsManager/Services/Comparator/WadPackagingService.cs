@@ -41,9 +41,9 @@ namespace AssetsManager.Services.Comparator
             }
 
             var audioBankDiffs = finalDiffs.Where(d => 
-                (d.NewPath ?? d.OldPath).EndsWith("_events.bnk", StringComparison.OrdinalIgnoreCase) ||
-                (d.NewPath ?? d.OldPath).EndsWith("_audio.bnk", StringComparison.OrdinalIgnoreCase) ||
-                (d.NewPath ?? d.OldPath).EndsWith("_audio.wpk", StringComparison.OrdinalIgnoreCase)
+                PathUtils.NormalizeBankFileName(d.NewPath ?? d.OldPath).EndsWith("_events.bnk", StringComparison.OrdinalIgnoreCase) ||
+                PathUtils.NormalizeBankFileName(d.NewPath ?? d.OldPath).EndsWith("_audio.bnk", StringComparison.OrdinalIgnoreCase) ||
+                PathUtils.NormalizeBankFileName(d.NewPath ?? d.OldPath).EndsWith("_audio.wpk", StringComparison.OrdinalIgnoreCase)
             ).ToList();
             _logService.LogDebug($"[CreateLeanWadPackageAsync] Found {audioBankDiffs.Count} audio bank diffs to process.");
             var dependencyRequests = new List<DependencyRequest>(audioBankDiffs.Count * 3);

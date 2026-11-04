@@ -10,6 +10,7 @@ Improvements
 Changes
 
 Bug Fixes
+  - Audio Banks / Automatically link sound banks with variant suffixes, including DJ Sona, in Explorer, comparisons, and backups.
   - 3D Studio / Play the correct animations and facial expressions for each skin form, and remove duplicate form labels.
   - 3D Studio / Prevent previously drawn materials from hiding or changing bloom halos.
   - 3D Studio / Keep particle depth offsets from shifting or stretching effects in orthographic views when using fallback shaders.
