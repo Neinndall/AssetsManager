@@ -114,6 +114,7 @@ namespace AssetsManager.Utils
         }
 
         public AudioExportFormat AudioExportFormat { get; set; } = AudioExportFormat.Ogg;
+        public VideoExportFormat VideoExportFormat { get; set; } = VideoExportFormat.Original;
         public ImageExportFormat ImageExportFormat { get; set; } = ImageExportFormat.Original;
         public DataExportFormat DataExportFormat { get; set; } = DataExportFormat.Original;
 
@@ -398,6 +399,7 @@ namespace AssetsManager.Utils
                     WireOverlay = false
                 },
                 AudioExportFormat = AudioExportFormat.Ogg,
+                VideoExportFormat = VideoExportFormat.Original,
                 ImageExportFormat = ImageExportFormat.Original,
                 DataExportFormat = DataExportFormat.Original,
                 LastPbeStatusMessage = null,
@@ -447,6 +449,7 @@ namespace AssetsManager.Utils
             StudioParameters = defaultSettings.StudioParameters;
             Studio = defaultSettings.Studio;
             AudioExportFormat = defaultSettings.AudioExportFormat;
+            VideoExportFormat = defaultSettings.VideoExportFormat;
             ImageExportFormat = defaultSettings.ImageExportFormat;
             SaveJsonHistory = defaultSettings.SaveJsonHistory;
             SaveWadComparisonHistory = defaultSettings.SaveWadComparisonHistory;

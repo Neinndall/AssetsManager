@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Threading;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -71,15 +72,12 @@ namespace AssetsManager.Views.Dialogs
 
         private void ProcessFiles(string[] files)
         {
+            if (ViewModel.IsProcessing) return;
             foreach (string file in files)
             {
                 if (ViewModel.Items.Any(i => i.FilePath == file)) continue;
 
-                string ext = Path.GetExtension(file).ToLowerInvariant();
-                ConverterFileType? type = null;
-
-                if (ext == ".tex" || ext == ".dds") type = ConverterFileType.Image;
-                else if (SupportedFileTypes.Media.Contains(ext)) type = ConverterFileType.Audio;
+                ConverterFileType? type = ConverterModel.GetFileType(file);
 
                 if (type.HasValue)
                 {
@@ -133,36 +131,53 @@ namespace AssetsManager.Views.Dialogs
             {
                 string destinationPath = dialog.SelectedPath;
                 ViewModel.IsProcessing = true;
+                var items = ViewModel.Items.ToList();
 
                 try
                 {
                     await Task.Run(async () =>
                     {
-                        foreach (var item in ViewModel.Items.ToList())
+                        foreach (var item in items)
                         {
                             if (item.Status == "Done") continue;
 
                             item.Status = "Processing...";
+                            item.ErrorMessage = null;
                             try
                             {
                                 if (item.FileType == ConverterFileType.Image)
                                 {
                                     await ProcessImageItem(item, destinationPath);
                                 }
+                                else if (item.FileType == ConverterFileType.Video)
+                                {
+                                    await ProcessVideoItem(item, destinationPath);
+                                }
                                 else
                                 {
                                     await ProcessAudioItem(item, destinationPath);
                                 }
                             }
-                            catch (Exception)
+                            catch (Exception ex)
                             {
                                 item.Status = "Error";
+                                item.ErrorMessage = ex.Message;
+                                _logService.LogError(ex, $"Failed to convert '{item.FileName}'.");
                             }
                         }
                     });
 
-                    _customMessageBox.ShowSuccess("Conversion Complete", "All files have been processed.", this);
-                    _logService.LogInteractiveSuccess($"Universal conversion completed. Files saved in {destinationPath}", destinationPath);
+                    int failed = items.Count(item => item.Status != "Done");
+                    if (failed == 0)
+                    {
+                        _customMessageBox.ShowSuccess("Conversion Complete", "All files have been converted.", this);
+                        _logService.LogInteractiveSuccess($"Universal conversion completed. Files saved in {destinationPath}", destinationPath);
+                    }
+                    else
+                    {
+                        _customMessageBox.ShowInfo("Conversion Finished", $"{items.Count - failed} files converted, {failed} failed. Hover over an error status for details.", this);
+                        _logService.LogWarning($"Universal conversion finished: {items.Count - failed} converted, {failed} failed.");
+                    }
                 }
                 finally
                 {
@@ -185,6 +200,20 @@ namespace AssetsManager.Views.Dialogs
                 {
                     item.Status = "Failed";
                 }
+            }
+        }
+
+        private async Task ProcessVideoItem(ConverterItem item, string destinationPath)
+        {
+            string outputPath = PathUtils.GetUniqueFilePath(destinationPath, Path.ChangeExtension(item.FileName, ".mp4"));
+            try
+            {
+                await WindowsVideoTranscoder.ConvertFileAsync(item.FilePath, outputPath, CancellationToken.None);
+                item.Status = "Done";
+            }
+            catch (Exception ex)
+            {
+                throw new IOException($"Windows could not convert '{item.FileName}' to MP4. The required media codec may be unavailable. {ex.Message}", ex);
             }
         }
 

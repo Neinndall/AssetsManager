@@ -36,7 +36,7 @@
                         <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
                             <materialIcons:MaterialIcon Kind="FileImportOutline" Width="60" Height="60" Foreground="{StaticResource TextMuted}" Margin="0,0,0,15" HorizontalAlignment="Center"/>
                             <TextBlock Text="Drag and drop your files here" Foreground="{StaticResource TextPrimary}" FontSize="16" FontWeight="Medium" HorizontalAlignment="Center"/>
-                            <TextBlock Text="Supports: .dds, .tex, .wem, .ogg, .wav, .mp3, .flac" Foreground="{StaticResource TextMuted}" FontSize="12" HorizontalAlignment="Center" Margin="0,8,0,0"/>
+                            <TextBlock Text="Supports: .dds, .tex, .wem, .ogg, .wav, .mp3, .flac, .webm" Foreground="{StaticResource TextMuted}" FontSize="12" HorizontalAlignment="Center" Margin="0,8,0,0" TextWrapping="Wrap" TextAlignment="Center"/>
                         </StackPanel>
                     </Border>
                 </Grid>
@@ -45,7 +45,8 @@
                 <Border Visibility="{Binding Items.Count, Converter={StaticResource CountToVisibilityConverter}}" 
                         Background="{StaticResource SidebarBackground}" CornerRadius="10" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
                     <Grid>
-                        <ListView ItemsSource="{Binding Items}" Background="Transparent" BorderThickness="0" Foreground="{StaticResource TextPrimary}" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                        <ListView ItemsSource="{Binding Items}" Background="Transparent" BorderThickness="0" Foreground="{StaticResource TextPrimary}" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                  IsEnabled="{Binding IsProcessing, Converter={StaticResource InverseBooleanConverter}}">
                             <ListView.ItemContainerStyle>
                                 <Style TargetType="ListViewItem">
                                     <Setter Property="Template">
@@ -69,7 +70,7 @@
                                                             <TextBlock Text="{Binding FilePath}" FontSize="10" Foreground="{StaticResource TextMuted}" TextTrimming="CharacterEllipsis"/>
                                                         </StackPanel>
                                                         
-                                                        <TextBlock Grid.Column="2" Text="{Binding Status}" VerticalAlignment="Center" HorizontalAlignment="Center" FontSize="11" FontWeight="Bold"/>
+                                                        <TextBlock Grid.Column="2" Text="{Binding Status}" ToolTip="{Binding ErrorMessage}" VerticalAlignment="Center" HorizontalAlignment="Center" FontSize="11" FontWeight="Bold"/>
                                                         
                                                         <Button Grid.Column="3" Style="{StaticResource TransparentIconButton}" Click="RemoveItem_Click" Tag="{Binding}">
                                                             <materialIcons:MaterialIcon Kind="DeleteOutline" Width="16" Foreground="{StaticResource AccentRed}"/>
@@ -84,6 +85,10 @@
                                                         <Setter TargetName="TypeIcon" Property="Kind" Value="Music"/>
                                                         <Setter TargetName="TypeIcon" Property="Foreground" Value="{StaticResource AccentOrange}"/>
                                                     </DataTrigger>
+                                                    <DataTrigger Binding="{Binding FileType}" Value="{x:Static models:ConverterFileType.Video}">
+                                                        <Setter TargetName="TypeIcon" Property="Kind" Value="Video"/>
+                                                        <Setter TargetName="TypeIcon" Property="Foreground" Value="{StaticResource AccentBlue}"/>
+                                                    </DataTrigger>
                                                 </ControlTemplate.Triggers>
                                             </ControlTemplate>
                                         </Setter.Value>
@@ -96,11 +101,11 @@
             </Grid>
 
             <!-- 3. Format Selectors Section -->
-            <Border Grid.Row="2" Background="{StaticResource SidebarBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" Padding="20,12"
+            <Border Grid.Row="1" Background="{StaticResource SidebarBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" Padding="20,12"
                     Visibility="{Binding Items.Count, Converter={StaticResource CountToVisibilityConverter}}">
-                <StackPanel HorizontalAlignment="Center" Orientation="Horizontal">
+                <WrapPanel HorizontalAlignment="Center">
                     <!-- Image Formats -->
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0"
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="10,4"
                                 Visibility="{Binding HasImages, Converter={StaticResource BoolToVisibilityConverter}}">
                         <TextBlock Text="IMAGE OUTPUT" Style="{StaticResource ToolSectionLabel}" Width="90" VerticalAlignment="Center" Margin="0,0,10,0"/>
                         <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="8" Padding="2">
@@ -112,7 +117,7 @@
                     </StackPanel>
 
                     <!-- Audio Formats -->
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0"
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="10,4"
                                 Visibility="{Binding HasAudio, Converter={StaticResource BoolToVisibilityConverter}}">
                         <TextBlock Text="AUDIO OUTPUT" Style="{StaticResource ToolSectionLabel}" Width="90" VerticalAlignment="Center" Margin="0,0,10,0"/>
                         <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="8" Padding="2">
@@ -124,11 +129,19 @@
                             </StackPanel>
                         </Border>
                     </StackPanel>
-                </StackPanel>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="10,4"
+                                Visibility="{Binding HasVideo, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <TextBlock Text="VIDEO OUTPUT" Style="{StaticResource ToolSectionLabel}" Width="90" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                        <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="8" Padding="2"
+                                ToolTip="MP4 uses Windows codecs and does not preserve transparency">
+                            <RadioButton Content="MP4" IsChecked="True" Style="{StaticResource SegmentedRadioButtonStyle}" MinWidth="55"/>
+                        </Border>
+                    </StackPanel>
+                </WrapPanel>
             </Border>
 
             <!-- 4. Footer (HUD Style with bottom rounding) -->
-            <Border Grid.Row="3" Background="{StaticResource CardBackground}" CornerRadius="0,0,11,11" Padding="20,16" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" ClipToBounds="True">
+            <Border Grid.Row="2" Background="{StaticResource CardBackground}" CornerRadius="0,0,11,11" Padding="20,16" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" ClipToBounds="True">
                 <Grid>
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <materialIcons:MaterialIcon Kind="InformationOutline" Width="16" Foreground="{StaticResource TextMuted}" Margin="0,0,8,0"/>

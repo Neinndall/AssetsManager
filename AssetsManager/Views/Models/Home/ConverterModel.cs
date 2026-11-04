@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
+using System.IO;
+using AssetsManager.Utils;
 using System.Runtime.CompilerServices;
 using AssetsManager.Utils.Framework;
 using AssetsManager.Views.Models.Settings;
@@ -12,7 +14,8 @@ namespace AssetsManager.Views.Models.Home
     public enum ConverterFileType
     {
         Image,
-        Audio
+        Audio,
+        Video
     }
 
     public class ConverterItem : INotifyPropertyChanged
@@ -20,6 +23,7 @@ namespace AssetsManager.Views.Models.Home
         private string _fileName;
         private string _filePath;
         private string _status = "Pending";
+        private string _errorMessage;
         private double _progress = 0;
         private ConverterFileType _fileType;
 
@@ -45,6 +49,12 @@ namespace AssetsManager.Views.Models.Home
         {
             get => _progress;
             set { _progress = value; OnPropertyChanged(); }
+        }
+
+        public string ErrorMessage
+        {
+            get => _errorMessage;
+            set { _errorMessage = value; OnPropertyChanged(); }
         }
 
         public ConverterFileType FileType
@@ -76,8 +86,19 @@ namespace AssetsManager.Views.Models.Home
 
         private bool? _hasImages;
         private bool? _hasAudio;
+        private bool? _hasVideo;
         public bool HasImages => _hasImages ??= Items.Any(i => i.FileType == ConverterFileType.Image);
         public bool HasAudio => _hasAudio ??= Items.Any(i => i.FileType == ConverterFileType.Audio);
+        public bool HasVideo => _hasVideo ??= Items.Any(i => i.FileType == ConverterFileType.Video);
+
+        public static ConverterFileType? GetFileType(string filePath)
+        {
+            string extension = Path.GetExtension(filePath).ToLowerInvariant();
+            if (extension == ".webm") return ConverterFileType.Video;
+            if (extension == ".tex" || extension == ".dds") return ConverterFileType.Image;
+            if (SupportedFileTypes.Media.Contains(extension)) return ConverterFileType.Audio;
+            return null;
+        }
 
         public ConverterModel()
         {
@@ -85,8 +106,10 @@ namespace AssetsManager.Views.Models.Home
             {
                 _hasImages = null;
                 _hasAudio = null;
+                _hasVideo = null;
                 OnPropertyChanged(nameof(HasImages));
                 OnPropertyChanged(nameof(HasAudio));
+                OnPropertyChanged(nameof(HasVideo));
             };
         }
 

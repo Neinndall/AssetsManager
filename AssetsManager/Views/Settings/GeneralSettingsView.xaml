@@ -190,6 +190,18 @@
                 <Grid Margin="0,0,0,24">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                     <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                        <TextBlock Text="Video encoding target" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" FontSize="13"/>
+                        <TextBlock Text="Format for video in Explorer Save (Smart)" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,2,0,0"/>
+                    </StackPanel>
+                    <ComboBox Grid.Column="1" Width="120" Height="30" Style="{StaticResource ModernComboBox}"
+                              ToolTip="MP4 uses Windows codecs and does not preserve transparency"
+                              ItemsSource="{Binding VideoFormatOptions}" DisplayMemberPath="Name" SelectedValuePath="Value"
+                              SelectedValue="{Binding Settings.VideoExportFormat, Mode=TwoWay}"/>
+                </Grid>
+
+                <Grid Margin="0,0,0,24">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
                         <TextBlock Text="Texture export target" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" FontSize="13"/>
                         <TextBlock Text="Format for textures when auto-extracting new assets" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,2,0,0"/>
                     </StackPanel>
