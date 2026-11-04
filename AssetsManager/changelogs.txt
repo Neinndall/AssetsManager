@@ -1,6 +1,7 @@
 AssetsManager - League of Legends | v4.1.0.9
 
 HOTFIX UPDATE
+This hotfix adds WebM-to-MP4 conversion in Explorer and Universal Converter using Windows media codecs, improves conversion controls and error reporting, expands hash guessing with skin form metadata, and fixes rendering, particle shadows, and scene selection issues in 3D Studio.
 
 New Features
   - Explorer / Choose Original WebM or MP4 video output for Save (Smart) in Settings, using Windows media codecs.
