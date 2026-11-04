@@ -10,6 +10,7 @@ Improvements
 Changes
 
 Bug Fixes
+  - Audio Banks / Restore event names for champion forms such as DJ Sona by locating their skin metadata in the owning champion's archive.
   - Audio Banks / Automatically link sound banks with variant suffixes, including DJ Sona, in Explorer, comparisons, and backups.
   - 3D Studio / Play the correct animations and facial expressions for each skin form, and remove duplicate form labels.
   - 3D Studio / Prevent previously drawn materials from hiding or changing bloom halos.

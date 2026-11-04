@@ -167,7 +167,7 @@ namespace AssetsManager.Services.Audio
             {
                 string champName = wadPrefix.ToLower();
 
-                // Si la ruta no coincide con el prefijo, lo sacamos de la ruta (caso de archivos sueltos en WADs globales)
+                // A form can have its own BIN path while belonging to another champion's WAD.
                 if (virtualPath.Contains("/characters/"))
                 {
                     var pathParts = virtualPath.Split('/');
@@ -218,8 +218,9 @@ namespace AssetsManager.Services.Audio
                     }
                 }
 
-                _logService.LogDebug($"[GetBinFileSearchStrategy] CHAMP Strategy: '{champName}' -> Linking to '{skinName}.bin' in '{champName}.wad.client'");
-                return new BinFileStrategy($"data/characters/{champName}/skins/{skinName}.bin", $"{champName}.wad.client", BinType.Champion);
+                string targetWadName = $"{wadPrefix.ToLowerInvariant()}.wad.client";
+                _logService.LogDebug($"[GetBinFileSearchStrategy] CHAMP Strategy: '{champName}' -> Linking to '{skinName}.bin' in '{targetWadName}'");
+                return new BinFileStrategy($"data/characters/{champName}/skins/{skinName}.bin", targetWadName, BinType.Champion);
             }
 
             // 4. ESTRATEGIAS POR RUTA (Companions)
