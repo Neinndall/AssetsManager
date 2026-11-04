@@ -22,12 +22,13 @@ public sealed class SharedProgramParametersGpuTests
     [InlineData(0)]
     [InlineData(1)]
     [InlineData(2)]
+    [InlineData(3)]
     public void InterleavedOwnersAndPassesKeepTheirParametersAndClocks(int host)
     {
         using var context = new HiddenWglContext();
         using GL gl = GL.GetApi(context.GetProcAddress);
         using var runtime = new GameShaderRuntime(gl, false, null);
-        bool particle = host != 0, mesh = host == 2;
+        bool fraction = host == 3, particle = host is 1 or 2, mesh = host == 2;
         var kind = particle ? GameMaterialKind.Particles : GameMaterialKind.SkinnedMesh;
         var globals = new GameShaderTranslator.UniformBlock("$Globals", "AuditGlobals", 64, new[]
         {
@@ -76,7 +77,8 @@ public sealed class SharedProgramParametersGpuTests
                     Program = new GameMaterialProgram(kind, true, passes),
                     DynamicParameters = new[]
                     {
-                        new GameMaterialDynamicParameter("Drive", state => new Vector4(state.Time + state.Gear, 0, 0, 0))
+                        new GameMaterialDynamicParameter("Drive", state => new Vector4(
+                            (fraction ? state.AnimationFraction((uint)(10 + state.Gear)) : state.Time) + state.Gear, 0, 0, 0))
                     }
                 };
                 object cacheOwner = materials[owner];
@@ -110,9 +112,13 @@ public sealed class SharedProgramParametersGpuTests
                 }
                 else
                 {
-                    drive = ownTime + owner;
+                    drive = (fraction ? ownTime / (4f + owner * 4f) : ownTime) + owner;
+                    var clip = new AnimationClipCatalogItem("Dance", "Dance", "", 4f + owner * 4f,
+                        null, null, null, Array.Empty<AnimationClipTimedCue>(), 0, false, "")
+                    { MaterialAnimations = new[] { new GameMaterialAnimation((uint)(10 + owner), 0, 4f + owner * 4f) } };
+                    var state = fraction ? GameMaterialState.Preview(null, clip) with { Gear = owner } : (GameMaterialState)owner;
                     Assert.True(runtime.TryBindSkinned(materials[owner], pass, Matrix4x4.Identity,
-                        Array.Empty<Matrix4x4>(), false, frame, _ => null, state: owner));
+                        Array.Empty<Matrix4x4>(), false, frame, _ => null, state: state));
                     Assert.Equal((int)program, gl.GetInteger(GLEnum.CurrentProgram));
                 }
                 gl.DrawArrays(PrimitiveType.Triangles, 0, 3);

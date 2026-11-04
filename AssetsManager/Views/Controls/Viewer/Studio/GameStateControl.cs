@@ -138,7 +138,7 @@ namespace AssetsManager.Views.Controls.Viewer
             if (_championModel == null)
                 return;
             _championModel.GameState = GameMaterialState.Preview(EnabledCharacterGameStates(), _playingAnimationClip,
-                _activeBundle?.SpellPreviews);
+                _activeBundle?.SpellPreviews, loop: _activeSpellPlan == null);
             UpdatePersistentEffectState();
             var state = (_championModel.GameState ?? GameMaterialState.Resting) with
                 { Gear = _model.SelectedCharacterForm?.Definition?.GearIndex ?? -1 };

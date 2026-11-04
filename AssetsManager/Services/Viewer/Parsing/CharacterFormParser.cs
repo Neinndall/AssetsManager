@@ -86,8 +86,7 @@ namespace AssetsManager.Services.Viewer.Parsing
                     data.ShowSubmeshHashes.All(hash => data.InitialHiddenSubmeshHashes?.Contains(hash) != true) &&
                     data.HideSubmeshHashes.All(hash => data.InitialHiddenSubmeshHashes?.Contains(hash) == true) &&
                     Get(gearData.Properties, F_skinMeshProperties) is BinTreeEmbedded mesh &&
-                    mesh.ClassHash == ownerMesh.ClassHash && mesh.Properties.Count == ownerMesh.Properties.Count &&
-                    mesh.Properties.All(pair => ownerMesh.Properties.TryGetValue(pair.Key, out var value) && pair.Value.Equals(value)))
+                    mesh.ClassHash == ownerMesh.ClassHash && SamePreviewMesh(mesh, ownerMesh))
                     baseGear = gearUpgrade.PathHash;
             }
 
@@ -155,6 +154,14 @@ namespace AssetsManager.Services.Viewer.Parsing
             return forms.ToArray();
         }
 
+        private static bool SamePreviewMesh(BinTreeStruct left, BinTreeStruct right)
+        {
+            uint shadows = VfxParsingHash.Fnv1a("initialSubmeshShadowsToHide");
+            // Gear fields overlay the owner; omitted fields keep their inherited values.
+            return left.Properties.Where(pair => pair.Key != shadows)
+                .All(pair => right.Properties.TryGetValue(pair.Key, out var value) && pair.Value.Equals(value));
+        }
+
         private static bool IsOtherAsset(string formAsset, string ownerAsset) =>
             !string.IsNullOrWhiteSpace(formAsset) && !string.IsNullOrWhiteSpace(ownerAsset) &&
             !string.Equals(formAsset.Replace('\\', '/'), ownerAsset.Replace('\\', '/'), StringComparison.OrdinalIgnoreCase);
@@ -164,6 +171,12 @@ namespace AssetsManager.Services.Viewer.Parsing
         {
             string character = CharacterFolder(meshPath);
             if (string.IsNullOrEmpty(character)) return null;
+            if (string.Equals(character, ownerCharacter, StringComparison.OrdinalIgnoreCase))
+            {
+                string[] segments = meshPath.Replace('\\', '/').Split('/', StringSplitOptions.RemoveEmptyEntries);
+                int skins = Array.FindIndex(segments, segment => segment.Equals("Skins", StringComparison.OrdinalIgnoreCase));
+                return skins >= 0 && skins + 3 < segments.Length ? segments[skins + 2] : null;
+            }
             string suffix = !string.IsNullOrEmpty(ownerCharacter) &&
                 character.Length > ownerCharacter.Length &&
                 character.StartsWith(ownerCharacter, StringComparison.OrdinalIgnoreCase)
