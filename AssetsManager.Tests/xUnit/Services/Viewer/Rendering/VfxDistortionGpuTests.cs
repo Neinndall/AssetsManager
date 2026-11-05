@@ -41,7 +41,21 @@ public sealed class VfxDistortionGpuTests
     public void DistortionRampAndUnsupportedLayersMatchInstalledShader(bool mesh, int ramp, int erosion, int mult)
         => CompareWarp(mesh, 128, false, false, ramp, erosion, mult);
 
-    private static void CompareWarp(bool mesh, byte alpha, bool vertical, bool occluded, int rampMode = 0, int erosionMode = 0, int multMode = 0)
+    public static IEnumerable<object[]> LookupCases()
+    {
+        foreach (bool mesh in new[] { false, true })
+        for (int driver = 0; driver < 4; driver++)
+        for (int mult = 0; mult < 3; mult++)
+        foreach (bool clampEdges in new[] { false, true })
+            yield return new object[] { mesh, driver, mult, clampEdges };
+    }
+
+    [Theory]
+    [MemberData(nameof(LookupCases))]
+    public void DistortionVariableLookupMatchesInstalledShaderAcrossDriversAndAnimatedUv(bool mesh, int driver, int mult, bool clampEdges)
+        => CompareWarp(mesh, 128, false, false, 3, 1, mult, driver, clampEdges);
+
+    private static void CompareWarp(bool mesh, byte alpha, bool vertical, bool occluded, int rampMode = 0, int erosionMode = 0, int multMode = 0, int lookupDriver = 0, bool clampEdges = false)
     {
         string install = InstalledSkins.FindInstall();
         Assert.NotNull(install);
@@ -53,7 +67,18 @@ public sealed class VfxDistortionGpuTests
         uint color = gl.GenTexture(), depth = gl.GenRenderbuffer(), framebuffer = gl.GenFramebuffer();
         uint white = Texture(1, 1, new byte[] { 255, 255, 255, 255 });
         uint normal = Texture(1, 1, new byte[] { vertical ? (byte)128 : (byte)255, vertical ? (byte)255 : (byte)128, 255, alpha });
-        uint rampTexture = Texture(1, 1, rampMode == 2 ? new byte[] { 128, 64, 192, 128 } : new byte[] { 255, 255, 255, 128 });
+        byte[] rampPixels = new byte[8 * 8 * 4];
+        for (int y = 0; y < 8; y++)
+        for (int x = 0; x < 8; x++)
+        {
+            int at = (y * 8 + x) * 4;
+            rampPixels[at] = (byte)(80 + 20 * x);
+            rampPixels[at + 1] = (byte)(70 + 22 * y);
+            rampPixels[at + 2] = (byte)(100 + 8 * x + 10 * y);
+            rampPixels[at + 3] = (byte)(60 + 12 * x + 14 * y);
+        }
+        uint rampTexture = rampMode == 3 ? Texture(8, 8, rampPixels)
+            : Texture(1, 1, rampMode == 2 ? new byte[] { 128, 64, 192, 128 } : new byte[] { 255, 255, 255, 128 });
         uint erosionTexture = Texture(1, 1, new byte[] { 0, 0, 0, 128 });
         uint multTexture = Texture(1, 1, new byte[] { 128, 128, 128, 128 });
         var definition = new VfxEmitterDefinition("warp", VfxCurveF.Const(1), VfxCurveF.Const(1),
@@ -63,6 +88,11 @@ public sealed class VfxDistortionGpuTests
             RenderState: VfxEmitterRenderState.Default with { DisableBackfaceCull = true, AlphaReference = 0 },
             Distortion: new VfxDistortionDefinition(.25f, 1, "normal.tex"),
             ParticleColorTexturePath: rampMode != 0 ? "ramp.tex" : null,
+            ColorLookUpTypeX: lookupDriver, ColorLookUpTypeY: lookupDriver == 3 ? 1 : lookupDriver + 1,
+            ColorLookUpScales: rampMode == 3 ? (clampEdges ? new Vector2(1.8f, -1.6f) : new Vector2(.65f, .55f)) : Vector2.Zero,
+            ColorLookUpOffsets: rampMode == 3 ? (clampEdges ? new Vector2(-.3f, 1.2f) : new Vector2(.12f, .18f)) : Vector2.Zero,
+            TextureMultTexDiv: rampMode == 3 ? new Vector2(2, 2) : Vector2.One,
+            TextureMultEmitterUvScrollRate: rampMode == 3 ? new Vector2(.17f, -.11f) : Vector2.Zero,
             TextureMultPath: multMode == 2 ? "mult.tex" : null,
             AuthoredFeatures: multMode == 1 ? new VfxEmitterAuthoredFeatures(HasTextureMultLayer: true) : null,
             AlphaErosion: erosionMode != 0
@@ -75,6 +105,7 @@ public sealed class VfxDistortionGpuTests
                     new float[] { -1, -1, 0, 1, -1, 0, -1, 1, 0, 1, 1, 0 },
                     new float[] { 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1 },
                     new float[] { 0, 0, 1, 0, 0, 1, 1, 1 }, null, new uint[] { 0, 1, 2, 2, 1, 3 });
+        var previousFrames = new Dictionary<(int, int, float), byte[]>();
         try
         {
             foreach (var size in new[] { (64, 64), (96, 48), (48, 96), (64, 64) })
@@ -82,6 +113,20 @@ public sealed class VfxDistortionGpuTests
             for (int frame = 0; frame < 2; frame++)
             {
                 int width = size.Item1, height = size.Item2;
+                if (rampMode == 3)
+                    foreach (var emitter in new[] { nativeEmitter, stockEmitter })
+                    {
+                        emitter.RenderTime = frame * .7f;
+                        emitter.Instances[10] = frame;
+                        emitter.Instances[11] = frame == 0 ? .15f : .8f;
+                        emitter.Instances[12] = frame == 0 ? .25f : .7f;
+                        emitter.Instances[13] = frame == 0 ? .3f : .4f;
+                        emitter.Instances[14] = frame == 0 ? .1f : .2f;
+                        emitter.Instances[34] = clampEdges ? .75f : .2f;
+                        emitter.Instances[29] = frame * .13f;
+                        emitter.Instances[30] = frame * -.09f;
+                        emitter.Instances[33] = frame * .3f;
+                    }
                 byte[] background = new byte[width * height * 4];
                 for (int y = 0; y < height; y++)
                 for (int x = 0; x < width; x++)
@@ -89,7 +134,7 @@ public sealed class VfxDistortionGpuTests
                     int at = (y * width + x) * 4;
                     background[at] = (byte)(x * 255 / (width - 1));
                     background[at + 1] = (byte)(y * 255 / (height - 1));
-                    background[at + 2] = frame == 0 ? (byte)30 : (byte)190;
+                    background[at + 2] = frame == 0 || rampMode == 3 ? (byte)30 : (byte)190;
                     background[at + 3] = 153;
                 }
                 foreach (bool missingMap in new[] { false, true, false })
@@ -102,7 +147,27 @@ public sealed class VfxDistortionGpuTests
                     if (alpha != 0 && !occluded && !missingMap)
                         Assert.True(Math.Abs(expected[center + (vertical ? 1 : 0)] - background[center + (vertical ? 1 : 0)]) > (rampMode == 0 ? 8 : 1),
                             "The installed shader must visibly warp the gradient for a non-zero normal mask.");
-                    if (rampMode != 2) Assert.InRange(Math.Abs(expected[center + 2] - background[center + 2]), 0, 1);
+                    if (rampMode < 2) Assert.InRange(Math.Abs(expected[center + 2] - background[center + 2]), 0, 1);
+                    if (rampMode == 3)
+                    {
+                        if (!missingMap)
+                        {
+                            var key = (width, height, particleAlpha);
+                            if (frame == 0) previousFrames[key] = expected;
+                            else
+                                Assert.True(Math.Abs(expected[center] - previousFrames[key][center])
+                                    + Math.Abs(expected[center + 1] - previousFrames[key][center + 1]) > 0,
+                                    "Changing lookup drivers or animated UVs must change the installed shader's result over the same background.");
+                        }
+                        foreach (int y in new[] { height / 3, height / 2, height * 2 / 3 })
+                        foreach (int x in new[] { width / 3, width / 2, width * 2 / 3 })
+                        for (int channel = 0; channel < 4; channel++)
+                        {
+                            int sample = (y * width + x) * 4;
+                            Assert.True(Math.Abs(actual[sample + channel] - expected[sample + channel]) <= 2,
+                                $"Variable lookup: mesh={mesh}, driver={lookupDriver}, mult={multMode}, clamp={clampEdges}, frame={frame}, pixel={sample / 4}, channel={channel}: game={expected[sample + channel]}, stock={actual[sample + channel]}.");
+                        }
+                    }
                     for (int channel = 0; channel < 4; channel++)
                     {
                         Assert.True(Math.Abs(actual[center + channel] - expected[center + channel]) <= 2,
