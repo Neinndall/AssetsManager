@@ -25,6 +25,23 @@ public sealed class VfxDistortionGpuTests
     [Theory]
     [MemberData(nameof(WarpCases))]
     public void StockWarpMatchesInstalledShaderAcrossMasksAspectAndConsecutiveFrames(bool mesh, byte alpha, bool vertical, bool occluded)
+        => CompareWarp(mesh, alpha, vertical, occluded);
+
+    public static IEnumerable<object[]> LayerCases()
+    {
+        foreach (bool mesh in new[] { false, true })
+        for (int ramp = 0; ramp < 3; ramp++)
+        for (int erosion = 0; erosion < 3; erosion++)
+        for (int mult = 0; mult < 3; mult++)
+            yield return new object[] { mesh, ramp, erosion, mult };
+    }
+
+    [Theory]
+    [MemberData(nameof(LayerCases))]
+    public void DistortionRampAndUnsupportedLayersMatchInstalledShader(bool mesh, int ramp, int erosion, int mult)
+        => CompareWarp(mesh, 128, false, false, ramp, erosion, mult);
+
+    private static void CompareWarp(bool mesh, byte alpha, bool vertical, bool occluded, int rampMode = 0, int erosionMode = 0, int multMode = 0)
     {
         string install = InstalledSkins.FindInstall();
         Assert.NotNull(install);
@@ -36,12 +53,21 @@ public sealed class VfxDistortionGpuTests
         uint color = gl.GenTexture(), depth = gl.GenRenderbuffer(), framebuffer = gl.GenFramebuffer();
         uint white = Texture(1, 1, new byte[] { 255, 255, 255, 255 });
         uint normal = Texture(1, 1, new byte[] { vertical ? (byte)128 : (byte)255, vertical ? (byte)255 : (byte)128, 255, alpha });
+        uint rampTexture = Texture(1, 1, rampMode == 2 ? new byte[] { 128, 64, 192, 128 } : new byte[] { 255, 255, 255, 128 });
+        uint erosionTexture = Texture(1, 1, new byte[] { 0, 0, 0, 128 });
+        uint multTexture = Texture(1, 1, new byte[] { 128, 128, 128, 128 });
         var definition = new VfxEmitterDefinition("warp", VfxCurveF.Const(1), VfxCurveF.Const(1),
             null, 0, 0, false, false, 1, VfxCurve3.Const(Vector3.One), null, VfxCurve4.Const(Vector4.One),
             null, null, null, null, VfxCurve3.Const(Vector3.Zero), "white.tex", Vector2.One, 1, false, mesh,
             PrimitiveKind: mesh ? VfxPrimitiveKind.Mesh : VfxPrimitiveKind.CameraQuad,
             RenderState: VfxEmitterRenderState.Default with { DisableBackfaceCull = true, AlphaReference = 0 },
-            Distortion: new VfxDistortionDefinition(.25f, 1, "normal.tex"));
+            Distortion: new VfxDistortionDefinition(.25f, 1, "normal.tex"),
+            ParticleColorTexturePath: rampMode != 0 ? "ramp.tex" : null,
+            TextureMultPath: multMode == 2 ? "mult.tex" : null,
+            AuthoredFeatures: multMode == 1 ? new VfxEmitterAuthoredFeatures(HasTextureMultLayer: true) : null,
+            AlphaErosion: erosionMode != 0
+                ? new VfxAlphaErosionDefinition("erosion.tex", VfxCurveF.Const(erosionMode == 1 ? .2f : .9f),
+                    .1f, .1f, 2, VfxCurve4.Const(Vector4.UnitW), SliceWidth: 1.5f) : null);
         var nativeEmitter = State(); var stockEmitter = State();
         if (mesh)
             foreach (var pair in new[] { (native, nativeEmitter), (stock, stockEmitter) })
@@ -74,13 +100,13 @@ public sealed class VfxDistortionGpuTests
                     Assert.Null(native.GameParticleFallback(nativeEmitter, mesh));
                     int center = ((height / 2) * width + width / 2) * 4;
                     if (alpha != 0 && !occluded && !missingMap)
-                        Assert.True(Math.Abs(expected[center + (vertical ? 1 : 0)] - background[center + (vertical ? 1 : 0)]) > 8,
+                        Assert.True(Math.Abs(expected[center + (vertical ? 1 : 0)] - background[center + (vertical ? 1 : 0)]) > (rampMode == 0 ? 8 : 1),
                             "The installed shader must visibly warp the gradient for a non-zero normal mask.");
-                    Assert.InRange(Math.Abs(expected[center + 2] - background[center + 2]), 0, 1);
+                    if (rampMode != 2) Assert.InRange(Math.Abs(expected[center + 2] - background[center + 2]), 0, 1);
                     for (int channel = 0; channel < 4; channel++)
                     {
                         Assert.True(Math.Abs(actual[center + channel] - expected[center + channel]) <= 2,
-                            $"mesh={mesh}, normalAlpha={alpha}, vertical={vertical}, occluded={occluded}, missing={missingMap}, size={width}x{height}, particleAlpha={particleAlpha}, frame={frame}, channel={channel}: game={expected[center + channel]}, stock={actual[center + channel]}.");
+                            $"mesh={mesh}, ramp={rampMode}, erosion={erosionMode}, mult={multMode}, normalAlpha={alpha}, vertical={vertical}, occluded={occluded}, missing={missingMap}, size={width}x{height}, particleAlpha={particleAlpha}, frame={frame}, channel={channel}: game={expected[center + channel]}, stock={actual[center + channel]}.");
                         if (occluded || missingMap || alpha == 0)
                             Assert.InRange(Math.Abs(expected[center + channel] - background[center + channel]), 0, 1);
                     }
@@ -122,6 +148,7 @@ public sealed class VfxDistortionGpuTests
             gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
             gl.DeleteFramebuffer(framebuffer); gl.DeleteTexture(color); gl.DeleteRenderbuffer(depth);
             gl.DeleteTexture(white); gl.DeleteTexture(normal);
+            gl.DeleteTexture(rampTexture); gl.DeleteTexture(erosionTexture); gl.DeleteTexture(multTexture);
         }
         uint Texture(uint width, uint height, byte[] pixels)
         {
@@ -136,11 +163,16 @@ public sealed class VfxDistortionGpuTests
         {
             var row = new float[VfxPlaybackRuntime.InstanceStride];
             row[2] = .2f; row[3] = row[4] = row[18] = .8f;
+            row[24] = erosionMode == 1 ? .2f : .9f;
+            row[28] = 1;
             row[5] = row[6] = row[7] = row[8] = 1;
             row[21] = row[22] = row[31] = row[32] = row[36] = row[40] = row[44] = 1;
             return new VfxPlaybackRuntime.EmitterState
             {
                 Def = definition, Texture = white, DistortionTexture = normal, TextureWidth = 1, TextureHeight = 1,
+                ColorGradientTexture = rampMode != 0 ? rampTexture : 0,
+                ErosionTexture = erosionMode != 0 ? erosionTexture : 0,
+                TextureMult = multMode == 2 ? multTexture : 0,
                 Instances = row, InstanceCount = 1
             };
         }

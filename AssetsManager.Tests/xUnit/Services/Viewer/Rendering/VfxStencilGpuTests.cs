@@ -23,6 +23,57 @@ public sealed class VfxStencilGpuTests
     [InlineData(false, true)]
     [InlineData(true, false)]
     [InlineData(true, true)]
+    public void ResolvedCustomMaterialUsesColourWhileMissingMaterialKeepsLegacyWarp(bool native, bool missing)
+    {
+        using var frame = new Frame(native);
+        var emitter = frame.Emitter(0, 0, new(0, 1, 0, 1), 2);
+        var colorDefinition = emitter.Def;
+        GameMaterialProgram program = GameParticleProgramResolver.Create(colorDefinition, false);
+        program = program with
+        {
+            Passes = new[] { program.Passes[0] with
+                { State = GameMaterialPassState.Default with { CullEnabled = false, DepthEnabled = false, WriteMask = 15 } } }
+        };
+        var material = ModelMaterialDefinition.Default with
+        {
+            BindingKind = missing ? ModelMaterialBindingKind.Missing : ModelMaterialBindingKind.Authored,
+            AlphaCutoff = 0, Program = program,
+            RenderState = ModelMaterialRenderState.Default with { DoubleSided = true, DepthTest = false, DepthWrite = false }
+        };
+        var warp = new VfxDistortionDefinition(.25f, 1, "normal.tex");
+        emitter.DistortionTexture = emitter.Texture;
+        VfxEmitterDefinition reference = missing
+            ? colorDefinition with { Distortion = warp }
+            : colorDefinition with { CustomMaterial = material };
+        byte[] expected = Draw(reference);
+        var combined = colorDefinition with { CustomMaterial = material, Distortion = warp };
+        Assert.Equal(missing, combined.DrawsAsDistortion);
+        Assert.Equal(expected, Draw(combined));
+        // A resolved custom program owns its tint parameters; its colour need not match the stock material's intensity.
+        Assert.True(frame.Pixel(32)[1] > 0);
+        if (missing) Assert.InRange((int)frame.Pixel(32)[1], 126, 129);
+        Assert.Equal(0, frame.Pixel(32)[2]);
+        if (native) Assert.Null(frame.Renderer.GameParticleFallback(emitter, false));
+
+        byte[] Draw(VfxEmitterDefinition definition)
+        {
+            emitter.Def = definition;
+            frame.Clear();
+            frame.Gl.ClearColor(.25f, .5f, .75f, .6f);
+            frame.Gl.Clear(ClearBufferMask.ColorBufferBit);
+            frame.Renderer.CaptureScene(64, 64, true, false);
+            frame.Draw(emitter);
+            var row = new byte[64 * 4];
+            frame.Gl.ReadPixels(0, 32, 64, 1, PixelFormat.Rgba, PixelType.UnsignedByte, row.AsSpan());
+            return row;
+        }
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
     public void CustomMaterialResolutionControlsEmitterStencilInNativeAndStockDraws(bool native, bool missing)
     {
         using var frame = new Frame(native);

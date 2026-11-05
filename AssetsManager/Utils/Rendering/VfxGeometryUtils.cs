@@ -53,6 +53,8 @@ namespace AssetsManager.Utils.Rendering
         public static bool ShouldUseColorRamp(VfxEmitterDefinition definition, bool hasColorRampTexture, bool shadowPass = false)
         {
             if (!hasColorRampTexture || definition is null) return false;
+            // Distortion shaders keep their lookup even when the colour pair would exclude it for erosion or MULT_PASS.
+            if (!shadowPass && definition.DrawsAsDistortion) return true;
             // Slice's colour pass reads its ramp separately; shadow coverage keeps the regular exclusions.
             if (definition.SliceRange > 0f && !shadowPass) return true;
 
