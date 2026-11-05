@@ -60,6 +60,8 @@ namespace AssetsManager.Views.Models.Viewer
         Vector4 Value,
         GameMaterialParamSource Source);
 
+    internal sealed record GameMaterialPositionParameter(string Name, uint Fields);
+
     internal enum GameMaterialWinding
     {
         Clockwise,
@@ -102,6 +104,8 @@ namespace AssetsManager.Views.Models.Viewer
     {
         internal string VertexShaderPath { get; init; }
         internal string PixelShaderPath { get; init; }
+        internal IReadOnlyList<GameMaterialPositionParameter> PlayerPositionParameters { get; init; } =
+            System.Array.Empty<GameMaterialPositionParameter>();
     }
 
     internal sealed record GameMaterialProgram(

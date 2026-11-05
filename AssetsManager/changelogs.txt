@@ -12,6 +12,7 @@ Changes
   - Hash Guessing Lab / Remove method search from all domains.
 
 Bug Fixes
+  - 3D Studio / Keep position-driven material effects aligned with each character when moving it in the scene.
   - 3D Studio / Preserve distortion colors and strength when effects also declare erosion or extra texture layers.
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>

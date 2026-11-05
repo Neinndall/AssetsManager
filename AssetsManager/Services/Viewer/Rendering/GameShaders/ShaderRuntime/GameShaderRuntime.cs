@@ -202,9 +202,11 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
         {
             internal readonly Dictionary<string, Vector4> Parameters = new(StringComparer.Ordinal);
             internal readonly Dictionary<string, bool> RuntimeSwitches = new(StringComparer.Ordinal);
+            internal readonly IReadOnlyList<GameMaterialPositionParameter> PlayerPositionParameters;
 
             internal PassGlobals(GameMaterialPass pass)
             {
+                PlayerPositionParameters = pass?.PlayerPositionParameters ?? Array.Empty<GameMaterialPositionParameter>();
                 foreach (GameMaterialParameter parameter in pass?.Parameters ?? Array.Empty<GameMaterialParameter>())
                 {
                     if (!string.IsNullOrEmpty(parameter?.Name))

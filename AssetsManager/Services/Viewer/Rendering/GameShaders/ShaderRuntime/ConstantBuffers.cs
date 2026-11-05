@@ -37,6 +37,10 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                 {
                     case Globals:
                         WriteGlobals(block.Data, block.Block, globals, mesh, overrides);
+                        // The bone palette already places characters in world space. Static and particle
+                        // subjects retain the origin of their own shader space, matching the preview contract.
+                        WritePlayerPosition(block.Data, block.Block, globals?.PlayerPositionParameters,
+                            character?.World.Translation ?? Vector3.Zero);
                         break;
                     case "PerFrameVertexCB":
                         WritePerFrameVertex(block.Data, frame, skinned);
@@ -98,6 +102,24 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
 
         internal static bool BlockDataMatches(ReadOnlySpan<float> current, ReadOnlySpan<float> uploaded) =>
             MemoryMarshal.AsBytes(current).SequenceEqual(MemoryMarshal.AsBytes(uploaded));
+
+        private static void WritePlayerPosition(float[] data, GameShaderTranslator.UniformBlock block,
+            IReadOnlyList<GameMaterialPositionParameter> parameters, Vector3 position)
+        {
+            if (parameters == null || parameters.Count == 0) return;
+            foreach (var parameter in parameters)
+            foreach (var member in block.Members)
+            {
+                if (member.Name != parameter.Name) continue;
+                int at = checked((int)(member.Offset / sizeof(float)));
+                int count = Math.Min(4, checked((int)(member.Size / sizeof(float))));
+                var value = new Vector4(position, 0f);
+                int next = 0;
+                for (int component = 0; component < count; component++)
+                    if ((parameter.Fields & (1u << component)) != 0)
+                        Set(data, at + component, value[next++]);
+            }
+        }
 
         private static void WriteGlobals(
             float[] data,

@@ -13,6 +13,47 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
 {
     public sealed class MapMaterialParserTests
     {
+        [Theory]
+        [InlineData(true, true, false)]
+        [InlineData(true, false, false)]
+        [InlineData(true, true, true)]
+        [InlineData(false, true, false)]
+        [InlineData(false, false, false)]
+        public void PlayerPositionResolvesDeclaredLogicalComponentsAndHonorsEnabled(bool declared, bool enabled, bool omittedEnabled)
+        {
+            uint H(string text) => Fnv1a.HashLower(text);
+            var logical = Embedded("ShaderLogicalParameter", new BinTreeString(H("name"), "Position"), new BinTreeU32(H("fields"), 0b1101));
+            var physical = Embedded("ShaderPhysicalParameter", new BinTreeString(H("name"), "Packed"),
+                new BinTreeVector4(H("data"), new Vector4(1, 2, 3, 4)), Container("logicalParameters", logical));
+            var shader = new BinTreeObject(H("shader"), H("CustomShaderDef"), new BinTreeProperty[]
+            { new BinTreeString(H("objectPath"), "shader"), Container("parameters", physical) });
+            BinTreeEmbedded Parameter(string name, string kind, bool on)
+            {
+                var fields = new List<BinTreeProperty> { new BinTreeString(H("name"), name),
+                    new BinTreeStruct(H("driver"), H(kind), Array.Empty<BinTreeProperty>()) };
+                if (!omittedEnabled || !on) fields.Add(new BinTreeBool(H("Enabled"), on));
+                return Embedded("DynamicMaterialParameterDef", fields.ToArray());
+            }
+            var passDefinition = Embedded("StaticMaterialPassDef", new BinTreeObjectLink(H("shader"), H("shader")));
+            var technique = Embedded("StaticMaterialTechniqueDef", new BinTreeString(H("name"), "normal"),
+                Container("passes", passDefinition));
+            var material = new BinTreeObject(H("material"), H("StaticMaterialDef"), new BinTreeProperty[]
+            {
+                Container("paramValues", Embedded("StaticMaterialShaderParamDef", new BinTreeString(H("name"), "Position"),
+                    new BinTreeVector4(H("value"), new Vector4(9, 8, 7, 6)))),
+                new BinTreeStruct(H("dynamicMaterial"), H("DynamicMaterialDef"), new BinTreeProperty[]
+                { Container("parameters", Parameter("Position", "PlayerPositionDynamicMaterialDriver", enabled),
+                    Parameter("Missing", "PlayerPositionDynamicMaterialDriver", true),
+                    Parameter("Packed", "UnknownDriver", true), Parameter("Packed", "PlayerPositionDynamicMaterialDriver", false)) }),
+                Container("techniques", technique)
+            });
+            var pass = Assert.Single(new MapMaterialParser().ParseProgram(material, declared ? new[] { Tree(shader) } : Array.Empty<BinTree>()).Passes);
+            if (!enabled) Assert.Empty(pass.PlayerPositionParameters);
+            else Assert.Equal(new GameMaterialPositionParameter(declared ? "Packed" : "Position", declared ? 0b1101u : 0b1111u),
+                Assert.Single(pass.PlayerPositionParameters));
+            Assert.Equal(declared ? new Vector4(9, 2, 8, 7) : new Vector4(9, 8, 7, 6), Assert.Single(pass.Parameters).Value);
+        }
+
         [Fact]
         public void ProgramPreservesAllPassesDefinesRuntimeSwitchesLogicalParamsAndSamplerState()
         {
