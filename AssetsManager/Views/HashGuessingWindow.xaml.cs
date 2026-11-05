@@ -32,7 +32,8 @@ namespace AssetsManager.Views
         private readonly List<HashMethodItemModel> _allMethods = new();
         private CancellationTokenSource _cancellationTokenSource;
         private bool _isUpdatingResultsColumns;
-        private readonly Dictionary<HashGuessDomain, int> _lastResolvedCounts = new();
+        private int _countRefreshVersion;
+        private readonly Dictionary<(HashGuessDomain, HashGuessScope), int> _lastResolvedCounts = new();
 
         public HashGuessingWindow(
             HashGuessingService hashGuessingService,
@@ -362,14 +363,9 @@ namespace AssetsManager.Views
         private void RefreshMethodsForCurrentDomain()
         {
             int domainIndex = DomainSelector?.SelectedIndex ?? 0;
-            string query = TxtMethodSearch?.Text?.Trim() ?? string.Empty;
 
             var filtered = _allMethods
                 .Where(m => m.DomainIndex == domainIndex)
-                .Where(m => string.IsNullOrEmpty(query) ||
-                            m.Name.Contains(query, StringComparison.OrdinalIgnoreCase) ||
-                            m.Description.Contains(query, StringComparison.OrdinalIgnoreCase) ||
-                            m.Category.Contains(query, StringComparison.OrdinalIgnoreCase))
                 .ToList();
 
             _viewModel.AvailableMethods.Clear();
@@ -381,25 +377,30 @@ namespace AssetsManager.Views
             }
         }
 
+        private HashGuessScope SelectedScope => (HashGuessScope)Math.Max(0, ScopeSelector?.SelectedIndex ?? 0);
+
         private async void UpdateUnknownCountAsync()
         {
-            if (DomainSelector == null || TxtUnknownCount == null || TxtUnknownBreakdown == null) return;
+            if (_hashGuessingService == null || DomainSelector == null || TxtUnknownCount == null || TxtUnknownBreakdown == null) return;
+            if (_viewModel.IsRunning) return;
+            int refreshVersion = ++_countRefreshVersion;
             int selectedIndex = DomainSelector.SelectedIndex;
+            var scope = SelectedScope;
             try
             {
                 if (selectedIndex < 2)
                 {
                     var domain = selectedIndex == 0 ? HashGuessDomain.Game : HashGuessDomain.Lcu;
-                    var count = await Task.Run(() => _hashGuessingService.GetUnknownCountAsync(domain, CancellationToken.None));
-                    if (DomainSelector != null && DomainSelector.SelectedIndex == selectedIndex)
+                    var count = await Task.Run(() => _hashGuessingService.GetUnknownCountAsync(domain, CancellationToken.None, scope));
+                    if (refreshVersion == _countRefreshVersion && !_viewModel.IsRunning && DomainSelector.SelectedIndex == selectedIndex && SelectedScope == scope)
                     {
-                        ShowLiveUnknownCount(count, _lastResolvedCounts.GetValueOrDefault(domain));
+                        ShowLiveUnknownCount(count, _lastResolvedCounts.GetValueOrDefault((domain, scope)));
                     }
                 }
                 else
                 {
                     var summary = await Task.Run(() => _binRstHashGuessingService.GetSummaryAsync(CancellationToken.None));
-                    if (DomainSelector != null && DomainSelector.SelectedIndex == selectedIndex)
+                    if (refreshVersion == _countRefreshVersion && !_viewModel.IsRunning && DomainSelector.SelectedIndex == selectedIndex && SelectedScope == scope)
                     {
                         if (selectedIndex == 2)
                         {
@@ -417,6 +418,7 @@ namespace AssetsManager.Views
             catch (Exception ex)
             {
                 _logService.LogError(ex, "Hash Lab could not refresh the unknown hash count.");
+                if (refreshVersion != _countRefreshVersion || _viewModel.IsRunning) return;
                 TxtUnknownCount.Text = "Unknown";
                 TxtUnknownBreakdown.Text = string.Empty;
             }
@@ -425,7 +427,7 @@ namespace AssetsManager.Views
         private void ShowLiveUnknownCount(int remaining, int resolved)
         {
             var domain = DomainSelector.SelectedIndex == 0 ? HashGuessDomain.Game : HashGuessDomain.Lcu;
-            _lastResolvedCounts[domain] = resolved;
+            _lastResolvedCounts[(domain, SelectedScope)] = resolved;
             TxtUnknownCount.Text = $"{remaining:N0} unknowns";
             TxtUnknownBreakdown.Text = $"Resolved: {resolved:N0} · Remaining: {remaining:N0}";
         }
@@ -498,13 +500,15 @@ namespace AssetsManager.Views
 
         private void DomainSelector_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
+            if (ScopePanel != null)
+                ScopePanel.Visibility = DomainSelector.SelectedIndex < 2 ? Visibility.Visible : Visibility.Collapsed;
             UpdateUnknownCountAsync();
             RefreshMethodsForCurrentDomain();
         }
 
-        private void TxtMethodSearch_TextChanged(object sender, TextChangedEventArgs e)
+        private void ScopeSelector_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            RefreshMethodsForCurrentDomain();
+            UpdateUnknownCountAsync();
         }
 
 
@@ -708,6 +712,7 @@ namespace AssetsManager.Views
         private async Task RunAsync(HashGuessMode mode)
         {
             if (_viewModel.IsRunning) return;
+            var scope = SelectedScope;
 
             var domain = DomainSelector.SelectedIndex == 0 ? HashGuessDomain.Game : HashGuessDomain.Lcu;
             if (mode is HashGuessMode.GrepGame or HashGuessMode.BannerGuess or HashGuessMode.GameCustom) domain = HashGuessDomain.Game;
@@ -855,19 +860,19 @@ namespace AssetsManager.Views
                     // Include preparation and persistence, even when the service's initial awaits complete synchronously.
                     result = await Task.Run(async () => mode switch
                     {
-                        HashGuessMode.GameBasic => await _hashGuessingService.RunGameBasicGuessingAsync(rootPath, progress, effectiveToken, matchProgress, selectedSubMethods),
-                        HashGuessMode.GameExtended => await _hashGuessingService.RunGameExtendedGuessingAsync(rootPath, progress, effectiveToken, matchProgress, selectedSubMethods),
-                        HashGuessMode.BannerGuess => await _hashGuessingService.RunGameBannerGuessingAsync(rootPath, progress, effectiveToken, matchProgress),
-                        HashGuessMode.GameCustom => await _hashGuessingService.RunGameCustomGuessingAsync(rootPath, progress, effectiveToken, matchProgress, selectedSubMethods),
-                        HashGuessMode.LcuScoped => await _hashGuessingService.RunLcuScopedPluginGuessingAsync(rootPath, progress, effectiveToken, matchProgress),
-                        HashGuessMode.LcuModifiers => await _hashGuessingService.RunLcuUniversalModifierGuessingAsync(rootPath, progress, effectiveToken, matchProgress),
-                        HashGuessMode.LcuMedia => await _hashGuessingService.RunLcuMediaGuessingAsync(rootPath, progress, effectiveToken, matchProgress),
-                        HashGuessMode.LcuBasic => await _hashGuessingService.RunLcuBasicGuessingAsync(rootPath, progress, effectiveToken, matchProgress, selectedSubMethods),
-                        HashGuessMode.LcuExtended => await _hashGuessingService.RunLcuExtendedGuessingAsync(rootPath, progress, effectiveToken, matchProgress, selectedSubMethods),
-                        HashGuessMode.LcuCustom => await _hashGuessingService.RunLcuCustomGuessingAsync(rootPath, progress, effectiveToken, matchProgress, selectedSubMethods),
-                        HashGuessMode.LcuV1Paths => await _hashGuessingService.RunLcuV1PathGuessingAsync(rootPath, progress, effectiveToken, matchProgress),
-                        HashGuessMode.GrepGame => await _hashGuessingService.RunEmbeddedPathGrepAsync(HashGuessDomain.Game, rootPath, progress, effectiveToken, matchProgress),
-                        HashGuessMode.GrepLcu => await _hashGuessingService.RunEmbeddedPathGrepAsync(HashGuessDomain.Lcu, rootPath, progress, effectiveToken, matchProgress),
+                        HashGuessMode.GameBasic => await _hashGuessingService.RunGameBasicGuessingAsync(rootPath, progress, effectiveToken, matchProgress, selectedSubMethods, scope: scope),
+                        HashGuessMode.GameExtended => await _hashGuessingService.RunGameExtendedGuessingAsync(rootPath, progress, effectiveToken, matchProgress, selectedSubMethods, scope: scope),
+                        HashGuessMode.BannerGuess => await _hashGuessingService.RunGameBannerGuessingAsync(rootPath, progress, effectiveToken, matchProgress, scope: scope),
+                        HashGuessMode.GameCustom => await _hashGuessingService.RunGameCustomGuessingAsync(rootPath, progress, effectiveToken, matchProgress, selectedSubMethods, scope: scope),
+                        HashGuessMode.LcuScoped => await _hashGuessingService.RunLcuScopedPluginGuessingAsync(rootPath, progress, effectiveToken, matchProgress, scope: scope),
+                        HashGuessMode.LcuModifiers => await _hashGuessingService.RunLcuUniversalModifierGuessingAsync(rootPath, progress, effectiveToken, matchProgress, scope: scope),
+                        HashGuessMode.LcuMedia => await _hashGuessingService.RunLcuMediaGuessingAsync(rootPath, progress, effectiveToken, matchProgress, scope: scope),
+                        HashGuessMode.LcuBasic => await _hashGuessingService.RunLcuBasicGuessingAsync(rootPath, progress, effectiveToken, matchProgress, selectedSubMethods, scope: scope),
+                        HashGuessMode.LcuExtended => await _hashGuessingService.RunLcuExtendedGuessingAsync(rootPath, progress, effectiveToken, matchProgress, selectedSubMethods, scope: scope),
+                        HashGuessMode.LcuCustom => await _hashGuessingService.RunLcuCustomGuessingAsync(rootPath, progress, effectiveToken, matchProgress, selectedSubMethods, scope: scope),
+                        HashGuessMode.LcuV1Paths => await _hashGuessingService.RunLcuV1PathGuessingAsync(rootPath, progress, effectiveToken, matchProgress, scope: scope),
+                        HashGuessMode.GrepGame => await _hashGuessingService.RunEmbeddedPathGrepAsync(HashGuessDomain.Game, rootPath, progress, effectiveToken, matchProgress, scope: scope),
+                        HashGuessMode.GrepLcu => await _hashGuessingService.RunEmbeddedPathGrepAsync(HashGuessDomain.Lcu, rootPath, progress, effectiveToken, matchProgress, scope: scope),
                         _ => throw new ArgumentOutOfRangeException(nameof(mode))
                     }, effectiveToken);
                 }
@@ -938,6 +943,7 @@ namespace AssetsManager.Views
                 _viewModel.IsProgressIndeterminate = false;
                 _cancellationTokenSource = null;
                 _hashGuessingService?.ReleaseMemory();
+                UpdateUnknownCountAsync();
                 if (_progressUIManager != null)
                 {
                     await _progressUIManager.OnHashGuessingCompletedAsync();
@@ -1222,6 +1228,7 @@ namespace AssetsManager.Views
                 _viewModel.IsProgressIndeterminate = false;
                 _cancellationTokenSource = null;
                 _hashGuessingService?.ReleaseMemory();
+                UpdateUnknownCountAsync();
                 if (_progressUIManager != null)
                 {
                     await _progressUIManager.OnHashGuessingCompletedAsync();

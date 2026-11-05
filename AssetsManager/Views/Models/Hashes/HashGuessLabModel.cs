@@ -13,7 +13,6 @@ namespace AssetsManager.Views.Models.Hashes
         private string _progressText = "0%";
 
         private HashMethodItemModel _selectedMethod;
-        private string _searchQuery = string.Empty;
         private string _selectedPluginFilter = "All";
         private string _selectedExtensionFilter = "All";
 
@@ -21,7 +20,6 @@ namespace AssetsManager.Views.Models.Hashes
         public ObservableRangeCollection<object> Matches { get; } = new();
 
         public HashMethodItemModel SelectedMethod { get => _selectedMethod; set { _selectedMethod = value; OnPropertyChanged(); } }
-        public string SearchQuery { get => _searchQuery; set { _searchQuery = value; OnPropertyChanged(); } }
         public string SelectedPluginFilter { get => _selectedPluginFilter; set { _selectedPluginFilter = value; OnPropertyChanged(); } }
         public string SelectedExtensionFilter { get => _selectedExtensionFilter; set { _selectedExtensionFilter = value; OnPropertyChanged(); } }
 
