@@ -9,6 +9,7 @@ using AssetsManager.Services.Viewer.Vfx.Runtime;
 using AssetsManager.Services.Viewer.Vfx.Semantics;
 using AssetsManager.Tests.Support;
 using AssetsManager.Tests.xUnit.Services.Viewer.Vfx;
+using AssetsManager.Utils.Rendering;
 using AssetsManager.Views.Models.Viewer;
 using Silk.NET.OpenGL;
 using Xunit;
@@ -18,6 +19,105 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering;
 [Collection("Viewport native graphics")]
 public sealed class VfxStencilGpuTests
 {
+    public static IEnumerable<object[]> CustomPassCases()
+    {
+        foreach (VfxPrimitiveKind primitive in new[] { VfxPrimitiveKind.CameraQuad, VfxPrimitiveKind.Mesh, VfxPrimitiveKind.AttachedMesh })
+        foreach (bool reverse in new[] { false, true })
+        for (int mask = 0; mask < 3; mask++)
+        foreach (bool additive in new[] { false, true })
+        foreach (bool legacyWarp in new[] { false, true })
+            yield return new object[] { primitive, reverse, mask, additive, legacyWarp };
+    }
+
+    [Theory]
+    [MemberData(nameof(CustomPassCases))]
+    public void CustomPassesKeepTheirBlendDepthAndWriteStateAndDoNotAffectStockDraws(
+        VfxPrimitiveKind primitive, bool reverse, int mask, bool additive, bool legacyWarp)
+    {
+        using var frame = new Frame(true);
+        bool mesh = primitive != VfxPrimitiveKind.CameraQuad;
+        var emitter = frame.Emitter(0, 0, new(.4f, .6f, .8f, .5f), .8f, primitive);
+        VfxEmitterDefinition original = emitter.Def;
+        GameMaterialProgram program = GameParticleProgramResolver.Create(original, mesh);
+        // A controlled custom material owns its parameters and texture instead of borrowing emitter aliases.
+        var values = new Dictionary<string, Vector4>();
+        VfxShaderParameterUtils.PopulateNativeParameters(values, original, 0);
+        var parameters = new List<GameMaterialParameter>();
+        foreach (var pair in values) parameters.Add(new(pair.Key, pair.Value, GameMaterialParamSource.Material));
+        program = program with { Passes = new[] { program.Passes[0] with
+        {
+            Parameters = parameters,
+            Textures = new[] { new GameMaterialTexture("TEXTURE", new MapTextureReference("controlled.tex", 0),
+                GameMaterialTextureSource.Material, null) }
+        } } };
+        emitter.ProgramTextures["controlled.tex"] = emitter.Texture;
+        var opaque = program.Passes[0] with { State = GameMaterialPassState.Default with
+            { CullEnabled = false, DepthEnabled = true, DepthCompareFunc = 7, WriteMask = mask == 1 ? 16u : 31u } };
+        var blended = program.Passes[0] with { State = GameMaterialPassState.Default with
+        {
+            CullEnabled = false, DepthEnabled = true, DepthCompareFunc = 3,
+            BlendEnabled = true, SourceColor = additive ? MapBlendFactor.One : MapBlendFactor.SourceAlpha,
+            DestinationColor = additive ? MapBlendFactor.One : MapBlendFactor.OneMinusSourceAlpha,
+            SourceAlpha = MapBlendFactor.One, DestinationAlpha = MapBlendFactor.OneMinusSourceAlpha,
+            WriteMask = mask == 2 ? 0u : 15u
+        } };
+        var stock = frame.Emitter(0, 0, new(0, 1, 0, 1), .8f, primitive);
+        stock.Def = stock.Def with { BlendMode = 1,
+            RenderState = stock.Def.RenderState with { RenderPass = original.RenderState.RenderPass + 1 } };
+        frame.Draw(stock);
+        byte[] stockControl = frame.Pixel(32);
+        Assert.True(stockControl[1] > 0);
+
+        for (int repeat = 0; repeat < 2; repeat++)
+        {
+            frame.Clear();
+            emitter.Def = Definition(new[] { opaque }, false);
+            frame.Draw(emitter);
+            Assert.Equal((1, 1), frame.Renderer.LastParticleDrawCounts);
+            emitter.Def = Definition(new[] { blended }, false);
+            frame.Draw(emitter);
+            Assert.Equal((1, 1), frame.Renderer.LastParticleDrawCounts);
+            byte[] expected = frame.Pixel(32);
+            Assert.True(expected[0] + expected[1] + expected[2] > 0);
+            float expectedDepth = Depth();
+            // Attached geometry retains its owner placement instead of the particle's translation.
+            float planeDepth = primitive == VfxPrimitiveKind.AttachedMesh ? .5f : .6f;
+            Assert.InRange(Math.Abs(expectedDepth - planeDepth), 0, .00001f);
+
+            frame.Clear();
+            emitter.Def = Definition(reverse ? new[] { blended, opaque } : new[] { opaque, blended }, legacyWarp);
+            frame.Draw(emitter);
+            Assert.Null(frame.Renderer.GameParticleFallback(emitter, mesh));
+            Assert.Equal((2, 2), frame.Renderer.LastParticleDrawCounts);
+            Assert.Equal(expected, frame.Pixel(32));
+            Assert.InRange(Math.Abs(Depth() - expectedDepth), 0, .00001f);
+            frame.Draw(stock);
+            Assert.Equal(stockControl, frame.Pixel(32));
+
+            frame.Clear();
+            frame.Draw(emitter, stock);
+            Assert.Equal((3, 3), frame.Renderer.LastParticleDrawCounts);
+            Assert.Equal(stockControl, frame.Pixel(32));
+        }
+
+        VfxEmitterDefinition Definition(GameMaterialPass[] passes, bool warp) => original with
+        {
+            Distortion = warp ? new VfxDistortionDefinition(.25f, 1, "normal.tex") : null,
+            CustomMaterial = ModelMaterialDefinition.Default with
+            {
+                BindingKind = ModelMaterialBindingKind.Authored, AlphaCutoff = 0,
+                Program = program with { Passes = passes },
+                RenderState = ModelMaterialRenderState.Default with { DoubleSided = true }
+            }
+        };
+        float Depth()
+        {
+            Span<float> pixel = stackalloc float[1];
+            frame.Gl.ReadPixels(32, 32, 1, 1, PixelFormat.DepthComponent, PixelType.Float, pixel);
+            return pixel[0];
+        }
+    }
+
     [Theory]
     [InlineData(false, false)]
     [InlineData(false, true)]
