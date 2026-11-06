@@ -55,7 +55,22 @@ public sealed class VfxDistortionGpuTests
     public void DistortionVariableLookupMatchesInstalledShaderAcrossDriversAndAnimatedUv(bool mesh, int driver, int mult, bool clampEdges)
         => CompareWarp(mesh, 128, false, false, 3, 1, mult, driver, clampEdges);
 
-    private static void CompareWarp(bool mesh, byte alpha, bool vertical, bool occluded, int rampMode = 0, int erosionMode = 0, int multMode = 0, int lookupDriver = 0, bool clampEdges = false)
+    public static IEnumerable<object[]> RibbonCases()
+    {
+        foreach (VfxPrimitiveKind primitive in new[] { VfxPrimitiveKind.Beam, VfxPrimitiveKind.CameraSegmentBeam,
+                     VfxPrimitiveKind.CameraTrail, VfxPrimitiveKind.ArbitraryTrail })
+        for (int driver = 0; driver < 4; driver++)
+        for (int mult = 0; mult < 3; mult++)
+        foreach (byte uvMode in new byte[] { 0, 2 })
+            yield return new object[] { primitive, driver, mult, uvMode };
+    }
+
+    [Theory]
+    [MemberData(nameof(RibbonCases))]
+    public void DistortionRibbonLookupMatchesInstalledShader(VfxPrimitiveKind primitive, int driver, int mult, byte uvMode)
+        => CompareWarp(false, 128, false, false, 3, 1, mult, driver, false, primitive, uvMode);
+
+    private static void CompareWarp(bool mesh, byte alpha, bool vertical, bool occluded, int rampMode = 0, int erosionMode = 0, int multMode = 0, int lookupDriver = 0, bool clampEdges = false, VfxPrimitiveKind? ribbon = null, byte uvMode = 0)
     {
         string install = InstalledSkins.FindInstall();
         Assert.NotNull(install);
@@ -84,7 +99,7 @@ public sealed class VfxDistortionGpuTests
         var definition = new VfxEmitterDefinition("warp", VfxCurveF.Const(1), VfxCurveF.Const(1),
             null, 0, 0, false, false, 1, VfxCurve3.Const(Vector3.One), null, VfxCurve4.Const(Vector4.One),
             null, null, null, null, VfxCurve3.Const(Vector3.Zero), "white.tex", Vector2.One, 1, false, mesh,
-            PrimitiveKind: mesh ? VfxPrimitiveKind.Mesh : VfxPrimitiveKind.CameraQuad,
+            PrimitiveKind: ribbon ?? (mesh ? VfxPrimitiveKind.Mesh : VfxPrimitiveKind.CameraQuad), UvMode: uvMode,
             RenderState: VfxEmitterRenderState.Default with { DisableBackfaceCull = true, AlphaReference = 0 },
             Distortion: new VfxDistortionDefinition(.25f, 1, "normal.tex"),
             ParticleColorTexturePath: rampMode != 0 ? "ramp.tex" : null,
@@ -97,7 +112,10 @@ public sealed class VfxDistortionGpuTests
             AuthoredFeatures: multMode == 1 ? new VfxEmitterAuthoredFeatures(HasTextureMultLayer: true) : null,
             AlphaErosion: erosionMode != 0
                 ? new VfxAlphaErosionDefinition("erosion.tex", VfxCurveF.Const(erosionMode == 1 ? .2f : .9f),
-                    .1f, .1f, 2, VfxCurve4.Const(Vector4.UnitW), SliceWidth: 1.5f) : null);
+                    .1f, .1f, 2, VfxCurve4.Const(Vector4.UnitW), SliceWidth: 1.5f) : null,
+            Beam: ribbon.HasValue ? new VfxBeamDefinition(0, 0, 2, VfxCurve3.Const(Vector3.One),
+                VfxCurve4.Const(Vector4.One), false, Vector3.Zero, Vector3.Zero) : null,
+            Trail: ribbon.HasValue ? new VfxTrailDefinition(VfxCurve3.Const(Vector3.One), 0, 0, 0, 0) : null);
         var nativeEmitter = State(); var stockEmitter = State();
         if (mesh)
             foreach (var pair in new[] { (native, nativeEmitter), (stock, stockEmitter) })
@@ -117,15 +135,19 @@ public sealed class VfxDistortionGpuTests
                     foreach (var emitter in new[] { nativeEmitter, stockEmitter })
                     {
                         emitter.RenderTime = frame * .7f;
-                        emitter.Instances[10] = frame;
-                        emitter.Instances[11] = frame == 0 ? .15f : .8f;
-                        emitter.Instances[12] = frame == 0 ? .25f : .7f;
-                        emitter.Instances[13] = frame == 0 ? .3f : .4f;
-                        emitter.Instances[14] = frame == 0 ? .1f : .2f;
-                        emitter.Instances[34] = clampEdges ? .75f : .2f;
-                        emitter.Instances[29] = frame * .13f;
-                        emitter.Instances[30] = frame * -.09f;
-                        emitter.Instances[33] = frame * .3f;
+                        for (int particle = 0; particle < emitter.InstanceCount; particle++)
+                        {
+                            int at = particle * VfxPlaybackRuntime.InstanceStride;
+                            emitter.Instances[at + 10] = frame;
+                            emitter.Instances[at + 11] = (frame == 0 ? .15f : .65f) + particle * .15f;
+                            emitter.Instances[at + 12] = (frame == 0 ? .25f : .6f) + particle * .1f;
+                            emitter.Instances[at + 13] = frame == 0 ? .3f : .4f;
+                            emitter.Instances[at + 14] = frame == 0 ? .1f : .2f;
+                            emitter.Instances[at + 34] = clampEdges ? .75f : .2f;
+                            emitter.Instances[at + 29] = frame * .13f;
+                            emitter.Instances[at + 30] = frame * -.09f;
+                            emitter.Instances[at + 33] = frame * .3f;
+                        }
                     }
                 byte[] background = new byte[width * height * 4];
                 for (int y = 0; y < height; y++)
@@ -140,13 +162,23 @@ public sealed class VfxDistortionGpuTests
                 foreach (bool missingMap in new[] { false, true, false })
                 {
                     nativeEmitter.DistortionTexture = stockEmitter.DistortionTexture = missingMap ? 0 : normal;
-                    nativeEmitter.Instances[8] = stockEmitter.Instances[8] = particleAlpha;
+                    for (int particle = 0; particle < nativeEmitter.InstanceCount; particle++)
+                        nativeEmitter.Instances[particle * VfxPlaybackRuntime.InstanceStride + 8]
+                            = stockEmitter.Instances[particle * VfxPlaybackRuntime.InstanceStride + 8] = particleAlpha;
                     byte[] expected = Draw(native, nativeEmitter), actual = Draw(stock, stockEmitter);
                     Assert.Null(native.GameParticleFallback(nativeEmitter, mesh));
                     int center = ((height / 2) * width + width / 2) * 4;
                     if (alpha != 0 && !occluded && !missingMap)
-                        Assert.True(Math.Abs(expected[center + (vertical ? 1 : 0)] - background[center + (vertical ? 1 : 0)]) > (rampMode == 0 ? 8 : 1),
-                            "The installed shader must visibly warp the gradient for a non-zero normal mask.");
+                    {
+                        // A coloured ramp can cancel the warp's change in one channel while visibly changing the others.
+                        int contribution = rampMode == 3
+                            ? Math.Abs(expected[center] - background[center])
+                                + Math.Abs(expected[center + 1] - background[center + 1])
+                                + Math.Abs(expected[center + 2] - background[center + 2])
+                            : Math.Abs(expected[center + (vertical ? 1 : 0)] - background[center + (vertical ? 1 : 0)]);
+                        Assert.True(contribution > (rampMode == 0 ? 8 : 1),
+                            $"The installed shader must visibly affect the gradient: primitive={definition.PrimitiveKind}, mult={multMode}, frame={frame}, size={width}x{height}, alpha={particleAlpha}, game=({expected[center]}, {expected[center + 1]}, {expected[center + 2]}), background=({background[center]}, {background[center + 1]}, {background[center + 2]}).");
+                    }
                     if (rampMode < 2) Assert.InRange(Math.Abs(expected[center + 2] - background[center + 2]), 0, 1);
                     if (rampMode == 3)
                     {
@@ -165,7 +197,7 @@ public sealed class VfxDistortionGpuTests
                         {
                             int sample = (y * width + x) * 4;
                             Assert.True(Math.Abs(actual[sample + channel] - expected[sample + channel]) <= 2,
-                                $"Variable lookup: mesh={mesh}, driver={lookupDriver}, mult={multMode}, clamp={clampEdges}, frame={frame}, pixel={sample / 4}, channel={channel}: game={expected[sample + channel]}, stock={actual[sample + channel]}.");
+                                $"Variable lookup: primitive={definition.PrimitiveKind}, uvMode={uvMode}, driver={lookupDriver}, mult={multMode}, clamp={clampEdges}, frame={frame}, pixel={sample / 4}, channel={channel}: game={expected[sample + channel]}, stock={actual[sample + channel]}.");
                         }
                     }
                     for (int channel = 0; channel < 4; channel++)
@@ -198,7 +230,7 @@ public sealed class VfxDistortionGpuTests
                     gl.DepthMask(true); gl.ClearDepth(occluded ? .1 : 1); gl.Clear(ClearBufferMask.DepthBufferBit);
                     renderer.CaptureScene((uint)width, (uint)height, true, true);
                     renderer.Render(new[] { new VfxRenderQueueEntry(emitter, 0, 0) }, Matrix4x4.Identity, Matrix4x4.Identity);
-                    Assert.Equal((1, 1), renderer.LastParticleDrawCounts);
+                    Assert.Equal((1, ribbon.HasValue ? 2 : 1), renderer.LastParticleDrawCounts);
                     var storedDepth = new float[1];
                     gl.ReadPixels(width / 2, height / 2, 1, 1, PixelFormat.DepthComponent, PixelType.Float, storedDepth.AsSpan());
                     Assert.InRange(Math.Abs(storedDepth[0] - (occluded ? .1f : 1f)), 0, .00001f);
@@ -232,14 +264,36 @@ public sealed class VfxDistortionGpuTests
             row[28] = 1;
             row[5] = row[6] = row[7] = row[8] = 1;
             row[21] = row[22] = row[31] = row[32] = row[36] = row[40] = row[44] = 1;
-            return new VfxPlaybackRuntime.EmitterState
+            bool trail = ribbon is VfxPrimitiveKind.CameraTrail or VfxPrimitiveKind.ArbitraryTrail;
+            int count = trail || ribbon == VfxPrimitiveKind.CameraSegmentBeam ? 2 : 1;
+            if (ribbon.HasValue) row[4] = row[18] = 0;
+            float[] instances = new float[count * VfxPlaybackRuntime.InstanceStride];
+            var emitter = new VfxPlaybackRuntime.EmitterState
             {
                 Def = definition, Texture = white, DistortionTexture = normal, TextureWidth = 1, TextureHeight = 1,
                 ColorGradientTexture = rampMode != 0 ? rampTexture : 0,
                 ErosionTexture = erosionMode != 0 ? erosionTexture : 0,
                 TextureMult = multMode == 2 ? multTexture : 0,
-                Instances = row, InstanceCount = 1
+                SystemOrigin = new Vector3(-.75f, 0, .2f), SystemTarget = new Vector3(.75f, 0, .2f),
+                SystemOrientation = Matrix4x4.Identity, InstanceCount = count
             };
+            for (int particle = 0; particle < count; particle++)
+            {
+                int at = particle * VfxPlaybackRuntime.InstanceStride;
+                row.CopyTo(instances, at);
+                if (trail) instances[at] = particle == 0 ? -.75f : .75f;
+                if (ribbon == VfxPrimitiveKind.CameraSegmentBeam) instances[at] = emitter.SystemOrigin.X;
+                if (ribbon.HasValue)
+                    emitter.Particles.Add(new VfxPlaybackRuntime.Particle
+                    {
+                        Serial = (uint)particle, Ordinal = (ushort)particle, Life = 1, BirthFrame = Matrix4x4.Identity,
+                        TrailTiling = trail ? new Vector3(2, 1, 0) : Vector3.Zero,
+                        BirthRotation = ribbon == VfxPrimitiveKind.ArbitraryTrail
+                            ? new Vector3(0, 0, MathF.PI / 2) : Vector3.Zero
+                    });
+            }
+            emitter.Instances = instances;
+            return emitter;
         }
     }
 }
