@@ -1118,27 +1118,7 @@ void main() { FragColor = vec4(0.4, 0.6, 0.8, 0.5); }";
             VfxEmitterDefinition Emitter,
             bool Mesh);
 
-        private static string ToDesktopGlsl(string source)
-        {
-            string result = source ?? string.Empty;
-            result = System.Text.RegularExpressions.Regex.Replace(
-                result,
-                @"^#version\s+300\s+es\s*$",
-                "#version 330 core",
-                System.Text.RegularExpressions.RegexOptions.Multiline |
-                System.Text.RegularExpressions.RegexOptions.CultureInvariant);
-            result = System.Text.RegularExpressions.Regex.Replace(
-                result,
-                @"^\s*precision\s+(?:lowp|mediump|highp)\s+\w+\s*;\s*$\r?\n?",
-                string.Empty,
-                System.Text.RegularExpressions.RegexOptions.Multiline |
-                System.Text.RegularExpressions.RegexOptions.CultureInvariant);
-            return System.Text.RegularExpressions.Regex.Replace(
-                result,
-                @"\b(?:lowp|mediump|highp)\s+",
-                string.Empty,
-                System.Text.RegularExpressions.RegexOptions.CultureInvariant);
-        }
+        private static string ToDesktopGlsl(string source) => GameShaderRuntime.ToDesktopGlsl(source);
 
         [System.Runtime.InteropServices.DllImport(
             "opengl32.dll",

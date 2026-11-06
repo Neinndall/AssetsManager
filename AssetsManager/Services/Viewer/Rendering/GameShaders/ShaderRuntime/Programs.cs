@@ -233,10 +233,20 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             if (_gles)
                 return result;
 
+            return ToDesktopGlsl(result);
+        }
+
+        internal static string ToDesktopGlsl(string source)
+        {
+            string result = source ?? string.Empty;
+            // ESSL 3.00 exposes packing builtins that GLSL 3.30 needs an explicit extension for.
+            bool packing = Regex.IsMatch(result,
+                @"\b(?:pack|unpack)(?:Half2x16|Unorm2x16|Snorm2x16|Unorm4x8|Snorm4x8)\s*\(",
+                RegexOptions.CultureInvariant);
             result = Regex.Replace(
                 result,
                 @"^#version\s+300\s+es\s*$",
-                "#version 330 core",
+                packing ? "#version 330 core\n#extension GL_ARB_shading_language_packing : require" : "#version 330 core",
                 RegexOptions.Multiline | RegexOptions.CultureInvariant);
             result = Regex.Replace(
                 result,
