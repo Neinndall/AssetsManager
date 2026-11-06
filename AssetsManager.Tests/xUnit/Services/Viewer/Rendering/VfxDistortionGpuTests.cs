@@ -70,7 +70,22 @@ public sealed class VfxDistortionGpuTests
     public void DistortionRibbonLookupMatchesInstalledShader(VfxPrimitiveKind primitive, int driver, int mult, byte uvMode)
         => CompareWarp(false, 128, false, false, 3, 1, mult, driver, false, primitive, uvMode);
 
-    private static void CompareWarp(bool mesh, byte alpha, bool vertical, bool occluded, int rampMode = 0, int erosionMode = 0, int multMode = 0, int lookupDriver = 0, bool clampEdges = false, VfxPrimitiveKind? ribbon = null, byte uvMode = 0)
+    public static IEnumerable<object[]> MeshVariantCases()
+    {
+        foreach (VfxPrimitiveKind primitive in new[] { VfxPrimitiveKind.AttachedMesh, VfxPrimitiveKind.Beam })
+        for (int driver = 0; driver < 4; driver++)
+        for (int mult = 0; mult < 3; mult++)
+        foreach (byte uvMode in new byte[] { 0, 1, 2 })
+        foreach (bool patternedNormal in new[] { false, true })
+            yield return new object[] { primitive, driver, mult, uvMode, patternedNormal };
+    }
+
+    [Theory]
+    [MemberData(nameof(MeshVariantCases))]
+    public void DistortionMeshVariantMatchesInstalledShaderWithAnimatedResources(VfxPrimitiveKind primitive, int driver, int mult, byte uvMode, bool patternedNormal)
+        => CompareWarp(true, 128, false, false, 3, 1, mult, driver, false, null, uvMode, primitive, patternedNormal);
+
+    private static void CompareWarp(bool mesh, byte alpha, bool vertical, bool occluded, int rampMode = 0, int erosionMode = 0, int multMode = 0, int lookupDriver = 0, bool clampEdges = false, VfxPrimitiveKind? ribbon = null, byte uvMode = 0, VfxPrimitiveKind? meshPrimitive = null, bool patternedNormal = false)
     {
         string install = InstalledSkins.FindInstall();
         Assert.NotNull(install);
@@ -81,7 +96,18 @@ public sealed class VfxDistortionGpuTests
         native.Initialize(gl, InstalledSkins.Settings(install)); stock.Initialize(gl);
         uint color = gl.GenTexture(), depth = gl.GenRenderbuffer(), framebuffer = gl.GenFramebuffer();
         uint white = Texture(1, 1, new byte[] { 255, 255, 255, 255 });
-        uint normal = Texture(1, 1, new byte[] { vertical ? (byte)128 : (byte)255, vertical ? (byte)255 : (byte)128, 255, alpha });
+        byte[] normalPixels = new byte[8 * 8 * 4];
+        for (int y = 0; y < 8; y++)
+        for (int x = 0; x < 8; x++)
+        {
+            int at = (y * 8 + x) * 4;
+            normalPixels[at] = (byte)(150 + 12 * x);
+            normalPixels[at + 1] = (byte)(132 + 8 * y);
+            normalPixels[at + 2] = 255;
+            normalPixels[at + 3] = (byte)(96 + 6 * x + 7 * y);
+        }
+        uint normal = patternedNormal ? Texture(8, 8, normalPixels)
+            : Texture(1, 1, new byte[] { vertical ? (byte)128 : (byte)255, vertical ? (byte)255 : (byte)128, 255, alpha });
         byte[] rampPixels = new byte[8 * 8 * 4];
         for (int y = 0; y < 8; y++)
         for (int x = 0; x < 8; x++)
@@ -98,8 +124,9 @@ public sealed class VfxDistortionGpuTests
         uint multTexture = Texture(1, 1, new byte[] { 128, 128, 128, 128 });
         var definition = new VfxEmitterDefinition("warp", VfxCurveF.Const(1), VfxCurveF.Const(1),
             null, 0, 0, false, false, 1, VfxCurve3.Const(Vector3.One), null, VfxCurve4.Const(Vector4.One),
-            null, null, null, null, VfxCurve3.Const(Vector3.Zero), "white.tex", Vector2.One, 1, false, mesh,
-            PrimitiveKind: ribbon ?? (mesh ? VfxPrimitiveKind.Mesh : VfxPrimitiveKind.CameraQuad), UvMode: uvMode,
+            null, null, null, null, VfxCurve3.Const(Vector3.Zero), "white.tex", meshPrimitive.HasValue ? new Vector2(2, 2) : Vector2.One, 1, false, mesh,
+            PrimitiveKind: meshPrimitive ?? ribbon ?? (mesh ? VfxPrimitiveKind.Mesh : VfxPrimitiveKind.CameraQuad), UvMode: uvMode,
+            MeshPath: meshPrimitive == VfxPrimitiveKind.Beam ? "beam.scb" : null,
             RenderState: VfxEmitterRenderState.Default with { DisableBackfaceCull = true, AlphaReference = 0 },
             Distortion: new VfxDistortionDefinition(.25f, 1, "normal.tex"),
             ParticleColorTexturePath: rampMode != 0 ? "ramp.tex" : null,
@@ -113,13 +140,18 @@ public sealed class VfxDistortionGpuTests
             AlphaErosion: erosionMode != 0
                 ? new VfxAlphaErosionDefinition("erosion.tex", VfxCurveF.Const(erosionMode == 1 ? .2f : .9f),
                     .1f, .1f, 2, VfxCurve4.Const(Vector4.UnitW), SliceWidth: 1.5f) : null,
-            Beam: ribbon.HasValue ? new VfxBeamDefinition(0, 0, 2, VfxCurve3.Const(Vector3.One),
+            Beam: ribbon.HasValue || meshPrimitive == VfxPrimitiveKind.Beam ? new VfxBeamDefinition(0, 0, 2, VfxCurve3.Const(Vector3.One),
                 VfxCurve4.Const(Vector4.One), false, Vector3.Zero, Vector3.Zero) : null,
             Trail: ribbon.HasValue ? new VfxTrailDefinition(VfxCurve3.Const(Vector3.One), 0, 0, 0, 0) : null);
         var nativeEmitter = State(); var stockEmitter = State();
         if (mesh)
             foreach (var pair in new[] { (native, nativeEmitter), (stock, stockEmitter) })
-                pair.Item1.UploadEmitterMesh(pair.Item2,
+                if (meshPrimitive == VfxPrimitiveKind.Beam)
+                    pair.Item1.UploadEmitterMesh(pair.Item2,
+                        new float[] { 0, -1, -1, 0, 1, -1, 0, 1, 1, 0, -1, -1, 0, 1, 1, 0, -1, 1 },
+                        new float[] { 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0 },
+                        new float[] { 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1 }, null);
+                else pair.Item1.UploadEmitterMesh(pair.Item2,
                     new float[] { -1, -1, 0, 1, -1, 0, -1, 1, 0, 1, 1, 0 },
                     new float[] { 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1 },
                     new float[] { 0, 0, 1, 0, 0, 1, 1, 1 }, null, new uint[] { 0, 1, 2, 2, 1, 3 });
@@ -147,6 +179,12 @@ public sealed class VfxDistortionGpuTests
                             emitter.Instances[at + 29] = frame * .13f;
                             emitter.Instances[at + 30] = frame * -.09f;
                             emitter.Instances[at + 33] = frame * .3f;
+                            if (meshPrimitive.HasValue)
+                            {
+                                emitter.Instances[at + 19] = frame * .17f;
+                                emitter.Instances[at + 20] = frame * -.09f;
+                                emitter.Instances[at + 23] = frame * .2f;
+                            }
                         }
                     }
                 byte[] background = new byte[width * height * 4];
@@ -159,9 +197,11 @@ public sealed class VfxDistortionGpuTests
                     background[at + 2] = frame == 0 || rampMode == 3 ? (byte)30 : (byte)190;
                     background[at + 3] = 153;
                 }
-                foreach (bool missingMap in new[] { false, true, false })
+                foreach (int resourceStep in meshPrimitive.HasValue ? new[] { 0, 1, 0, 2, 0 } : new[] { 0, 1, 0 })
                 {
+                    bool missingMap = resourceStep == 1, missingRamp = resourceStep == 2;
                     nativeEmitter.DistortionTexture = stockEmitter.DistortionTexture = missingMap ? 0 : normal;
+                    nativeEmitter.ColorGradientTexture = stockEmitter.ColorGradientTexture = !missingRamp && rampMode != 0 ? rampTexture : 0;
                     for (int particle = 0; particle < nativeEmitter.InstanceCount; particle++)
                         nativeEmitter.Instances[particle * VfxPlaybackRuntime.InstanceStride + 8]
                             = stockEmitter.Instances[particle * VfxPlaybackRuntime.InstanceStride + 8] = particleAlpha;
@@ -182,7 +222,7 @@ public sealed class VfxDistortionGpuTests
                     if (rampMode < 2) Assert.InRange(Math.Abs(expected[center + 2] - background[center + 2]), 0, 1);
                     if (rampMode == 3)
                     {
-                        if (!missingMap)
+                        if (!missingMap && !missingRamp)
                         {
                             var key = (width, height, particleAlpha);
                             if (frame == 0) previousFrames[key] = expected;
