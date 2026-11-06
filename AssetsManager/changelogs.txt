@@ -6,6 +6,7 @@ New Features
   - Hash Guessing Lab / Separate current-patch and historical Game/LCU unknowns, with a scope selector for guessing.
 
 Improvements
+  - 3D Studio / Update graphics dependencies for compatibility and reliability improvements.
   - Hash Guessing Lab / Recover unknown UI BIN filenames from their declared scene names.
 
 Changes
