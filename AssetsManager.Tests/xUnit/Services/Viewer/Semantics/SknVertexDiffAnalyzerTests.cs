@@ -2,12 +2,12 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Numerics;
-using AssetsManager.Services.Viewer.Parsing;
+using AssetsManager.Services.Viewer.Semantics;
 using AssetsManager.Views.Dialogs;
 using LeagueToolkit.Core.Mesh;
 using Xunit;
 
-namespace AssetsManager.Tests.xUnit.Services.Viewer;
+namespace AssetsManager.Tests.xUnit.Services.Viewer.Semantics;
 
 public sealed class SknVertexDiffAnalyzerTests
 {
@@ -105,6 +105,33 @@ public sealed class SknVertexDiffAnalyzerTests
         var reverse = Assert.Single(SknVertexDiffAnalyzer.Compare(newMesh, oldMesh)["Body"].Changes);
         Assert.Equal(1, reverse.OldOnly);
         Assert.Equal(0, reverse.NewOnly);
+    }
+
+    [Fact]
+    public void InspectionFiltersAttributePositionsAndKeepsAuthoredNormalDirections()
+    {
+        var edited = Triangle();
+        edited[1] = edited[1] with { Normal = Vector3.UnitY };
+        edited[2] = edited[2] with { Uv = Vector2.One };
+        using var oldMesh = Mesh(Triangle());
+        using var newMesh = Mesh(edited);
+        var changes = SknVertexDiffAnalyzer.Compare(oldMesh, newMesh);
+        var normalPart = Assert.Single(SknVertexInspection.Build(newMesh, changes, "Normals", true));
+        Assert.Equal(Vector3.UnitX, Assert.Single(normalPart.Positions));
+        Assert.Equal(Vector3.UnitY, Assert.Single(normalPart.Normals));
+        var uvPart = Assert.Single(SknVertexInspection.Build(newMesh, changes, "UV", true));
+        Assert.Equal(Vector3.UnitY, Assert.Single(uvPart.Positions));
+        Assert.Empty(SknVertexInspection.Build(newMesh, changes, "Bone weights", true));
+        Assert.Equal(3, Assert.Single(SknVertexInspection.Build(newMesh, changes, "Normals", false)).Positions.Length);
+    }
+
+    [Fact]
+    public void EntirelyAddedPartsArePositionChangesRatherThanNormalChanges()
+    {
+        using var mesh = Mesh(Triangle());
+        var differences = SknVertexDiffAnalyzer.Compare(null, mesh);
+        Assert.Equal(3, Assert.Single(SknVertexInspection.Build(mesh, differences, "Positions", true)).Positions.Length);
+        Assert.Empty(SknVertexInspection.Build(mesh, differences, "Normals", true));
     }
 
     [Fact]

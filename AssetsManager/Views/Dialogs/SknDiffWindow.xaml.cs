@@ -12,7 +12,8 @@ using System.Windows.Media;
 using System.Windows.Media.Media3D;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Viewer.Loading;
-using AssetsManager.Services.Viewer.Parsing;
+using AssetsManager.Services.Viewer.Semantics;
+using AssetsManager.Services.Viewer.Rendering;
 using AssetsManager.Utils;
 using AssetsManager.Views.Controls.Viewer;
 using AssetsManager.Views.Helpers;
@@ -40,6 +41,9 @@ namespace AssetsManager.Views.Dialogs
         private readonly Dictionary<string, MeshGeometry3D> _attributeGeometryCache = new(StringComparer.OrdinalIgnoreCase);
         private IReadOnlyDictionary<string, SknVertexPartDiff> _vertexDiffs =
             new Dictionary<string, SknVertexPartDiff>(StringComparer.OrdinalIgnoreCase);
+        private readonly SknDiffInspectionModel _inspection = new();
+        private IReadOnlyList<SknVertexInspectionBatch> _oldInspection = Array.Empty<SknVertexInspectionBatch>();
+        private IReadOnlyList<SknVertexInspectionBatch> _newInspection = Array.Empty<SknVertexInspectionBatch>();
 
         private EventHandler _oldCameraChangedHandler;
         private EventHandler _newCameraChangedHandler;
@@ -56,6 +60,13 @@ namespace AssetsManager.Views.Dialogs
             // Inject services into viewports
             OldViewport.LogService = logService;
             NewViewport.LogService = logService;
+            OldViewport.ConfigureInspection(_inspection);
+            NewViewport.ConfigureInspection(_inspection);
+            OldViewport.InspectionPartVisible = IsPartUserVisible;
+            NewViewport.InspectionPartVisible = IsPartUserVisible;
+            _inspection.PropertyChanged += Inspection_PropertyChanged;
+            OldViewport.FocusInspectionRequested += FocusInspectionRequested;
+            NewViewport.FocusInspectionRequested += FocusInspectionRequested;
 
             // Expand the toolbars by default
             OldViewport.ViewModel.IsToolbarVisible = true;
@@ -168,6 +179,9 @@ namespace AssetsManager.Views.Dialogs
 
         protected override void OnClosed(EventArgs e)
         {
+            _inspection.PropertyChanged -= Inspection_PropertyChanged;
+            OldViewport.FocusInspectionRequested -= FocusInspectionRequested;
+            NewViewport.FocusInspectionRequested -= FocusInspectionRequested;
             base.OnClosed(e);
 
             // Close any remaining loading handover before releasing comparison resources.
@@ -347,6 +361,7 @@ namespace AssetsManager.Views.Dialogs
 
             if (loadingWindow != null) await loadingWindow.SetStateAndRenderAsync(DiffLoadingState.Comparing3DGeometry);
             _vertexDiffs = await Task.Run(() => SknVertexDiffAnalyzer.Compare(_oldScene?.SkinnedMesh, _newScene?.SkinnedMesh));
+            RebuildInspectionGeometry();
             CompareModels();
             BuildMeshPartsList();
             ResetCharacterCameras();
@@ -494,8 +509,10 @@ namespace AssetsManager.Views.Dialogs
             var red = new System.Numerics.Vector4(1f, 0.2f, 0.25f, 1f);
             var gray = new System.Numerics.Vector4(0.4f, 0.43f, 0.48f, ghost ? 0.12f : 1f);
             var purple = new System.Numerics.Vector4(0.7f, 0.4f, 1f, 1f);
-            bool attributes = ShowAttributeChangesCheckBox.IsChecked == true;
+            bool attributes = OldViewport.ShowAttributeChanges && _inspection.Surfaces;
             var newViewport = combined ? OldViewport : NewViewport;
+            OldViewport.SetInspectionGeometry(combined ? _oldInspection.Concat(_newInspection).ToArray() : _oldInspection);
+            NewViewport.SetInspectionGeometry(combined ? Array.Empty<SknVertexInspectionBatch>() : _newInspection);
 
             foreach (string name in oldParts.Keys.Union(newParts.Keys, StringComparer.OrdinalIgnoreCase))
             {
@@ -539,7 +556,69 @@ namespace AssetsManager.Views.Dialogs
             NewViewport.RequestRender();
         }
 
-        private void AttributeChanges_Click(object sender, RoutedEventArgs e) => UpdateVisualHighlighting();
+        private void RebuildInspectionGeometry()
+        {
+            _oldInspection = SknVertexInspection.Build(_oldScene?.SkinnedMesh, _vertexDiffs, _inspection.Attribute, _inspection.ChangedOnly)
+                .Select(part => new SknVertexInspectionBatch(_oldScene, part, new(1f, 0.25f, 0.3f, 1f))).ToArray();
+            _newInspection = SknVertexInspection.Build(_newScene?.SkinnedMesh, _vertexDiffs, _inspection.Attribute, _inspection.ChangedOnly)
+                .Select(part => new SknVertexInspectionBatch(_newScene, part, new(0.2f, 1f, 0.4f, 1f))).ToArray();
+        }
+
+        private void Inspection_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(SknDiffInspectionModel.Summary))
+                return;
+            if (e.PropertyName is nameof(SknDiffInspectionModel.Attribute) or nameof(SknDiffInspectionModel.ChangedOnly))
+            {
+                RebuildInspectionGeometry();
+                _attributeGeometryCache.Clear();
+                foreach (var pair in _commonGeometryCache)
+                {
+                    if (!_vertexDiffs.TryGetValue(pair.Key, out var diff))
+                        continue;
+                    var mesh = SknMeshDiffAnalyzer.ExtractAffectedMesh(pair.Value, diff.PositionsFor(_inspection.Attribute));
+                    if (mesh != null)
+                    {
+                        mesh.Freeze();
+                        _attributeGeometryCache[pair.Key] = mesh;
+                    }
+                }
+                UpdateVisualHighlighting();
+            }
+            else if (e.PropertyName == nameof(SknDiffInspectionModel.Surfaces))
+                UpdateVisualHighlighting();
+            OldViewport.RequestRender();
+            NewViewport.RequestRender();
+        }
+
+        private IEnumerable<System.Numerics.Vector3> InspectionWorldPositions(string partName = null) =>
+            _oldInspection.Concat(_newInspection)
+                .Where(batch => IsPartUserVisible(batch.Part.Name) && (partName == null ||
+                    string.Equals(batch.Part.Name, partName, StringComparison.OrdinalIgnoreCase)))
+                .SelectMany(batch => batch.Part.Positions.Select(position =>
+                    System.Numerics.Vector3.Transform(position, GlMeshRenderer.CreateWorldMatrix(batch.Model))));
+
+        private void FocusInspectionRequested(object sender, EventArgs e) =>
+            OldViewport.FocusPositions(InspectionWorldPositions());
+
+        private void FocusPart_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button { Tag: string name })
+                return;
+            var affected = InspectionWorldPositions(name).ToArray();
+            if (affected.Length > 0)
+            {
+                OldViewport.FocusPositions(affected);
+                return;
+            }
+            var points = new List<System.Numerics.Vector3>();
+            foreach (var scene in new[] { _oldScene, _newScene }.Where(scene => scene != null))
+                foreach (var part in scene.Parts.Where(part => string.Equals(part.Name, name, StringComparison.OrdinalIgnoreCase)))
+                    if (part.Geometry.Geometry is MeshGeometry3D mesh)
+                        points.AddRange(mesh.Positions.Select(point => System.Numerics.Vector3.Transform(
+                            new((float)point.X, (float)point.Y, (float)point.Z), GlMeshRenderer.CreateWorldMatrix(scene))));
+            OldViewport.FocusPositions(points);
+        }
 
         private void Viewport_SurfaceFiltersChanged(object sender, EventArgs e)
         {
@@ -548,6 +627,7 @@ namespace AssetsManager.Views.Dialogs
             target.ShowAddedSurfaces = source.ShowAddedSurfaces;
             target.ShowRemovedSurfaces = source.ShowRemovedSurfaces;
             target.ShowUnchangedContext = source.ShowUnchangedContext;
+            target.ShowAttributeChanges = source.ShowAttributeChanges;
             UpdateVisualHighlighting();
         }
 
@@ -873,17 +953,15 @@ namespace AssetsManager.Views.Dialogs
                 .GroupBy(change => change.Name)
                 .Select(group => new SknAttributeChange(group.Key, group.Sum(change => change.OldOnly),
                     group.Sum(change => change.NewOnly)).Summary));
-            AttributeSummaryLabel.Text = attributeParts == 0
+            _inspection.Summary = attributeParts == 0
                 ? "No vertex attribute differences detected"
                 : $"{attributeParts:N0} parts with vertex data changes · {attributeSummary}";
-            AttributeSummaryLabel.ToolTip = AttributeSummaryLabel.Text +
-                "\nExact values are compared at shared positions, independent of vertex ordering. " +
-                "Counts do not establish individual vertex identities.";
             DiffSummaryLabel.Text = changedCount == 0
                 ? "No geometry or vertex attribute changes detected"
                 : added == 0 && removed == 0
                     ? $"Geometry unchanged | {changedCount:N0} parts with vertex data changes"
                     : $"{changedCount:N0} changed parts | {added:N0} NEW-only / {removed:N0} OLD-only triangles";
+            DiffSummaryLabel.ToolTip = DiffSummaryLabel.Text + "\n" + _inspection.Summary;
         }
 
         private bool _isDraggingMeshPanel = false;
@@ -961,7 +1039,7 @@ namespace AssetsManager.Views.Dialogs
                     _commonGeometryCache[newPart.Name] = commonMesh;
                     if (_vertexDiffs.TryGetValue(newPart.Name, out var vertexDiff) && vertexDiff.HasChanges)
                     {
-                        var affected = SknMeshDiffAnalyzer.ExtractAffectedMesh(commonMesh, vertexDiff.ChangedPositions);
+                        var affected = SknMeshDiffAnalyzer.ExtractAffectedMesh(commonMesh, vertexDiff.PositionsFor(_inspection.Attribute));
                         if (affected != null)
                         {
                             affected.Freeze();

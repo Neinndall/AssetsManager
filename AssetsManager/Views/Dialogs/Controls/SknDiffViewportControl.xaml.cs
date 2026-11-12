@@ -36,6 +36,10 @@ namespace AssetsManager.Views.Dialogs.Controls
         private bool _skyCubeDirty;
         private FxaaPostEffectsRenderer _fxaaRenderer;
         private SmaaPostEffectsRenderer _smaaRenderer;
+        private SknVertexInspectionRenderer _vertexInspectionRenderer;
+        private IReadOnlyList<SknVertexInspectionBatch> _inspectionBatches = Array.Empty<SknVertexInspectionBatch>();
+        internal SknDiffInspectionModel Inspection { get; private set; } = new();
+        internal Func<string, bool> InspectionPartVisible { get; set; } = _ => true;
 
         private readonly SknDiffViewportModel _viewModel;
         public SknDiffViewportModel ViewModel => _viewModel;
@@ -212,7 +216,7 @@ namespace AssetsManager.Views.Dialogs.Controls
                     lightColor1,
                     lightDir2,
                     lightColor2,
-                    ambientColor);
+                    ambientColor, wireOverlay: Inspection.Edges);
             }
             foreach (var model in _auxiliaryModels)
             {
@@ -226,11 +230,19 @@ namespace AssetsManager.Views.Dialogs.Controls
                     lightColor1,
                     lightDir2,
                     lightColor2,
-                    ambientColor);
+                    ambientColor, wireOverlay: Inspection.Edges);
             }
 
             // Glow the game shaders wrote, once every model is drawn and before anti-aliasing.
             _meshRenderer?.ComposeBloom();
+
+            if (ShowAttributeChanges && (Inspection.Vertices || Inspection.Normals) && _inspectionBatches.Count > 0)
+            {
+                _vertexInspectionRenderer ??= new SknVertexInspectionRenderer(_gl);
+                _vertexInspectionRenderer.Render(_inspectionBatches, viewProj, InspectionPartVisible,
+                    Inspection.Vertices, Inspection.Normals, Inspection.ThroughMesh,
+                    (float)Inspection.PointSize, (float)Inspection.NormalLength);
+            }
 
             if (_fxaaRenderer != null && _viewModel.IsFxaaEnabled)
             {
@@ -551,6 +563,8 @@ namespace AssetsManager.Views.Dialogs.Controls
             _groundRefreshOperation?.Abort();
             _groundRefreshOperation = null;
             ClearModels();
+            RunReleaseStep(nameof(SknVertexInspectionRenderer), () => _vertexInspectionRenderer?.Dispose(), gpuBound: true);
+            _vertexInspectionRenderer = null;
             RunReleaseStep(nameof(CustomCameraController), () => _cameraController?.Dispose());
             _cameraController = null;
             RunReleaseStep(nameof(GlMeshRenderer), () => _meshRenderer?.Dispose(), gpuBound: true);
@@ -582,7 +596,50 @@ namespace AssetsManager.Views.Dialogs.Controls
 
         public void ClearModels()
         {
+            _inspectionBatches = Array.Empty<SknVertexInspectionBatch>();
             foreach (SceneModel model in _loadedModels.Concat(_auxiliaryModels).ToArray()) RemoveModel(model);
+        }
+
+        internal void ConfigureInspection(SknDiffInspectionModel inspection)
+        {
+            Inspection = inspection;
+            VertexInspectionOptionsPanel.DataContext = inspection;
+        }
+
+        internal void SetInspectionGeometry(IReadOnlyList<SknVertexInspectionBatch> batches)
+        {
+            _inspectionBatches = batches;
+            RequestRender();
+        }
+
+        private void VertexInspection_Click(object sender, RoutedEventArgs e) => VertexInspectionPopup.IsOpen = true;
+
+        internal event EventHandler FocusInspectionRequested;
+
+        private void FocusInspection_Click(object sender, RoutedEventArgs e)
+        {
+            VertexInspectionPopup.IsOpen = false;
+            FocusInspectionRequested?.Invoke(this, EventArgs.Empty);
+        }
+
+        internal void FocusPositions(IEnumerable<Vector3> positions)
+        {
+            var points = positions.ToArray();
+            if (points.Length == 0 || Viewport3D.Camera is not PerspectiveCamera camera)
+                return;
+
+            Vector3 min = points.Aggregate(Vector3.Min), max = points.Aggregate(Vector3.Max);
+            Vector3 middle = (min + max) / 2;
+            var center = new Point3D(middle.X, middle.Y, middle.Z);
+            double radius = Math.Max(1, Vector3.Distance(min, max) / 2);
+            double aspect = Math.Max(1, OpenTkControl.ActualWidth) / Math.Max(1, OpenTkControl.ActualHeight);
+            double distance = CameraPresets.CalculatePerspectiveFrameDistance(radius, camera.FieldOfView, aspect);
+            Vector3D away = -camera.LookDirection;
+            if (away.LengthSquared < 0.0001) away = new(0, 0, 1);
+            away.Normalize();
+            Point3D eye = center + away * distance;
+            _cameraController?.FlyTo(eye, center - eye, camera.UpDirection);
+            RequestRender();
         }
 
         public void RemoveModel(SceneModel model)
@@ -804,6 +861,12 @@ namespace AssetsManager.Views.Dialogs.Controls
         {
             get => ShowContextToggle.IsChecked == true;
             set => ShowContextToggle.IsChecked = value;
+        }
+
+        public bool ShowAttributeChanges
+        {
+            get => ShowAttributesToggle.IsChecked == true;
+            set => ShowAttributesToggle.IsChecked = value;
         }
 
         public event EventHandler SurfaceFiltersChanged;

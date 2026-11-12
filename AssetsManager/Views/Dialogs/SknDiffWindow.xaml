@@ -29,10 +29,6 @@
                     <ColumnDefinition Width="Auto"/> <!-- Title/Status -->
                     <ColumnDefinition Width="*"/>    <!-- Metrics -->
                 </Grid.ColumnDefinitions>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
 
                 <!-- Left: Title -->
                 <StackPanel Grid.Column="0" VerticalAlignment="Center">
@@ -60,14 +56,6 @@
                         </StackPanel>
                     </Border>
                 </WrapPanel>
-                <DockPanel Grid.Row="1" Grid.ColumnSpan="2" Margin="0,10,0,0" LastChildFill="True">
-                    <CheckBox x:Name="ShowAttributeChangesCheckBox" DockPanel.Dock="Right" IsChecked="True"
-                              Content="Vertex attributes" Click="AttributeChanges_Click" Margin="16,0,0,0"
-                              Style="{StaticResource ModernCheckBox}" Foreground="{StaticResource TextPrimary}"
-                              ToolTip="Highlight surfaces touching positions with changed normals, UV, colors, tangents or bone data. Exact numeric differences are included."/>
-                    <TextBlock x:Name="AttributeSummaryLabel" FontSize="10" Foreground="{StaticResource TextSecondary}"
-                               VerticalAlignment="Center" TextWrapping="Wrap"/>
-                </DockPanel>
             </Grid>
         </Border>
 
@@ -247,12 +235,14 @@
                                                     CornerRadius="7,0,0,7"/>
 
                                             <StackPanel Grid.Column="1" Margin="10,6,8,6" VerticalAlignment="Center">
-                                                <TextBlock Text="{Binding Name}" FontSize="11" FontWeight="SemiBold"
-                                                           Foreground="{StaticResource TextPrimary}"
-                                                           TextTrimming="CharacterEllipsis"/>
+                                                <Button Tag="{Binding Name}" Click="FocusPart_Click" Padding="0" HorizontalContentAlignment="Left" HorizontalAlignment="Left"
+                                                        Style="{StaticResource TransparentIconButton}" ToolTip="Focus this mesh part">
+                                                    <TextBlock Text="{Binding Name}" FontSize="11" FontWeight="SemiBold"
+                                                               Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis"/>
+                                                </Button>
                                                 <TextBlock Text="{Binding StatusLabel}" FontSize="8" FontWeight="Bold"
                                                            Foreground="{Binding DiffColorBrush}" Margin="0,1,0,0"/>
-                                                <TextBlock Text="{Binding AttributeSummary}" FontSize="9" TextWrapping="Wrap"
+                                                <TextBlock Text="{Binding AttributeSummary}" FontSize="9" TextTrimming="CharacterEllipsis"
                                                            Foreground="{StaticResource TextSecondary}" Margin="0,2,0,0">
                                                     <TextBlock.Style>
                                                         <Style TargetType="TextBlock">
