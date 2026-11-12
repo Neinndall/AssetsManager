@@ -14,6 +14,30 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Runtime;
 public sealed class StudioSceneActorSystemTests
 {
     [Fact]
+    public void ExplicitSystemStaysVisibleWithoutCharacterEffectsWhilePlayingOrPaused()
+    {
+        using var fixture = new Fixture();
+        // Skin-driven previews obey the effects switch; explicitly opened Systems retain visibility.
+        Assert.False(fixture.Runtime.ShouldRenderParticles(characterEffectsEnabled: false));
+        Assert.True(fixture.Runtime.ShouldRenderParticles(characterEffectsEnabled: true));
+        fixture.Session.Seek(1);
+        var graph = Assert.Single(fixture.Session.Graphs);
+        fixture.Runtime.AdoptPlayingSystem(fixture.Playback);
+
+        foreach (bool playing in new[] { true, false, true })
+        {
+            fixture.Runtime.Advance(0.1f, playing, 1f, fixture.Actor);
+            Assert.True(fixture.Runtime.ShouldRenderParticles(characterEffectsEnabled: false));
+            Assert.Same(graph, Assert.Single(fixture.Session.Graphs));
+            Assert.True(fixture.Session.LiveParticleCount > 0);
+        }
+
+        fixture.Session.SetSystem(null);
+        Assert.False(fixture.Runtime.ShouldRenderParticles(characterEffectsEnabled: false));
+        Assert.False(fixture.Runtime.ShouldRenderParticles(characterEffectsEnabled: true));
+    }
+
+    [Fact]
     public void HandoverKeepsLiveGraphsParticlesAndClockPastTheOpeningIdleDuration()
     {
         using var fixture = new Fixture();

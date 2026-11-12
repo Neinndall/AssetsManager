@@ -99,6 +99,9 @@ namespace AssetsManager.Services.Viewer.Runtime
 
         internal int LiveParticleCount => Session.LiveParticleCount;
 
+        internal bool ShouldRenderParticles(bool characterEffectsEnabled) =>
+            Session.ActiveSystem != null && (SystemPlayback != null || characterEffectsEnabled);
+
         /// <summary>
         /// Loads a Character exactly like the focused Skin preview: skin BIN graph, owner SKN/SKL with
         /// its authored materials, GPU skinning and the remembered form.

@@ -15,6 +15,7 @@ Changes
   - Hash Guessing Lab / Remove method search from all domains.
 
 Bug Fixes
+  - 3D Studio / Keep explicitly opened Systems visible on other actors when character effects are disabled.
   - 3D Studio / Prevent switching actors from replacing the selected character with the previous skin.
   - 3D Studio / Keep Play working for the selected preview when browsing Systems, Clips or Spells folders.
   - 3D Studio / Keep each character's selected System and particles running when switching actors, preserving playback and effect settings.

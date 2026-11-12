@@ -739,10 +739,10 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void PrepareSceneActorParticles(MapSunData sun, Matrix4x4 viewProjection, Matrix4x4 view, int width, int height)
         {
-            if (!_model.IsSkinWorkspace || !_model.CharacterEffectsEnabled) return;
+            if (!_model.IsSkinWorkspace) return;
             foreach ((StudioSceneActor actor, StudioSceneActorRuntime runtime) in _sceneActorRuntimes)
             {
-                if (actor.IsVisible && runtime.Session.ActiveSystem != null)
+                if (actor.IsVisible && runtime.ShouldRenderParticles(_model.CharacterEffectsEnabled))
                     PrepareParticleSession(runtime.Session, sun, viewProjection, view, width, height,
                         runtime.SystemPlayback?.FlexChannels ?? Vector3.Zero);
             }
