@@ -87,8 +87,8 @@ namespace AssetsManager.Views.Controls.Viewer
                     TrySelectSceneSkin(skin);
                     break;
                 case StudioBrowserSection section:
-                    if (!TrySelectSceneSkin(section.Owner)) break;
-                    _model.IsAnimationMode = section.Kind != StudioBrowserSectionKind.Systems;
+                    // Folder navigation preserves the active preview and its playback mode.
+                    TrySelectSceneSkin(section.Owner);
                     break;
                 case VfxSystemDiagnosticItem system:
                     _pendingSpell = null;
