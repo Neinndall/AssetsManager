@@ -311,7 +311,7 @@
                     <TextBlock Text="NEW-only surface" FontSize="10" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="0,0,16,0"/>
 
                     <Border Background="#FF3340" CornerRadius="3" Width="10" Height="10" Margin="0,0,6,0"/>
-                    <TextBlock Text="OLD-only surface" FontSize="10" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="0,0,24,0"/>
+                    <TextBlock Text="OLD-only surface" FontSize="10" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="0,0,16,0"/>
                     <Border Background="#B366FF" CornerRadius="3" Width="10" Height="10" Margin="0,0,6,0"/>
                     <TextBlock Text="Vertex attributes" FontSize="10" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"
                                ToolTip="Surfaces touching positions with changed vertex data. Geometry may be unchanged."/>
