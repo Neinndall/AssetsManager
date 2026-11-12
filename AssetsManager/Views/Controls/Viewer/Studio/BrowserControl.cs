@@ -16,28 +16,39 @@ namespace AssetsManager.Views.Controls.Viewer
 {
     public partial class StudioControl
     {
+        private bool _isBindingBrowserSkin;
+
         private void BindBrowserSkin()
         {
-            if (_browserSkin != null)
+            _isBindingBrowserSkin = true;
+            try
             {
-                _browserSkin.IsExpanded = false;
-                foreach (var section in _browserSkin.Sections)
-                    section.Items = new ListCollectionView(Array.Empty<object>());
+                if (_browserSkin != null)
+                {
+                    _browserSkin.IsExpanded = false;
+                    foreach (var section in _browserSkin.Sections)
+                        section.Items = new ListCollectionView(Array.Empty<object>());
+                }
+                _browserSkin = _model.SelectedSkin;
+                if (_browserSkin == null) return;
+                StudioBrowserSection systems = _browserSkin.Sections.FirstOrDefault(section => section.Kind == StudioBrowserSectionKind.Systems);
+                StudioBrowserSection clips = _browserSkin.Sections.FirstOrDefault(section => section.Kind == StudioBrowserSectionKind.Clips);
+                StudioBrowserSection spells = _browserSkin.Sections.FirstOrDefault(section => section.Kind == StudioBrowserSectionKind.Spells);
+                if (systems != null) systems.Items = CollectionViewSource.GetDefaultView(_model.Systems);
+                if (clips != null) clips.Items = CollectionViewSource.GetDefaultView(_model.DetectedAnimations);
+                if (spells != null) spells.Items = CollectionViewSource.GetDefaultView(_browserSkin.SpellItems);
+                _model.IsRawSystemsMode = true;
+                LoadSkinSource(_browserSkin);
             }
-            _browserSkin = _model.SelectedSkin;
-            if (_browserSkin == null) return;
-            StudioBrowserSection systems = _browserSkin.Sections.FirstOrDefault(section => section.Kind == StudioBrowserSectionKind.Systems);
-            StudioBrowserSection clips = _browserSkin.Sections.FirstOrDefault(section => section.Kind == StudioBrowserSectionKind.Clips);
-            StudioBrowserSection spells = _browserSkin.Sections.FirstOrDefault(section => section.Kind == StudioBrowserSectionKind.Spells);
-            if (systems != null) systems.Items = CollectionViewSource.GetDefaultView(_model.Systems);
-            if (clips != null) clips.Items = CollectionViewSource.GetDefaultView(_model.DetectedAnimations);
-            if (spells != null) spells.Items = CollectionViewSource.GetDefaultView(_browserSkin.SpellItems);
-            _model.IsRawSystemsMode = true;
-            LoadSkinSource(_browserSkin);
+            finally
+            {
+                _isBindingBrowserSkin = false;
+            }
         }
 
         internal void BrowserItem_Expanded(object sender, RoutedEventArgs e)
         {
+            if (_isBindingBrowserSkin) return;
             if (e.OriginalSource is TreeViewItem { DataContext: StudioSkinItem skin })
                 TrySelectSceneSkin(skin);
         }
@@ -64,6 +75,8 @@ namespace AssetsManager.Views.Controls.Viewer
 
         internal void StudioBrowser_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
         {
+            // Collapsing the previous skin can select its parent synchronously. That is not user navigation.
+            if (_isBindingBrowserSkin) return;
             if (e.NewValue != null && !_isSceneFocusHandover)
             {
                 _startNextPreviewPaused = false;
