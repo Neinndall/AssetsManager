@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using AssetsManager.Services.Viewer.Runtime;
 using AssetsManager.Services.Viewer.Vfx.Loading;
 using AssetsManager.Services.Viewer.Vfx.Runtime;
 using AssetsManager.Services.Viewer.Vfx.Session;
@@ -51,23 +52,26 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             var def = systemItem.Definition;
             if (def == null) return;
+            StudioSystemPlayback adopted = _pendingSystemAdoption?.CanResumeSystem(systemItem.PathHash, def, _vfxRenderer) == true
+                ? _pendingSystemAdoption.SystemPlayback : null;
+            _pendingSystemAdoption = null;
             _pendingSpell = null;
             _activeSpellPlan = null;
 
             StandaloneRunMemory remembered = RecallStandaloneRun(systemItem);
-            int playbackSeed = remembered?.Seed ?? StandalonePlaybackSeed;
-            float playbackSpeed = remembered?.Speed ?? 1f;
+            int playbackSeed = adopted != null ? _vfxRenderer.ActiveSystem.PlaybackSeed : remembered?.Seed ?? StandalonePlaybackSeed;
+            float playbackSpeed = adopted?.Speed ?? remembered?.Speed ?? 1f;
             var inferredRig = VfxSystemRigResolver.ResolveSettings(def, _activeBundle, VfxLoadingService == null ? null : VfxLoadingService.ResolveBinEntryPath);
             VfxRigSettings rigSettings =
-                (remembered?.RigSettings ?? inferredRig.Settings) with
+                (adopted != null ? _vfxRenderer.RigSettings : remembered?.RigSettings ?? inferredRig.Settings) with
                 {
-                    IsLooping = _model.IsPreviewLoopEnabled
+                    IsLooping = adopted?.Looping ?? _model.IsPreviewLoopEnabled
                 };
             VfxRigPreset rigPreset = rigSettings.Preset;
             if (remembered == null)
                 _model.LogMessages.Add($"[RIG] Auto {rigPreset}: {inferredRig.Reason}");
-            HashSet<int> muted = remembered?.Muted?.ToHashSet() ?? new HashSet<int>();
-            HashSet<int> soloed = remembered?.Soloed?.ToHashSet() ?? new HashSet<int>();
+            HashSet<int> muted = adopted?.Muted?.ToHashSet() ?? remembered?.Muted?.ToHashSet() ?? new HashSet<int>();
+            HashSet<int> soloed = adopted?.Soloed?.ToHashSet() ?? remembered?.Soloed?.ToHashSet() ?? new HashSet<int>();
 
             _model.SelectedEmitter = null;
             _model.Emitters.Clear();
@@ -94,15 +98,15 @@ namespace AssetsManager.Views.Controls.Viewer
                 Speed = playbackSpeed
             };
 
-            _model.CurrentTime = 0;
+            _model.CurrentTime = adopted != null ? _vfxRenderer.PlaybackTime : 0;
             _model.PlaybackSeed = playbackSeed;
             string playbackContext = "standalone system";
             _vfxRenderer?.SetWorldTransform(CharacterVfxPlacement());
-            _vfxRenderer?.SetVfxSystem(systemModel);
+            if (adopted == null) _vfxRenderer?.SetVfxSystem(systemModel);
             ApplyChampionBindPose();
             if (_vfxRenderer != null)
             {
-                _vfxRenderer.RigSettings = rigSettings;
+                if (adopted == null) _vfxRenderer.RigSettings = rigSettings;
                 _model.RigPreset = rigPreset;
             }
             else
@@ -115,6 +119,16 @@ namespace AssetsManager.Views.Controls.Viewer
             double rigDuration = _vfxRenderer?.RigDuration ?? VfxRigMotion.RunLength(rigSettings, def);
             double timelineMax = ResolveTimelineDuration(rigDuration);
             ResetPreviewLoopRange(timelineMax);
+            if (adopted != null)
+            {
+                _model.TotalDuration = adopted.Duration;
+                _model.IsPreviewLoopEnabled = adopted.Looping;
+                _model.ActiveLoopStart = adopted.LoopStart;
+                _model.ActiveLoopDuration = adopted.LoopEnd;
+                _model.VfxFlex0 = adopted.FlexChannels.X;
+                _model.VfxFlex1 = adopted.FlexChannels.Y;
+                _model.VfxFlex2 = adopted.FlexChannels.Z;
+            }
 
             // 2. Audit Emitters
             for (int emitterIndex = 0; emitterIndex < def.Emitters.Count; emitterIndex++)
@@ -194,13 +208,14 @@ namespace AssetsManager.Views.Controls.Viewer
             double restoredTime = remembered == null
                 ? 0d
                 : RememberedPlayhead(remembered.Playhead, timelineMax);
-            _vfxRenderer?.Seek(restoredTime);
+            if (adopted == null) _vfxRenderer?.Seek(restoredTime);
             if (_vfxRenderer?.ActiveSystem != null)
                 _model.CurrentTime = _vfxRenderer.PlaybackTime;
             else
                 _model.CurrentTime = restoredTime;
             bool play = !TakeStartPreviewPaused();
             if (play) _vfxRenderer?.Play();
+            else _vfxRenderer?.Pause();
             _model.IsPlaying = play;
 
             TryLoadChampionModelAsync(searchDir);
