@@ -29,21 +29,25 @@
                     <ColumnDefinition Width="Auto"/> <!-- Title/Status -->
                     <ColumnDefinition Width="*"/>    <!-- Metrics -->
                 </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
 
                 <!-- Left: Title -->
                 <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                    <TextBlock Text="GEOMETRIC DIFF" Style="{StaticResource ToolSectionLabel}" Margin="0,0,0,2"/>
-                    <TextBlock Text="Positions &amp; triangle topology" FontSize="10" Foreground="{StaticResource TextPrimary}" Opacity="0.8"/>
+                    <TextBlock Text="MESH DIFF" Style="{StaticResource ToolSectionLabel}" Margin="0,0,0,2"/>
+                    <TextBlock Text="Geometry &amp; vertex attributes" FontSize="10" Foreground="{StaticResource TextPrimary}" Opacity="0.8"/>
                 </StackPanel>
 
                 <!-- Center: Metrics Badges -->
-                <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <WrapPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                     <!-- Vertices Delta -->
                     <Border Background="{StaticResource SidebarBackground}" CornerRadius="6" Padding="12,6" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="0,0,12,0">
                         <StackPanel Orientation="Horizontal">
                             <icons:MaterialIcon Kind="VectorPoint" Width="14" Height="14" Foreground="{StaticResource AccentBlue}" Margin="0,0,8,0" VerticalAlignment="Center"/>
                             <TextBlock Text="VERTICES:" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                            <TextBlock x:Name="VertexDeltaLabel" Text="0" FontSize="11" FontWeight="Black" Foreground="{StaticResource AccentBlue}" VerticalAlignment="Center"/>
+                            <TextBlock x:Name="VertexDeltaLabel" Text="0" FontSize="11" FontWeight="Black" Foreground="{StaticResource AccentBlue}" VerticalAlignment="Center" ToolTip="OLD → NEW vertex totals. Δ is the net count difference, not the number of modified vertices."/>
                         </StackPanel>
                     </Border>
 
@@ -55,7 +59,15 @@
                             <TextBlock x:Name="FaceDeltaLabel" Text="0" FontSize="11" FontWeight="Black" Foreground="{StaticResource AccentGreen}" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Border>
-                </StackPanel>
+                </WrapPanel>
+                <DockPanel Grid.Row="1" Grid.ColumnSpan="2" Margin="0,10,0,0" LastChildFill="True">
+                    <CheckBox x:Name="ShowAttributeChangesCheckBox" DockPanel.Dock="Right" IsChecked="True"
+                              Content="Vertex attributes" Click="AttributeChanges_Click" Margin="16,0,0,0"
+                              Style="{StaticResource ModernCheckBox}" Foreground="{StaticResource TextPrimary}"
+                              ToolTip="Highlight surfaces touching positions with changed normals, UV, colors, tangents or bone data. Exact numeric differences are included."/>
+                    <TextBlock x:Name="AttributeSummaryLabel" FontSize="10" Foreground="{StaticResource TextSecondary}"
+                               VerticalAlignment="Center" TextWrapping="Wrap"/>
+                </DockPanel>
             </Grid>
         </Border>
 
@@ -240,6 +252,18 @@
                                                            TextTrimming="CharacterEllipsis"/>
                                                 <TextBlock Text="{Binding StatusLabel}" FontSize="8" FontWeight="Bold"
                                                            Foreground="{Binding DiffColorBrush}" Margin="0,1,0,0"/>
+                                                <TextBlock Text="{Binding AttributeSummary}" FontSize="9" TextWrapping="Wrap"
+                                                           Foreground="{StaticResource TextSecondary}" Margin="0,2,0,0">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding AttributeSummary}" Value="">
+                                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
                                             </StackPanel>
 
                                             <Border Grid.Column="2" Margin="0,0,8,0" Padding="6,3"
@@ -298,6 +322,9 @@
 
                     <Border Background="#FF3340" CornerRadius="3" Width="10" Height="10" Margin="0,0,6,0"/>
                     <TextBlock Text="OLD-only surface" FontSize="10" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="0,0,24,0"/>
+                    <Border Background="#B366FF" CornerRadius="3" Width="10" Height="10" Margin="0,0,6,0"/>
+                    <TextBlock Text="Vertex attributes" FontSize="10" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"
+                               ToolTip="Surfaces touching positions with changed vertex data. Geometry may be unchanged."/>
 
                 </StackPanel>
                 <TextBlock x:Name="DiffSummaryLabel" Grid.Column="1" Margin="16,0,0,0"

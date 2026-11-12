@@ -3,6 +3,7 @@ AssetsManager - League of Legends | v4.1.0.10
 HOTFIX UPDATE
 
 New Features
+  - SKN Diff / Compare vertex normals, UV, colors, tangents and bone data, with per-part details and highlighted affected surfaces.
   - Hash Guessing Lab / Separate current-patch and historical Game/LCU unknowns, with a scope selector for guessing.
 
 Improvements
@@ -13,6 +14,7 @@ Changes
   - Hash Guessing Lab / Remove method search from all domains.
 
 Bug Fixes
+  - SKN Diff / Explain modified files whose geometry is unchanged and clarify net vertex and triangle counts.
   - 3D Studio / Restore particle effects that failed to load their game shaders on desktop OpenGL.
   - 3D Studio / Keep position-driven material effects aligned with each character when moving it in the scene.
   - 3D Studio / Preserve distortion colors and strength when effects also declare erosion or extra texture layers.
