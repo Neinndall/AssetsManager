@@ -23,13 +23,17 @@ public sealed class SharedProgramParametersGpuTests
     [InlineData(1)]
     [InlineData(2)]
     [InlineData(3)]
+    [InlineData(4)]
+    [InlineData(5)]
+    [InlineData(6)]
     public void InterleavedOwnersAndPassesKeepTheirParametersAndClocks(int host)
     {
         using var context = new HiddenWglContext();
         using GL gl = GL.GetApi(context.GetProcAddress);
         using var runtime = new GameShaderRuntime(gl, false, null);
-        bool fraction = host == 3, particle = host is 1 or 2, mesh = host == 2;
-        var kind = particle ? GameMaterialKind.Particles : GameMaterialKind.SkinnedMesh;
+        bool position = host is 4 or 5 or 6, staticMesh = host == 6;
+        bool fraction = host == 3, particle = host is 1 or 2 or 5, mesh = host is 2 or 5;
+        var kind = staticMesh ? GameMaterialKind.StaticMesh : particle ? GameMaterialKind.Particles : GameMaterialKind.SkinnedMesh;
         var globals = new GameShaderTranslator.UniformBlock("$Globals", "AuditGlobals", 64, new[]
         {
             Member("Tint", 0), Member("Drive", 16), Member("switch_Test", 32), Member("Optional", 48)
@@ -38,6 +42,7 @@ public sealed class SharedProgramParametersGpuTests
             Array.Empty<GameShaderTranslator.BlockMember>());
         var pixelFrame = new GameShaderTranslator.UniformBlock("PerFramePixelCB", "AuditPixelFrame", 576,
             Array.Empty<GameShaderTranslator.BlockMember>());
+        var vertexGlobals = new GameShaderTranslator.UniformBlock("$Globals", "AuditGlobalsVS", 64, globals.Members);
         GameShaderTranslator.TranslatedStage Stage(string source, params GameShaderTranslator.UniformBlock[] blocks) =>
             new("#version 300 es\nprecision highp float;\n" + source,
                 new GameShaderTranslator.ShaderSidecar(blocks, Array.Empty<GameShaderTranslator.TextureBinding>(),
@@ -45,12 +50,16 @@ public sealed class SharedProgramParametersGpuTests
                 Array.Empty<GameShaderTranslator.AppliedPatch>(), Array.Empty<(string, string)>(), Array.Empty<uint>());
         var translated = new GameShaderTranslator.TranslatedProgram(
             Stage("layout(std140) uniform AuditVertexFrame { vec4 vf[34]; };\nflat out float clockVS;\n" +
+                (position ? "layout(std140) uniform AuditGlobalsVS { vec4 gv[4]; };\nflat out vec2 playerXY;\n" : "") +
                 "void main(){ vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2); " +
-                "gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0); clockVS = vf[5].x; }", vertexFrame),
+                "gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0); clockVS = vf[5].x; " +
+                (position ? "playerXY = gv[1].xy;" : "") + " }",
+                position ? new[] { vertexFrame, vertexGlobals } : new[] { vertexFrame }),
             Stage("layout(std140) uniform AuditGlobals { vec4 g[4]; };\n" +
                 "layout(std140) uniform AuditPixelFrame { vec4 pf[36]; };\n" +
                 "flat in float clockVS;\nout vec4 result;\n" +
-                "void main(){ result = vec4(clockVS, pf[1].x, g[0].x + g[1].x, g[2].x + g[3].x); }", globals, pixelFrame));
+                (position ? "flat in vec2 playerXY;\nvoid main(){ result = vec4(playerXY, g[1].zw); }" :
+                    "void main(){ result = vec4(clockVS, pf[1].x, g[0].x + g[1].x, g[2].x + g[3].x); }"), globals, pixelFrame));
         object linked = typeof(GameShaderRuntime).GetMethod("CreateProgram", Flags)!.Invoke(runtime,
             new object[] { translated, kind, particle })!;
         using var linkedOwner = (IDisposable)linked;
@@ -69,19 +78,35 @@ public sealed class SharedProgramParametersGpuTests
             gl.Viewport(0, 0, 1, 1);
             var materials = new ModelMaterialDefinition[2];
             var emitters = new VfxEmitterDefinition[2];
+            var surfaces = new MapMaterialDefinition[2];
             for (int owner = 0; owner < 2; owner++)
             {
                 var passes = new[] { Pass(owner, 0), Pass(owner, 1) };
+                if (position)
+                    for (int index = 0; index < passes.Length; index++)
+                        passes[index] = passes[index] with
+                        {
+                            Parameters = new[] { new GameMaterialParameter("Drive", new Vector4(.2f, .3f, .4f, .5f), GameMaterialParamSource.Pass) },
+                            PlayerPositionParameters = owner == 0
+                                ? new[] { new GameMaterialPositionParameter("Drive", index == 0 ? 0b1101u : 0b0111u) }
+                                : Array.Empty<GameMaterialPositionParameter>()
+                        };
                 materials[owner] = ModelMaterialDefinition.TextureOnly("audit") with
                 {
                     Program = new GameMaterialProgram(kind, true, passes),
-                    DynamicParameters = new[]
+                    DynamicParameters = position ? Array.Empty<GameMaterialDynamicParameter>() : new[]
                     {
                         new GameMaterialDynamicParameter("Drive", state => new Vector4(
                             (fraction ? state.AnimationFraction((uint)(10 + state.Gear)) : state.Time) + state.Gear, 0, 0, 0))
                     }
                 };
                 object cacheOwner = materials[owner];
+                if (staticMesh)
+                {
+                    surfaces[owner] = new MapMaterialDefinition("audit", 0, false, true, "audit", null, null, null,
+                        null, null, null, MapMaterialRenderState.Default, Array.Empty<string>()) { Program = materials[owner].Program };
+                    cacheOwner = surfaces[owner];
+                }
                 if (particle)
                 {
                     emitters[owner] = new VfxEmitterDefinition("audit", VfxCurveF.Const(1), VfxCurveF.Const(1),
@@ -100,12 +125,19 @@ public sealed class SharedProgramParametersGpuTests
             {
                 int owner = draw.Item1, pass = draw.Item2;
                 float ownTime = time + owner * .25f;
-                var frame = new GameShaderRuntime.Frame(Matrix4x4.Identity, Matrix4x4.Identity, Vector3.Zero, ownTime, null);
+                var frame = new GameShaderRuntime.Frame(Matrix4x4.Identity, Matrix4x4.Identity, Vector3.Zero,
+                    position ? 0f : ownTime, null, CharacterPosition: new Vector3(100, 200, 300));
+                var worldPosition = new Vector3(ownTime + 10, -20 - owner, 30 + pass);
                 float drive;
-                if (particle)
+                if (staticMesh)
+                {
+                    drive = 0;
+                    Assert.True(runtime.TryBind(surfaces[owner], pass, null, false, frame, _ => null, _ => null));
+                }
+                else if (particle)
                 {
                     // Alternate a dynamic override with the authored pass value, including its removal.
-                    var overrides = owner == 0 ? new Dictionary<string, Vector4> { ["Drive"] = new(ownTime, 0, 0, 0) } : null;
+                    var overrides = !position && owner == 0 ? new Dictionary<string, Vector4> { ["Drive"] = new(ownTime, 0, 0, 0) } : null;
                     drive = owner == 0 ? ownTime : .2f;
                     Assert.Equal(program, runtime.UseParticleProgram(emitters[owner], mesh, pass));
                     runtime.BindParticle(emitters[owner], mesh, pass, frame, overrides, _ => null);
@@ -117,7 +149,8 @@ public sealed class SharedProgramParametersGpuTests
                         null, null, null, Array.Empty<AnimationClipTimedCue>(), 0, false, "")
                     { MaterialAnimations = new[] { new GameMaterialAnimation((uint)(10 + owner), 0, 4f + owner * 4f) } };
                     var state = fraction ? GameMaterialState.Preview(null, clip) with { Gear = owner } : (GameMaterialState)owner;
-                    Assert.True(runtime.TryBindSkinned(materials[owner], pass, Matrix4x4.Identity,
+                    Assert.True(runtime.TryBindSkinned(materials[owner], pass,
+                        position ? Matrix4x4.CreateScale(-2, 3, 4) * Matrix4x4.CreateTranslation(worldPosition) : Matrix4x4.Identity,
                         Array.Empty<Matrix4x4>(), false, frame, _ => null, state: state));
                     Assert.Equal((int)program, gl.GetInteger(GLEnum.CurrentProgram));
                 }
@@ -127,6 +160,13 @@ public sealed class SharedProgramParametersGpuTests
                 float tint = owner == 0 ? .1f + pass * .1f : 0f;
                 float switchAndOptional = pass == 0 ? 1.75f : 0f;
                 var expected = new[] { ownTime, ownTime, tint + drive, switchAndOptional };
+                if (position)
+                {
+                    var point = particle || staticMesh ? Vector3.Zero : worldPosition;
+                    expected = owner != 0 ? new[] { .2f, .3f, .4f, .5f }
+                        : pass == 0 ? new[] { point.X, .3f, point.Y, point.Z }
+                        : new[] { point.X, point.Y, point.Z, .5f };
+                }
                 for (int channel = 0; channel < 4; channel++)
                     Assert.InRange(MathF.Abs(pixel[channel] - expected[channel]), 0, .00001f);
                 Assert.Equal(GLEnum.NoError, gl.GetError());

@@ -59,8 +59,5 @@ public sealed class VfxNestedShaderIndexTests
         finally { gl.DeleteProgram(program); }
     }
 
-    private static string Desktop(string source) => Regex.Replace(
-        source.Replace("#version 300 es", "#version 330 core")
-            .Replace("precision highp float;", "").Replace("precision highp int;", ""),
-        @"\b(?:highp|mediump|lowp)\s+", "");
+    private static string Desktop(string source) => GameShaderRuntime.ToDesktopGlsl(source);
 }

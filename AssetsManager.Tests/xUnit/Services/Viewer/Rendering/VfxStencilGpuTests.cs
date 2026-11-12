@@ -9,6 +9,7 @@ using AssetsManager.Services.Viewer.Vfx.Runtime;
 using AssetsManager.Services.Viewer.Vfx.Semantics;
 using AssetsManager.Tests.Support;
 using AssetsManager.Tests.xUnit.Services.Viewer.Vfx;
+using AssetsManager.Utils.Rendering;
 using AssetsManager.Views.Models.Viewer;
 using Silk.NET.OpenGL;
 using Xunit;
@@ -18,6 +19,258 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering;
 [Collection("Viewport native graphics")]
 public sealed class VfxStencilGpuTests
 {
+    public static IEnumerable<object[]> CustomSamplerCases()
+    {
+        foreach (VfxPrimitiveKind primitive in new[] { VfxPrimitiveKind.CameraQuad, VfxPrimitiveKind.Mesh, VfxPrimitiveKind.AttachedMesh })
+        for (int addressing = 0; addressing < 4; addressing++)
+        foreach (bool linear in new[] { false, true })
+        foreach (bool sharedTexture in new[] { false, true })
+            yield return new object[] { primitive, addressing, linear, sharedTexture };
+    }
+
+    [Theory]
+    [MemberData(nameof(CustomSamplerCases))]
+    public void CustomPassSamplersKeepIndependentAddressingWithoutMutatingSharedTextures(
+        VfxPrimitiveKind primitive, int addressing, bool linear, bool sharedTexture)
+    {
+        using var frame = new Frame(true);
+        bool mesh = primitive != VfxPrimitiveKind.CameraQuad;
+        var emitter = frame.Emitter(0, 0, new(.4f, .4f, .4f, 1), .8f, primitive);
+        emitter.Instances[19] = .9f;
+        var original = emitter.Def;
+        var program = GameParticleProgramResolver.Create(original, mesh);
+        var values = new Dictionary<string, Vector4>();
+        VfxShaderParameterUtils.PopulateNativeParameters(values, original, 0);
+        var parameters = new List<GameMaterialParameter>();
+        foreach (var pair in values) parameters.Add(new(pair.Key, pair.Value, GameMaterialParamSource.Material));
+        byte[] pixels = new byte[4 * 4 * 4], otherPixels = new byte[pixels.Length];
+        for (int y = 0; y < 4; y++)
+        for (int x = 0; x < 4; x++)
+        {
+            int at = (y * 4 + x) * 4;
+            pixels[at] = (byte)(40 + x * 50); pixels[at + 1] = (byte)(40 + y * 50);
+            pixels[at + 2] = 90; pixels[at + 3] = 255;
+            otherPixels[at] = (byte)(60 + x * 40); otherPixels[at + 1] = (byte)(150 - y * 30);
+            otherPixels[at + 2] = 160; otherPixels[at + 3] = 255;
+        }
+        uint texture = frame.Texture(4, pixels), other = sharedTexture ? texture : frame.Texture(4, otherPixels);
+        emitter.ProgramTextures["first.tex"] = texture;
+        emitter.ProgramTextures["second.tex"] = other;
+        var samplerA = new GameMaterialSamplerState(addressing == 2 ? "Clamp" : addressing == 3 ? "Wrap" : "",
+            addressing == 1 ? MapTextureWrap.Mirror : addressing == 3 ? MapTextureWrap.Clamp : MapTextureWrap.Repeat,
+            MapTextureWrap.Repeat, MapTextureWrap.Repeat, linear, linear);
+        var samplerB = new GameMaterialSamplerState(addressing == 2 ? "Wrap" : addressing == 3 ? "Clamp" : "",
+            addressing == 3 ? MapTextureWrap.Repeat : MapTextureWrap.Clamp,
+            MapTextureWrap.Clamp, MapTextureWrap.Clamp, linear, linear);
+        GameMaterialPass Pass(string path, GameMaterialSamplerState sampler, bool blend) => program.Passes[0] with
+        {
+            Parameters = parameters,
+            Textures = new[] { new GameMaterialTexture("TEXTURE", new MapTextureReference(path, 0), GameMaterialTextureSource.Material, sampler) },
+            State = GameMaterialPassState.Default with { CullEnabled = false, DepthEnabled = false, WriteMask = 15,
+                BlendEnabled = blend, SourceColor = MapBlendFactor.One, DestinationColor = MapBlendFactor.One,
+                SourceAlpha = MapBlendFactor.One, DestinationAlpha = MapBlendFactor.Zero }
+        };
+        var first = Pass("first.tex", samplerA, false);
+        var second = Pass("second.tex", samplerB, true);
+        try
+        {
+            for (int repeat = 0; repeat < 2; repeat++)
+            {
+                frame.Clear();
+                Draw(first);
+                byte[] firstControl = frame.Pixel(32);
+                frame.Clear();
+                Draw(second);
+                byte[] secondControl = frame.Pixel(32);
+                Assert.True(Math.Abs(firstControl[0] - secondControl[0]) > 3,
+                    "The controlled samplers must read visibly different texels.");
+                frame.Clear();
+                Draw(first); Draw(second);
+                byte[] expected = frame.Pixel(32);
+                frame.Clear();
+                Draw(first, second);
+                Assert.Equal((2, 2), frame.Renderer.LastParticleDrawCounts);
+                Assert.Equal(expected, frame.Pixel(32));
+                frame.Clear();
+                Draw(first);
+                Assert.Equal(firstControl, frame.Pixel(32));
+                foreach (uint held in new[] { texture, other })
+                {
+                    frame.Gl.ActiveTexture(TextureUnit.Texture0);
+                    frame.Gl.BindTexture(TextureTarget.Texture2D, held);
+                    frame.Gl.GetTexParameter(TextureTarget.Texture2D, GLEnum.TextureMagFilter, out int filter);
+                    frame.Gl.GetTexParameter(TextureTarget.Texture2D, GLEnum.TextureMinFilter, out int minFilter);
+                    frame.Gl.GetTexParameter(TextureTarget.Texture2D, GLEnum.TextureWrapS, out int wrap);
+                    frame.Gl.GetTexParameter(TextureTarget.Texture2D, GLEnum.TextureWrapT, out int wrapT);
+                    Assert.Equal((int)TextureMagFilter.Nearest, filter);
+                    Assert.Equal((int)TextureMinFilter.Nearest, minFilter);
+                    Assert.Equal((int)TextureWrapMode.Repeat, wrap);
+                    Assert.Equal((int)TextureWrapMode.Repeat, wrapT);
+                }
+            }
+        }
+        finally { frame.Gl.DeleteTexture(texture); if (other != texture) frame.Gl.DeleteTexture(other); }
+
+        void Draw(params GameMaterialPass[] passes)
+        {
+            emitter.Def = original with { CustomMaterial = ModelMaterialDefinition.Default with
+                { BindingKind = ModelMaterialBindingKind.Authored, AlphaCutoff = 0, Program = program with { Passes = passes } } };
+            frame.Draw(emitter);
+            string fallback = frame.Renderer.GameParticleFallback(emitter, mesh);
+            Assert.True(fallback is null, fallback);
+        }
+    }
+
+    public static IEnumerable<object[]> CustomPassCases()
+    {
+        foreach (VfxPrimitiveKind primitive in new[] { VfxPrimitiveKind.CameraQuad, VfxPrimitiveKind.Mesh, VfxPrimitiveKind.AttachedMesh })
+        foreach (bool reverse in new[] { false, true })
+        for (int mask = 0; mask < 3; mask++)
+        foreach (bool additive in new[] { false, true })
+        foreach (bool legacyWarp in new[] { false, true })
+            yield return new object[] { primitive, reverse, mask, additive, legacyWarp };
+    }
+
+    [Theory]
+    [MemberData(nameof(CustomPassCases))]
+    public void CustomPassesKeepTheirBlendDepthAndWriteStateAndDoNotAffectStockDraws(
+        VfxPrimitiveKind primitive, bool reverse, int mask, bool additive, bool legacyWarp)
+    {
+        using var frame = new Frame(true);
+        bool mesh = primitive != VfxPrimitiveKind.CameraQuad;
+        var emitter = frame.Emitter(0, 0, new(.4f, .6f, .8f, .5f), .8f, primitive);
+        VfxEmitterDefinition original = emitter.Def;
+        GameMaterialProgram program = GameParticleProgramResolver.Create(original, mesh);
+        // A controlled custom material owns its parameters and texture instead of borrowing emitter aliases.
+        var values = new Dictionary<string, Vector4>();
+        VfxShaderParameterUtils.PopulateNativeParameters(values, original, 0);
+        var parameters = new List<GameMaterialParameter>();
+        foreach (var pair in values) parameters.Add(new(pair.Key, pair.Value, GameMaterialParamSource.Material));
+        program = program with { Passes = new[] { program.Passes[0] with
+        {
+            Parameters = parameters,
+            Textures = new[] { new GameMaterialTexture("TEXTURE", new MapTextureReference("controlled.tex", 0),
+                GameMaterialTextureSource.Material, null) }
+        } } };
+        emitter.ProgramTextures["controlled.tex"] = emitter.Texture;
+        var opaque = program.Passes[0] with { State = GameMaterialPassState.Default with
+            { CullEnabled = false, DepthEnabled = true, DepthCompareFunc = 7, WriteMask = mask == 1 ? 16u : 31u } };
+        var blended = program.Passes[0] with { State = GameMaterialPassState.Default with
+        {
+            CullEnabled = false, DepthEnabled = true, DepthCompareFunc = 3,
+            BlendEnabled = true, SourceColor = additive ? MapBlendFactor.One : MapBlendFactor.SourceAlpha,
+            DestinationColor = additive ? MapBlendFactor.One : MapBlendFactor.OneMinusSourceAlpha,
+            SourceAlpha = MapBlendFactor.One, DestinationAlpha = MapBlendFactor.OneMinusSourceAlpha,
+            WriteMask = mask == 2 ? 0u : 15u
+        } };
+        var stock = frame.Emitter(0, 0, new(0, 1, 0, 1), .8f, primitive);
+        stock.Def = stock.Def with { BlendMode = 1,
+            RenderState = stock.Def.RenderState with { RenderPass = original.RenderState.RenderPass + 1 } };
+        frame.Draw(stock);
+        byte[] stockControl = frame.Pixel(32);
+        Assert.True(stockControl[1] > 0);
+
+        for (int repeat = 0; repeat < 2; repeat++)
+        {
+            frame.Clear();
+            emitter.Def = Definition(new[] { opaque }, false);
+            frame.Draw(emitter);
+            Assert.Equal((1, 1), frame.Renderer.LastParticleDrawCounts);
+            emitter.Def = Definition(new[] { blended }, false);
+            frame.Draw(emitter);
+            Assert.Equal((1, 1), frame.Renderer.LastParticleDrawCounts);
+            byte[] expected = frame.Pixel(32);
+            Assert.True(expected[0] + expected[1] + expected[2] > 0);
+            float expectedDepth = Depth();
+            // Attached geometry retains its owner placement instead of the particle's translation.
+            float planeDepth = primitive == VfxPrimitiveKind.AttachedMesh ? .5f : .6f;
+            Assert.InRange(Math.Abs(expectedDepth - planeDepth), 0, .00001f);
+
+            frame.Clear();
+            emitter.Def = Definition(reverse ? new[] { blended, opaque } : new[] { opaque, blended }, legacyWarp);
+            frame.Draw(emitter);
+            Assert.Null(frame.Renderer.GameParticleFallback(emitter, mesh));
+            Assert.Equal((2, 2), frame.Renderer.LastParticleDrawCounts);
+            Assert.Equal(expected, frame.Pixel(32));
+            Assert.InRange(Math.Abs(Depth() - expectedDepth), 0, .00001f);
+            frame.Draw(stock);
+            Assert.Equal(stockControl, frame.Pixel(32));
+
+            frame.Clear();
+            frame.Draw(emitter, stock);
+            Assert.Equal((3, 3), frame.Renderer.LastParticleDrawCounts);
+            Assert.Equal(stockControl, frame.Pixel(32));
+        }
+
+        VfxEmitterDefinition Definition(GameMaterialPass[] passes, bool warp) => original with
+        {
+            Distortion = warp ? new VfxDistortionDefinition(.25f, 1, "normal.tex") : null,
+            CustomMaterial = ModelMaterialDefinition.Default with
+            {
+                BindingKind = ModelMaterialBindingKind.Authored, AlphaCutoff = 0,
+                Program = program with { Passes = passes },
+                RenderState = ModelMaterialRenderState.Default with { DoubleSided = true }
+            }
+        };
+        float Depth()
+        {
+            Span<float> pixel = stackalloc float[1];
+            frame.Gl.ReadPixels(32, 32, 1, 1, PixelFormat.DepthComponent, PixelType.Float, pixel);
+            return pixel[0];
+        }
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void ResolvedCustomMaterialUsesColourWhileMissingMaterialKeepsLegacyWarp(bool native, bool missing)
+    {
+        using var frame = new Frame(native);
+        var emitter = frame.Emitter(0, 0, new(0, 1, 0, 1), 2);
+        var colorDefinition = emitter.Def;
+        GameMaterialProgram program = GameParticleProgramResolver.Create(colorDefinition, false);
+        program = program with
+        {
+            Passes = new[] { program.Passes[0] with
+                { State = GameMaterialPassState.Default with { CullEnabled = false, DepthEnabled = false, WriteMask = 15 } } }
+        };
+        var material = ModelMaterialDefinition.Default with
+        {
+            BindingKind = missing ? ModelMaterialBindingKind.Missing : ModelMaterialBindingKind.Authored,
+            AlphaCutoff = 0, Program = program,
+            RenderState = ModelMaterialRenderState.Default with { DoubleSided = true, DepthTest = false, DepthWrite = false }
+        };
+        var warp = new VfxDistortionDefinition(.25f, 1, "normal.tex");
+        emitter.DistortionTexture = emitter.Texture;
+        VfxEmitterDefinition reference = missing
+            ? colorDefinition with { Distortion = warp }
+            : colorDefinition with { CustomMaterial = material };
+        byte[] expected = Draw(reference);
+        var combined = colorDefinition with { CustomMaterial = material, Distortion = warp };
+        Assert.Equal(missing, combined.DrawsAsDistortion);
+        Assert.Equal(expected, Draw(combined));
+        // A resolved custom program owns its tint parameters; its colour need not match the stock material's intensity.
+        Assert.True(frame.Pixel(32)[1] > 0);
+        if (missing) Assert.InRange((int)frame.Pixel(32)[1], 126, 129);
+        Assert.Equal(0, frame.Pixel(32)[2]);
+        if (native) Assert.Null(frame.Renderer.GameParticleFallback(emitter, false));
+
+        byte[] Draw(VfxEmitterDefinition definition)
+        {
+            emitter.Def = definition;
+            frame.Clear();
+            frame.Gl.ClearColor(.25f, .5f, .75f, .6f);
+            frame.Gl.Clear(ClearBufferMask.ColorBufferBit);
+            frame.Renderer.CaptureScene(64, 64, true, false);
+            frame.Draw(emitter);
+            var row = new byte[64 * 4];
+            frame.Gl.ReadPixels(0, 32, 64, 1, PixelFormat.Rgba, PixelType.UnsignedByte, row.AsSpan());
+            return row;
+        }
+    }
+
     [Theory]
     [InlineData(false, false)]
     [InlineData(false, true)]
@@ -455,7 +708,7 @@ public sealed class VfxStencilGpuTests
             Gl.ReadPixels(x, 32, 1, 1, PixelFormat.StencilIndex, PixelType.UnsignedByte, pixel);
             return pixel[0];
         }
-        private uint Texture(uint size, byte[] pixels)
+        internal uint Texture(uint size, byte[] pixels)
         {
             uint texture = Gl.GenTexture();
             Gl.BindTexture(TextureTarget.Texture2D, texture);

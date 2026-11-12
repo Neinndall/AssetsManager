@@ -12,6 +12,39 @@ namespace AssetsManager.Services.Hashes.Guessers.Game;
 
 internal sealed partial class GameHashGuesser
 {
+    private void GuessUiSceneBinPath(HashGuessEngine engine, BinTree tree, string wad, ulong chunk,
+        CancellationToken cancellationToken)
+    {
+        if (!engine.UnknownHashes.Contains(chunk)) return;
+        string[] prefixes = null;
+        foreach (var obj in tree.Objects.Values)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            string name = obj.Properties.GetValueOrDefault(Fnv1a.HashLower("name")) switch
+            {
+                BinTreeString text => text.Value,
+                BinTreeHash hash => _resolveBinHash?.Invoke(hash.Value),
+                _ => null
+            };
+            name ??= _resolveBinHash?.Invoke(obj.PathHash);
+            name = name?.Replace('\\', '/').ToLowerInvariant();
+            if (name == null || !name.StartsWith("clientstates/", StringComparison.Ordinal)) continue;
+            string leaf = name[(name.LastIndexOf('/') + 1)..];
+            if (leaf.Length < 3 || !leaf.All(c => char.IsAsciiLetterOrDigit(c) || c is '_' or '-')) continue;
+            prefixes ??= Corpus.GetOrCreate("ui-scene-bin-namespaces", paths => paths
+                .Where(path => !path.Contains('/') && Regex.IsMatch(path, @"^[a-z0-9_-]+\.[a-z0-9_.-]+\.bin$",
+                    RegexOptions.CultureInvariant))
+                .Select(path => path[..(path.IndexOf('.') + 1)]).Distinct(StringComparer.Ordinal)
+                .Order(StringComparer.Ordinal).ToArray());
+            foreach (string prefix in prefixes)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (engine.CheckNormalizedParts(prefix, leaf, ".bin", HashGuessStrategy.BinEntry,
+                    wad, chunk, expectedHash: chunk)) return;
+            }
+        }
+    }
+
     private void GuessUiAssetPaths(HashGuessEngine engine, string sourcePath, string wad, ulong chunk,
         CancellationToken cancellationToken, Func<BinTree> treeFactory)
     {

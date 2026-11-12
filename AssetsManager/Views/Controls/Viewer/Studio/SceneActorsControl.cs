@@ -37,6 +37,7 @@ namespace AssetsManager.Views.Controls.Viewer
         private readonly List<IDisposable> _preparedParticleBatches = new();
         private VfxParticleShadowScene _particleShadows;
         private StudioSceneActorRuntime _pendingActorAdoption;
+        private StudioSceneActorRuntime _pendingSystemAdoption;
         private bool _isSceneFocusHandover;
         private bool _isSynchronizingSceneActorSelection;
         private bool _openSkinInOwnTab;
@@ -170,6 +171,7 @@ namespace AssetsManager.Views.Controls.Viewer
             if (ReferenceEquals(previous, actor))
             {
                 RefreshCharacterInteractionTarget();
+                RevealSceneActorInBrowser(actor.Skin);
                 return;
             }
 
@@ -201,6 +203,7 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 // Rebinds the browser/Inspector to the actor; LoadBinFile adopts the promoted runtime.
                 _model.SelectedSkin = actor.Skin;
+                RevealSceneActorInBrowser(actor.Skin);
             }
             finally
             {
@@ -468,6 +471,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 _isSceneFocusHandover || _isSwitchingWorkspaceTab) return;
             foreach ((StudioSceneActor actor, StudioSceneActorRuntime runtime) in _sceneActorRuntimes)
             {
+                if (runtime.SystemPlayback != null) continue;
                 actor.IsPlaybackPaused = !_model.IsPlaying;
                 runtime.Seek(_model.CurrentTime, loop: false);
             }
@@ -483,7 +487,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
         /// <summary>
         /// Moves the focused Character's loaded objects into a background runtime. The clip that is
-        /// already playing keeps running; System/Spell inspection falls back to the actor's own clip.
+        /// already playing keeps running, as does a ready standalone System with its own transport.
         /// </summary>
         private StudioSceneActorRuntime DetachFocusedRuntime()
         {
@@ -494,6 +498,16 @@ namespace AssetsManager.Views.Controls.Viewer
                 return null;
             }
 
+            StudioSystemPlayback systemPlayback = HasSelectedSystemReady()
+                ? new(_inspectedSystem.PathHash, _model.TotalDuration, _model.Speed,
+                    _model.IsPreviewLoopEnabled, _model.ActiveLoopStart, _model.ActiveLoopDuration,
+                    new(_model.VfxFlex0, _model.VfxFlex1, _model.VfxFlex2),
+                    _model.Emitters.Where(emitter => emitter.IsMuted).Select(emitter => emitter.SourceOrder).ToArray(),
+                    _model.Emitters.Where(emitter => emitter.IsSolo).Select(emitter => emitter.SourceOrder).ToArray())
+                : _pendingSystemAdoption?.CanResumeSystem(_model.SelectedSystem?.PathHash ?? 0,
+                    _model.SelectedSystem?.Definition, _vfxRenderer) == true
+                    ? _pendingSystemAdoption.SystemPlayback : null;
+            _pendingSystemAdoption = null;
             if (_inspectedSystem != null)
             {
                 RememberStandaloneRun(_inspectedSystem);
@@ -529,7 +543,11 @@ namespace AssetsManager.Views.Controls.Viewer
             _animationBasePartVisibility.Clear();
             _animationBaseHiddenSubmeshes.Clear();
 
-            if (playingClip != null)
+            if (systemPlayback != null)
+            {
+                runtime.AdoptPlayingSystem(systemPlayback);
+            }
+            else if (playingClip != null)
             {
                 runtime.AdoptPlayingClip(playingClip);
             }
@@ -576,6 +594,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 return null;
             }
             _pendingActorAdoption = null;
+            _pendingSystemAdoption = null;
             return adoption;
         }
 
@@ -595,6 +614,7 @@ namespace AssetsManager.Views.Controls.Viewer
             }
             _clipCatalog?.Dispose();
             _clipCatalog = runtime.ClipCatalog;
+            _pendingSystemAdoption = runtime.SystemPlayback != null ? runtime : null;
         }
 
         private void ReleaseSceneActorRuntime(StudioSceneActorRuntime runtime)
@@ -662,6 +682,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 RunReleaseStep(nameof(VfxRenderSession), session.Dispose, gpuBound: true);
             _retiredSceneActorSessions.Clear();
             _pendingActorAdoption = null;
+            _pendingSystemAdoption = null;
         }
 
         #endregion
@@ -673,7 +694,7 @@ namespace AssetsManager.Views.Controls.Viewer
             if (_sceneActorRuntimes.Count == 0 || !_model.IsSkinWorkspace) return;
             foreach ((StudioSceneActor actor, StudioSceneActorRuntime runtime) in _sceneActorRuntimes)
             {
-                bool synchronized = _model.SelectedWorkspaceTab.IsAnimationPlaybackSyncEnabled &&
+                bool synchronized = runtime.SystemPlayback == null && _model.SelectedWorkspaceTab.IsAnimationPlaybackSyncEnabled &&
                     _model.SelectedAnimation != null;
                 runtime.Advance(deltaSeconds, synchronized ? _model.IsPlaying : !actor.IsPlaybackPaused,
                     _model.Speed, actor, synchronized ? _model.CurrentTime : null);
@@ -703,12 +724,14 @@ namespace AssetsManager.Views.Controls.Viewer
             Matrix4x4 viewProjection,
             Matrix4x4 view,
             int width,
-            int height)
+            int height,
+            Vector3? flexChannels = null)
         {
             session.AlignSurfaceEffects = _model.IsSkinWorkspace;
             session.SetEffectsQuality((VfxEffectsQuality)(AppSettings?.StudioParameters?.EffectsQuality ?? 3));
-            session.SetFlexChannels(_model.IsRawSystemsMode ? new Vector3(_model.VfxFlex0, _model.VfxFlex1, _model.VfxFlex2) : Vector3.Zero);
-            if (_model.IsRawSystemsMode) _model.VfxFlexMask = session.FlexChannelMask;
+            session.SetFlexChannels(flexChannels ?? (_model.IsRawSystemsMode
+                ? new Vector3(_model.VfxFlex0, _model.VfxFlex1, _model.VfxFlex2) : Vector3.Zero));
+            if (_model.IsRawSystemsMode && ReferenceEquals(session, _vfxRenderer)) _model.VfxFlexMask = session.FlexChannelMask;
             session.SetSun(sun);
             session.SetViewportSize(width, height);
             session.SetTerrainDepth(_frameTerrainDepth, _frameTerrainWidth, _frameTerrainHeight);
@@ -718,11 +741,12 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void PrepareSceneActorParticles(MapSunData sun, Matrix4x4 viewProjection, Matrix4x4 view, int width, int height)
         {
-            if (!_model.IsSkinWorkspace || !_model.CharacterEffectsEnabled) return;
+            if (!_model.IsSkinWorkspace) return;
             foreach ((StudioSceneActor actor, StudioSceneActorRuntime runtime) in _sceneActorRuntimes)
             {
-                if (actor.IsVisible && runtime.Session.ActiveSystem != null)
-                    PrepareParticleSession(runtime.Session, sun, viewProjection, view, width, height);
+                if (actor.IsVisible && runtime.ShouldRenderParticles(_model.CharacterEffectsEnabled))
+                    PrepareParticleSession(runtime.Session, sun, viewProjection, view, width, height,
+                        runtime.SystemPlayback?.FlexChannels ?? Vector3.Zero);
             }
         }
 

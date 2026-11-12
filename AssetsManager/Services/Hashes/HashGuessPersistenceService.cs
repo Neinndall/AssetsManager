@@ -19,9 +19,10 @@ namespace AssetsManager.Services.Hashes
         public async Task CommitPathRunAsync(
             HashGuessDomain domain,
             IEnumerable<ulong> remainingUnknowns,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            HashGuessScope scope = HashGuessScope.All)
         {
-            await _pathStore.SaveUnknownHashesAsync(domain, remainingUnknowns, cancellationToken);
+            await _pathStore.SaveUnknownHashesAsync(domain, remainingUnknowns, cancellationToken, scope);
         }
 
         public Task PromotePathMatchesAsync(IEnumerable<HashGuessMatch> matches, CancellationToken cancellationToken) =>

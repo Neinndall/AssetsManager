@@ -73,7 +73,8 @@ namespace AssetsManager.Views.Controls.Viewer
             if (systemItem == null) return;
 
             _pendingSpell = null;
-            ResetPreviewContextForSelection();
+            if (_pendingSystemAdoption?.CanResumeSystem(systemItem.PathHash, systemItem.Definition, _vfxRenderer) != true)
+                ResetPreviewContextForSelection();
         }
 
         private void TryInspectPendingSystem()

@@ -575,20 +575,50 @@ namespace AssetsManager.Services.Viewer.Parsing
                 MapShaderDefinitionData shader = ReadShaderDefinition(shaderTrees, pass.ShaderHash, warnings);
                 IReadOnlyList<MapMaterialSamplerData> authoredSamplers = ReadMaterialSamplers(material, shader, warnings);
                 IReadOnlyDictionary<string, bool> switches = ResolveProgramSwitches(material, shader, warnings);
+                var parameters = ResolveProgramParameters(materialParameters, pass.Parameters, shader, warnings);
                 resolved.Add(new GameMaterialPass(
                     pass.ShaderHash,
                     shader?.Path,
                     ResolveProgramDefines(materialMacros, pass.ShaderMacros, shader, switches),
                     ResolveRuntimeSwitches(shader, switches),
                     ResolveProgramTextures(authoredSamplers, shader),
-                    ResolveProgramParameters(materialParameters, pass.Parameters, shader, warnings),
-                    ResolveProgramState(pass)));
+                    parameters,
+                    ResolveProgramState(pass))
+                {
+                    PlayerPositionParameters = ResolvePlayerPositionParameters(material, shader, parameters)
+                });
             }
 
             return new GameMaterialProgram(
                 ResolveMaterialKind(ReadOptionalUInt(material, MaterialType)),
                 animated,
                 resolved);
+        }
+
+        private static IReadOnlyList<GameMaterialPositionParameter> ResolvePlayerPositionParameters(
+            IReadOnlyDictionary<uint, BinTreeProperty> material, MapShaderDefinitionData shader,
+            IReadOnlyList<GameMaterialParameter> parameters)
+        {
+            var result = new List<GameMaterialPositionParameter>();
+            if (!material.TryGetValue(DynamicMaterial, out var dynamicValue) || dynamicValue is not BinTreeStruct dynamic ||
+                !dynamic.Properties.TryGetValue(Fnv1a.HashLower("parameters"), out var value) || value is not BinTreeContainer entries)
+                return result;
+            foreach (var entry in entries.Elements.OfType<BinTreeStruct>())
+            {
+                if (entry.Properties.TryGetValue(Fnv1a.HashLower("Enabled"), out var enabled) && enabled is BinTreeBool { Value: false } ||
+                    !TryReadString(entry.Properties, Name, out string name) || string.IsNullOrWhiteSpace(name) ||
+                    !entry.Properties.TryGetValue(Driver, out var driver) || driver is not BinTreeStruct node ||
+                    node.ClassHash != Fnv1a.HashLower("PlayerPositionDynamicMaterialDriver"))
+                    continue;
+                if (shader?.IsDeclared == true && shader.PhysicalParameters != null)
+                {
+                    if (TryFindParameterTarget(shader.PhysicalParameters, name, out int index, out uint mask))
+                        result.Add(new(shader.PhysicalParameters[index].Name, mask));
+                }
+                else if (parameters.Any(parameter => parameter.Name == name))
+                    result.Add(new(name, 0b1111));
+            }
+            return result;
         }
 
         private IReadOnlyDictionary<string, bool> ResolveProgramSwitches(

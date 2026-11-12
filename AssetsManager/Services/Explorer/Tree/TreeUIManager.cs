@@ -147,7 +147,7 @@ namespace AssetsManager.Services.Explorer.Tree
             return item;
         }
 
-        private static async Task<TreeViewItem> RealizeItemAsync(ItemsControl owner, FileSystemNodeModel node,
+        internal static async Task<TreeViewItem> RealizeItemAsync(ItemsControl owner, object node,
             CancellationToken cancellationToken)
         {
             for (int attempt = 0; attempt < 4; attempt++)

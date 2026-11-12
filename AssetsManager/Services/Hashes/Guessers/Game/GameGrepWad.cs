@@ -212,6 +212,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                     BinTree linkTree = GetCachedBinTree();
                     if (linkTree != null)
                     {
+                        GuessUiSceneBinPath(engine, linkTree, sourceWadPath, sourceChunkHash, cancellationToken);
                         _linkTemplates.GetValue(engine, static _ => new GameBinLinkTemplateIndex()).Guess(engine, linkTree, HashFile.Load(),
                             _resolveBinHash, _resolveBinHash64, sourceWadPath, sourceChunkHash, cancellationToken);
                         _animationForms.GetValue(engine, static _ => new GameAnimationFormIndex()).Guess(

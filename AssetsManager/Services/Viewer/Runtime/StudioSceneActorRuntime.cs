@@ -19,9 +19,13 @@ using AssetsManager.Services.Viewer.Vfx.Semantics;
 
 namespace AssetsManager.Services.Viewer.Runtime
 {
+    internal sealed record StudioSystemPlayback(uint PathHash, double Duration, float Speed,
+        bool Looping, double LoopStart, double LoopEnd, Vector3 FlexChannels,
+        IReadOnlyList<int> Muted, IReadOnlyList<int> Soloed);
+
     /// <summary>
     /// Runtime of one non-focused Character in a 3D Studio Skin scene: owner mesh, pose evaluator,
-    /// authored clip and the VFX session attached to it, looping on the shared transport. The focused
+    /// authored clip or standalone System and its live VFX session. The focused
     /// actor uses the Studio's inspection pipeline; these objects move between both roles without
     /// being decoded again. GPU-bound release (mesh buffers, session renderer) belongs to the viewport.
     /// </summary>
@@ -87,12 +91,16 @@ namespace AssetsManager.Services.Viewer.Runtime
         internal string SearchDirectory { get; }
         internal double AuthoredScale { get; }
 
-        /// <summary>The prepared clip this actor plays, or null for bind pose.</summary>
+        /// <summary>The prepared clip this actor plays, or null for a standalone System or bind pose.</summary>
         internal AnimationClipCatalogItem Clip { get; private set; }
+        internal StudioSystemPlayback SystemPlayback { get; private set; }
 
-        internal double LoopDuration => Clip?.Duration > 0f ? Clip.Duration : 3d;
+        internal double LoopDuration => SystemPlayback?.Duration ?? (Clip?.Duration > 0f ? Clip.Duration : 3d);
 
         internal int LiveParticleCount => Session.LiveParticleCount;
+
+        internal bool ShouldRenderParticles(bool characterEffectsEnabled) =>
+            Session.ActiveSystem != null && (SystemPlayback != null || characterEffectsEnabled);
 
         /// <summary>
         /// Loads a Character exactly like the focused Skin preview: skin BIN graph, owner SKN/SKL with
@@ -285,13 +293,26 @@ namespace AssetsManager.Services.Viewer.Runtime
         /// </summary>
         internal void AdoptPlayingClip(AnimationClipCatalogItem clip)
         {
+            SystemPlayback = null;
             Clip = clip;
             ConfigureClipCues(clip);
             Session.SetBoneTransformSampler(SampleBone);
         }
 
+        /// <summary>Retains a standalone System's live graph, particles, clock and rig across focus changes.</summary>
+        internal void AdoptPlayingSystem(StudioSystemPlayback playback)
+        {
+            SystemPlayback = playback ?? throw new ArgumentNullException(nameof(playback));
+            Clip = null;
+        }
+
+        internal bool CanResumeSystem(uint pathHash, VfxSystemDefinition definition, VfxRenderSession session) =>
+            SystemPlayback?.PathHash == pathHash && ReferenceEquals(Session, session) &&
+            definition != null && ReferenceEquals(Session.ActiveSystem?.Definition, definition);
+
         private void StartClip(AnimationClipCatalogItem clip)
         {
+            SystemPlayback = null;
             Clip = clip;
             Model.CurrentAnimation = clip.AnimationAsset;
             Model.AnimationTime = 0d;
@@ -316,6 +337,7 @@ namespace AssetsManager.Services.Viewer.Runtime
 
         private void ShowBindPose()
         {
+            SystemPlayback = null;
             Clip = null;
             Model.CurrentAnimation = null;
             Model.AnimationTime = 0d;
@@ -368,14 +390,39 @@ namespace AssetsManager.Services.Viewer.Runtime
             _loading.ResolveAssetPath(path, SearchDirectory, ".anm");
 
         /// <summary>
-        /// Advances the actor on the shared transport. Background actors always loop their clip so a
-        /// scene keeps moving while the focused actor is inspected.
+        /// Advances clips on the optional shared transport and standalone Systems on their own
+        /// speed, pause and loop state. Background clips loop while another actor is inspected.
         /// </summary>
         internal void Advance(float deltaSeconds, bool playing, float speed, StudioSceneActor actor,
             double? transportTime = null)
         {
             if (Session.ActiveSystem == null)
             {
+                ApplyBindPose();
+                ApplySubmeshVisibility(actor, FormHiddenSubmeshes);
+                return;
+            }
+
+            if (SystemPlayback is { } standalone)
+            {
+                if (playing)
+                {
+                    Session.Play();
+                    Session.ActiveSystem.Speed = standalone.Speed;
+                    Session.Update(deltaSeconds);
+                    if (standalone.Looping && standalone.LoopEnd > standalone.LoopStart &&
+                        Session.PlaybackTime >= standalone.LoopEnd)
+                    {
+                        Session.Seek(standalone.LoopStart);
+                        Session.Play();
+                    }
+                    else if (!standalone.Looping && Session.PlaybackTime >= standalone.Duration)
+                    {
+                        Session.Pause();
+                        if (actor != null) actor.IsPlaybackPaused = true;
+                    }
+                }
+                else Session.Pause();
                 ApplyBindPose();
                 ApplySubmeshVisibility(actor, FormHiddenSubmeshes);
                 return;
@@ -503,7 +550,8 @@ namespace AssetsManager.Services.Viewer.Runtime
         }
 
         internal string DescribePlayback() =>
-            Clip == null ? "Bind pose" : $"{Clip.DisplayName} · {Clip.Duration:F2}s";
+            SystemPlayback != null ? $"{Session.ActiveSystem?.Name} · System" :
+                Clip == null ? "Bind pose" : $"{Clip.DisplayName} · {Clip.Duration:F2}s";
 
         /// <summary>
         /// Releases CPU-owned state. The caller queues the SceneModel GPU release before this and

@@ -26,6 +26,11 @@ namespace AssetsManager.Tests.Diagnostics
 
         static async Task Main(string[] args)
         {
+            if (args.Length > 0 && args[0] == "studio-actor-browser")
+            {
+                StudioActorBrowserDiagnostic.Run();
+                return;
+            }
             if (args.Length > 0 && args[0] == "vfx-draw-order-candidates")
             {
                 VfxDrawOrderCandidatesDiagnostic.Run(args.Skip(1).ToArray());

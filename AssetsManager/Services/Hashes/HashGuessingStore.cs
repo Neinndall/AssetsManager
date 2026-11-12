@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using AssetsManager.Utils;
@@ -15,6 +16,11 @@ namespace AssetsManager.Services.Hashes
         private readonly SemaphoreSlim _lock = new(1, 1);
 
         public HashGuessingStore(DirectoriesCreator directoriesCreator) => _directoriesCreator = directoriesCreator;
+
+        public bool HasInventory(HashGuessDomain domain) =>
+            File.Exists(GetInventoryPath(domain, "unknowns")) ||
+            File.Exists(GetInventoryPath(domain, "historical")) ||
+            File.Exists(GetInventoryPath(domain, "pending"));
 
         private string GetKnownHashFilePath(HashGuessDomain domain) => Path.Combine(
             _directoriesCreator.HashesPath,
@@ -34,6 +40,15 @@ namespace AssetsManager.Services.Hashes
                         .ToDictionary(matchesByHash => matchesByHash.Key, matchesByHash => matchesByHash.Last().Path);
                     
                     await MergeHashFileAsync(GetKnownHashFilePath(group.Key), newEntries, cancellationToken);
+                    if (!HasInventory(group.Key)) continue;
+                    await RecoverInventoryAsync(group.Key);
+                    var current = await ReadHashesAsync(GetInventoryPath(group.Key, "unknowns"), cancellationToken);
+                    var historical = await ReadHashesAsync(GetInventoryPath(group.Key, "historical"), cancellationToken);
+                    current.ExceptWith(newEntries.Keys);
+                    historical.ExceptWith(newEntries.Keys);
+                    string patchPath = GetInventoryPath(group.Key, "patch");
+                    string patch = File.Exists(patchPath) ? await File.ReadAllTextAsync(patchPath, cancellationToken) : null;
+                    await CommitInventoryAsync(group.Key, current, historical, patch, cancellationToken);
                 }
             }
             finally
@@ -42,33 +57,29 @@ namespace AssetsManager.Services.Hashes
             }
         }
 
-        public async Task<HashSet<ulong>> LoadUnknownHashesAsync(HashGuessDomain domain, CancellationToken cancellationToken)
+        public async Task<HashSet<ulong>> LoadUnknownHashesAsync(HashGuessDomain domain, CancellationToken cancellationToken,
+            HashGuessScope scope = HashGuessScope.All)
         {
-            var result = new HashSet<ulong>();
-            string path = Path.Combine(_directoriesCreator.HashLabPath, domain == HashGuessDomain.Game ? "unknowns.game.txt" : "unknowns.lcu.txt");
-            if (!File.Exists(path)) return result;
-
             await _lock.WaitAsync(cancellationToken);
             try
             {
-                foreach (string line in await File.ReadAllLinesAsync(path, cancellationToken))
-                {
-                    if (ulong.TryParse(line.Trim(), System.Globalization.NumberStyles.HexNumber, null, out ulong hash))
-                    {
-                        result.Add(hash);
-                    }
-                }
+                await RecoverInventoryAsync(domain);
+                var result = scope == HashGuessScope.Historical ? new HashSet<ulong>() :
+                    await ReadHashesAsync(GetInventoryPath(domain, "unknowns"), cancellationToken);
+                if (scope != HashGuessScope.CurrentPatch)
+                    result.UnionWith(await ReadHashesAsync(GetInventoryPath(domain, "historical"), cancellationToken));
+                return result;
             }
             finally
             {
                 _lock.Release();
             }
-            return result;
         }
 
-        public async Task<int> LoadUnknownCountAsync(HashGuessDomain domain, CancellationToken cancellationToken)
+        public async Task<int> LoadUnknownCountAsync(HashGuessDomain domain, CancellationToken cancellationToken,
+            HashGuessScope scope = HashGuessScope.All)
         {
-            var pending = await LoadUnknownHashesAsync(domain, cancellationToken);
+            var pending = await LoadUnknownHashesAsync(domain, cancellationToken, scope);
             return pending.Count;
         }
 
@@ -132,29 +143,109 @@ namespace AssetsManager.Services.Hashes
         public async Task SaveUnknownHashesAsync(
             HashGuessDomain domain,
             IEnumerable<ulong> unknownHashes,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            HashGuessScope scope = HashGuessScope.All)
         {
             await _lock.WaitAsync(cancellationToken);
             try
             {
-                Directory.CreateDirectory(_directoriesCreator.HashLabPath);
-                string path = Path.Combine(_directoriesCreator.HashLabPath, domain == HashGuessDomain.Game ? "unknowns.game.txt" : "unknowns.lcu.txt");
+                await RecoverInventoryAsync(domain);
                 var pending = unknownHashes.ToHashSet();
-                var lines = pending.Select(hash => $"{hash:x16}").OrderBy(x => x).ToList();
-                string temporaryPath = path + ".tmp";
-                try
-                {
-                    await File.WriteAllLinesAsync(temporaryPath, lines, cancellationToken);
-                    File.Move(temporaryPath, path, true);
-                }
-                finally
-                {
-                    if (File.Exists(temporaryPath)) File.Delete(temporaryPath);
-                }
+                var historical = await ReadHashesAsync(GetInventoryPath(domain, "historical"), cancellationToken);
+                var current = await ReadHashesAsync(GetInventoryPath(domain, "unknowns"), cancellationToken);
+                if (scope != HashGuessScope.CurrentPatch) historical.IntersectWith(pending);
+                if (scope != HashGuessScope.Historical) current = pending.Except(historical).ToHashSet();
+                historical.ExceptWith(current);
+                string patchPath = GetInventoryPath(domain, "patch");
+                string patch = File.Exists(patchPath) ? await File.ReadAllTextAsync(patchPath, cancellationToken) : null;
+                await CommitInventoryAsync(domain, current, historical, patch, cancellationToken);
             }
             finally
             {
                 _lock.Release();
+            }
+        }
+
+        public async Task SaveScannedInventoryAsync(HashGuessDomain domain, IEnumerable<ulong> observed,
+            string patch, Func<ulong, bool> isKnown, CancellationToken cancellationToken)
+        {
+            await _lock.WaitAsync(cancellationToken);
+            try
+            {
+                await RecoverInventoryAsync(domain);
+                var current = await ReadHashesAsync(GetInventoryPath(domain, "unknowns"), cancellationToken);
+                var historical = await ReadHashesAsync(GetInventoryPath(domain, "historical"), cancellationToken);
+                string patchPath = GetInventoryPath(domain, "patch");
+                string previousPatch = File.Exists(patchPath) ? await File.ReadAllTextAsync(patchPath, cancellationToken) : null;
+                // Unversioned inventories predate patch tracking and form the historical baseline.
+                if (!string.Equals(previousPatch, patch, StringComparison.Ordinal))
+                {
+                    historical.UnionWith(current);
+                    current.Clear();
+                }
+                historical.RemoveWhere(hash => isKnown(hash));
+                current.UnionWith(observed);
+                current.RemoveWhere(hash => isKnown(hash) || historical.Contains(hash));
+                await CommitInventoryAsync(domain, current, historical, patch, cancellationToken);
+            }
+            finally
+            {
+                _lock.Release();
+            }
+        }
+
+        private string GetInventoryPath(HashGuessDomain domain, string prefix) => Path.Combine(
+            _directoriesCreator.HashLabPath, $"{prefix}.{(domain == HashGuessDomain.Game ? "game" : "lcu")}.txt");
+
+        private static async Task<HashSet<ulong>> ReadHashesAsync(string path, CancellationToken cancellationToken)
+        {
+            var hashes = new HashSet<ulong>();
+            if (File.Exists(path))
+                foreach (string line in await File.ReadAllLinesAsync(path, cancellationToken))
+                    if (ulong.TryParse(line.Trim(), System.Globalization.NumberStyles.HexNumber, null, out ulong hash))
+                        hashes.Add(hash);
+            return hashes;
+        }
+
+        private sealed record InventoryCommit(ulong[] Current, ulong[] Historical, string Patch);
+
+        private async Task CommitInventoryAsync(HashGuessDomain domain, HashSet<ulong> current,
+            HashSet<ulong> historical, string patch, CancellationToken cancellationToken)
+        {
+            Directory.CreateDirectory(_directoriesCreator.HashLabPath);
+            string journal = GetInventoryPath(domain, "pending");
+            var commit = new InventoryCommit(current.OrderBy(h => h).ToArray(), historical.OrderBy(h => h).ToArray(), patch);
+            await WriteAtomicAsync(journal, JsonSerializer.Serialize(commit), cancellationToken);
+            // Once journaled, finish all projections together, including when cancellation arrives.
+            await RecoverInventoryAsync(domain);
+        }
+
+        private async Task RecoverInventoryAsync(HashGuessDomain domain)
+        {
+            string journal = GetInventoryPath(domain, "pending");
+            if (!File.Exists(journal)) return;
+            var commit = JsonSerializer.Deserialize<InventoryCommit>(await File.ReadAllTextAsync(journal));
+            await WriteAtomicAsync(GetInventoryPath(domain, "unknowns"), FormatHashes(commit.Current), CancellationToken.None);
+            await WriteAtomicAsync(GetInventoryPath(domain, "historical"), FormatHashes(commit.Historical), CancellationToken.None);
+            await WriteAtomicAsync(GetInventoryPath(domain, "patch"), commit.Patch ?? string.Empty, CancellationToken.None);
+            File.Delete(journal);
+        }
+
+        private static string FormatHashes(IEnumerable<ulong> hashes) =>
+            string.Concat(hashes.Select(hash => $"{hash:x16}\n"));
+
+        private static async Task WriteAtomicAsync(string path, string text, CancellationToken cancellationToken)
+        {
+            string temporaryPath = path + ".tmp";
+            try
+            {
+                await File.WriteAllTextAsync(temporaryPath, text, cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
+                File.Move(temporaryPath, path, true);
+            }
+            finally
+            {
+                if (File.Exists(temporaryPath)) File.Delete(temporaryPath);
             }
         }
     }

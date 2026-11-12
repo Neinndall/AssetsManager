@@ -23,6 +23,37 @@
                 <Border x:Name="CameraInputSurface"
                         Background="Transparent"/>
 
+                <Popup x:Name="VertexInspectionPopup" Placement="Top" PlacementTarget="{Binding ElementName=VertexInspectionButton}"
+                       StaysOpen="False" AllowsTransparency="True" PopupAnimation="Fade" VerticalOffset="-10">
+                    <Border Width="290" Padding="16" Background="{StaticResource CardBackground}"
+                            BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="12">
+                        <StackPanel x:Name="VertexInspectionOptionsPanel">
+                            <TextBlock Text="VERTEX INSPECTION" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                            <TextBlock Text="{Binding Summary}" FontSize="10" TextWrapping="Wrap" Foreground="{StaticResource TextMuted}" Margin="0,4,0,14"/>
+                            <TextBlock Text="Points and normals: OLD red · NEW green" FontSize="9" TextWrapping="Wrap"
+                                       Foreground="{StaticResource TextSecondary}" Margin="0,0,0,12"/>
+                            <TextBlock Text="Highlight changes in" FontSize="10" Foreground="{StaticResource TextSecondary}" Margin="0,0,0,6"/>
+                            <ComboBox ItemsSource="{Binding Attributes}" SelectedItem="{Binding Attribute}" Margin="0,0,0,12" Height="30"
+                                      Style="{StaticResource ModernComboBox}"/>
+                            <CheckBox Content="Vertices" IsChecked="{Binding Vertices}" Style="{StaticResource ModernCheckBox}" Margin="0,4"/>
+                            <CheckBox Content="Affected surfaces" IsChecked="{Binding Surfaces}" Style="{StaticResource ModernCheckBox}" Margin="0,4"
+                                      ToolTip="Fill affected triangles in purple. Leave off to inspect individual points."/>
+                            <CheckBox Content="Normal directions" IsChecked="{Binding Normals}" Style="{StaticResource ModernCheckBox}" Margin="0,4"
+                                      ToolTip="Authored OLD and NEW normals. Small numeric changes may overlap visually."/>
+                            <CheckBox Content="Mesh edges" IsChecked="{Binding Edges}" Style="{StaticResource ModernCheckBox}" Margin="0,4"/>
+                            <CheckBox Content="Affected positions only" IsChecked="{Binding ChangedOnly}" Style="{StaticResource ModernCheckBox}" Margin="0,4"
+                                      ToolTip="Includes coincident vertices at affected positions. Vertex identities are not inferred."/>
+                            <CheckBox Content="See through surfaces" IsChecked="{Binding ThroughMesh}" Style="{StaticResource ModernCheckBox}" Margin="0,4,0,12"/>
+                            <TextBlock Text="Point size" FontSize="10" Foreground="{StaticResource TextSecondary}"/>
+                            <Slider Minimum="2" Maximum="10" Value="{Binding PointSize}" Margin="0,6,0,12" Style="{StaticResource HUDSliderStyle}"/>
+                            <TextBlock Text="Normal length" FontSize="10" Foreground="{StaticResource TextSecondary}"/>
+                            <Slider Minimum="0.2" Maximum="20" Value="{Binding NormalLength}" Margin="0,6,0,14" Style="{StaticResource HUDSliderStyle}"
+                                    ToolTip="Line length in model units. This does not amplify the difference between OLD and NEW."/>
+                            <Button Content="Focus affected vertices" Style="{StaticResource SecondaryButton}" Click="FocusInspection_Click"/>
+                        </StackPanel>
+                    </Border>
+                </Popup>
+
                 <Border HorizontalAlignment="Right"
                         VerticalAlignment="Top"
                         Margin="0,24,24,0"
@@ -182,7 +213,7 @@
                 <!-- ============================================ -->
                 <Border HorizontalAlignment="Center" 
                         VerticalAlignment="Bottom" 
-                        Margin="0,0,0,16"
+                        Margin="12,0,64,16"
                         Background="#E618181B" 
                         CornerRadius="18"
                         Padding="6,4"
@@ -193,6 +224,7 @@
                         <DropShadowEffect Color="Black" BlurRadius="22" ShadowDepth="4" Opacity="0.4"/>
                     </Border.Effect>
                     
+                    <Viewbox Stretch="Uniform" StretchDirection="DownOnly">
                     <Grid x:Name="ToolbarContentGrid">
                         <!-- Diff Toolbar Group (Collapsed by default) -->
                         <StackPanel x:Name="DiffToolbarGroup" Orientation="Horizontal" VerticalAlignment="Center" >
@@ -265,6 +297,12 @@
                                                   AutomationProperties.Name="Show unchanged context">
                                         <materialIcons:MaterialIcon Kind="EyeOutline" Width="13" Height="13"/>
                                     </ToggleButton>
+                                    <ToggleButton x:Name="ShowAttributesToggle" Style="{StaticResource TransparentIconToggleButton}"
+                                                  IsChecked="True" Click="SurfaceFilters_Click" Width="30" Height="30"
+                                                  ToolTip="Vertex attributes: highlight affected surfaces and inspection points"
+                                                  AutomationProperties.Name="Show vertex attributes">
+                                        <materialIcons:MaterialIcon Kind="VectorPolyline" Width="13" Height="13"/>
+                                    </ToggleButton>
                                 </StackPanel>
                             </Border>
 
@@ -281,6 +319,10 @@
                                                   Width="30" Height="30">
                                         <materialIcons:MaterialIcon Kind="PaletteOutline" Width="13" Height="13"/>
                                     </ToggleButton>
+                                    <Button x:Name="VertexInspectionButton" Style="{StaticResource TransparentIconButton}"
+                                            Click="VertexInspection_Click" ToolTip="Vertex inspection: filters, points, normals and edges" Width="30" Height="30">
+                                        <materialIcons:MaterialIcon Kind="Tune" Width="13" Height="13"/>
+                                    </Button>
                                 </StackPanel>
                             </Border>
 
@@ -299,6 +341,7 @@
                             </Border>
                         </StackPanel>
                     </Grid>
+                    </Viewbox>
                 </Border>
 
                 <!-- ============================================ -->
