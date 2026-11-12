@@ -171,6 +171,7 @@ namespace AssetsManager.Views.Controls.Viewer
             if (ReferenceEquals(previous, actor))
             {
                 RefreshCharacterInteractionTarget();
+                RevealSceneActorInBrowser(actor.Skin);
                 return;
             }
 
@@ -202,6 +203,7 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 // Rebinds the browser/Inspector to the actor; LoadBinFile adopts the promoted runtime.
                 _model.SelectedSkin = actor.Skin;
+                RevealSceneActorInBrowser(actor.Skin);
             }
             finally
             {

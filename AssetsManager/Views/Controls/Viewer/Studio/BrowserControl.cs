@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
@@ -11,12 +13,78 @@ using AssetsManager.Services.Viewer.Vfx.Composition;
 using AssetsManager.Services.Viewer.Runtime;
 using AssetsManager.Services.Viewer.Vfx.Session;
 using AssetsManager.Views.Models.Viewer;
+using AssetsManager.Services.Explorer.Tree;
 
 namespace AssetsManager.Views.Controls.Viewer
 {
     public partial class StudioControl
     {
         private bool _isBindingBrowserSkin;
+        private bool _isRevealingBrowserSkin;
+        private int _browserRevealGeneration;
+
+        private async void RevealSceneActorInBrowser(StudioSkinItem skin)
+        {
+            int generation = ++_browserRevealGeneration;
+            _isRevealingBrowserSkin = false;
+            var path = new List<object>();
+            if (skin == null || !FindSkinBrowserPath(_model.BrowserRoots, skin, path)) return;
+            _isRevealingBrowserSkin = true;
+            try
+            {
+                // A search may hide the selected actor or one of its ancestors.
+                IEnumerable<object> siblings = _model.BrowserRoots;
+                foreach (object node in path)
+                {
+                    if (!CollectionViewSource.GetDefaultView(siblings).Contains(node))
+                    {
+                        _model.SearchQuery = string.Empty;
+                        RefreshProjectBrowserSearch();
+                        break;
+                    }
+                    if (node is StudioBrowserFolder folder) siblings = folder.Children;
+                }
+
+                ItemsControl owner = StudioBrowserView.BrowserTree;
+                foreach (object node in path)
+                {
+                    if (generation != _browserRevealGeneration || _isCleanedUp || !ReferenceEquals(_model.SelectedSkin, skin)) return;
+                    TreeViewItem item = await TreeUIManager.RealizeItemAsync(owner, node, CancellationToken.None);
+                    if (item == null || generation != _browserRevealGeneration || _isCleanedUp || !ReferenceEquals(_model.SelectedSkin, skin)) return;
+                    if (node is StudioBrowserFolder folder)
+                    {
+                        folder.IsExpanded = true;
+                        item.IsExpanded = true;
+                        owner = item;
+                    }
+                    else
+                    {
+                        item.IsSelected = true;
+                        item.BringIntoView();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                LogService?.LogError(ex, "Failed to reveal the selected scene actor in the Studio browser.");
+            }
+            finally
+            {
+                if (generation == _browserRevealGeneration) _isRevealingBrowserSkin = false;
+            }
+        }
+
+        private static bool FindSkinBrowserPath(IEnumerable<object> nodes, StudioSkinItem skin, List<object> path)
+        {
+            foreach (object node in nodes)
+            {
+                path.Add(node);
+                if (ReferenceEquals(node, skin) || node is StudioBrowserFolder folder && FindSkinBrowserPath(folder.Children, skin, path))
+                    return true;
+                path.RemoveAt(path.Count - 1);
+            }
+            return false;
+        }
 
         private void BindBrowserSkin()
         {
@@ -48,7 +116,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
         internal void BrowserItem_Expanded(object sender, RoutedEventArgs e)
         {
-            if (_isBindingBrowserSkin) return;
+            if (_isBindingBrowserSkin || _isRevealingBrowserSkin) return;
             if (e.OriginalSource is TreeViewItem { DataContext: StudioSkinItem skin })
                 TrySelectSceneSkin(skin);
         }
@@ -76,7 +144,7 @@ namespace AssetsManager.Views.Controls.Viewer
         internal void StudioBrowser_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
         {
             // Collapsing the previous skin can select its parent synchronously. That is not user navigation.
-            if (_isBindingBrowserSkin) return;
+            if (_isBindingBrowserSkin || _isRevealingBrowserSkin) return;
             if (e.NewValue != null && !_isSceneFocusHandover)
             {
                 _startNextPreviewPaused = false;

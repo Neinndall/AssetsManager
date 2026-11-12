@@ -7,6 +7,7 @@ New Features
   - Hash Guessing Lab / Separate current-patch and historical Game/LCU unknowns, with a scope selector for guessing.
 
 Improvements
+  - 3D Studio / Reveal and select the corresponding skin in the asset tree when selecting a scene actor.
   - SKN Diff / Inspect affected vertices and normal directions by attribute, focus mesh parts, and keep inspection controls in the viewport toolbar.
   - 3D Studio / Update graphics dependencies for compatibility and reliability improvements.
   - Hash Guessing Lab / Recover unknown UI BIN filenames from their declared scene names.

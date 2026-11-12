@@ -9,6 +9,7 @@ namespace AssetsManager.Views.Controls.Viewer
     public partial class StudioBrowserControl : UserControl
     {
         internal StudioControl Owner { get; set; }
+        internal TreeView BrowserTree => StudioBrowser;
 
         public StudioBrowserControl() => InitializeComponent();
 
