@@ -458,6 +458,142 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
             Assert.Equal(expectedV, AssetsManager.Services.Viewer.Vfx.Rendering.VfxOpenGlRenderer.PaletteRowNormalized(palette), 5);
         }
 
+        [Theory]
+        [InlineData(VfxPrimitiveKind.CameraQuad)]
+        [InlineData(VfxPrimitiveKind.ArbitraryQuad)]
+        [InlineData(VfxPrimitiveKind.Beam)]
+        [InlineData(VfxPrimitiveKind.Ray)]
+        [InlineData(VfxPrimitiveKind.CameraTrail)]
+        [InlineData(VfxPrimitiveKind.ArbitraryTrail)]
+        [InlineData(VfxPrimitiveKind.CameraSegmentBeam)]
+        public void NonMeshNativeGateRejectsUnsupportedUvModesAndReflectionWithoutDistortion(VfxPrimitiveKind primitive)
+        {
+            var reflection = new VfxReflectionDefinition(1f, 2f, 0f, 1f, Vector4.One, Vector4.One, "cube.dds");
+            var distortion = new VfxDistortionDefinition(1f, 1, "normal.tex");
+            for (byte uvMode = 0; uvMode <= 5; uvMode++)
+            {
+                VfxEmitterDefinition emitter = Emitter() with
+                {
+                    PrimitiveKind = primitive,
+                    IsMeshPrimitive = false,
+                    UvMode = uvMode,
+                    TextureMultPath = "mult.tex",
+                    AlphaErosion = new VfxAlphaErosionDefinition("erosion.tex", VfxCurveF.Const(0.5f), 0.1f, 0.1f, 0),
+                    PaletteDefinition = new VfxPaletteDefinition(4, VfxCurve3.Const(Vector3.Zero), "palette.tex"),
+                    SoftParticle = new VfxSoftParticleDefinition(0f, 1f, 0f, 1f)
+                };
+
+                bool expectedUnreflected = uvMode is not (1 or 2);
+                Assert.Equal(expectedUnreflected, GameParticleProgramResolver.CanCreateNativeProgram(emitter, false));
+                if (expectedUnreflected)
+                {
+                    AssertPair(
+                        GameParticleProgramResolver.ResolvePair(emitter, false),
+                        "ParticleSystem/QUAD",
+                        GameParticleProgramResolver.QuadVertexPath,
+                        GameParticleProgramResolver.QuadPixelPath);
+                    string[] defines = GameParticleProgramResolver.BuildEmitterDefines(emitter, false)
+                        .Select(define => define.Name)
+                        .ToArray();
+                    Assert.DoesNotContain("SCREEN_SPACE_UV", defines);
+                    Assert.DoesNotContain("LOCAL_SPACE_UV", defines);
+                    Assert.DoesNotContain("REFLECTIVE", defines);
+                }
+
+                // Quad/beam shaders have no REFLECTIVE permutation; non-distortion reflective emitters fall back cleanly.
+                Assert.False(GameParticleProgramResolver.CanCreateNativeProgram(emitter with { Reflection = reflection }, false));
+                Assert.True(GameParticleProgramResolver.CanCreateNativeProgram(emitter with { Reflection = reflection, Distortion = distortion }, false));
+            }
+        }
+
+        [Fact]
+        public void MeshAndAttachedMeshNativeGateAcceptsAllUvModesAndReflectionCombinationsOnInstalledCache()
+        {
+            string root = FindInstalledShaderCacheRoot();
+            if (root == null)
+                return;
+
+            string cachePath = Path.Combine(root, @"Game\DATA\FINAL\ShaderCache.dx11.wad.client");
+            var reflection = new VfxReflectionDefinition(1f, 2f, 0.25f, 1f, Vector4.One, Vector4.One, "cube.dds");
+            var alphaErosion = new VfxAlphaErosionDefinition("erosion.tex", VfxCurveF.Const(1f), 0f, 0f, 0);
+            var softParticle = new VfxSoftParticleDefinition(0f, 1f, 0f, 1f);
+            var palette = new VfxPaletteDefinition(4, VfxCurve3.Const(Vector3.Zero), "palette.tex");
+
+            using var wad = new WadFile(cachePath);
+            using var context = new HiddenWglContext();
+            Silk.NET.OpenGL.GL gl = Silk.NET.OpenGL.GL.GetApi(context.GetProcAddress);
+            var glFailures = new System.Collections.Generic.List<string>();
+            try
+            {
+                foreach (VfxPrimitiveKind primitive in new[] { VfxPrimitiveKind.Mesh, VfxPrimitiveKind.AttachedMesh })
+                foreach (byte uvMode in new byte[] { 0, 1, 2, 3, 4, 5 })
+                foreach (bool hasReflection in new[] { false, true })
+                foreach (bool stackedFeatures in new[] { false, true })
+                {
+                    VfxEmitterDefinition emitter = Emitter() with
+                    {
+                        PrimitiveKind = primitive,
+                        IsMeshPrimitive = true,
+                        UvMode = uvMode,
+                        Reflection = hasReflection ? reflection : null,
+                        TextureMultPath = stackedFeatures ? "mult.tex" : null,
+                        AlphaErosion = stackedFeatures ? alphaErosion : null,
+                        PaletteDefinition = stackedFeatures ? palette : null,
+                        SoftParticle = stackedFeatures ? softParticle : null
+                    };
+
+                    Assert.True(GameParticleProgramResolver.CanCreateNativeProgram(emitter, true));
+                    GameMaterialProgram program = GameParticleProgramResolver.Create(emitter, true);
+                    Assert.NotNull(program);
+
+                    string[] defineNames = program.Passes[0].Defines.Select(define => define.Name).ToArray();
+                    Assert.Equal(hasReflection, defineNames.Contains("REFLECTIVE"));
+                    Assert.Equal(uvMode == 1, defineNames.Contains("SCREEN_SPACE_UV"));
+                    Assert.Equal(uvMode == 2, defineNames.Contains("SEPARATE_ALPHA_UV"));
+                    Assert.Equal(uvMode is 3 or 4 or 5, defineNames.Contains("LOCAL_SPACE_UV"));
+
+                    if (uvMode is 4 or 5 && !stackedFeatures && hasReflection)
+                        continue; // Modes 3, 4, 5 map to the exact same LOCAL_SPACE_UV define set.
+
+                    GameShaderProgramResolver.ShaderBytecodeMaterialProgram bytecodes =
+                        GameShaderProgramResolver.ReadProgram(program, wad, cachePath);
+                    GameShaderProgramResolver.ShaderBytecodePassRead pass = Assert.Single(bytecodes.Passes);
+                    Assert.True(pass.Bytecode.Ready, $"{primitive} uv={uvMode} refl={hasReflection}: {pass.Bytecode.Failure}");
+
+                    GameShaderTranslator.TranslationRead translated = GameShaderTranslator.Translate(
+                        pass.Bytecode.Program.Vertex,
+                        pass.Bytecode.Program.VertexReflection,
+                        pass.Bytecode.Program.Pixel,
+                        pass.Bytecode.Program.PixelReflection);
+                    Assert.True(translated.Ready, $"{primitive} uv={uvMode} refl={hasReflection}: {translated.Failure}");
+
+                    GameShaderTranslator.TranslatedProgram composed = GameParticleShaderPrelude.Compose(translated.Program, true);
+                    uint linked = 0;
+                    try
+                    {
+                        linked = AssetsManager.Utils.Rendering.GlShaderCompiler.CreateRawProgram(
+                            gl,
+                            ToDesktopGlsl(composed.Vertex.Glsl),
+                            ToDesktopGlsl(composed.Pixel.Glsl));
+                    }
+                    catch (System.Exception ex)
+                    {
+                        glFailures.Add($"{primitive} uv={uvMode} refl={hasReflection} stacked={stackedFeatures}: {ex.Message}");
+                    }
+                    finally
+                    {
+                        if (linked != 0)
+                            gl.DeleteProgram(linked);
+                    }
+                }
+                Assert.Empty(glFailures);
+            }
+            finally
+            {
+                gl.Dispose();
+            }
+        }
+
         [Fact]
         public void StockParticlePermutationsComposeAndCompileAgainstAnInvisibleWglContext()
         {

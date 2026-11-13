@@ -50,6 +50,7 @@ uniform vec3 uPlacementUp;
 uniform vec3 uPlacementForward;
 uniform int uFlipU;
 uniform int uFlipV;
+uniform int uUvMode;
 uniform int uFlipUMult;
 uniform int uFlipVMult;
 uniform int uAddressModeMult;
@@ -69,6 +70,7 @@ out vec4 vMeshColor;
 out vec3 vColorDynamics;
 out vec3 vRim;
 out vec4 vReflect;
+out vec3 vScreenUv;
 
 vec3 meshRotateEuler(vec3 p, vec3 r){
     float sz = sin(r.z); float cz = cos(r.z);
@@ -160,14 +162,15 @@ void main(){
     gl_Position = uViewProj * vec4(p, 1.0);
     vec2 baseUv = aUv;
     vRawUv = aUv;
-    // mesh_ps_fixedalphauv samples the transformed-but-unscrolled coordinate. Unlike the
-    // normal layer transform this path has no authored centre or translation column.
+    // SEPARATE_ALPHA_UV transforms baseUv by the linear affine rows without translation,
+    // negating on axis flips and dividing into the atlas grid.
     vec2 alphaUv = baseUv * uUvScale;
     float uvSin = sin(uUvRotation); float uvCos = cos(uUvRotation);
     alphaUv = vec2(alphaUv.x * uvCos - alphaUv.y * uvSin,
                    alphaUv.x * uvSin + alphaUv.y * uvCos);
-    if (uFlipU != 0) alphaUv.x = 1.0 - alphaUv.x;
-    if (uFlipV != 0) alphaUv.y = 1.0 - alphaUv.y;
+    if (uFlipU != 0) alphaUv.x = -alphaUv.x;
+    if (uFlipV != 0) alphaUv.y = -alphaUv.y;
+    alphaUv /= max(round(uTexDiv), vec2(1.0));
     vCornerUv = alphaUv;
 
     vec2 centeredUv = (baseUv - uUvTransformCenter) * uUvScale;
@@ -183,6 +186,17 @@ void main(){
     float mainFrame = mod(mod(frame, mainDiv.x * mainDiv.y) + mainDiv.x * mainDiv.y, mainDiv.x * mainDiv.y);
     vec2 mainCell = vec2(mod(mainFrame, mainCols), floor(mainFrame / mainCols));
     vCell = mainCell;
+    vScreenUv = vec3(0.0, 0.0, 1.0);
+    if (uUvMode == 1) {
+        vec4 screenClip = uViewProj * vec4(p, 1.0);
+        vec2 screenUv = (screenClip.xy / screenClip.w - uUvTransformCenter) * uUvScale;
+        screenUv = vec2(screenUv.x * uvCos - screenUv.y * uvSin,
+                        screenUv.x * uvSin + screenUv.y * uvCos);
+        screenUv += uUvTransformCenter + uBirthUvOffset + uEmitterUvOffset;
+        if (uFlipU != 0) screenUv.x = 1.0 - screenUv.x;
+        if (uFlipV != 0) screenUv.y = 1.0 - screenUv.y;
+        vScreenUv = vec3((vCell + screenUv) / mainDiv, 1.0) * screenClip.w;
+    }
     vec2 multUv = aUv;
     vec2 centeredMultUv = (multUv - uUvTransformCenterMult) * uUvScaleMult;
     float multSin = sin(uUvRotationMult); float multCos = cos(uUvRotationMult);
@@ -453,6 +467,7 @@ in vec4 vMeshColor;
 in vec3 vColorDynamics;
 in vec3 vRim;
 in vec4 vReflect;
+in vec3 vScreenUv;
 uniform int uIsDistortion;
 uniform sampler2D uDistortionTex;
 uniform sampler2D uSceneTex;
@@ -570,6 +585,8 @@ void main(){
         fragColor = distortedScene(vUv, atlasUvRaw(vLocalUv, vCell, uTexDiv), uColor * vMeshColor);
         return;
     }
+    if (uUvMode == 1 && uSliceRange <= 0.0 && uShadowPass == 0)
+        vUv = vScreenUv.xy / vScreenUv.z;
     vec4 texel = (uHasTex != 0)
         ? texture(uTex, vUv)
         : vec4(1.0);

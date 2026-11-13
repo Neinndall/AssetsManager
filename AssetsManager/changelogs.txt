@@ -15,6 +15,7 @@ Bug Fixes
   - 3D Studio / Decode 16-bit half-float shader inputs bitwise so subnormal particle values remain accurate and no longer require the desktop packing extension.
   - 3D Studio / Preserve bind-pose owner transforms, socket attachments, and attached effect meshes when inspecting standalone systems or spells without a clip.
   - 3D Studio / Forward active clip state and playback progress to custom character shaders during map previews so animation-driven surface parameters update.
+  - 3D Studio / Support screen-space and separate-alpha UV modes accurately on the fallback particle mesh shader, matching native axis flips and atlas divisions.
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
