@@ -167,5 +167,26 @@ namespace AssetsManager.Tests.xUnit.Shaders
             Assert.Contains("out vec4 v_COLOR;\nvoid main()", output, StringComparison.Ordinal);
             Assert.Equal(1, output.Split("v_TEXCOORD;", StringSplitOptions.None).Length - 1);
         }
+
+        [Fact]
+        public void SafeHalfUnpackRewritesBuiltinWithoutTouchingCustomIdentifiersAndRemainsIdempotent()
+        {
+            string source = Preamble +
+                            "vec2 custom_unpackHalf2x16(uint v) { return vec2(float(v)); }\n" +
+                            "void main() { vec2 a = unpackHalf2x16(0x80010001u); vec2 b = custom_unpackHalf2x16(1u); }\n";
+            (string output, var applied) = GameShaderTranslator.PatchGlsl(
+                source,
+                GameShaderTranslator.Stage.Vertex,
+                Array.Empty<(string, uint)>());
+
+            Assert.Contains(GameShaderTranslator.AppliedPatch.SafeHalfUnpack, applied);
+            Assert.Contains("dxbcUnpackHalf2x16(0x80010001u)", output, StringComparison.Ordinal);
+            Assert.Contains("custom_unpackHalf2x16(1u)", output, StringComparison.Ordinal);
+            Assert.Equal(1, output.Split("dxbcUnpackHalf2x16(highp uint", StringSplitOptions.None).Length - 1);
+
+            (string second, int secondCount) = GameShaderTranslator.SafeHalfUnpack(output);
+            Assert.Equal(0, secondCount);
+            Assert.Equal(output, second);
+        }
     }
 }

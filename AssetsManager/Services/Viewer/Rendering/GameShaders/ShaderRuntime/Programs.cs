@@ -239,6 +239,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
         internal static string ToDesktopGlsl(string source)
         {
             string result = source ?? string.Empty;
+            (result, _) = GameShaderTranslator.SafeHalfUnpack(result);
             // ESSL 3.00 exposes packing builtins that GLSL 3.30 needs an explicit extension for.
             bool packing = Regex.IsMatch(result,
                 @"\b(?:pack|unpack)(?:Half2x16|Unorm2x16|Snorm2x16|Unorm4x8|Snorm4x8)\s*\(",

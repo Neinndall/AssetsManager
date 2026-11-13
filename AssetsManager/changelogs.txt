@@ -12,6 +12,7 @@ Bug Fixes
   - 3D Studio / Clamp scene color lookups and unbound shared textures on custom particle shaders so screen edges and missing inputs do not wrap.
   - 3D Studio / Invalidate stale scene color and depth captures after resource clears, resizes, or disabled channels in custom particle passes.
   - 3D Studio / Capture updated scene color after ground effects and before post-color custom particle passes across characters and map effects.
+  - 3D Studio / Decode 16-bit half-float shader inputs bitwise so subnormal particle values remain accurate and no longer require the desktop packing extension.
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 

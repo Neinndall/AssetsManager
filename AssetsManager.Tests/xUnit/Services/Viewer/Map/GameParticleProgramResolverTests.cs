@@ -602,6 +602,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Map
 
         [Theory]
         [InlineData("ASSETS/Shaders/HLSL/ParticleSystem/QUAD_VS_FixedAlphaUV.vs", "vs", GameShaderTranslator.AppliedPatch.BaseVertexZero)]
+        [InlineData("ASSETS/Shaders/HLSL/ParticleSystem/QUAD_VS.vs", "vs", GameShaderTranslator.AppliedPatch.SafeHalfUnpack)]
         [InlineData("Shaders/StaticMesh/Mantis_Env_Baked_PBR", "ps", GameShaderTranslator.AppliedPatch.MipLevelsOne)]
         public void EsUnsupportedQueriesTranslateAndCompileOnDesktopOpenGl(
             string shader,
