@@ -99,7 +99,8 @@ public sealed class AssetTrackerScannerService
             await limiter.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
             {
-                results.Add(await ProbeGeneratedUrlAsync(category, id, cancellationToken).ConfigureAwait(false));
+                foreach (AssetTrackerUrlProbeResult probe in await ProbeGeneratedUrlsAsync(category, id, cancellationToken).ConfigureAwait(false))
+                    results.Add(probe);
             }
             finally
             {
@@ -110,7 +111,7 @@ public sealed class AssetTrackerScannerService
         await Task.WhenAll(tasks).ConfigureAwait(false);
 
         var scanResult = new AssetTrackerScanResult();
-        foreach (AssetTrackerUrlProbeResult result in results.OrderBy(item => item.AssetId))
+        foreach (AssetTrackerUrlProbeResult result in results.OrderBy(item => item.AssetId).ThenBy(item => item.Url, StringComparer.Ordinal))
         {
             ApplyResult(category, result, DateTime.UtcNow, preserveAvailableOnUnavailable: false);
             scanResult.Add(result);
@@ -216,31 +217,58 @@ public sealed class AssetTrackerScannerService
         category.Entries[result.AssetId.Value] = entry;
     }
 
-    private async Task<AssetTrackerUrlProbeResult> ProbeGeneratedUrlAsync(
+    private async Task<IReadOnlyList<AssetTrackerUrlProbeResult>> ProbeGeneratedUrlsAsync(
         AssetCategory category,
         long assetId,
         CancellationToken cancellationToken)
     {
-        IReadOnlyList<string> extensions = category.Extensions?.Count > 0
-            ? category.Extensions
-            : new[] { category.Extension };
-        AssetTrackerUrlProbeResult last = null;
+        string[] extensions = ((IEnumerable<string>)(category.Extensions?.Count > 0 ? category.Extensions : new[] { category.Extension }))
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value.TrimStart('.'))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        string[] suffixes = (category.FileNameSuffixes ?? new() { "" })
+            .Where(value => value != null)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        if (suffixes.Length == 0) suffixes = new[] { "" };
 
-        foreach (string suffix in (category.FileNameSuffixes ?? new() { "" }).Where(value => value != null).Distinct(StringComparer.Ordinal))
-        foreach (string extension in extensions.Where(value => !string.IsNullOrWhiteSpace(value))
-                     .Distinct(StringComparer.OrdinalIgnoreCase))
+        var available = new List<AssetTrackerUrlProbeResult>();
+        AssetTrackerUrlProbeResult temporary = null;
+        AssetTrackerUrlProbeResult lastFailure = null;
+
+        foreach (string suffix in suffixes)
         {
-            string cleanExtension = extension.TrimStart('.');
-            string url = $"{category.BaseUrl}{assetId}{suffix}.{cleanExtension}";
-            last = await ProbeUrlAsync(assetId, url, cleanExtension, cancellationToken).ConfigureAwait(false);
-            if (last.IsAvailable || last.IsTemporaryFailure) return last;
+            foreach (string extension in extensions)
+            {
+                string url = $"{category.BaseUrl}{assetId}{suffix}.{extension}";
+                AssetTrackerUrlProbeResult probe = await ProbeUrlAsync(assetId, url, extension, cancellationToken).ConfigureAwait(false);
+                if (probe.IsAvailable)
+                {
+                    available.Add(probe);
+                    // One extension per suffix; keep checking remaining suffixes so base and _1/_2/_3 variants are all captured.
+                    break;
+                }
+                if (probe.IsTemporaryFailure)
+                {
+                    temporary ??= probe;
+                    if (available.Count == 0) return new[] { probe };
+                    break;
+                }
+                lastFailure = probe;
+            }
         }
 
-        return last ?? new AssetTrackerUrlProbeResult
+        if (available.Count > 0) return available;
+        if (temporary != null) return new[] { temporary };
+        return new[]
         {
-            AssetId = assetId,
-            Extension = category.Extension,
-            StatusCode = HttpStatusCode.NotFound
+            lastFailure ?? new AssetTrackerUrlProbeResult
+            {
+                AssetId = assetId,
+                Extension = category.Extension,
+                StatusCode = HttpStatusCode.NotFound
+            }
         };
     }
 

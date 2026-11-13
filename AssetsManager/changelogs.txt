@@ -5,6 +5,7 @@ HOTFIX UPDATE
 New Features
 
 Improvements
+  - Asset Tracker / Discover and retain _2 and _3 bundle filename variants alongside base and _1 images when scanning numeric bundle ranges.
 
 Changes
 

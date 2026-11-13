@@ -75,6 +75,44 @@ public sealed class AssetCatalogServiceTests
     }
 
     [Fact]
+    public async Task NumericBundleScanRetainsAllAvailableSuffixVariantsAcrossReload()
+    {
+        using var bridge = new AssetsManagerTestBridge();
+        using var http = Client(request =>
+        {
+            string path = request.RequestUri.AbsolutePath;
+            bool ok = path.EndsWith("99901653_1.png", StringComparison.Ordinal)
+                || path.EndsWith("99901653_2.png", StringComparison.Ordinal)
+                || path.EndsWith("99901658.png", StringComparison.Ordinal)
+                || path.EndsWith("99901658_1.png", StringComparison.Ordinal);
+            return Task.FromResult(Response(ok ? HttpStatusCode.OK : HttpStatusCode.Forbidden));
+        });
+        var service = Service(bridge, http);
+        var category = service.Categories.Single(item => item.Id == "2");
+        var targets = new[] { 99901653L, 99901658L }.Select(id => new TrackedAsset
+        {
+            AssetId = id,
+            CategoryId = category.Id,
+            Url = $"{category.BaseUrl}{id}.{category.Extension}",
+            IsGenerated = true
+        });
+
+        var result = await service.ScanAsync(category, targets, default);
+
+        Assert.Equal(4, result.Available);
+        var trackerRows = service.GetAssetListForCategory(category).Where(row => row.CanDownload).ToList();
+        Assert.Equal(4, trackerRows.Count);
+        Assert.Contains(trackerRows, row => row.Url.EndsWith("99901653_1.png", StringComparison.Ordinal));
+        Assert.Contains(trackerRows, row => row.Url.EndsWith("99901653_2.png", StringComparison.Ordinal));
+        Assert.Contains(trackerRows, row => row.Url.EndsWith("99901658.png", StringComparison.Ordinal));
+        Assert.Contains(trackerRows, row => row.Url.EndsWith("99901658_1.png", StringComparison.Ordinal));
+
+        var reloaded = Service(bridge, http);
+        var catalogRows = reloaded.GetCatalogAssets("2").Where(row => row.CanDownload).ToList();
+        Assert.Equal(4, catalogRows.Count);
+    }
+
+    [Fact]
     public async Task MultipleArticlesCanShareOneVerifiedImageWithoutLosingArticleIds()
     {
         using var bridge = new AssetsManagerTestBridge();
@@ -170,7 +208,8 @@ public sealed class AssetCatalogServiceTests
         using var http = Client(request =>
         {
             long id = AssetCatalogRouting.GetImageNumber(request.RequestUri.AbsoluteUri).Value;
-            return Task.FromResult(Response(id is 79900918 or 79900919 ? HttpStatusCode.NotFound : HttpStatusCode.OK));
+            bool baseOnly = !Path.GetFileNameWithoutExtension(request.RequestUri.AbsolutePath).Contains('_');
+            return Task.FromResult(Response(baseOnly && id is not (79900918 or 79900919) ? HttpStatusCode.OK : HttpStatusCode.NotFound));
         });
         var source = new Source();
         var service = Service(bridge, http, source);
@@ -222,8 +261,12 @@ public sealed class AssetCatalogServiceTests
     public async Task TwoFailuresPlusEightNewFailuresKeepExactlyNineteenThroughTwentyEight()
     {
         using var bridge = new AssetsManagerTestBridge();
-        using var http = Client(request => Task.FromResult(Response(AssetCatalogRouting.GetImageNumber(request.RequestUri.AbsoluteUri) < 19
-            ? HttpStatusCode.OK : HttpStatusCode.NotFound)));
+        using var http = Client(request =>
+        {
+            bool baseOnly = !Path.GetFileNameWithoutExtension(request.RequestUri.AbsolutePath).Contains('_');
+            return Task.FromResult(Response(baseOnly && AssetCatalogRouting.GetImageNumber(request.RequestUri.AbsoluteUri) < 19
+                ? HttpStatusCode.OK : HttpStatusCode.NotFound));
+        });
         var service = Service(bridge, http);
         var category = service.Categories.Single(item => item.Id == "1");
         category.Start = 1;

@@ -79,6 +79,30 @@ namespace AssetsManager.Tests.xUnit.Services.Monitor
             Assert.EndsWith("99901659_1.png", category.Entries.Single().Value.Url);
         }
 
+        [Fact]
+        public async Task NumericBundleDiscoveryFindsBaseAndMultipleSuffixVariants()
+        {
+            using var http = new HttpClient(new ProbeHandler(request =>
+                request.RequestUri.AbsolutePath.EndsWith("99901658.png", StringComparison.Ordinal)
+                || request.RequestUri.AbsolutePath.EndsWith("99901658_1.png", StringComparison.Ordinal)
+                || request.RequestUri.AbsolutePath.EndsWith("99901653_1.png", StringComparison.Ordinal)
+                || request.RequestUri.AbsolutePath.EndsWith("99901653_2.png", StringComparison.Ordinal)
+                || request.RequestUri.AbsolutePath.EndsWith("99901654_3.png", StringComparison.Ordinal)
+                    ? Response(HttpStatusCode.OK, "image/png")
+                    : Response(HttpStatusCode.Forbidden)));
+            var category = AssetsManager.Views.Models.Monitor.DefaultCategories.Get().Single(item => item.Id == "2");
+
+            var result = await new AssetTrackerScannerService(http).ScanAsync(category, new long[] { 99901653, 99901654, 99901658 }, default);
+
+            Assert.Equal(5, result.Available);
+            Assert.Equal(3, result.NewDiscoveries);
+            Assert.Contains(result.Results, item => item.Url.EndsWith("99901653_1.png", StringComparison.Ordinal) && item.IsAvailable);
+            Assert.Contains(result.Results, item => item.Url.EndsWith("99901653_2.png", StringComparison.Ordinal) && item.IsAvailable);
+            Assert.Contains(result.Results, item => item.Url.EndsWith("99901654_3.png", StringComparison.Ordinal) && item.IsAvailable);
+            Assert.Contains(result.Results, item => item.Url.EndsWith("99901658.png", StringComparison.Ordinal) && item.IsAvailable);
+            Assert.Contains(result.Results, item => item.Url.EndsWith("99901658_1.png", StringComparison.Ordinal) && item.IsAvailable);
+        }
+
         [Theory]
         [InlineData(HttpStatusCode.TooManyRequests)]
         [InlineData(HttpStatusCode.ServiceUnavailable)]
