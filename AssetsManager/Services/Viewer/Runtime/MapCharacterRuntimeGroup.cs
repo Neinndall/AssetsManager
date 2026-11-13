@@ -66,13 +66,68 @@ namespace AssetsManager.Services.Viewer.Runtime
         internal void SetPreviewClip(AnimationClipDefinition clip, MapCharacterData placement = null)
         {
             PreviewClip = clip;
-            var clips = (Animation?.PreparedClipPlaylist(clip) ?? Array.Empty<AnimationClipDefinition>())
-                .Prepend(clip).Where(item => item != null);
-            PreviewGameState = GameMaterialState.From(-1, null, clips.SelectMany(item =>
-                new[] { item.OwnerPathHash, GameMaterialState.AnimationHash(item.ClipName) }).Where(hash => hash != 0));
+            PreviewGameState = BuildPreviewGameState(clip);
             PreviewPlacement = placement ?? Placements?.FirstOrDefault();
             PreviewTimeSeconds = 0f;
             PreviewHiddenSubmeshes = new HashSet<uint>();
+        }
+
+        private GameMaterialState BuildPreviewGameState(AnimationClipDefinition clip)
+        {
+            if (clip == null)
+                return GameMaterialState.Resting with { Gear = -1 };
+
+            var animations = new HashSet<uint>();
+            var playback = new List<GameMaterialAnimation>();
+            IReadOnlyList<AnimationClipDefinition> playlist =
+                Animation?.PreparedClipPlaylist(clip) ?? Array.Empty<AnimationClipDefinition>();
+            IReadOnlyList<float> stepDurations =
+                Animation?.PreparedClipStepDurations(clip) ?? Array.Empty<float>();
+            float totalDuration = Animation?.PreparedClipDuration(clip) ?? 0f;
+            float passTime = 0f;
+
+            void AddPlaybackWindow(uint hash, float start, float duration)
+            {
+                if (hash == 0)
+                    return;
+                animations.Add(hash);
+                if (duration > 0f && float.IsFinite(duration))
+                {
+                    var entry = new GameMaterialAnimation(hash, start, duration);
+                    if (!playback.Contains(entry))
+                        playback.Add(entry);
+                }
+            }
+
+            for (int index = 0; index < playlist.Count; index++)
+            {
+                AnimationClipDefinition step = playlist[index];
+                if (step == null)
+                    continue;
+                float stepDuration = index < stepDurations.Count &&
+                                     float.IsFinite(stepDurations[index]) &&
+                                     stepDurations[index] > 0f
+                    ? stepDurations[index]
+                    : 0f;
+                AddPlaybackWindow(step.OwnerPathHash, passTime, stepDuration);
+                if (!string.IsNullOrWhiteSpace(step.ClipName))
+                    AddPlaybackWindow(GameMaterialState.AnimationHash(step.ClipName), passTime, stepDuration);
+                passTime += stepDuration;
+            }
+
+            float rootDuration = float.IsFinite(totalDuration) && totalDuration > 0f
+                ? totalDuration
+                : passTime;
+            AddPlaybackWindow(clip.OwnerPathHash, 0f, rootDuration);
+            if (!string.IsNullOrWhiteSpace(clip.ClipName))
+                AddPlaybackWindow(GameMaterialState.AnimationHash(clip.ClipName), 0f, rootDuration);
+
+            return new GameMaterialState(-1, new HashSet<string>(StringComparer.OrdinalIgnoreCase), animations)
+            {
+                AnimationPlayback = playback,
+                AnimationDuration = rootDuration,
+                LoopAnimation = true
+            };
         }
 
         internal void SetPreviewHiddenSubmeshes(IReadOnlySet<uint> hidden)
