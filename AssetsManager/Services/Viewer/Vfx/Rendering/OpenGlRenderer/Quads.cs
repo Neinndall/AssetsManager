@@ -20,7 +20,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             bool isDistortion = !_drawingShadows && es.Def.DrawsAsDistortion && !useWireframe;
             // The game draws the scene behind a distorting emitter at any strength, so it always needs the frame.
             bool warpsFrame = isDistortion;
-            if (warpsFrame && _capture.ColorTexture == 0) return;
+            if (warpsFrame && !HasValidColorCapture) return;
 
             var renderState = es.Def.RenderState ?? VfxEmitterRenderState.Default;
             _particleUniforms.Uniform2(_particleUniforms.TexDiv, es.Def.TexDiv.X <= 0 ? 1f : es.Def.TexDiv.X, es.Def.TexDiv.Y <= 0 ? 1f : es.Def.TexDiv.Y);
@@ -131,7 +131,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _particleUniforms.Uniform1(_particleUniforms.ErosionFeatherIn, erosionDefinition?.FeatherIn ?? 0f);
             _particleUniforms.Uniform1(_particleUniforms.ErosionFeatherOut, erosionDefinition?.FeatherOut ?? 0f);
             _particleUniforms.Uniform1(_particleUniforms.ErosionSliceWidth, erosionDefinition?.SliceWidth ?? 1.5f);
-            bool useSoftParticles = ShouldUseSoftParticles(es.Def, _capture.DepthTexture != 0);
+            bool useSoftParticles = ShouldUseSoftParticles(es.Def, HasValidDepthCapture);
             _particleUniforms.Uniform1(_particleUniforms.HasSoftParticle, useSoftParticles ? 1 : 0);
             Vector4 softParams = ResolveSoftParticleParams(es.Def.SoftParticle);
             Vector4 softControl = ResolveSoftParticleControl(es.Def.SoftParticle?.Target ?? 0);
@@ -154,7 +154,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                     BindStockSampler(1, es.Def.TextureMultAddressMode);
                     _gl.ActiveTexture(TextureUnit.Texture0);
                 }
-                if (_capture.ColorTexture != 0)
+                if (HasValidColorCapture)
                 {
                     _gl.ActiveTexture(TextureUnit.Texture2);
                     _gl.BindTexture(TextureTarget.Texture2D, _capture.ColorTexture);
@@ -178,7 +178,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                     BindStockSampler(4, 2);
                     _gl.ActiveTexture(TextureUnit.Texture0);
                 }
-                if (_capture.DepthTexture != 0)
+                if (HasValidDepthCapture)
                 {
                     _gl.ActiveTexture(TextureUnit.Texture6);
                     _gl.BindTexture(TextureTarget.Texture2D, _capture.DepthTexture);

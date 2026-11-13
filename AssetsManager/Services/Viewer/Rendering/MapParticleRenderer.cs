@@ -36,8 +36,7 @@ namespace AssetsManager.Services.Viewer.Rendering
         private uint _preparedViewportWidth;
         private uint _preparedViewportHeight;
         private bool _preparedShaded;
-        private bool _preparedSoftDepth;
-        private bool _preparedSceneColor;
+        private VfxOpenGlRenderer.VfxPreparedSceneInputs _preparedInputs;
         private bool _preparedWireframe;
         private float _preparedWireOpacity;
         private bool _ready;
@@ -46,9 +45,21 @@ namespace AssetsManager.Services.Viewer.Rendering
         bool IPreparedParticlePass.HasPreparedGroundPass => _preparedShaded && _ground.Exists(
             entry => entry.Emitter.IsVisible && !entry.Emitter.Def.Disabled && entry.Emitter.InstanceCount > 0);
         bool IPreparedParticlePass.HasPreparedEarlyDistortion => _preparedShaded && _earlyDistortion.Count > 0;
-        bool IPreparedParticlePass.NeedsPreparedSceneCapture => _preparedShaded && (_preparedSoftDepth || _preparedSceneColor);
+        bool IPreparedParticlePass.NeedsPreparedSceneCapture => _preparedShaded && (_preparedInputs.NeedsDepth || _preparedInputs.NeedsInitialColor);
+        bool IPreparedParticlePass.NeedsPreparedPostGroundColorCapture => _preparedShaded && _preparedInputs.NeedsPostGroundColor;
+        bool IPreparedParticlePass.NeedsPreparedPostColorCapture => _preparedShaded && _preparedInputs.NeedsPostColor;
         public void CapturePreparedSceneInputs()
-            => _renderer.CaptureScene(_preparedViewportWidth, _preparedViewportHeight, _preparedSceneColor, _preparedSoftDepth);
+            => _renderer.CapturePreparedInitialInputs(_preparedViewportWidth, _preparedViewportHeight, _preparedShaded, in _preparedInputs);
+        public void CapturePreparedPostGroundColorInputs()
+        {
+            if (_preparedShaded && _preparedInputs.NeedsPostGroundColor)
+                _renderer.CaptureScene(_preparedViewportWidth, _preparedViewportHeight, true, false);
+        }
+        public void CapturePreparedPostColorInputs()
+        {
+            if (_preparedShaded && _preparedInputs.NeedsPostColor)
+                _renderer.CaptureScene(_preparedViewportWidth, _preparedViewportHeight, true, false);
+        }
         bool IPreparedParticlePass.HasPreparedShadowCasters => _preparedShaded && _queue.Exists(e =>
             e.Emitter.IsVisible && !e.Emitter.Def.Disabled && e.Emitter.InstanceCount > 0 && VfxRenderPhaseSemantics.CastsShadow(e.Emitter.Def));
         void IPreparedParticlePass.RenderPreparedShadowPass(Matrix4x4 lightViewProjection, Matrix4x4 eyeView)
@@ -84,9 +95,11 @@ namespace AssetsManager.Services.Viewer.Rendering
             CapturePreparedEarlyDistortionFrame();
             RenderPreparedEarlyDistortionPass();
             RenderPreparedGroundPass();
+            CapturePreparedPostGroundColorInputs();
             RenderPreparedColorPass();
             CapturePreparedDistortionFrame();
             RenderPreparedDistortionPass();
+            CapturePreparedPostColorInputs();
             RenderPreparedPostColorPass();
         }
 
@@ -108,15 +121,17 @@ namespace AssetsManager.Services.Viewer.Rendering
             bool wireOverlay = false)
         {
             _preparedStencilScene = null;
-            if (!_ready || runtimes == null || runtimes.Count == 0)
+            if (!_ready) return false;
+            if (runtimes == null || runtimes.Count == 0)
+            {
+                _renderer.InvalidateSceneCaptures();
                 return false;
+            }
 
             _sources.Clear();
             _graphs.Clear();
             _drawGroups.Clear();
             _drawCapacities.Clear();
-            bool needsSoftParticles = false;
-            bool needsSceneColor = false;
             foreach (MapParticleRuntime mapRuntime in runtimes)
             {
                 VfxPlaybackGraphRuntime graph = mapRuntime?.Graph;
@@ -132,26 +147,16 @@ namespace AssetsManager.Services.Viewer.Rendering
                 _drawGroups[graph] = mapRuntime.DrawGroupKey;
                 _drawCapacities[mapRuntime.DrawGroupKey] = mapRuntime.SharedDrawCapacity;
                 foreach (VfxPlaybackRuntime runtime in graph.Runtimes)
-                {
-                    IReadOnlyList<VfxPlaybackRuntime.EmitterState> emitters = runtime.Emitters;
-                    _sources.Add(emitters);
-                    if (needsSoftParticles && needsSceneColor) continue;
-                    foreach (VfxPlaybackRuntime.EmitterState emitter in emitters)
-                    {
-                        if (!emitter.IsVisible || emitter.InstanceCount == 0) continue;
-                        var inputs = _renderer.SceneInputsFor(emitter.Def);
-                        needsSoftParticles |= inputs.Depth;
-                        needsSceneColor |= inputs.Color;
-                    }
-                }
+                    _sources.Add(runtime.Emitters);
             }
 
             if (_sources.Count == 0)
+            {
+                _renderer.InvalidateSceneCaptures();
                 return false;
+            }
 
             _uploader.UploadPendingResources(_graphs, _renderer);
-            _preparedSoftDepth = needsSoftParticles;
-            _preparedSceneColor = needsSceneColor;
             _renderer.SharedDrawGroups = _drawGroups;
             _renderer.SharedDrawCapacities = _drawCapacities;
             VfxRenderQueue.BuildInto(_sources, _queue, _graphOrders, _drawGroups);
@@ -165,23 +170,14 @@ namespace AssetsManager.Services.Viewer.Rendering
             _preparedWireframe = previewPasses.Wireframe;
             _preparedWireOpacity = previewPasses.WireOpacity;
 
-            _shaded.Clear();
-            _ground.Clear();
-            _distortion.Clear();
-            _earlyDistortion.Clear();
-            _postColor.Clear();
-            foreach (VfxRenderQueueEntry entry in _queue)
-            {
-                VfxRenderPhases phases = VfxRenderPhaseSemantics.Resolve(entry.Emitter.Def, entry.Emitter.HudLayer);
-                if (phases.EarlyDistortion) _earlyDistortion.Add(entry);
-                if (phases.LateDistortion) _distortion.Add(entry);
-                if (phases.Under)
-                {
-                    if (entry.Emitter.Def.IsGroundLayer) _ground.Add(entry);
-                    else _shaded.Add(entry);
-                }
-                if (phases.Over) _postColor.Add(entry);
-            }
+            _preparedInputs = _renderer.BuildPreparedPhaseQueues(
+                _queue,
+                _ground,
+                _shaded,
+                _earlyDistortion,
+                _distortion,
+                _postColor);
+            _renderer.SyncPreparedSceneCaptures(_preparedShaded, in _preparedInputs);
             return _queue.Count > 0;
         }
 

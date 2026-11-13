@@ -39,6 +39,19 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
         }
 
         [Fact]
+        public void GroundStillCapturesSceneInputsBeforeGroundWhenDepthCallbackIsOmitted()
+        {
+            var log = new List<string>();
+            var passes = new IPreparedParticlePass[] { new RecordingPass("actor", log, ground: true) };
+
+            PreparedParticlePasses.Render(passes, new List<IDisposable>(), () => log.Add("characters"));
+
+            Assert.True(log.IndexOf("actor:depth") >= 0);
+            Assert.True(log.IndexOf("actor:depth") < log.IndexOf("actor:ground"));
+            Assert.True(log.IndexOf("actor:ground") < log.IndexOf("characters"));
+        }
+
+        [Fact]
         public void CharactersStillDrawWithoutParticles()
         {
             int drawn = 0;

@@ -101,7 +101,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             bool isDistortion = !_drawingShadows && es.Def.DrawsAsDistortion && !wireframePass;
             // The game draws the scene behind a distorting emitter at any strength, so it always needs the frame.
             bool warpsFrame = isDistortion;
-            if (warpsFrame && _capture.ColorTexture == 0) return;
+            if (warpsFrame && !HasValidColorCapture) return;
             EnsureMeshProgram();
             bool native = UseGameParticle(es, true, passIndex, wireframePass);
             _meshUniforms.Uniform1(_meshUniforms.ShadowPass, _drawingShadows ? 1 : 0);
@@ -289,7 +289,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 _gl.BindTexture(TextureTarget.TextureCubeMap, es.ReflectionTexture);
                 _gl.ActiveTexture(TextureUnit.Texture0);
             }
-            bool meshUsesSoftParticles = ShouldUseSoftParticles(es.Def, _capture.DepthTexture != 0);
+            bool meshUsesSoftParticles = ShouldUseSoftParticles(es.Def, HasValidDepthCapture);
             _meshUniforms.Uniform1(_meshUniforms.HasSoftParticle, meshUsesSoftParticles ? 1 : 0);
             Vector4 meshSoftParams = ResolveSoftParticleParams(es.Def.SoftParticle);
             Vector4 meshSoftControl = ResolveSoftParticleControl(es.Def.SoftParticle?.Target ?? 0);
@@ -300,7 +300,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _meshUniforms.Uniform2(_meshUniforms.ViewportSize, (float)_capture.Width, (float)_capture.Height);
             if (!native)
             {
-                if (_capture.DepthTexture != 0)
+                if (HasValidDepthCapture)
                 {
                     _gl.ActiveTexture(TextureUnit.Texture6);
                     _gl.BindTexture(TextureTarget.Texture2D, _capture.DepthTexture);

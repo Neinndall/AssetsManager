@@ -12,14 +12,25 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
     public sealed partial class VfxRenderSession
     {
         private VfxStencilScene _preparedStencilScene;
-        private bool _preparedSoftDepth;
-        private bool _preparedSceneColor;
+        private VfxOpenGlRenderer.VfxPreparedSceneInputs _preparedInputs;
         bool IPreparedParticlePass.HasPreparedGroundPass => _preparedShaded && _groundRenderQueue.Exists(
             entry => entry.Emitter.IsVisible && !entry.Emitter.Def.Disabled && entry.Emitter.InstanceCount > 0);
         bool IPreparedParticlePass.HasPreparedEarlyDistortion => _preparedShaded && _earlyDistortionRenderQueue.Count > 0;
-        bool IPreparedParticlePass.NeedsPreparedSceneCapture => _preparedShaded && (_preparedSoftDepth || _preparedSceneColor);
+        bool IPreparedParticlePass.NeedsPreparedSceneCapture => _preparedShaded && (_preparedInputs.NeedsDepth || _preparedInputs.NeedsInitialColor);
+        bool IPreparedParticlePass.NeedsPreparedPostGroundColorCapture => _preparedShaded && _preparedInputs.NeedsPostGroundColor;
+        bool IPreparedParticlePass.NeedsPreparedPostColorCapture => _preparedShaded && _preparedInputs.NeedsPostColor;
         public void CapturePreparedSceneInputs()
-            => _renderer.CaptureScene(_viewportWidth, _viewportHeight, _preparedSceneColor, _preparedSoftDepth);
+            => _renderer.CapturePreparedInitialInputs(_viewportWidth, _viewportHeight, _preparedShaded, in _preparedInputs);
+        public void CapturePreparedPostGroundColorInputs()
+        {
+            if (_preparedShaded && _preparedInputs.NeedsPostGroundColor)
+                _renderer.CaptureScene(_viewportWidth, _viewportHeight, true, false);
+        }
+        public void CapturePreparedPostColorInputs()
+        {
+            if (_preparedShaded && _preparedInputs.NeedsPostColor)
+                _renderer.CaptureScene(_viewportWidth, _viewportHeight, true, false);
+        }
         bool IPreparedParticlePass.HasPreparedShadowCasters => _preparedShaded && _renderQueue.Exists(e =>
             e.Emitter.IsVisible && !e.Emitter.Def.Disabled && e.Emitter.InstanceCount > 0 && VfxRenderPhaseSemantics.CastsShadow(e.Emitter.Def));
         void IPreparedParticlePass.RenderPreparedShadowPass(Matrix4x4 lightViewProjection, Matrix4x4 eyeView)
@@ -39,9 +50,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             CapturePreparedEarlyDistortionFrame();
             RenderPreparedEarlyDistortionPass();
             RenderPreparedGroundPass();
+            CapturePreparedPostGroundColorInputs();
             RenderPreparedColorPass();
             CapturePreparedDistortionFrame();
             RenderPreparedDistortionPass();
+            CapturePreparedPostColorInputs();
             RenderPreparedPostColorPass();
         }
 
@@ -93,28 +106,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
 
             _gpuResourceUploader.UploadPendingResources(_graphs, _renderer, retainedGraphs: RetainedConditionGraphs());
             _renderSources.Clear();
-            bool needsSoftParticles = false;
-            bool needsSceneColor = false;
             foreach (VfxPlaybackGraphRuntime graph in _graphs)
             {
                 foreach (VfxPlaybackRuntime runtime in graph.Runtimes)
-                {
-                    IReadOnlyList<VfxPlaybackRuntime.EmitterState> emitters = runtime.Emitters;
-                    _renderSources.Add(emitters);
-                    if (needsSoftParticles && needsSceneColor) continue;
-
-                    foreach (VfxPlaybackRuntime.EmitterState emitter in emitters)
-                    {
-                        if (!emitter.IsVisible || emitter.InstanceCount == 0) continue;
-                        var inputs = _renderer.SceneInputsFor(emitter.Def);
-                        needsSoftParticles |= inputs.Depth;
-                        needsSceneColor |= inputs.Color;
-                    }
-                }
+                    _renderSources.Add(runtime.Emitters);
             }
 
-            _preparedSoftDepth = needsSoftParticles;
-            _preparedSceneColor = needsSceneColor;
             VfxRenderQueue.BuildInto(_renderSources, _renderQueue, _renderGraphOrders);
 
             var previewPasses = ResolvePreviewPasses(viewMode, wireOverlay, _renderer.SupportsWireframe);
@@ -124,23 +121,14 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             _preparedWireframe = previewPasses.Wireframe;
             _preparedWireOpacity = previewPasses.WireOpacity;
 
-            _shadedRenderQueue.Clear();
-            _groundRenderQueue.Clear();
-            _distortionRenderQueue.Clear();
-            _earlyDistortionRenderQueue.Clear();
-            _postColorRenderQueue.Clear();
-            foreach (VfxRenderQueueEntry entry in _renderQueue)
-            {
-                VfxRenderPhases phases = VfxRenderPhaseSemantics.Resolve(entry.Emitter.Def, entry.Emitter.HudLayer);
-                if (phases.EarlyDistortion) _earlyDistortionRenderQueue.Add(entry);
-                if (phases.LateDistortion) _distortionRenderQueue.Add(entry);
-                if (phases.Under)
-                {
-                    if (entry.Emitter.Def.IsGroundLayer) _groundRenderQueue.Add(entry);
-                    else _shadedRenderQueue.Add(entry);
-                }
-                if (phases.Over) _postColorRenderQueue.Add(entry);
-            }
+            _preparedInputs = _renderer.BuildPreparedPhaseQueues(
+                _renderQueue,
+                _groundRenderQueue,
+                _shadedRenderQueue,
+                _earlyDistortionRenderQueue,
+                _distortionRenderQueue,
+                _postColorRenderQueue);
+            _renderer.SyncPreparedSceneCaptures(_preparedShaded, in _preparedInputs);
             return _renderQueue.Count > 0;
         }
 

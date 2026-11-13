@@ -101,7 +101,8 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                 if (texture.HasValue && textureTargets != null &&
                     textureTargets.TryGetValue(texture.Value, out TextureTarget actual) && actual != target)
                     texture = null;
-                if (!texture.HasValue || texture.Value == 0)
+                bool isNeutralFallback = !texture.HasValue || texture.Value == 0;
+                if (isNeutralFallback)
                 {
                     if (!emitter.HasResolvedCustomMaterial && sampler.Dimension == GameShaderTranslator.TextureDimension.Texture2D &&
                         own is "TEXTURE" or "TEXTUREMULT" or "PARTICLE_COLOR_TEXTURE" or "sPalettesTexture" or "sAlphaErosionTexture")
@@ -115,10 +116,16 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                 // VFX decoded textures carry one level, as in LTK's useVfxTextures.
                 int mode = GameParticleProgramResolver.TextureAddressMode(emitter, own);
                 uint samplerObject;
-                // The shared depth capture keeps point sampling; emitter samplers must not interpolate geometry depths.
-                if (sampler.TextureName == SceneDepthTexture && sampler.Dimension == GameShaderTranslator.TextureDimension.Texture2D)
-                    samplerObject = ResolveNeutralSampler(clamp: true, nearest: true);
-                else if (sampler.Dimension == GameShaderTranslator.TextureDimension.Buffer)
+                bool isSharedSceneDepth = sampler.TextureName == SceneDepthTexture &&
+                    sampler.Dimension == GameShaderTranslator.TextureDimension.Texture2D;
+                bool isSharedSceneColor = sampler.TextureName == SceneColorTexture &&
+                    sampler.Dimension == GameShaderTranslator.TextureDimension.Texture2D;
+                // Shared scene depth keeps point sampling and shared scene color clamps edges cleanly;
+                // neither may fall back to an authored wrap sampler or repeat particle address mode.
+                if (isSharedSceneDepth || isSharedSceneColor)
+                    samplerObject = ResolveNeutralSampler(clamp: true, nearest: isSharedSceneDepth);
+                else if (sampler.Dimension == GameShaderTranslator.TextureDimension.Buffer ||
+                    (isNeutralFallback && sampler.TextureName.EndsWith(SharedTextureSuffix, StringComparison.Ordinal)))
                     samplerObject = ResolveNeutralSampler(true, sampler.Dimension);
                 else if (emitter.HasResolvedCustomMaterial && declared?.Sampler != null)
                     samplerObject = ResolveParticleSampler(declared.Sampler);

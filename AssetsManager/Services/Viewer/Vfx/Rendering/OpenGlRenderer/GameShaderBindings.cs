@@ -133,8 +133,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 !string.IsNullOrWhiteSpace(emitter.Def.AlphaErosion?.TexturePath) ? _textures.FallbackTransparentTexture : null,
             "NORMAL_MAP" => emitter.DistortionTexture != 0 ? emitter.DistortionTexture : _textures.FallbackTransparentTexture,
             "REFLECTION_MAP" or "REFLECTION_MAP_TX" => emitter.ReflectionTexture != 0 ? emitter.ReflectionTexture : null,
-            "sDepthTexture_SharedTexture" => _capture.DepthTexture != 0 ? _capture.DepthTexture : null,
-            "SAMPLER_BACK_BUFFER_COPY_SharedTexture" => _capture.ColorTexture != 0 ? _capture.ColorTexture : null,
+            "sDepthTexture_SharedTexture" => HasValidDepthCapture ? _capture.DepthTexture : null,
+            "SAMPLER_BACK_BUFFER_COPY_SharedTexture" => HasValidColorCapture ? _capture.ColorTexture : null,
             _ => emitter.ProgramTextures.TryGetValue(name, out uint texture) && texture != 0 ? texture : null
         };
     }
