@@ -20,6 +20,13 @@ namespace AssetsManager.Services.Viewer.Semantics
         internal static bool MapCharacterClipOwnsVfxRenderer(bool hasActiveClip, bool groupHasPreviewClip) =>
             hasActiveClip || groupHasPreviewClip;
 
+        internal static bool ShouldHoldOwnerBindPose(
+            bool isBindPoseClip,
+            bool hasSelectedSystem,
+            bool hasSelectedSpell,
+            bool hasCurrentAnimation) =>
+            !hasCurrentAnimation && (isBindPoseClip || hasSelectedSystem || hasSelectedSpell);
+
         internal static void RotateSelectedActors(IEnumerable<StudioSceneActor> actors, double deltaSeconds, string backdropKey)
         {
             foreach (StudioSceneActor actor in actors)

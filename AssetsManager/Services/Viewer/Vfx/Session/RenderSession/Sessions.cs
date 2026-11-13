@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 using AssetsManager.Services.Viewer.Vfx.Runtime;
 using AssetsManager.Views.Models.Viewer;
@@ -8,6 +9,15 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
 {
     public sealed partial class VfxRenderSession
     {
+        private void ResetOwnerRenderState()
+        {
+            _ownerSkinningMatrices = null;
+            _ownerHiddenSubmeshes = _ownerSceneContext?.InitialHiddenSubmeshHashes?.ToArray();
+            if (!_ready) return;
+            _renderer.SetOwnerSkinningMatrices(null);
+            _renderer.SetOwnerHiddenSubmeshes(_ownerHiddenSubmeshes);
+        }
+
         public void SetSystem(VfxSystemModel system)
         {
             _waitForInitialResources = system != null;
@@ -31,11 +41,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             _lastRigOrigin = null;
             _boneTransformProvider = null;
             _boneTransformSampler = null;
-            if (_ready)
-            {
-                _renderer.SetOwnerSkinningMatrices(null);
-                _renderer.SetOwnerHiddenSubmeshes(_ownerSceneContext?.InitialHiddenSubmeshHashes);
-            }
+            ResetOwnerRenderState();
             if (system != null)
             {
                 system.CurrentTime = 0;
@@ -114,12 +120,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             _boneTransformProvider = null;
             _boneTransformSampler = null;
 
+            ResetOwnerRenderState();
             if (_ready)
-            {
-                _renderer.SetOwnerSkinningMatrices(null);
-                _renderer.SetOwnerHiddenSubmeshes(_ownerSceneContext?.InitialHiddenSubmeshHashes);
                 QueueGpuResourcePurge();
-            }
 
             double duration = Math.Max(0.1d, animationDuration);
             AddIdleEffects(idleEffects, systems, resourceMap, searchDirectory, ownerSceneContext);
@@ -183,11 +186,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             _isPlaying = false;
             _usesStandaloneRig = false;
             _ownerSceneContext = ownerSceneContext;
-            if (_ready)
-            {
-                _renderer.SetOwnerSkinningMatrices(null);
-                _renderer.SetOwnerHiddenSubmeshes(_ownerSceneContext?.InitialHiddenSubmeshHashes);
-            }
+            ResetOwnerRenderState();
             _graph = null;
             _graphs.Clear();
             _graphPlacements.Clear();

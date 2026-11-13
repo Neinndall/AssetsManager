@@ -7,6 +7,7 @@ using System.Windows.Media.Media3D;
 using AssetsManager.Services.Viewer.Animation;
 using AssetsManager.Services.Viewer.Interaction;
 using AssetsManager.Services.Viewer.Rendering;
+using AssetsManager.Services.Viewer.Semantics;
 using AssetsManager.Services.Viewer.Vfx.Rendering;
 using AssetsManager.Services.Viewer.Vfx.Resources;
 using AssetsManager.Services.Viewer.Vfx.Session;
@@ -668,11 +669,15 @@ namespace AssetsManager.Views.Controls.Viewer
                     return null;
                 });
             }
-            else if (_model.SelectedAnimation?.IsBindPose == true)
+            else if (CharacterViewportSemantics.ShouldHoldOwnerBindPose(
+                _model.SelectedAnimation?.IsBindPose == true,
+                _model.SelectedSystem != null,
+                _model.SelectedSpell != null,
+                _championModel.CurrentAnimation != null))
             {
                 ApplyChampionBindPose();
             }
-            else if (_model.SelectedSystem == null)
+            else
             {
                 _vfxRenderer?.SetOwnerSkinningMatrices(null);
                 _vfxRenderer?.UpdateBoneTransforms(null);

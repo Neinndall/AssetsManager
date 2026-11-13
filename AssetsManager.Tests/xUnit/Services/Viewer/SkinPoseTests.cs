@@ -317,6 +317,25 @@ public sealed class SkinPoseTests
         Assert.Equal(0.2, spring.UntilSeconds.Value, 6);
     }
 
+    [Fact]
+    public void BindBoneTransformResolvesSocketsUsingPoseDefinition()
+    {
+        RigResource skeleton = Rig();
+        var definition = new SkinPoseDefinition
+        {
+            Sockets = new[]
+            {
+                new SkinSocketDefinition("Anchor", SkinSocketKind.Joint, H("Hand"), new Vector3(1, 0, 0)),
+                new SkinSocketDefinition("WorldSocket", SkinSocketKind.World, 0, new Vector3(4, 5, 6))
+            }
+        };
+
+        Assert.True(AnimationService.TryGetBindBoneTransform(skeleton, "Anchor", out Matrix4x4 socket, definition));
+        Near(new(3, 0, 0), socket.Translation);
+        Assert.True(AnimationService.TryGetBindBoneTransform(skeleton, "WorldSocket", out Matrix4x4 world, definition));
+        Near(new(4, 5, 6), world.Translation);
+    }
+
     private static RigResource Rig()
     {
         var builder = new RigResourceBuilder();

@@ -482,7 +482,11 @@ namespace AssetsManager.Views.Controls.Viewer
             ApplyCharacterPlacement();
             _model.LogMessages.Add($"[CHAMPION MESH] Model loaded for 3D Studio: {Path.GetFileName(sknPath)} (Skeleton: {(boneCount > 0 ? $"{boneCount} bones" : "None")})");
             InvalidateChampionBindPose();
-            if (_model.SelectedSystem != null && _model.SelectedAnimation == null && _model.SelectedSpell == null)
+            if (CharacterViewportSemantics.ShouldHoldOwnerBindPose(
+                _model.SelectedAnimation?.IsBindPose == true,
+                _model.SelectedSystem != null,
+                _model.SelectedSpell != null,
+                _championModel.CurrentAnimation != null))
                 ApplyChampionBindPose();
 
             // The catalog may already be available from BIN load. Rebuild only when needed.

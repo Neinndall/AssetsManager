@@ -470,13 +470,10 @@ namespace AssetsManager.Services.Viewer.Animation
                 byHash.TryAdd(Elf.HashLower(name), transform);
             }
 
-            var sockets = new SkinSocketResolver(definition ?? SkinPoseDefinition.Empty, world,
-                hash =>
-                {
-                    for (int i = 0; i < skeleton.Joints.Count; i++)
-                        if (Fnv1a.HashLower(skeleton.Joints[i].Name) == hash || Elf.HashLower(skeleton.Joints[i].Name) == hash) return i;
-                    return -1;
-                });
+            var sockets = new SkinSocketResolver(
+                definition ?? SkinPoseDefinition.Empty,
+                world,
+                hash => FindJointIndexByHash(skeleton, hash));
             return (name, hash) =>
             {
                 if (!string.IsNullOrWhiteSpace(name) && byName.TryGetValue(name, out Matrix4x4 named))
@@ -501,24 +498,38 @@ namespace AssetsManager.Services.Viewer.Animation
         internal static bool TryGetBindBoneTransform(
             RigResource skeleton,
             string boneName,
-            out Matrix4x4 transform)
+            out Matrix4x4 transform,
+            SkinPoseDefinition definition = null)
         {
             transform = Matrix4x4.Identity;
-            if (skeleton == null || string.IsNullOrWhiteSpace(boneName)) return false;
+            if (skeleton?.Joints == null || skeleton.Joints.Count == 0 || string.IsNullOrWhiteSpace(boneName))
+                return false;
 
-            int jointIndex = -1;
+            Matrix4x4[] world = CreateBindWorldTransforms(skeleton);
             for (int index = 0; index < skeleton.Joints.Count; index++)
             {
                 if (string.Equals(skeleton.Joints[index].Name, boneName, StringComparison.OrdinalIgnoreCase))
                 {
-                    jointIndex = index;
-                    break;
+                    transform = world[index];
+                    return true;
                 }
             }
-            if (jointIndex < 0) return false;
 
-            transform = CreateBindWorldTransforms(skeleton)[jointIndex];
-            return true;
+            if (definition is not { Sockets.Count: > 0 })
+                return false;
+
+            var sockets = new SkinSocketResolver(definition, world, hash => FindJointIndexByHash(skeleton, hash));
+            return sockets.TryResolve(boneName, 0, world, out transform);
+        }
+
+        private static int FindJointIndexByHash(RigResource skeleton, uint hash)
+        {
+            for (int i = 0; i < skeleton.Joints.Count; i++)
+            {
+                if (Fnv1a.HashLower(skeleton.Joints[i].Name) == hash || Elf.HashLower(skeleton.Joints[i].Name) == hash)
+                    return i;
+            }
+            return -1;
         }
 
         internal static Matrix4x4[] CreateBindWorldTransforms(RigResource skeleton)

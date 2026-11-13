@@ -107,6 +107,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
         private Vector3? _lastRigOrigin;
         private Matrix4x4 _worldTransform = Matrix4x4.Identity;
         private VfxOwnerSceneContext _ownerSceneContext;
+        private Matrix4x4[] _ownerSkinningMatrices;
+        private uint[] _ownerHiddenSubmeshes;
         private float? _pinnedBirthChance;
         public VfxEffectsQuality EffectsQuality { get; private set; } = VfxEffectsQuality.VeryHigh;
         private Vector3 _flexChannels;
@@ -250,6 +252,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             _renderer.AlignSurfaceEffects = _alignSurfaceEffects;
             _renderer.Initialize(gl, settings);
             _renderer.SetOwnerWorldTransform(_worldTransform);
+            _renderer.SetOwnerSkinningMatrices(_ownerSkinningMatrices);
+            _renderer.SetOwnerHiddenSubmeshes(_ownerHiddenSubmeshes);
             _ready = true;
         }
 
@@ -429,6 +433,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
         /// </summary>
         public void SetOwnerSkinningMatrices(Matrix4x4[] matrices)
         {
+            _ownerSkinningMatrices = matrices;
             if (!_ready) return;
             _renderer.SetOwnerSkinningMatrices(matrices);
         }
@@ -439,8 +444,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
         /// </summary>
         public void SetOwnerHiddenSubmeshes(IEnumerable<uint> hashes)
         {
+            _ownerHiddenSubmeshes = hashes?.ToArray();
             if (!_ready) return;
-            _renderer.SetOwnerHiddenSubmeshes(hashes);
+            _renderer.SetOwnerHiddenSubmeshes(_ownerHiddenSubmeshes);
         }
 
     }

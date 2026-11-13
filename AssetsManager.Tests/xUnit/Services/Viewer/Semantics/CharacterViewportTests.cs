@@ -287,5 +287,29 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Semantics
             Assert.Equal(meshWorld.M43, vfxPlacement.M43, 4);
             Assert.Equal(meshWorld.M44, vfxPlacement.M44, 4);
         }
+
+        [Theory]
+        [InlineData(true, false, false, false, true)]
+        [InlineData(false, true, false, false, true)]
+        [InlineData(false, false, true, false, true)]
+        [InlineData(false, false, false, false, false)]
+        [InlineData(true, false, false, true, false)]
+        [InlineData(false, true, false, true, false)]
+        [InlineData(false, false, true, true, false)]
+        public void ShouldHoldOwnerBindPoseCoversBindPoseClipStandaloneSystemAndBindPoseSpell(
+            bool isBindPoseClip,
+            bool hasSelectedSystem,
+            bool hasSelectedSpell,
+            bool hasCurrentAnimation,
+            bool expected)
+        {
+            Assert.Equal(
+                expected,
+                CharacterViewportSemantics.ShouldHoldOwnerBindPose(
+                    isBindPoseClip,
+                    hasSelectedSystem,
+                    hasSelectedSpell,
+                    hasCurrentAnimation));
+        }
     }
 }
