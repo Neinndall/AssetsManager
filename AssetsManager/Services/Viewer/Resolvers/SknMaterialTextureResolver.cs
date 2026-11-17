@@ -1590,7 +1590,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
                     texturePath,
                     ReadWrap(sampler.Properties, AddressU),
                     ReadWrap(sampler.Properties, AddressV),
-                    usesShaderDefaultTexture);
+                    usesShaderDefaultTexture || string.IsNullOrEmpty(texturePath));
                 if (samplerIndices.TryGetValue(textureName, out int existingIndex))
                     result[existingIndex] = parsedSampler;
                 else

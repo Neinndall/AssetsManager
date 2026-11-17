@@ -836,6 +836,61 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
         }
 
         [Fact]
+        public void ReadMetadata_OmittedSamplerTexturePathUsesShaderDefaultAndPreservesWrap()
+        {
+            const string materialPath = "Characters/Test/Skins/Base/Materials/Body";
+            const string shaderPath = "Shaders/Test/DefaultSampler";
+            const string defaultTexturePath = "ASSETS/Characters/Test/Shader_Default_TX_CM.tex";
+            uint shaderHash = Fnv1a.HashLower(shaderPath);
+
+            BinTreeEmbedded samplerWithoutPath = Embedded(
+                "StaticMaterialShaderSamplerDef",
+                new BinTreeString(Fnv1a.HashLower("textureName"), "Diffuse_Texture"),
+                new BinTreeU32(Fnv1a.HashLower("addressU"), 1),
+                new BinTreeU32(Fnv1a.HashLower("addressV"), 2));
+            BinTreeEmbedded pass = Embedded(
+                "StaticMaterialPassDef",
+                new BinTreeObjectLink(Fnv1a.HashLower("shader"), shaderHash));
+            BinTreeEmbedded technique = Embedded(
+                "StaticMaterialTechniqueDef",
+                new BinTreeString(Fnv1a.HashLower("name"), "normal"),
+                Container("passes", pass));
+            BinTreeObject material = new(
+                materialPath,
+                "StaticMaterialDef",
+                new BinTreeProperty[]
+                {
+                    Container("samplerValues", samplerWithoutPath),
+                    Container("techniques", technique)
+                });
+            BinTree skinTree = new(new[] { Skin(materialPath), material }, Array.Empty<string>());
+
+            BinTreeEmbedded shaderTexture = Embedded(
+                "ShaderTexture",
+                new BinTreeString(Fnv1a.HashLower("name"), "Diffuse_Texture"),
+                new BinTreeString(Fnv1a.HashLower("defaultTexturePath"), defaultTexturePath));
+            BinTreeObject shader = new(
+                shaderPath,
+                "CustomShaderDef",
+                new BinTreeProperty[] { Container("textures", shaderTexture) });
+            BinTree shaderTree = new(new[] { shader }, Array.Empty<string>());
+
+            SknMaterialTextureMetadata metadata = SknMaterialTextureResolver.ReadMetadata(
+                new[] { skinTree },
+                new[] { shaderTree });
+            SknMaterialTextureResolution resolution = SknMaterialTextureResolver.Resolve(
+                metadata,
+                new[] { "shader_default_tx_cm" });
+
+            SknMaterialSampler parsedSampler = Assert.Single(metadata.DefaultMaterial.Samplers);
+            Assert.Null(parsedSampler.TexturePath);
+            Assert.True(parsedSampler.UsesShaderDefaultTexture);
+            Assert.Equal("shader_default_tx_cm", resolution.DefaultMaterialDefinition.BaseTextureName);
+            Assert.Equal(ModelMaterialWrapMode.Clamp, resolution.DefaultMaterialDefinition.WrapU);
+            Assert.Equal(ModelMaterialWrapMode.Mirror, resolution.DefaultMaterialDefinition.WrapV);
+        }
+
+        [Fact]
         public void ReadShaderDefinitions_AcceptsStringDefaultTexturePathLikeAssetLocator()
         {
             const string shaderPath = "Shaders/Test/StringDefault";
