@@ -18,6 +18,7 @@ Bug Fixes
   - 3D Studio / Forward active clip state and playback progress to custom character shaders during map previews so animation-driven surface parameters update.
   - 3D Studio / Support screen-space and separate-alpha UV modes accurately on the fallback particle mesh shader, matching native axis flips and atlas divisions.
   - 3D Studio / Fall back to shader default textures when character or VFX materials omit a sampler texturePath while preserving sampler wrap modes.
+  - 3D Studio / Evaluate particle-lifetime KeyedScale and ColorOverLife curves on component-driven emitters instead of freezing them at constant fallback values.
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 

@@ -103,6 +103,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             Vector4? structFallback = null)
         {
             if (!p.TryGetValue(field, out var prop)) return null;
+            return ReadCurve4Property(prop, structFallback);
+        }
+
+        internal static VfxCurve4? ReadCurve4Property(BinTreeProperty prop, Vector4? structFallback = null)
+        {
             if (prop is BinTreeStruct v)
             {
                 Func<BinTreeProperty, AuthoredValue<Vector4>?> reader =
