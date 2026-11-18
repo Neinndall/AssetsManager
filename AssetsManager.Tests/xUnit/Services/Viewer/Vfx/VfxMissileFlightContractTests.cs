@@ -268,20 +268,75 @@ public sealed class VfxMissileFlightContractTests
         Assert.NotNull(track);
         if(data.GetProperty("Arrival").ValueKind==JsonValueKind.Null) Assert.Null(track.Arrival);
         else Assert.InRange(Math.Abs(track.Arrival.Value-data.GetProperty("Arrival").GetDouble()),0,VfxSpellFlightPath.FlightStep+1e-6);
+        bool splineGravity = missile.HeightKind == VfxSpellMissileHeightKind.Gravity &&
+            missile.MovementKind is VfxSpellMissileMovementKind.FixedSpeedSpline or VfxSpellMissileMovementKind.FixedTimeSpline;
         foreach(var sample in data.GetProperty("Samples").EnumerateArray())
         {
             double time=sample.GetProperty("Time").GetDouble();
             Vector3 Read(string key){var v=sample.GetProperty(key);return new(v[0].GetSingle(),v[1].GetSingle(),v[2].GetSingle());}
             var expected=Read("Position"); var actual=track.PositionAt(time);
+            if (splineGravity)
+            {
+                // The pinned samples retain LTK's path and arrival. Compute the corrected height independently.
+                double flightTime = missile.Duration ?? track.Duration;
+                double t = Math.Clamp(time / flightTime, 0d, 1d);
+                expected.Y = (float)((1d - t) * track.Start.Y + t * track.End.Y +
+                    missile.HeightSolverGravity.Value * flightTime * flightTime * t * (1d - t) / 2d);
+            }
             float length=expected.Length();
-            // Integration uses floats; extreme spline/gravity heights also need a few ULPs.
             float tolerance=.1f+4f*(MathF.BitIncrement(length)-length);
             Assert.True(Vector3.Distance(expected,actual)<tolerance,$"{name} at {time}: expected position {expected}, got {actual}, tolerance {tolerance}");
             expected=Read("Direction");actual=track.DirectionAt(time);
+            if (splineGravity)
+            {
+                // FaceTarget now pitches toward the corrected height. The heading is unchanged.
+                Assert.InRange(actual.LengthSquared(), 0.999f, 1.001f);
+                expected.Y = actual.Y = 0f;
+                expected = Vector3.Normalize(expected);
+                actual = Vector3.Normalize(actual);
+            }
             Assert.True(Vector3.Distance(expected,actual)<.01f,$"{name} at {time}: expected direction {expected}, got {actual}");
         }
     }
 
+    [Theory]
+    [InlineData(VfxSpellMissileMovementKind.FixedTimeSpline, 2500f, 500f, 0.25f, 0.125d)]
+    [InlineData(VfxSpellMissileMovementKind.FixedTimeSpline, 250f, 500f, 0.25f, 0.125d)]
+    [InlineData(VfxSpellMissileMovementKind.FixedSpeedSpline, 2000f, 4000f, 2400f, 0.45d)]
+    public void SplineGravityUsesFlightTimeAndKeepsTheHorizontalPath(
+        VfxSpellMissileMovementKind kind, float range, float gravity, float pace, double sampleTime)
+    {
+        var missile = Missile(kind) with
+        {
+            Speed = kind == VfxSpellMissileMovementKind.FixedSpeedSpline ? pace : null,
+            Duration = kind == VfxSpellMissileMovementKind.FixedTimeSpline ? pace : null,
+            HeightOffsetAtEnd = false
+        };
+        Vector3 start = new(0, 100, 0);
+        Vector3 target = new(range, 0, 0);
+        var control = VfxSpellFlightPath.Compile(missile, start, target);
+        var track = VfxSpellFlightPath.Compile(missile with
+        {
+            HeightKind = VfxSpellMissileHeightKind.Gravity,
+            HeightSolverGravity = gravity,
+            FacingKind = VfxSpellMissileFacingKind.MatchVelocity
+        }, start, target);
+
+        Assert.NotNull(control);
+        Assert.NotNull(track);
+        Assert.Equal(control.Arrival, track.Arrival);
+        double flightTime = missile.Duration ?? control.Duration;
+        double fraction = sampleTime / flightTime;
+        float expectedHeight = (float)(100 * (1 - fraction) +
+            gravity * flightTime * flightTime * fraction * (1 - fraction) / 2);
+        Vector3 position = track.PositionAt(sampleTime);
+        Vector3 flatControl = control.PositionAt(sampleTime);
+        Assert.Equal(flatControl.X, position.X);
+        Assert.Equal(flatControl.Z, position.Z);
+        Assert.Equal(expectedHeight, position.Y, precision: 3);
+        Assert.Equal(start, track.PositionAt(0));
+        Assert.Equal(0f, track.PositionAt(track.Duration).Y);
+    }
 }
 
 [CollectionDefinition("VFX missile files", DisableParallelization=true)]
