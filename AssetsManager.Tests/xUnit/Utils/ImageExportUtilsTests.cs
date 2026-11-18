@@ -112,10 +112,12 @@ namespace AssetsManager.Tests.xUnit.Utils
                     }
                 }
 
-                // First frame top-left margin should contain OLD badge color (orange)
-                Assert.True(RegionHasColor(firstFrame, 0, 0, firstFrame.Width / 2, firstFrame.Height / 3, p => p.R > 200 && p.G > 100 && p.B < 50));
-                // Final frame top-right should contain NEW badge color (green)
-                Assert.True(RegionHasColor(lastFrame, lastFrame.Width / 2, 0, lastFrame.Width / 2, lastFrame.Height / 3, p => p.G > 180 && p.R < 80));
+                // In Wipe (left-to-right), NEW reveals on the left and OLD stays on the right.
+                int oldBadgeX = effect == TimelineTransitionEffect.Wipe ? firstFrame.Width / 2 : 0;
+                int newBadgeX = effect == TimelineTransitionEffect.Wipe ? 0 : lastFrame.Width / 2;
+
+                Assert.True(RegionHasColor(firstFrame, oldBadgeX, 0, firstFrame.Width / 2, firstFrame.Height / 3, p => p.R > 200 && p.G > 100 && p.B < 50));
+                Assert.True(RegionHasColor(lastFrame, newBadgeX, 0, lastFrame.Width / 2, lastFrame.Height / 3, p => p.G > 180 && p.R < 80));
             }
             finally
             {

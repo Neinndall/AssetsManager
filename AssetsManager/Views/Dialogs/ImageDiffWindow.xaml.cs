@@ -615,11 +615,11 @@ namespace AssetsManager.Views.Dialogs
                 switch (effect)
                 {
                     case TimelineTransitionEffect.Wipe:
-                        // Reveal NEW from the right so OLD remains on the left and NEW on the right.
+                        // Reveal NEW from left to right so the wipe matches reading order and Slider mode.
                         bool sweeping = t > 0.001 && t < 0.999;
                         if (SliderSeparatorLine != null)
                             SliderSeparatorLine.Visibility = sweeping ? Visibility.Visible : Visibility.Collapsed;
-                        ApplyHorizontalSplit(1.0 - t, newOnLeft: false);
+                        ApplyHorizontalSplit(t, newOnLeft: true);
                         OldImageOverlay.Opacity = 1.0;
                         NewImageOverlay.Opacity = 1.0;
                         break;
@@ -652,11 +652,18 @@ namespace AssetsManager.Views.Dialogs
 
             if (effect == TimelineTransitionEffect.Wipe)
             {
+                // Keep each badge pinned to its own half during a left-to-right wipe (NEW left, OLD right).
+                NewBadge.HorizontalAlignment = HorizontalAlignment.Left;
+                OldBadge.HorizontalAlignment = HorizontalAlignment.Right;
+
                 bool sweeping = t > 0.001 && t < 0.999;
                 OldBadge.Visibility = t < 0.999 ? Visibility.Visible : Visibility.Collapsed;
                 NewBadge.Visibility = (sweeping || t >= 0.999) ? Visibility.Visible : Visibility.Collapsed;
                 return;
             }
+
+            OldBadge.HorizontalAlignment = HorizontalAlignment.Left;
+            NewBadge.HorizontalAlignment = HorizontalAlignment.Right;
 
             bool showNew = t >= 0.5;
             OldBadge.Visibility = showNew ? Visibility.Collapsed : Visibility.Visible;

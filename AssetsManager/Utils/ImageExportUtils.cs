@@ -493,8 +493,8 @@ namespace AssetsManager.Utils
             {
                 case TimelineTransitionEffect.Wipe:
                 {
-                    // Reveal NEW from the right so OLD stays on the left and NEW stays on the right.
-                    int cutX = Math.Clamp((int)Math.Round(width * (1.0 - t)), 0, width);
+                    // Reveal NEW from left to right: [0..cutX] = NEW, [cutX..width] = OLD.
+                    int cutX = Math.Clamp((int)Math.Round(width * t), 0, width);
                     int leftBytes = cutX * 4;
                     int rightBytes = stride - leftBytes;
 
@@ -502,9 +502,9 @@ namespace AssetsManager.Utils
                     {
                         int rowOffset = y * stride;
                         if (leftBytes > 0)
-                            oldLayer.AsSpan(rowOffset, leftBytes).CopyTo(destination.Slice(rowOffset, leftBytes));
+                            newLayer.AsSpan(rowOffset, leftBytes).CopyTo(destination.Slice(rowOffset, leftBytes));
                         if (rightBytes > 0)
-                            newLayer.AsSpan(rowOffset + leftBytes, rightBytes).CopyTo(destination.Slice(rowOffset + leftBytes, rightBytes));
+                            oldLayer.AsSpan(rowOffset + leftBytes, rightBytes).CopyTo(destination.Slice(rowOffset + leftBytes, rightBytes));
                     }
 
                     if (t > 0.001 && t < 0.999)
@@ -574,14 +574,14 @@ namespace AssetsManager.Utils
             if (effect == TimelineTransitionEffect.Wipe)
             {
                 bool sweeping = t > 0.001 && t < 0.999;
-                if (t < 0.999 && prepared.ScaledOldBadge != null)
-                {
-                    AlphaCompositeBadge(frame, width, height, prepared.ScaledOldBadge, margin, margin);
-                }
                 if ((sweeping || t >= 0.999) && prepared.ScaledNewBadge != null)
                 {
-                    int rightX = Math.Max(margin, width - margin - prepared.ScaledNewBadge.Width);
-                    AlphaCompositeBadge(frame, width, height, prepared.ScaledNewBadge, rightX, margin);
+                    AlphaCompositeBadge(frame, width, height, prepared.ScaledNewBadge, margin, margin);
+                }
+                if (t < 0.999 && prepared.ScaledOldBadge != null)
+                {
+                    int rightX = Math.Max(margin, width - margin - prepared.ScaledOldBadge.Width);
+                    AlphaCompositeBadge(frame, width, height, prepared.ScaledOldBadge, rightX, margin);
                 }
                 return;
             }
