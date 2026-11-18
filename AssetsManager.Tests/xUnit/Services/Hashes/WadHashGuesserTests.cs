@@ -4156,5 +4156,250 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
             Assert.True(animChecks > 0);
             AssertResolved(animEngine, singleWordAnim);
         }
+
+        [Fact]
+        public void GameGrepWadResolvesItemJadeAndAutoatlasTexVariants()
+        {
+            const string knownBase = "assets/items/icons2d/3032_innervating_locket.dds";
+            const string knownAtlas = "assets/items/icons2d/autoatlas/largeicons/2052_poro_snack_discoball.png";
+            const string expectedJade = "assets/items/icons2d/3032_innervating_locket_jade.tex";
+            const string expectedDisco = "assets/items/icons2d/2052_poro_snack_discoball.tex";
+
+            var anvilObj = new BinTreeObject(
+                "Anvil/447104",
+                "AnvilData",
+                new BinTreeProperty[]
+                {
+                    new BinTreeWadChunkLink(Fnv1a.HashLower("AugmentSmallIconPath"), XxHash64Ext.Hash(expectedJade))
+                });
+            var tree = new BinTree(new[] { anvilObj }, Array.Empty<string>());
+            using var stream = new MemoryStream();
+            tree.Write(stream);
+
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[] { knownBase, knownAtlas }));
+            var engine = CreateEngine(HashGuessDomain.Game, expectedJade, expectedDisco);
+
+            game.GrepWad(engine, new ArraySegment<byte>(stream.ToArray()), "data/maps/shipping/map30/map30.bin", "Map30.wad.client", 1);
+
+            Assert.Equal(0, engine.RemainingUnknownCount);
+            Assert.Contains(engine.Matches.Values, match => match.Path == expectedJade);
+            Assert.Contains(engine.Matches.Values, match => match.Path == expectedDisco);
+        }
+
+        [Fact]
+        public void GameGrepWadResolvesAnimationSoundEventsStancesAndTransitions()
+        {
+            const string expectedToDash = "assets/characters/akali/skins/skin102/animations/spell3_jump_todash.anm";
+            const string expectedInCombat = "assets/characters/akali/skins/skin102/animations/run_fast_to_run_fast_incombat.anm";
+            const string expectedTigerRun = "assets/characters/jade_udyr/skins/base/animations/tiger_run.anm";
+            const string expectedJokeA = "assets/characters/janna/skins/skin67/animations/joke_a.anm";
+            const string expectedJokeB = "assets/characters/janna/skins/skin67/animations/joke_b.anm";
+
+            BinTreeObject BuildAnimGraph(string entryPath, params (string Key, string TargetPath, string SoundEvent)[] entries)
+            {
+                var mapEntries = new List<KeyValuePair<BinTreeProperty, BinTreeProperty>>();
+                foreach (var (key, target, sound) in entries)
+                {
+                    var animRes = new BinTreeEmbedded(
+                        Fnv1a.HashLower("mAnimationResourceData"),
+                        Fnv1a.HashLower("AnimationResourceData"),
+                        new BinTreeProperty[]
+                        {
+                            new BinTreeWadChunkLink(Fnv1a.HashLower("mAnimationFilePath"), XxHash64Ext.Hash(target))
+                        });
+                    var clipProps = new List<BinTreeProperty> { animRes };
+                    if (!string.IsNullOrEmpty(sound))
+                    {
+                        var soundEvt = new BinTreeEmbedded(
+                            0,
+                            Fnv1a.HashLower("SoundEventData"),
+                            new BinTreeProperty[] { new BinTreeString(Fnv1a.HashLower("mSoundName"), sound) });
+                        clipProps.Add(new BinTreeMap(
+                            Fnv1a.HashLower("mEventDataMap"),
+                            BinPropertyType.Hash,
+                            BinPropertyType.Embedded,
+                            new[]
+                            {
+                                new KeyValuePair<BinTreeProperty, BinTreeProperty>(new BinTreeHash(0, Fnv1a.HashLower("Audio")), soundEvt)
+                            }));
+                    }
+
+                    mapEntries.Add(new KeyValuePair<BinTreeProperty, BinTreeProperty>(
+                        new BinTreeHash(0, Fnv1a.HashLower(key)),
+                        new BinTreeEmbedded(0, Fnv1a.HashLower("AtomicClipData"), clipProps)));
+                }
+
+                return new BinTreeObject(
+                    entryPath,
+                    "AnimationGraphData",
+                    new BinTreeProperty[]
+                    {
+                        new BinTreeMap(Fnv1a.HashLower("mClipDataMap"), BinPropertyType.Hash, BinPropertyType.Embedded, mapEntries)
+                    });
+            }
+
+            byte[] WriteTree(BinTreeObject obj)
+            {
+                var tree = new BinTree(new[] { obj }, Array.Empty<string>());
+                using var ms = new MemoryStream();
+                tree.Write(ms);
+                return ms.ToArray();
+            }
+
+            var akaliBytes = WriteTree(BuildAnimGraph(
+                "Characters/Akali/Animations/Skin102",
+                ("Spell3_Jump_to_Dash", expectedToDash, null),
+                ("run_fast_to_run_fast_incombat", expectedInCombat, null)));
+            var udyrBytes = WriteTree(BuildAnimGraph(
+                "Characters/Jade_Udyr/Animations/Skin0",
+                ("Spell1_Run", expectedTigerRun, null)));
+            var jannaBytes = WriteTree(BuildAnimGraph(
+                "Characters/Janna/Animations/Skin67",
+                ("UnmappedJokeClipA", expectedJokeA, "Play_sfx_JannaSkin67_Joke3DA_buffactivate"),
+                ("UnmappedJokeClipB", expectedJokeB, null)));
+
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
+            {
+                "assets/characters/akali/skins/base/animations/akali_base_run_fast.anm",
+                "assets/characters/akali/skins/base/animations/spell3_jump_to_dash.anm",
+                "assets/characters/jade_udyr/skins/base/animations/idle1.anm",
+                "assets/characters/janna/skins/skin67/animations/idle1.anm"
+            }));
+            var engine = CreateEngine(HashGuessDomain.Game, expectedToDash, expectedInCombat, expectedTigerRun, expectedJokeA, expectedJokeB);
+
+            game.GrepWad(engine, new ArraySegment<byte>(akaliBytes), "data/characters/akali/animations/skin102.bin", "Akali.wad.client", 1);
+            game.GrepWad(engine, new ArraySegment<byte>(udyrBytes), "data/characters/jade_udyr/animations/skin0.bin", "Udyr.wad.client", 2);
+            game.GrepWad(engine, new ArraySegment<byte>(jannaBytes), "data/characters/janna/skins/skin67.bin", "Janna.wad.client", 3);
+
+            Assert.Contains(engine.Matches.Values, match => match.Path == expectedToDash);
+            Assert.Contains(engine.Matches.Values, match => match.Path == expectedInCombat);
+            Assert.Contains(engine.Matches.Values, match => match.Path == expectedTigerRun);
+            Assert.Contains(engine.Matches.Values, match => match.Path == expectedJokeA);
+            Assert.Contains(engine.Matches.Values, match => match.Path == expectedJokeB);
+            Assert.Equal(0, engine.RemainingUnknownCount);
+        }
+
+        [Fact]
+        public void GameGrepWadResolvesGearUpgradeCompoundSamplerParticleAndTftTextures()
+        {
+            const string gearDistortion = "assets/characters/sona/skins/skin77/sona_skin77_gear02_hair_distortion.tex";
+            const string compoundScreenSpace = "assets/characters/tristana/skins/skin80/tristana_skin80_tassel_screenspace_mask_tx_cm.tex";
+            const string particleMask = "assets/characters/petchibijinx/skins/skin4/particles/mat_chibijinx_skin4_radialblur_cracks_mask.tex";
+            const string tftPaddedOuterwear = "assets/characters/tft_sushiconveyorbelt_props/skins/skin04/tft_sushiconveyorbelt_outerwear_tx.tex";
+
+            byte[] WriteTree(params BinTreeObject[] objs)
+            {
+                var tree = new BinTree(objs, Array.Empty<string>());
+                using var ms = new MemoryStream();
+                tree.Write(ms);
+                return ms.ToArray();
+            }
+
+            var sonaMat = new BinTreeObject(
+                "Characters/Sona/Skins/Skin77/Materials/HairMat",
+                "StaticMaterialDef",
+                new BinTreeProperty[]
+                {
+                    new BinTreeUnorderedContainer(Fnv1a.HashLower("samplerValues"), BinPropertyType.Embedded, new[]
+                    {
+                        new BinTreeEmbedded(0, Fnv1a.HashLower("StaticMaterialShaderSamplerDef"), new BinTreeProperty[]
+                        {
+                            new BinTreeString(Fnv1a.HashLower("TextureName"), "Distortion_Texture"),
+                            new BinTreeWadChunkLink(Fnv1a.HashLower("texturePath"), XxHash64Ext.Hash(gearDistortion))
+                        })
+                    })
+                });
+            var sonaGear = new BinTreeObject(
+                "Characters/Sona/Skins/Skin77/Gear2",
+                "GearSkinUpgrade",
+                new BinTreeProperty[]
+                {
+                    new BinTreeEmbedded(Fnv1a.HashLower("mGearData"), Fnv1a.HashLower("GearData"), new BinTreeProperty[]
+                    {
+                        new BinTreeEmbedded(Fnv1a.HashLower("skinMeshProperties"), Fnv1a.HashLower("SkinMeshDataProperties"), new BinTreeProperty[]
+                        {
+                            new BinTreeUnorderedContainer(Fnv1a.HashLower("materialOverride"), BinPropertyType.Embedded, new[]
+                            {
+                                new BinTreeEmbedded(0, Fnv1a.HashLower("SkinMeshDataProperties_MaterialOverride"), new BinTreeProperty[]
+                                {
+                                    new BinTreeString(Fnv1a.HashLower("submesh"), "Genre2_Hair_VFX"),
+                                    new BinTreeWadChunkLink(Fnv1a.HashLower("texture"), XxHash64Ext.Hash(gearDistortion))
+                                })
+                            })
+                        })
+                    })
+                });
+
+            var tristanaMat = new BinTreeObject(
+                "Characters/Tristana/Skins/Skin80/Materials/Tassel_MAT_inst",
+                "StaticMaterialDef",
+                new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("name"), "Characters/Tristana/Skins/Skin80/Materials/Tassel_MAT_inst"),
+                    new BinTreeUnorderedContainer(Fnv1a.HashLower("samplerValues"), BinPropertyType.Embedded, new[]
+                    {
+                        new BinTreeEmbedded(0, Fnv1a.HashLower("StaticMaterialShaderSamplerDef"), new BinTreeProperty[]
+                        {
+                            new BinTreeString(Fnv1a.HashLower("TextureName"), "Pattern_Mask"),
+                            new BinTreeWadChunkLink(Fnv1a.HashLower("texturePath"), XxHash64Ext.Hash(compoundScreenSpace))
+                        }),
+                        new BinTreeEmbedded(0, Fnv1a.HashLower("StaticMaterialShaderSamplerDef"), new BinTreeProperty[]
+                        {
+                            new BinTreeString(Fnv1a.HashLower("TextureName"), "ScreenSpace_Texture"),
+                            new BinTreeWadChunkLink(Fnv1a.HashLower("texturePath"), XxHash64Ext.Hash("assets/shared/materials/blank.tex"))
+                        })
+                    })
+                });
+
+            var jinxMat = new BinTreeObject(
+                "Characters/PetChibiJinx/Skins/Skin4/Materials/Mat_ChibiJinx_Skin4_RadialBlur_Cracks",
+                "StaticMaterialDef",
+                new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("name"), "Characters/PetChibiJinx/Skins/Skin4/Materials/Mat_ChibiJinx_Skin4_RadialBlur_Cracks"),
+                    new BinTreeUnorderedContainer(Fnv1a.HashLower("samplerValues"), BinPropertyType.Embedded, new[]
+                    {
+                        new BinTreeEmbedded(0, Fnv1a.HashLower("StaticMaterialShaderSamplerDef"), new BinTreeProperty[]
+                        {
+                            new BinTreeString(Fnv1a.HashLower("TextureName"), "Mask"),
+                            new BinTreeWadChunkLink(Fnv1a.HashLower("texturePath"), XxHash64Ext.Hash(particleMask))
+                        })
+                    })
+                });
+
+            var tftSkin = new BinTreeObject(
+                "Characters/TFT_SushiConveyorBelt_Props/Skins/Skin4",
+                "SkinCharacterDataProperties",
+                new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("championSkinName"), "TFT_SushiConveyorBelt_Chief"),
+                    new BinTreeEmbedded(Fnv1a.HashLower("skinMeshProperties"), Fnv1a.HashLower("SkinMeshDataProperties"), new BinTreeProperty[]
+                    {
+                        new BinTreeString(Fnv1a.HashLower("simpleSkin"), "ASSETS/Characters/TFT_SushiConveyorBelt_Props/Skins/Skin04/TFT_SushiConveyorBelt_Props_Skin04.skn"),
+                        new BinTreeUnorderedContainer(Fnv1a.HashLower("materialOverride"), BinPropertyType.Embedded, new[]
+                        {
+                            new BinTreeEmbedded(0, Fnv1a.HashLower("SkinMeshDataProperties_MaterialOverride"), new BinTreeProperty[]
+                            {
+                                new BinTreeString(Fnv1a.HashLower("submesh"), "Outerwear_A"),
+                                new BinTreeWadChunkLink(Fnv1a.HashLower("texture"), XxHash64Ext.Hash(tftPaddedOuterwear))
+                            })
+                        })
+                    })
+                });
+
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, Array.Empty<string>()));
+            var engine = CreateEngine(HashGuessDomain.Game, gearDistortion, compoundScreenSpace, particleMask, tftPaddedOuterwear);
+
+            game.GrepWad(engine, new ArraySegment<byte>(WriteTree(sonaMat, sonaGear)), "data/characters/sona/skins/skin77.bin", "Sona.wad.client", 1);
+            game.GrepWad(engine, new ArraySegment<byte>(WriteTree(tristanaMat)), "data/characters/tristana/skins/skin80.bin", "Tristana.wad.client", 2);
+            game.GrepWad(engine, new ArraySegment<byte>(WriteTree(jinxMat)), "data/characters/petchibijinx/skins/skin4.bin", "Companions.wad.client", 3);
+            game.GrepWad(engine, new ArraySegment<byte>(WriteTree(tftSkin)), "data/characters/tft_sushiconveyorbelt_props/skins/skin4.bin", "Map22.wad.client", 4);
+
+            Assert.Contains(engine.Matches.Values, match => match.Path == gearDistortion);
+            Assert.Contains(engine.Matches.Values, match => match.Path == compoundScreenSpace);
+            Assert.Contains(engine.Matches.Values, match => match.Path == particleMask);
+            Assert.Contains(engine.Matches.Values, match => match.Path == tftPaddedOuterwear);
+            Assert.Equal(0, engine.RemainingUnknownCount);
+        }
     }
 }

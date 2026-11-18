@@ -8,6 +8,7 @@ Improvements
   - Asset Tracker / Discover and retain _2 and _3 bundle filename variants alongside base and _1 images when scanning numeric bundle ranges.
   - Hash Guessing Lab / Resolve hashed-name character materials, glued submesh and sampler roles (bloom, outline, flipbook, lut, pattern, deform, rma), container channel siblings, and .png/.dds-to-.tex literals in GrepWad.
   - Hash Guessing Lab / Rewrite skin numbers and character-skin prefixes on identical-checksum WAD copies, expand Jade /animations/ and .tex ability icon projections, and add recent 2025/2026 esports banner event prefixes.
+  - Hash Guessing Lab / Traverse item icon _jade and autoatlas .tex variants, animation sound-event, stance, and transition links, and gear upgrade, companion theme, and TFT submesh textures.
 
 Changes
 
