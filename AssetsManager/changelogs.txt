@@ -27,6 +27,7 @@ Bug Fixes
   - Image Diff / Update the Overlay mode title dynamically when switching between Slider, Onion Skin, and Timeline.
   - Image Diff / Resume Timeline playback from the paused or scrubbed position instead of jumping back to the start.
   - Hash Guessing Lab / Include single-word .anm filenames in BIN-referenced animation suffix guessing instead of skipping clips without underscores.
+  - 3D Studio / Preserve positive depth-push offsets on attached character VFX meshes so behind-surface layers do not cover lit submeshes or body details in skin previews.
   - 3D Studio / Keep curved missiles with gravity in view by calculating their arc over the flight duration.
   - 3D Studio / Apply particle size before roll on legacy plane quads so rotated non-square effects keep their authored proportions.
   - 3D Studio / Respect authored blend modes on component-driven emitters instead of defaulting them to premultiplied blend state.

@@ -116,9 +116,11 @@ namespace AssetsManager.Utils.Rendering
 
             parameters["TEXTURE_INFO"] = new Vector4(1f, 1f, 1f, 0f);
             parameters["TEXTURE_INFO_2"] = new Vector4(1f, 1f, 1f, 0f);
-            // Studio can keep surface overlays on the skin without changing authored data or simulation.
+            // Studio can keep camera-pulled surface overlays on the skin without pulling
+            // depth-pushed (positive) layers forward over lit or opaque submeshes.
             bool align = alignSurfaceEffects && definition.PrimitiveKind == VfxPrimitiveKind.AttachedMesh &&
-                !definition.HasResolvedCustomMaterial && !definition.DrawsAsDistortion;
+                !definition.HasResolvedCustomMaterial && !definition.DrawsAsDistortion &&
+                definition.DepthPushPull < 0f;
             parameters["PARTICLE_DEPTH_PUSH_PULL"] = new Vector4(align ? 0f : definition.DepthPushPull, 0f, 0f, 0f);
 
             if (!definition.HasResolvedCustomMaterial)
