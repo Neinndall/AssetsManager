@@ -6,10 +6,13 @@ New Features
 
 Improvements
   - Asset Tracker / Discover and retain _2 and _3 bundle filename variants alongside base and _1 images when scanning numeric bundle ranges.
+  - Hash Guessing Lab / Resolve hashed-name character materials, glued submesh and sampler roles (bloom, outline, flipbook, lut, pattern, deform, rma), container channel siblings, and .png/.dds-to-.tex literals in GrepWad.
+  - Hash Guessing Lab / Rewrite skin numbers and character-skin prefixes on identical-checksum WAD copies, expand Jade /animations/ and .tex ability icon projections, and add recent 2025/2026 esports banner event prefixes.
 
 Changes
 
 Bug Fixes
+  - Hash Guessing Lab / Include single-word .anm filenames in BIN-referenced animation suffix guessing instead of skipping clips without underscores.
   - 3D Studio / Keep curved missiles with gravity in view by calculating their arc over the flight duration.
   - 3D Studio / Apply particle size before roll on legacy plane quads so rotated non-square effects keep their authored proportions.
   - 3D Studio / Respect authored blend modes on component-driven emitters instead of defaulting them to premultiplied blend state.
