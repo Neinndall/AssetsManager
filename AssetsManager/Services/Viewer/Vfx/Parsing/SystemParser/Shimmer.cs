@@ -99,6 +99,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 offset = Vector3.Zero;
             }
 
+            var renderProps = (render as BinTreeStruct)?.Properties ?? (render as BinTreeEmbedded)?.Properties;
+            byte blendMode = ReadBlendMode(renderProps is not null && Get(renderProps, F_blendMode) is not null ? renderProps : p, F_blendMode);
+
             return new VfxEmitterDefinition(
                 Name: name,
                 Rate: VfxCurveF.Const(1f),
@@ -108,7 +111,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 TimeBeforeFirstEmission: 0f,
                 IsSingleParticle: true,
                 Disabled: disabled,
-                BlendMode: 0,
+                BlendMode: blendMode,
                 BirthScale: VfxCurve3.Const(scale),
                 ScaleOverLife: shimmer is null ? null : scaleOverLifeCurve ?? VfxCurve3.Const(keyedScale),
                 BirthColor: VfxCurve4.Const(color),

@@ -322,8 +322,10 @@ void main(){
     float c = cos(rotation);
     vec2 geometryCorner = aCorner;
     if (uPivotUp != 0) geometryCorner.y += 0.5;
-    vec2 rc = vec2(geometryCorner.x * c - geometryCorner.y * s, geometryCorner.x * s + geometryCorner.y * c);
-    if (uPrimitiveKind == 0) rc *= 2.0;
+    // Scale before roll so non-square camera and legacy plane quads retain their authored shape.
+    vec2 sized = geometryCorner * aSize;
+    vec2 offset = vec2(sized.x * c - sized.y * s, sized.x * s + sized.y * c);
+    if (uPrimitiveKind == 0) offset *= 2.0;
     vec3 world;
     if (rayPrimitive) {
         float alongRay = aCorner.y + 0.5;
@@ -335,14 +337,12 @@ void main(){
     } else if (uLegacyOrientation != 0) {
         vec3 planeU = uLegacyOrientation == 2 ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 1.0, 0.0);
         vec3 planeV = uLegacyOrientation == 3 ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 0.0, -1.0);
-        world = aCenter + planeU * (rc.y * aSize.y) + planeV * (rc.x * aSize.x);
+        world = aCenter + planeU * offset.y + planeV * offset.x;
     } else if (uArbitraryQuad == 0 && uDirectionOriented == 0) {
-        // Scale before roll so non-square camera quads retain their authored shape.
-        vec2 sized = geometryCorner * aSize;
-        vec2 offset = vec2(sized.x * c - sized.y * s, sized.x * s + sized.y * c);
-        if (uPrimitiveKind == 0) offset *= 2.0;
         world = aCenter + right * offset.x + up * offset.y;
     } else {
+        vec2 rc = vec2(geometryCorner.x * c - geometryCorner.y * s, geometryCorner.x * s + geometryCorner.y * c);
+        if (uPrimitiveKind == 0) rc *= 2.0;
         world = aCenter + right * (rc.x * aSize.x) + up * (rc.y * aSize.y);
     }
     // Orthographic rays are parallel, including away from the screen centre.

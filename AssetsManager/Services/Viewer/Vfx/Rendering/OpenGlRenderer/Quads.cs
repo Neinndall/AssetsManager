@@ -10,7 +10,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
 {
     public sealed partial class VfxOpenGlRenderer
     {
-        private void RenderQuadEmitter(VfxPlaybackRuntime.EmitterState es, ReadOnlySpan<float> instancesSpan, int renderInstanceCount, float sharedPalettePhase, bool useWireframe, float wireOpacity, Vector3 camPos, Vector3 camRight, Vector3 camUp, int passIndex)
+        private void RenderQuadEmitter(VfxPlaybackRuntime.EmitterState es, ReadOnlySpan<float> instancesSpan, int renderInstanceCount, float sharedPalettePhase, bool useWireframe, float wireOpacity, Vector3 camPos, Vector3 camRight, Vector3 camUp, Vector3 camForward, int passIndex)
         {
             if (!es.Def.IsVisual) return;
             bool native = UseGameParticle(es, false, passIndex, useWireframe);
@@ -199,7 +199,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             if (native) BindGameParticle(es, false, passIndex, sharedPalettePhase);
             if (es.Def.PrimitiveKind is VfxPrimitiveKind.CameraTrail or VfxPrimitiveKind.ArbitraryTrail)
             {
-                int vertices = BuildSharedRibbon(es, camPos, ResolveCameraForward(camRight, camUp), renderInstanceCount, false);
+                int vertices = BuildSharedRibbon(es, camPos, camForward, renderInstanceCount, false);
                 if (vertices > 0)
                 {
                     _gl.BindVertexArray(_trailVao);

@@ -271,10 +271,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             }
 
             bool isSingle = GetBool(p, F_isSingle);
-            byte blendMode = NormalizeEnumByte(
-                GetU8(p, F_blendMode) ?? (int?)(AsU32(Get(p, F_blendMode))),
-                maxInclusive: 8,
-                fallback: (byte)VfxAuthoredDefaults.BlendMode);
+            byte blendMode = ReadBlendMode(p, F_blendMode);
             byte stencilMode = isSimpleEmitter ? (byte)0 : NormalizeEnumByte(
                 GetU8(p, F_stencilMode),
                 maxInclusive: 4,

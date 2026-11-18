@@ -251,4 +251,29 @@ public sealed class VfxShimmerComponentTests
         Assert.Equal(1f, state.Instances[5], 3);
         Assert.Equal(1f, state.Instances[8], 3);
     }
+
+    [Theory]
+    [InlineData(null, (byte)0)]
+    [InlineData((byte)1, (byte)1)]
+    [InlineData((byte)4, (byte)4)]
+    public void ReadsRenderComponentBlendModeWhenAuthored(byte? authoredBlendMode, byte expectedBlendMode)
+    {
+        var lifetime = Node("LifetimeComponent", "VfxLifetimeComponent",
+            Node("LifetimeBehavior", "0x7015f762", Scalar("EmitterDuration", -1), Scalar("particleLifetime", 1f), Scalar("startDelay", 0), Scalar("LoopDelay", 0)),
+            Node("SpawnBehavior", "0x31beb841", Scalar("EmissionRate", 0), Scalar("0x10498eed", 1), Scalar("SpawnDuration", 0)));
+        var render = authoredBlendMode is byte mode
+            ? Node("RenderComponent", "0x5a4c5648", new BinTreeU8(H("blendMode"), mode))
+            : Node("RenderComponent", "0x5a4c5648");
+        var components = Node("VfxComponents", "VfxComponents",
+            Node("GeometryComponent", "VfxGeometryComponent", new BinTreeString(H("mesh"), "assets/cube.gmesh")),
+            lifetime,
+            render);
+        var emitter = Node("", "VfxEmitterDefinitionData", new BinTreeString(H("emitterName"), "blend"), components);
+        var tree = new BinTree(new[] { new BinTreeObject("Vfx/ShimmerBlend", "VfxSystemDefinitionData",
+            new[] { new BinTreeContainer(H("shimmerEmitterDefinitionData"), BinPropertyType.Struct, new[] { emitter }) }) }, Array.Empty<string>());
+        using var stream = new MemoryStream(); tree.Write(stream);
+        var system = Assert.Single(VfxGraphParser.ParseDocument(stream.ToArray()).Systems).Value;
+        var parsed = Assert.Single(system.Emitters);
+        Assert.Equal(expectedBlendMode, parsed.BlendMode);
+    }
 }

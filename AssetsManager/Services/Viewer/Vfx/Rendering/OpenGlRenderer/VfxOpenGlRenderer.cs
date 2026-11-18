@@ -518,6 +518,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             Matrix4x4.Invert(view, out var inv);
             var camRight = Vector3.Normalize(Vector3.TransformNormal(Vector3.UnitX, inv));
             var camUp = Vector3.Normalize(Vector3.TransformNormal(Vector3.UnitY, inv));
+            // Derive forward directly from inv so mirrored viewports (det < 0) preserve camera look sign.
+            var camForward = Vector3.Normalize(Vector3.TransformNormal(-Vector3.UnitZ, inv));
             var camPos = inv.Translation;
             Matrix4x4 projection = inv * viewProj;
             _depthProjectionValue = new Vector4(projection.M33, projection.M43, projection.M34, projection.M44);
@@ -549,7 +551,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             // Shadow corners face the scene eye, but their orthographic depth push follows the light.
             var depthPushDirection = _drawingShadows
                 ? Vector3.Normalize(new Vector3(viewProj.M13, viewProj.M23, viewProj.M33))
-                : -Vector3.Cross(camRight, camUp);
+                : camForward;
             _particleUniforms.Uniform3(_particleUniforms.DepthPushDirection,
                 depthPushDirection.X, depthPushDirection.Y, depthPushDirection.Z);
             _particleUniforms.Uniform1(_particleUniforms.Tex, 0);
@@ -701,7 +703,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                     RenderProjection(es, instancesSpan, renderInstanceCount, viewProj, sharedPalettePhase, useWireframe, wireOpacity);
                     continue;
                 }
-                RenderQuadEmitter(es, instancesSpan, renderInstanceCount, sharedPalettePhase, useWireframe, wireOpacity, camPos, camRight, camUp, passIndex);
+                RenderQuadEmitter(es, instancesSpan, renderInstanceCount, sharedPalettePhase, useWireframe, wireOpacity, camPos, camRight, camUp, camForward, passIndex);
             }
 
             }
