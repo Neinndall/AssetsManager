@@ -36,7 +36,9 @@ public class ImageDiffWindowTests
                     ("ToolSectionLabel", typeof(TextBlock)), ("SettingsCard", typeof(Border)),
                     ("HudWindowStyle", typeof(HudWindow)), ("HUDSliderStyle", typeof(Slider)),
                     ("ModernComboBox", typeof(ComboBox)), ("ModernIconRadioButton", typeof(RadioButton)),
-                    ("SegmentedRadioButtonStyle", typeof(RadioButton)), ("TransparentIconButton", typeof(Button))
+                    ("SegmentedRadioButtonStyle", typeof(RadioButton)), ("TransparentIconButton", typeof(Button)),
+                    ("PrimaryButton", typeof(Button)), ("ModernCheckBox", typeof(CheckBox)),
+                    ("ModernProgressBar", typeof(ProgressBar))
                 }) app.Resources[key] = new Style(type);
                 app.Resources[typeof(TextBlock)] = new Style(typeof(TextBlock));
                 app.Resources["BooleanToVisibilityConverter"] = new BooleanToVisibilityConverter();
@@ -45,8 +47,11 @@ public class ImageDiffWindowTests
 
                 window = new ImageDiffWindow();
                 var adjust = (Slider)window.FindName("OverlaySlider");
+                var oldOverlay = (Image)window.FindName("OldImageOverlay");
                 var overlay = (Image)window.FindName("NewImageOverlay");
                 var clip = (RectangleGeometry)window.FindName("SliderClip");
+                var oldClip = (RectangleGeometry)window.FindName("OldSliderClip");
+                var infoLabel = (TextBlock)window.FindName("OverlayInfoLabel");
                 void Drain() => window.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
                 void Select(string name)
                 {
@@ -64,17 +69,22 @@ public class ImageDiffWindowTests
                 }
 
                 Select("SliderBtn");
+                Assert.Equal("Slider Overlay View", infoLabel.Text);
                 Select("OnionSkinBtn");
+                Assert.Equal("Onion Skin Transparency", infoLabel.Text);
                 CheckAdjust();
-                foreach (string effect in new[] { "WipeEffectBtn", "FadeEffectBtn" })
+                foreach (string effect in new[] { "WipeEffectBtn", "FadeEffectBtn", "CutEffectBtn" })
                 {
                     Select("TimelineBtn");
+                    Assert.Equal("Timeline Frame Sequence", infoLabel.Text);
                     Select(effect);
                     ((Slider)window.FindName("TimelineSlider")).Value = 60;
                     Drain();
                     Select("OnionSkinBtn");
                     CheckAdjust();
+                    Assert.Equal(1.0, oldOverlay.Opacity);
                     Assert.True(clip.Rect.Width >= overlay.ActualWidth);
+                    Assert.True(oldClip.Rect.Width >= oldOverlay.ActualWidth);
                     Select("SliderBtn");
                     Assert.Equal(1.0, overlay.Opacity);
                 }

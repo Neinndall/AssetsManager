@@ -3,16 +3,29 @@ AssetsManager - League of Legends | v4.1.0.11
 HOTFIX UPDATE
 
 New Features
+  - Image Diff / Export Timeline sequences as H.264 MP4 video alongside animated GIF.
+  - Image Diff / Add a Cut transition effect for instant A/B comparisons in Timeline mode.
+  - Image Diff / Add an option to crop exported sequences to the currently zoomed viewport region.
 
 Improvements
+  - Image Diff / Move Timeline export settings (format, FPS, resolution, upscaling, and zoom crop) into a dedicated popover.
+  - Image Diff / Place zoom and reset-to-fit controls in the footer so they work across all comparison modes.
+  - Image Diff / Upscale small textures sharply with nearest-neighbor scaling and match the active Dark, Checkerboard, or Light background on export.
+  - Image Diff / Add 1s and 1.5s hold presets, 60 FPS export, active filename and resolution-change indicators in Overlay mode, and cancellable export progress.
   - Asset Tracker / Discover and retain _2 and _3 bundle filename variants alongside base and _1 images when scanning numeric bundle ranges.
   - Hash Guessing Lab / Resolve hashed-name character materials, glued submesh and sampler roles (bloom, outline, flipbook, lut, pattern, deform, rma), container channel siblings, and .png/.dds-to-.tex literals in GrepWad.
   - Hash Guessing Lab / Rewrite skin numbers and character-skin prefixes on identical-checksum WAD copies, expand Jade /animations/ and .tex ability icon projections, and add recent 2025/2026 esports banner event prefixes.
   - Hash Guessing Lab / Traverse item icon _jade and autoatlas .tex variants, animation sound-event, stance, and transition links, and gear upgrade, companion theme, and TFT submesh textures.
 
 Changes
+  - Image Diff / Sweep Timeline Wipe from right to left so OLD stays on the left and NEW on the right, showing both labels and the divider line during transitions.
 
 Bug Fixes
+  - Image Diff / Render OLD and NEW labels cleanly in exported GIF and MP4 sequences.
+  - Image Diff / Prevent transparent or differently sized assets (such as emotes and banners) from stacking underneath each other in Slider, Wipe, Fade, and exported sequences.
+  - Image Diff / Keep differently sized overlays aligned when zooming and panning.
+  - Image Diff / Update the Overlay mode title dynamically when switching between Slider, Onion Skin, and Timeline.
+  - Image Diff / Resume Timeline playback from the paused or scrubbed position instead of jumping back to the start.
   - Hash Guessing Lab / Include single-word .anm filenames in BIN-referenced animation suffix guessing instead of skipping clips without underscores.
   - 3D Studio / Keep curved missiles with gravity in view by calculating their arc over the flight duration.
   - 3D Studio / Apply particle size before roll on legacy plane quads so rotated non-square effects keep their authored proportions.
