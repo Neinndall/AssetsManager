@@ -540,6 +540,8 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                         {
                             if (pathBuf.TryWrite(CultureInfo.InvariantCulture, $"assets/characters/{character}/hud/icons2d/{character}_{ability}{number}{suffix}.dds", out w))
                                 if (!CheckSpan(pathBuf[..w])) goto ChampionDone;
+                            if (pathBuf.TryWrite(CultureInfo.InvariantCulture, $"assets/characters/{character}/hud/icons2d/{character}_{ability}{number}{suffix}.tex", out w))
+                                if (!CheckSpan(pathBuf[..w])) goto ChampionDone;
                         }
                     }
                 }
@@ -565,6 +567,14 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                         // Candidate 1: same subpath under jade_{character}
                         if (pathBuf.TryWrite(CultureInfo.InvariantCulture, $"{marker}jade_{character}{subpath}", out w))
                             if (!CheckSpan(pathBuf[..w])) goto ChampionDone;
+
+                        const string baseAnimationsMarker = "/skins/base/animations/";
+                        if (subpath.StartsWith(baseAnimationsMarker, StringComparison.OrdinalIgnoreCase))
+                        {
+                            ReadOnlySpan<char> animRelative = subpath.AsSpan(baseAnimationsMarker.Length);
+                            if (pathBuf.TryWrite(CultureInfo.InvariantCulture, $"{marker}jade_{character}/animations/{animRelative}", out w))
+                                if (!CheckSpan(pathBuf[..w])) goto ChampionDone;
+                        }
 
                         // Child models can retain the parent character's name in their filenames.
                         int lastSlash = subpath.LastIndexOf('/');
@@ -702,6 +712,13 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             return checkedCount;
         }
 
+        private static readonly Regex CopySkinFolderRegex = new(
+            @"^assets/characters/(?<owner>[^/]+)/skins/(?<skin>skin\d+|base)$",
+            RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private static readonly Regex CopySkinTokenRegex = new(
+            @"(?<=^|_)(?:skin\d+|base)(?=_)",
+            RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
         /// <summary>
         /// Reuses filenames from matching WAD checksums in source, character and container folders.
         /// </summary>
@@ -773,7 +790,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                     .ToDictionary(group => group.Key, group => group.ToList(), StringComparer.Ordinal));
 
             int checkedCount = 0;
-            foreach (var (hash, checksum, character, _, _) in unresolved)
+            foreach (var (hash, checksum, character, wadPath, _) in unresolved)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (!engine.UnknownHashes.Contains(hash) || !copiesByChecksum.TryGetValue(checksum, out var allCopies)) continue;
@@ -783,13 +800,43 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                 var folders = new HashSet<string>(copies.Select(path => path[..Math.Max(0, path.LastIndexOf('/'))].ToLowerInvariant()), StringComparer.Ordinal);
                 foreach (string owner in new[] { character, $"jade_{character}" })
                     if (foldersByCharacter.TryGetValue(owner, out List<string> ownerFolders)) folders.UnionWith(ownerFolders);
+                if (localFolders.TryGetValue(wadPath, out var wadLocalFolders))
+                {
+                    foreach (string textureExtension in new[] { ".tex", ".dds" })
+                        if (wadLocalFolders.TryGetValue(textureExtension, out var inferredFolders))
+                            folders.UnionWith(inferredFolders);
+                }
 
                 foreach (string folder in folders)
                 {
+                    Match skinFolder = CopySkinFolderRegex.Match(folder);
                     foreach (string name in names)
                     {
                         Check(engine, $"{folder}/{name}", HashGuessStrategy.IdenticalContentCopy, "GAME identical copies");
                         checkedCount++;
+                        if (skinFolder.Success)
+                        {
+                            string owner = skinFolder.Groups["owner"].Value;
+                            string targetSkin = skinFolder.Groups["skin"].Value;
+                            string cleanOwner = owner.StartsWith("jade_", StringComparison.OrdinalIgnoreCase) ? owner[5..] : owner;
+
+                            string rewritten = CopySkinTokenRegex.Replace(name, targetSkin);
+                            if (!rewritten.Equals(name, StringComparison.OrdinalIgnoreCase))
+                            {
+                                Check(engine, $"{folder}/{rewritten}", HashGuessStrategy.IdenticalContentCopy, "GAME identical copies");
+                                checkedCount++;
+                            }
+
+                            string[] ownerPrefixes = owner.Equals(cleanOwner, StringComparison.OrdinalIgnoreCase)
+                                ? new[] { $"{cleanOwner}_{targetSkin}_" }
+                                : new[] { $"{cleanOwner}_{targetSkin}_", $"{owner}_{targetSkin}_" };
+                            foreach (string skinPrefix in ownerPrefixes)
+                            {
+                                if (name.StartsWith(skinPrefix, StringComparison.OrdinalIgnoreCase)) continue;
+                                Check(engine, $"{folder}/{skinPrefix}{name}", HashGuessStrategy.IdenticalContentCopy, "GAME identical copies");
+                                checkedCount++;
+                            }
+                        }
                     }
                     if (!engine.UnknownHashes.Contains(hash)) break;
                 }

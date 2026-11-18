@@ -16,7 +16,11 @@ namespace AssetsManager.Services.Hashes.Guessers.Game;
 // Sampler roles share vocabulary, but candidates must match the exact owning WAD link.
 internal sealed class GameMaterialTextureIndex
 {
-    private static readonly string[] Roles = { "matcap", "flow", "mask", "noise", "scroll", "distort", "iridescen" };
+    private static readonly string[] Roles =
+    {
+        "matcap", "flow", "mask", "noise", "scroll", "distort", "iridescen",
+        "bloom", "outline", "flipbook", "lut", "pattern", "deform", "rma"
+    };
     private static readonly uint MaterialClass = Fnv1a.HashLower("StaticMaterialDef");
     private static readonly uint Samplers = Fnv1a.HashLower("samplerValues");
     private static readonly uint TextureName = Fnv1a.HashLower("TextureName");

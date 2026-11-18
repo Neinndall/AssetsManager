@@ -3953,5 +3953,208 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
             Assert.Equal(new[] { run, runFast }.OrderBy(path => path), engine.Matches.Values.Select(match => match.Path).OrderBy(path => path));
             Assert.InRange(checkedCandidates, 1, 10_000);
         }
+
+        [Fact]
+        public void GameIdenticalCopiesRewritesSkinNumbersAndPrependsCharacterSkinPrefix()
+        {
+            const string knownSwapSource = "assets/characters/brand/skins/skin53/xinzhaorework_skin47_arm_tx_cm.tex";
+            const string knownPrefixSource = "assets/characters/soraka/skins/skin37/gold_rma.tex";
+            const string knownTargetFolderBin = "data/characters/soraka/skins/skin72.bin";
+            const string knownNamiFolderMarker = "assets/characters/nami/skins/skin70/nami_skin70_tx_cm.tex";
+            const string expectedRewritten = "assets/characters/nami/skins/skin70/xinzhaorework_skin70_arm_tx_cm.tex";
+            const string expectedPrefixed = "assets/characters/soraka/skins/skin72/soraka_skin72_gold_rma.tex";
+
+            string directory = Path.Combine(Path.GetTempPath(), $"assetsmanager-copies-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(directory);
+            try
+            {
+                byte[] swapBytes = Encoding.UTF8.GetBytes("identical-arm-texture-payload");
+                byte[] goldBytes = Encoding.UTF8.GetBytes("identical-gold-rma-payload");
+                byte[] binBytes = Encoding.ASCII.GetBytes("PROP");
+
+                WadBuilder.Bake(new[]
+                {
+                    new WadBakeEntry(knownSwapSource, () => new MemoryStream(swapBytes), WadChunkCompression.None),
+                    new WadBakeEntry(knownPrefixSource, () => new MemoryStream(goldBytes), WadChunkCompression.None)
+                }, Path.Combine(directory, "Source.wad.client"), new WadBakeSettings());
+
+                WadBuilder.Bake(new[]
+                {
+                    new WadBakeEntry(knownNamiFolderMarker, () => new MemoryStream(binBytes), WadChunkCompression.None),
+                    new WadBakeEntry(expectedRewritten, () => new MemoryStream(swapBytes), WadChunkCompression.None)
+                }, Path.Combine(directory, "Nami.wad.client"), new WadBakeSettings());
+
+                WadBuilder.Bake(new[]
+                {
+                    new WadBakeEntry(knownTargetFolderBin, () => new MemoryStream(binBytes), WadChunkCompression.None),
+                    new WadBakeEntry(expectedPrefixed, () => new MemoryStream(goldBytes), WadChunkCompression.None)
+                }, Path.Combine(directory, "Soraka.wad.client"), new WadBakeSettings());
+
+                var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
+                {
+                    knownSwapSource, knownPrefixSource, knownTargetFolderBin, knownNamiFolderMarker
+                }));
+                var engine = CreateEngine(HashGuessDomain.Game, expectedRewritten, expectedPrefixed);
+
+                game.GuessIdenticalCopies(engine, directory, CancellationToken.None);
+
+                Assert.Equal(0, engine.RemainingUnknownCount);
+                Assert.Equal(2, engine.Matches.Count);
+                Assert.Contains(engine.Matches.Values, match => match.Path == expectedRewritten);
+                Assert.Contains(engine.Matches.Values, match => match.Path == expectedPrefixed);
+            }
+            finally
+            {
+                if (Directory.Exists(directory)) Directory.Delete(directory, true);
+            }
+        }
+
+        [Fact]
+        public void GameGrepWadResolvesHashedMaterialsAndGluedSubmeshRoles()
+        {
+            const string bloomExpected = "assets/characters/nami/skins/skin69/nami_skin69_bodybloommask_tx_cm.tex";
+            const string gluedSubmeshExpected = "assets/characters/sona/skins/skin77/sona_skin77_genre3hair_vfx_tx_cm.tex";
+
+            var bloomSampler = new BinTreeEmbedded(
+                0,
+                Fnv1a.HashLower("StaticMaterialShaderSamplerDef"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("textureName"), "BloomMask_Texture"),
+                    new BinTreeWadChunkLink(Fnv1a.HashLower("texturePath"), XxHash64Ext.Hash(bloomExpected))
+                });
+            var hashedMaterial = new BinTreeObject(
+                0xdeadbeef,
+                Fnv1a.HashLower("StaticMaterialDef"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeHash64(0x8d39bde6, 0x1234567890abcdef),
+                    new BinTreeUnorderedContainer(
+                        Fnv1a.HashLower("samplerValues"),
+                        BinPropertyType.Embedded,
+                        new[] { bloomSampler })
+                });
+            var namiTree = new BinTree(new[] { hashedMaterial }, Array.Empty<string>());
+            using var namiStream = new MemoryStream();
+            namiTree.Write(namiStream);
+
+            var submeshOverride = new BinTreeEmbedded(
+                0,
+                Fnv1a.HashLower("SkinMeshDataProperties_MaterialOverride"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("submesh"), "Genre3_Hair_Vfx"),
+                    new BinTreeWadChunkLink(Fnv1a.HashLower("texture"), XxHash64Ext.Hash(gluedSubmeshExpected))
+                });
+            var sonaMesh = new BinTreeStruct(
+                Fnv1a.HashLower("skinMeshProperties"),
+                Fnv1a.HashLower("SkinMeshDataProperties"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeUnorderedContainer(
+                        Fnv1a.HashLower("materialOverride"),
+                        BinPropertyType.Embedded,
+                        new[] { submeshOverride })
+                });
+            var sonaSkin = new BinTreeObject(
+                "Characters/Sona/Skins/Skin77",
+                "SkinCharacterDataProperties",
+                new BinTreeProperty[] { sonaMesh });
+            var sonaTree = new BinTree(new[] { sonaSkin }, Array.Empty<string>());
+            using var sonaStream = new MemoryStream();
+            sonaTree.Write(sonaStream);
+
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, Array.Empty<string>()));
+            var engine = CreateEngine(HashGuessDomain.Game, bloomExpected, gluedSubmeshExpected);
+
+            game.GrepWad(engine, new ArraySegment<byte>(namiStream.ToArray()), "data/characters/nami/skins/skin69.bin", "Nami.wad.client", 1);
+            game.GrepWad(engine, new ArraySegment<byte>(sonaStream.ToArray()), "data/characters/sona/skins/skin77.bin", "Sona.wad.client", 2);
+
+            Assert.Equal(0, engine.RemainingUnknownCount);
+            Assert.Equal(2, engine.Matches.Count);
+            Assert.Contains(engine.Matches.Values, match => match.Path == bloomExpected);
+            Assert.Contains(engine.Matches.Values, match => match.Path == gluedSubmeshExpected);
+        }
+
+        [Fact]
+        public void GameGrepWadResolvesPngToTexLiteralAndContainerChannelSiblings()
+        {
+            const string knownNormal = "assets/maps/terrainpaint/paintlayers/mantis/visualspike/mantis_visualspike_voidtendrils_ac_n.tex";
+            const string expectedAlbedo = "assets/maps/terrainpaint/paintlayers/mantis/visualspike/mantis_visualspike_voidtendrils_ac_alb.tex";
+            const string expectedBannerTex = "assets/esports/sponsoredbanners/secret/loio_redbull.tex";
+
+            var tex1 = new BinTreeEmbedded(
+                0,
+                Fnv1a.HashLower("ShaderTexture"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("name"), "VoidNormal"),
+                    new BinTreeWadChunkLink(Fnv1a.HashLower("defaultTexturePath"), XxHash64Ext.Hash(knownNormal))
+                });
+            var tex2 = new BinTreeEmbedded(
+                0,
+                Fnv1a.HashLower("ShaderTexture"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("name"), "VoidAlb"),
+                    new BinTreeWadChunkLink(Fnv1a.HashLower("defaultTexturePath"), XxHash64Ext.Hash(expectedAlbedo))
+                });
+            var customShader = new BinTreeObject(
+                "Shaders/StaticMesh/Mantis_Env_Baked_PBR",
+                "CustomShaderDef",
+                new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("DefaultBannerTexturePath"), "ASSETS/Esports/SponsoredBanners/Secret/Loio_Redbull.png"),
+                    new BinTreeUnorderedContainer(
+                        Fnv1a.HashLower("textures"),
+                        BinPropertyType.Embedded,
+                        new[] { tex1, tex2 })
+                });
+            var tree = new BinTree(new[] { customShader }, Array.Empty<string>());
+            using var stream = new MemoryStream();
+            tree.Write(stream);
+
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[] { knownNormal }));
+            var engine = CreateEngine(HashGuessDomain.Game, expectedAlbedo, expectedBannerTex);
+
+            game.GrepWad(engine, new ArraySegment<byte>(stream.ToArray()), "data/shaders/shaders.bin", "Shaders.wad.client", 1);
+
+            Assert.Equal(0, engine.RemainingUnknownCount);
+            Assert.Equal(2, engine.Matches.Count);
+            Assert.Contains(engine.Matches.Values, match => match.Path == expectedAlbedo);
+            Assert.Contains(engine.Matches.Values, match => match.Path == expectedBannerTex);
+        }
+
+        [Fact]
+        public void GameCharacterFilesAndBannersAndAnimationBinResolveNewPatterns()
+        {
+            const string jadeAnim = "assets/characters/jade_quinnvalor/animations/quinnvalor_run_in.anm";
+            const string loioBanner = "assets/esports/sponsoredbanners/secret/loio_redbull.tex";
+            const string singleWordAnim = "assets/characters/sona/skins/skin77/animations/genre1_dance.anm";
+
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
+            {
+                "assets/characters/quinnvalor/skins/base/animations/quinnvalor_run_in.anm",
+                "assets/esports/sponsoredbanners/secret/lck_redbull.tex",
+                "assets/characters/sona/skins/skin77/animations/genre1_recall.anm",
+                "assets/characters/sona/skins/skin77/animations/dance.anm"
+            }));
+
+            var jadeEngine = CreateEngine(HashGuessDomain.Game, jadeAnim);
+            game.GuessCharactersFiles(jadeEngine, CancellationToken.None, characters: new[] { "quinnvalor" });
+            AssertResolved(jadeEngine, jadeAnim);
+
+            var bannerEngine = CreateEngine(HashGuessDomain.Game, loioBanner);
+            game.GuessEsportsBanners(bannerEngine, null, CancellationToken.None);
+            AssertResolved(bannerEngine, loioBanner);
+
+            var animEngine = CreateEngine(HashGuessDomain.Game, singleWordAnim);
+            long animChecks = game.SubstituteReferencedAnimationSuffixes(
+                animEngine,
+                new HashSet<(string Character, string Container)> { ("sona", "skin77") },
+                CancellationToken.None);
+            Assert.True(animChecks > 0);
+            AssertResolved(animEngine, singleWordAnim);
+        }
     }
 }

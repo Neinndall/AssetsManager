@@ -25,7 +25,8 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             };
         private static readonly string[] EsportsBannerEventPrefixes =
         {
-            "fst", "msi", "worlds", "ewc", "lck", "lec", "lcs", "lta", "lcp", "cblol", "pcs", "vcs", "ljl", "lla"
+            "fst", "fst26", "first_stand", "loio", "msi", "worlds", "worlds25", "worlds26",
+            "ewc", "lck", "lec", "lcs", "lta", "lcp", "cblol", "pcs", "vcs", "ljl", "lla"
         };
         private static readonly string[] EsportsBannerVersionSuffixes =
         {

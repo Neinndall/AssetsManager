@@ -76,7 +76,15 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                     CheckGameCandidates(ExpandGrepFilePath(path, HashGuessStrategy.BinLengthPath));
                 else CheckGame(path);
                 if (path.EndsWith(".png", StringComparison.OrdinalIgnoreCase))
-                    CheckGame(path[..^4] + ".dds", HashGuessStrategy.ImageExtensionVariant);
+                {
+                    string stem = path[..^4];
+                    CheckGame(stem + ".tex", HashGuessStrategy.ImageExtensionVariant);
+                    CheckGame(stem + ".dds", HashGuessStrategy.ImageExtensionVariant);
+                }
+                else if (path.EndsWith(".dds", StringComparison.OrdinalIgnoreCase))
+                {
+                    CheckGame(path[..^4] + ".tex", HashGuessStrategy.ImageExtensionVariant);
+                }
             }
 
             if (sourcePath.Equals("data/all_lua_files.manifest", StringComparison.OrdinalIgnoreCase))
@@ -357,12 +365,58 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                 {
                     case BinTreeStruct structure: VisitScope(structure.Properties.Values); break;
                     case BinTreeContainer container:
+                        GuessContainerChannelSiblings(container);
                         foreach (var child in container.Elements) VisitProperty(child);
                         break;
                     case BinTreeOptional { Value: not null } optional: VisitProperty(optional.Value); break;
                     case BinTreeMap map:
                         foreach (var pair in map) { VisitProperty(pair.Key); VisitProperty(pair.Value); }
                         break;
+                }
+            }
+
+            void GuessContainerChannelSiblings(BinTreeContainer container)
+            {
+                if (container.Elements.Count < 2 || engine.RemainingUnknownCount == 0) return;
+
+                bool hasUnresolved = false;
+                var resolvedTextures = new List<string>();
+                foreach (BinTreeStruct element in container.Elements.OfType<BinTreeStruct>())
+                {
+                    foreach (BinTreeWadChunkLink link in element.Properties.Values.OfType<BinTreeWadChunkLink>())
+                    {
+                        if (link.Value == 0) continue;
+                        if (engine.UnknownHashes.Contains(link.Value))
+                            hasUnresolved = true;
+                        else if ((knownPaths ??= HashFile.Load()).TryGetValue(link.Value, out string resolvedPath) &&
+                                 (resolvedPath.EndsWith(".tex", StringComparison.OrdinalIgnoreCase) ||
+                                  resolvedPath.EndsWith(".dds", StringComparison.OrdinalIgnoreCase)))
+                            resolvedTextures.Add(NormalizePath(resolvedPath));
+                    }
+                }
+                if (!hasUnresolved || resolvedTextures.Count == 0) return;
+
+                string[] channelSuffixes =
+                {
+                    "_alb", "_albedo", "_diff", "_diffuse", "_color", "_basecolor",
+                    "_n", "_nm", "_normal", "_mask", "_rma", "_s", "_spec", "_specular", "_emissive", "_glow"
+                };
+                foreach (string resolved in resolvedTextures)
+                {
+                    string ext = Path.GetExtension(resolved);
+                    string withoutExt = resolved[..^ext.Length];
+                    foreach (string channel in channelSuffixes)
+                    {
+                        if (!withoutExt.EndsWith(channel, StringComparison.Ordinal)) continue;
+                        string stem = withoutExt[..^channel.Length];
+                        foreach (string replacement in channelSuffixes)
+                        {
+                            if (replacement == channel) continue;
+                            Check(engine, stem + replacement + ext, HashGuessStrategy.BinLinkSibling, sourceWadPath, sourceChunkHash);
+                            if (engine.RemainingUnknownCount == 0) return;
+                        }
+                        break;
+                    }
                 }
             }
 
@@ -675,7 +729,9 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
 
         private static readonly string[] CanonicalMaterialRoles =
         {
-            "", "_mask", "_scroll", "_scrollmask", "_flowmap", "_matcap"
+            "", "_mask", "_scroll", "_scrollmask", "_flowmap", "_matcap",
+            "_bloom", "_bloommask", "_bloom_mask", "_outline", "_outlinemask", "_outline_mask",
+            "_colormask", "_color_mask", "_lut", "_flipbook", "_pattern01", "_pattern02", "_deformmask", "_rma"
         };
 
         private void GuessRegaliaBinChunkLinks(
@@ -797,6 +853,9 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             string[] parts = clean.Split('_', StringSplitOptions.RemoveEmptyEntries);
             if (parts.Length > 1)
             {
+                roles.Add(string.Concat(parts));
+                if (parts.Length >= 3)
+                    roles.Add($"{parts[0]}{parts[1]}_{string.Join('_', parts.Skip(2))}");
                 foreach (string part in parts)
                 {
                     if (!string.IsNullOrWhiteSpace(part))
@@ -827,14 +886,17 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             if (low.Length >= 3)
             {
                 descriptors.Add("_" + low);
+                descriptors.Add(low);
                 samplerStems?.Add(low);
 
                 string[] parts = low.Split('_', StringSplitOptions.RemoveEmptyEntries);
                 if (parts.Length > 1)
                 {
-                    descriptors.Add("_" + string.Join("", parts));
+                    string glued = string.Concat(parts);
+                    descriptors.Add("_" + glued);
+                    descriptors.Add(glued);
                     descriptors.Add("_" + string.Join('_', parts));
-                    samplerStems?.Add(string.Join("", parts));
+                    samplerStems?.Add(glued);
                     samplerStems?.Add(string.Join('_', parts));
                     foreach (string part in parts)
                     {
@@ -1046,7 +1108,10 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                     // Modern material names are XXH3 links; the entry still identifies the same material.
                     if (!matMatch.Success)
                         matMatch = MaterialPathRegex.Match(_resolveBinHash?.Invoke(obj.PathHash)?.Replace('\\', '/') ?? string.Empty);
-                    if (matMatch.Success)
+                    Match fallbackSkinMatch = !matMatch.Success
+                        ? SkinBinFileRegex.Match(NormalizePath(sourcePath))
+                        : Match.Empty;
+                    if (matMatch.Success || fallbackSkinMatch.Success)
                     {
                         var matLinks = new HashSet<ulong>();
                         foreach (BinTreeProperty property in obj.Properties.Values)
@@ -1080,16 +1145,30 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
 
                         if (targets.Count > 0)
                         {
-                            string mChamp = matMatch.Groups["champ"].Value.ToLowerInvariant();
-                            string mFolder = matMatch.Groups["folder"].Value.ToLowerInvariant();
-                            string mSkin = matMatch.Groups["skin"].Value.ToLowerInvariant();
-                            string rawMat = matMatch.Groups["mat"].Value.ToLowerInvariant();
-                            if (rawMat.EndsWith("_inst", StringComparison.OrdinalIgnoreCase)) rawMat = rawMat[..^5];
-                            if (rawMat.EndsWith("_mat", StringComparison.OrdinalIgnoreCase)) rawMat = rawMat[..^4];
-                            if (rawMat.StartsWith(mChamp + "_" + mSkin + "_", StringComparison.OrdinalIgnoreCase))
-                                rawMat = rawMat[(mChamp.Length + mSkin.Length + 2)..];
-                            else if (rawMat.StartsWith(mChamp + "_", StringComparison.OrdinalIgnoreCase))
-                                rawMat = rawMat[(mChamp.Length + 1)..];
+                            string mChamp;
+                            string mFolder;
+                            string mSkin;
+                            string rawMat;
+                            if (matMatch.Success)
+                            {
+                                mChamp = matMatch.Groups["champ"].Value.ToLowerInvariant();
+                                mFolder = matMatch.Groups["folder"].Value.ToLowerInvariant();
+                                mSkin = matMatch.Groups["skin"].Value.ToLowerInvariant();
+                                rawMat = matMatch.Groups["mat"].Value.ToLowerInvariant();
+                                if (rawMat.EndsWith("_inst", StringComparison.OrdinalIgnoreCase)) rawMat = rawMat[..^5];
+                                if (rawMat.EndsWith("_mat", StringComparison.OrdinalIgnoreCase)) rawMat = rawMat[..^4];
+                                if (rawMat.StartsWith(mChamp + "_" + mSkin + "_", StringComparison.OrdinalIgnoreCase))
+                                    rawMat = rawMat[(mChamp.Length + mSkin.Length + 2)..];
+                                else if (rawMat.StartsWith(mChamp + "_", StringComparison.OrdinalIgnoreCase))
+                                    rawMat = rawMat[(mChamp.Length + 1)..];
+                            }
+                            else
+                            {
+                                mChamp = fallbackSkinMatch.Groups["champ"].Value.ToLowerInvariant();
+                                mFolder = fallbackSkinMatch.Groups["folder"].Value.ToLowerInvariant();
+                                mSkin = fallbackSkinMatch.Groups["skin"].Value.ToLowerInvariant();
+                                rawMat = string.Empty;
+                            }
 
                             materialObjects.Add((mChamp, mFolder, mSkin, rawMat, targets));
                             totalUnresolved += targets.Count;
@@ -1117,40 +1196,52 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                 {
                     if (!engine.UnknownHashes.Contains(targetHash)) continue;
 
-                    var baseStems = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { rawMat };
-                    string[] rawParts = rawMat.Split('_', StringSplitOptions.RemoveEmptyEntries);
-                    if (rawParts.Length > 1)
+                    var baseStems = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    if (!string.IsNullOrEmpty(rawMat))
                     {
-                        foreach (string part in rawParts)
+                        baseStems.Add(rawMat);
+                        string[] rawParts = rawMat.Split('_', StringSplitOptions.RemoveEmptyEntries);
+                        if (rawParts.Length > 1)
                         {
-                            if (part.Length < 3 || part is "matcap" or "inst" or "mat" or "specular" or "fresnel") continue;
-                            baseStems.Add(part);
-                            if (part.EndsWith("ed", StringComparison.OrdinalIgnoreCase) && part.Length > 4)
-                                baseStems.Add(part[..^2]);
+                            foreach (string part in rawParts)
+                            {
+                                if (part.Length < 3 || part is "matcap" or "inst" or "mat" or "specular" or "fresnel") continue;
+                                baseStems.Add(part);
+                                if (part.EndsWith("ed", StringComparison.OrdinalIgnoreCase) && part.Length > 4)
+                                    baseStems.Add(part[..^2]);
+                            }
+
+                            string[] meaningful = rawParts
+                                .Where(part => part.Length >= 3 && part is not ("matcap" or "inst" or "mat" or "specular" or "fresnel"))
+                                .Select(part => part.EndsWith("ed", StringComparison.OrdinalIgnoreCase) && part.Length > 4 ? part[..^2] : part)
+                                .ToArray();
+                            if (meaningful.Length > 1)
+                            {
+                                baseStems.Add(string.Join("", meaningful));
+                                baseStems.Add(string.Join('_', meaningful));
+                            }
                         }
 
-                        string[] meaningful = rawParts
-                            .Where(part => part.Length >= 3 && part is not ("matcap" or "inst" or "mat" or "specular" or "fresnel"))
-                            .Select(part => part.EndsWith("ed", StringComparison.OrdinalIgnoreCase) && part.Length > 4 ? part[..^2] : part)
-                            .ToArray();
-                        if (meaningful.Length > 1)
+                        baseStems.UnionWith(samplerStems);
+                        foreach (string samplerStem in samplerStems)
                         {
-                            baseStems.Add(string.Join("", meaningful));
-                            baseStems.Add(string.Join('_', meaningful));
+                            baseStems.Add(rawMat + samplerStem);
+                            baseStems.Add(rawMat + "_" + samplerStem);
+                            foreach (string part in rawParts)
+                            {
+                                if (part.Length < 3 || part is "matcap" or "inst" or "mat") continue;
+                                baseStems.Add(part + samplerStem);
+                                baseStems.Add(part + "_" + samplerStem);
+                            }
                         }
                     }
-
-                    baseStems.UnionWith(samplerStems);
-                    foreach (string samplerStem in samplerStems)
+                    else
                     {
-                        baseStems.Add(rawMat + samplerStem);
-                        baseStems.Add(rawMat + "_" + samplerStem);
-                        foreach (string part in rawParts)
-                        {
-                            if (part.Length < 3 || part is "matcap" or "inst" or "mat") continue;
-                            baseStems.Add(part + samplerStem);
-                            baseStems.Add(part + "_" + samplerStem);
-                        }
+                        baseStems.Add("body");
+                        baseStems.Add("weapon");
+                        baseStems.UnionWith(samplerStems);
+                        if (submeshesBySkin.TryGetValue(mSkin, out var skinSubmeshes))
+                            baseStems.UnionWith(skinSubmeshes);
                     }
                     foreach (string baseStem in baseStems)
                     {
@@ -1603,6 +1694,8 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             }
 
             var materialTargets = new Dictionary<uint, List<ulong>>();
+            var samplerRoles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var samplerDescriptors = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (BinTreeObject material in tree.Objects.Values)
             {
                 if (material.ClassHash != StaticMaterialClassHash ||
@@ -1619,6 +1712,8 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                         if (!materialTargets.TryGetValue(material.PathHash, out List<ulong> targets))
                             materialTargets[material.PathHash] = targets = new List<ulong>();
                         targets.Add(link.Value);
+                        foreach (BinTreeString samplerText in sampler.Properties.Values.OfType<BinTreeString>())
+                            HarvestRoleTokens(samplerText.Value, samplerDescriptors, samplerRoles);
                     }
                 }
             }
@@ -1655,13 +1750,30 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
 
             if (materialTargets.Count == 0 && directTargets.Count == 0) return;
 
-            roles.RemoveWhere(string.IsNullOrWhiteSpace);
-            if (roles.Count == 0) return;
+            var combinedRoles = new HashSet<string>(roles, StringComparer.OrdinalIgnoreCase);
+            combinedRoles.UnionWith(samplerRoles);
+            if (samplerRoles.Count > 0)
+            {
+                var partAnchors = new HashSet<string>(roles, StringComparer.OrdinalIgnoreCase) { "body", "weapon" };
+                foreach (string anchor in partAnchors)
+                foreach (string samplerRole in samplerRoles)
+                {
+                    combinedRoles.Add($"{anchor}{samplerRole}");
+                    combinedRoles.Add($"{samplerRole}{anchor}");
+                    combinedRoles.Add($"{anchor}_{samplerRole}");
+                }
+            }
+
+            combinedRoles.RemoveWhere(string.IsNullOrWhiteSpace);
+            if (combinedRoles.Count == 0) return;
 
             var stems = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { $"{champ}_{skinFile}" };
             if (SkinFolderStems.TryGetValue(assetFolder, out HashSet<string> folderStems))
                 stems.UnionWith(folderStems);
 
+            string patchDecoration = skinFile.StartsWith("skin", StringComparison.OrdinalIgnoreCase)
+                ? $".skins_{champ}_{skinFile}"
+                : null;
             var candidates = new List<HashGuessCandidate>();
             foreach (string stem in stems)
             {
@@ -1669,18 +1781,22 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                 candidates.Add(new HashGuessCandidate($"{assetFolder}/{stem}_tx_gm.tex", HashGuessStrategy.CharacterTemplate));
                 candidates.Add(new HashGuessCandidate($"{assetFolder}/{stem}_mask_tx_cm.tex", HashGuessStrategy.CharacterTemplate));
                 candidates.Add(new HashGuessCandidate($"{assetFolder}/{stem}_goldfresnelmasks.tex", HashGuessStrategy.CharacterTemplate));
-                foreach (string role in roles)
+                foreach (string role in combinedRoles)
                 {
                     candidates.Add(new HashGuessCandidate($"{assetFolder}/{stem}_{role}_tx_cm.tex", HashGuessStrategy.CharacterTemplate));
                     candidates.Add(new HashGuessCandidate($"{assetFolder}/{stem}_{role}_tx_cm.dds", HashGuessStrategy.CharacterTemplate));
                     candidates.Add(new HashGuessCandidate($"{assetFolder}/{stem}_{role}_tx_gm.tex", HashGuessStrategy.CharacterTemplate));
                     candidates.Add(new HashGuessCandidate($"{assetFolder}/{stem}_{role}_tx.tex", HashGuessStrategy.CharacterTemplate));
+                    candidates.Add(new HashGuessCandidate($"{assetFolder}/{stem}_{role}.tex", HashGuessStrategy.CharacterTemplate));
                     candidates.Add(new HashGuessCandidate($"{assetFolder}/{stem}_{role}.dds", HashGuessStrategy.CharacterTemplate));
                     candidates.Add(new HashGuessCandidate($"{assetFolder}/{stem}_{role}_mask.tex", HashGuessStrategy.CharacterTemplate));
                     candidates.Add(new HashGuessCandidate($"{assetFolder}/{stem}_{role}_mask_tx_cm.tex", HashGuessStrategy.CharacterTemplate));
+                    candidates.Add(new HashGuessCandidate($"{assetFolder}/{stem}_{role}_vfx_tx_cm.tex", HashGuessStrategy.CharacterTemplate));
                     candidates.Add(new HashGuessCandidate($"{assetFolder}/{stem}_{role}_goldfresnelmasks.tex", HashGuessStrategy.CharacterTemplate));
                     candidates.Add(new HashGuessCandidate($"{assetFolder}/2x_{stem}_{role}_tx_cm.tex", HashGuessStrategy.CharacterTemplate));
                     candidates.Add(new HashGuessCandidate($"{assetFolder}/4x_{stem}_{role}_tx_cm.tex", HashGuessStrategy.CharacterTemplate));
+                    if (patchDecoration != null)
+                        candidates.Add(new HashGuessCandidate($"{assetFolder}/{stem}_{role}_tx_cm{patchDecoration}.tex", HashGuessStrategy.CharacterTemplate));
 
                     if (role.Contains('_'))
                     {

@@ -88,6 +88,8 @@ internal sealed partial class GameHashGuesser
             int slash = normalized.LastIndexOf('/');
             if (slash < 0) continue;
             string[] words = normalized[(slash + 1)..^4].Split('_');
+            if (words.Length == 1 && words[0].Length > 0)
+                suffixes.Add(words[0] + ".anm");
             for (int count = 1; count < Math.Min(5, words.Length); count++)
                 suffixes.Add(string.Join('_', words[^count..]) + ".anm");
             string[] folders = normalized[..slash].Split('/');
