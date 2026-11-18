@@ -112,12 +112,9 @@ namespace AssetsManager.Tests.xUnit.Utils
                     }
                 }
 
-                // In Wipe (left-to-right), NEW reveals on the left and OLD stays on the right.
-                int oldBadgeX = effect == TimelineTransitionEffect.Wipe ? firstFrame.Width / 2 : 0;
-                int newBadgeX = effect == TimelineTransitionEffect.Wipe ? 0 : lastFrame.Width / 2;
-
-                Assert.True(RegionHasColor(firstFrame, oldBadgeX, 0, firstFrame.Width / 2, firstFrame.Height / 3, p => p.R > 200 && p.G > 100 && p.B < 50));
-                Assert.True(RegionHasColor(lastFrame, newBadgeX, 0, lastFrame.Width / 2, lastFrame.Height / 3, p => p.G > 180 && p.R < 80));
+                // Across Wipe, Fade, and Cut, OLD stays pinned top-left and NEW stays pinned top-right.
+                Assert.True(RegionHasColor(firstFrame, 0, 0, firstFrame.Width / 2, firstFrame.Height / 3, p => p.R > 200 && p.G > 100 && p.B < 50));
+                Assert.True(RegionHasColor(lastFrame, lastFrame.Width / 2, 0, lastFrame.Width / 2, lastFrame.Height / 3, p => p.G > 180 && p.R < 80));
             }
             finally
             {

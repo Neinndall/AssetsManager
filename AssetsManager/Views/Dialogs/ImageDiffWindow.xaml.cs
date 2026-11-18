@@ -615,11 +615,11 @@ namespace AssetsManager.Views.Dialogs
                 switch (effect)
                 {
                     case TimelineTransitionEffect.Wipe:
-                        // Reveal NEW from left to right so the wipe matches reading order and Slider mode.
+                        // Keep OLD on the left and reveal NEW from the right so badges stay pinned to OLD-left / NEW-right.
                         bool sweeping = t > 0.001 && t < 0.999;
                         if (SliderSeparatorLine != null)
                             SliderSeparatorLine.Visibility = sweeping ? Visibility.Visible : Visibility.Collapsed;
-                        ApplyHorizontalSplit(t, newOnLeft: true);
+                        ApplyHorizontalSplit(1.0 - t, newOnLeft: false);
                         OldImageOverlay.Opacity = 1.0;
                         NewImageOverlay.Opacity = 1.0;
                         break;
@@ -650,20 +650,16 @@ namespace AssetsManager.Views.Dialogs
         {
             if (OldBadge == null || NewBadge == null) return;
 
+            OldBadge.HorizontalAlignment = HorizontalAlignment.Left;
+            NewBadge.HorizontalAlignment = HorizontalAlignment.Right;
+
             if (effect == TimelineTransitionEffect.Wipe)
             {
-                // Keep each badge pinned to its own half during a left-to-right wipe (NEW left, OLD right).
-                NewBadge.HorizontalAlignment = HorizontalAlignment.Left;
-                OldBadge.HorizontalAlignment = HorizontalAlignment.Right;
-
                 bool sweeping = t > 0.001 && t < 0.999;
                 OldBadge.Visibility = t < 0.999 ? Visibility.Visible : Visibility.Collapsed;
                 NewBadge.Visibility = (sweeping || t >= 0.999) ? Visibility.Visible : Visibility.Collapsed;
                 return;
             }
-
-            OldBadge.HorizontalAlignment = HorizontalAlignment.Left;
-            NewBadge.HorizontalAlignment = HorizontalAlignment.Right;
 
             bool showNew = t >= 0.5;
             OldBadge.Visibility = showNew ? Visibility.Collapsed : Visibility.Visible;
