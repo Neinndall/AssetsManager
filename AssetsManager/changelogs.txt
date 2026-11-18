@@ -18,7 +18,7 @@ Improvements
   - Hash Guessing Lab / Traverse item icon _jade and autoatlas .tex variants, animation sound-event, stance, and transition links, and gear upgrade, companion theme, and TFT submesh textures.
 
 Changes
-  - Image Diff / Keep OLD on the left and NEW on the right across Timeline Wipe, Fade, and Cut with both labels and the divider line visible during Wipe transitions.
+  - Image Diff / Sweep Timeline Wipe from left to right while keeping OLD top-left and NEW top-right with both labels and the divider line visible during transitions.
 
 Bug Fixes
   - Image Diff / Render OLD and NEW labels cleanly in exported GIF and MP4 sequences.

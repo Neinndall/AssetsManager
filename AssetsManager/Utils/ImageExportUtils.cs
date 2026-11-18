@@ -493,8 +493,8 @@ namespace AssetsManager.Utils
             {
                 case TimelineTransitionEffect.Wipe:
                 {
-                    // Keep OLD on the left and reveal NEW from the right: [0..cutX] = OLD, [cutX..width] = NEW.
-                    int cutX = Math.Clamp((int)Math.Round(width * (1.0 - t)), 0, width);
+                    // Sweep left to right revealing NEW: [0..cutX] = NEW, [cutX..width] = OLD.
+                    int cutX = Math.Clamp((int)Math.Round(width * t), 0, width);
                     int leftBytes = cutX * 4;
                     int rightBytes = stride - leftBytes;
 
@@ -502,9 +502,9 @@ namespace AssetsManager.Utils
                     {
                         int rowOffset = y * stride;
                         if (leftBytes > 0)
-                            oldLayer.AsSpan(rowOffset, leftBytes).CopyTo(destination.Slice(rowOffset, leftBytes));
+                            newLayer.AsSpan(rowOffset, leftBytes).CopyTo(destination.Slice(rowOffset, leftBytes));
                         if (rightBytes > 0)
-                            newLayer.AsSpan(rowOffset + leftBytes, rightBytes).CopyTo(destination.Slice(rowOffset + leftBytes, rightBytes));
+                            oldLayer.AsSpan(rowOffset + leftBytes, rightBytes).CopyTo(destination.Slice(rowOffset + leftBytes, rightBytes));
                     }
 
                     if (t > 0.001 && t < 0.999)

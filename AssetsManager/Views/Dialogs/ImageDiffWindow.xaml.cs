@@ -615,11 +615,11 @@ namespace AssetsManager.Views.Dialogs
                 switch (effect)
                 {
                     case TimelineTransitionEffect.Wipe:
-                        // Keep OLD on the left and reveal NEW from the right so badges stay pinned to OLD-left / NEW-right.
+                        // Sweep the divider left to right (revealing NEW) while keeping OLD top-left and NEW top-right.
                         bool sweeping = t > 0.001 && t < 0.999;
                         if (SliderSeparatorLine != null)
                             SliderSeparatorLine.Visibility = sweeping ? Visibility.Visible : Visibility.Collapsed;
-                        ApplyHorizontalSplit(1.0 - t, newOnLeft: false);
+                        ApplyHorizontalSplit(t, newOnLeft: true);
                         OldImageOverlay.Opacity = 1.0;
                         NewImageOverlay.Opacity = 1.0;
                         break;
