@@ -6,6 +6,7 @@ New Features
 
 Improvements
   - Hash Guessing Lab / Substitute synchronized year tokens across paths, project legacy .dds character assets to Jade .tex paths, strip Mat_ submesh prefixes, and cover multi-word esports banner sponsors.
+  - Hash Guessing Lab / Pair submesh and sampler anchors with identifier terms from unresolved skin BINs to resolve compound skin and chroma textures.
 
 Changes
 

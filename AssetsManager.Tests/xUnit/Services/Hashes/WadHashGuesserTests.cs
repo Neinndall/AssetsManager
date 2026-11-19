@@ -4465,5 +4465,93 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
             Assert.Contains(engine.Matches.Values, match => match.Path == expectedBanner);
             Assert.Equal(0, engine.RemainingUnknownCount);
         }
+
+        [Fact]
+        public void GameGrepWadResolvesCompoundSkinTexturesFromBinIdentifierWordPairs()
+        {
+            const string expectedWaveScreen = "assets/characters/yasuo/skins/skin97/yasuo_skin97_wavescreen_tx_cm.tex";
+            const string expectedHairBubbles = "assets/characters/zoe/skins/skin46/zoe_skin46_hair_bubbles_tx_cm.tex";
+
+            var yasuoMat = new BinTreeObject(
+                "Characters/Yasuo/Skins/Skin97/Materials/OpaqueMat",
+                "StaticMaterialDef",
+                new BinTreeProperty[]
+                {
+                    new BinTreeUnorderedContainer(Fnv1a.HashLower("samplerValues"), BinPropertyType.Embedded, new[]
+                    {
+                        new BinTreeEmbedded(0, Fnv1a.HashLower("StaticMaterialShaderSamplerDef"), new BinTreeProperty[]
+                        {
+                            new BinTreeString(Fnv1a.HashLower("TextureName"), "Diffuse_Texture"),
+                            new BinTreeWadChunkLink(Fnv1a.HashLower("texturePath"), XxHash64Ext.Hash(expectedWaveScreen))
+                        })
+                    }),
+                    new BinTreeString(Fnv1a.HashLower("paramName"), "Anim_Wave_Dir")
+                });
+            var yasuoSkin = new BinTreeObject(
+                "Characters/Yasuo/Skins/Skin97",
+                "SkinCharacterDataProperties",
+                new BinTreeProperty[]
+                {
+                    new BinTreeEmbedded(Fnv1a.HashLower("skinMeshProperties"), Fnv1a.HashLower("SkinMeshDataProperties"), new BinTreeProperty[]
+                    {
+                        new BinTreeUnorderedContainer(Fnv1a.HashLower("materialOverride"), BinPropertyType.Embedded, new[]
+                        {
+                            new BinTreeEmbedded(0, Fnv1a.HashLower("SkinMeshDataProperties_MaterialOverride"), new BinTreeProperty[]
+                            {
+                                new BinTreeString(Fnv1a.HashLower("submesh"), "ScreenSheath")
+                            })
+                        })
+                    })
+                });
+
+            var zoeMat = new BinTreeObject(
+                "Characters/Zoe/Skins/Skin46/Materials/HairMat",
+                "StaticMaterialDef",
+                new BinTreeProperty[]
+                {
+                    new BinTreeUnorderedContainer(Fnv1a.HashLower("samplerValues"), BinPropertyType.Embedded, new[]
+                    {
+                        new BinTreeEmbedded(0, Fnv1a.HashLower("StaticMaterialShaderSamplerDef"), new BinTreeProperty[]
+                        {
+                            new BinTreeString(Fnv1a.HashLower("TextureName"), "Pattern_01"),
+                            new BinTreeWadChunkLink(Fnv1a.HashLower("texturePath"), XxHash64Ext.Hash(expectedHairBubbles))
+                        })
+                    }),
+                    new BinTreeString(Fnv1a.HashLower("paramName"), "BubblesIntensity")
+                });
+            var zoeSkin = new BinTreeObject(
+                "Characters/Zoe/Skins/Skin46",
+                "SkinCharacterDataProperties",
+                new BinTreeProperty[]
+                {
+                    new BinTreeEmbedded(Fnv1a.HashLower("skinMeshProperties"), Fnv1a.HashLower("SkinMeshDataProperties"), new BinTreeProperty[]
+                    {
+                        new BinTreeUnorderedContainer(Fnv1a.HashLower("materialOverride"), BinPropertyType.Embedded, new[]
+                        {
+                            new BinTreeEmbedded(0, Fnv1a.HashLower("SkinMeshDataProperties_MaterialOverride"), new BinTreeProperty[]
+                            {
+                                new BinTreeString(Fnv1a.HashLower("submesh"), "Hair")
+                            })
+                        })
+                    })
+                });
+
+            byte[] WriteTree(params BinTreeObject[] objects)
+            {
+                using var stream = new MemoryStream();
+                new BinTree(objects, Array.Empty<string>()).Write(stream);
+                return stream.ToArray();
+            }
+
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, Array.Empty<string>()));
+            var engine = CreateEngine(HashGuessDomain.Game, expectedWaveScreen, expectedHairBubbles);
+
+            game.GrepWad(engine, new ArraySegment<byte>(WriteTree(yasuoMat, yasuoSkin)), "data/characters/yasuo/skins/skin97.bin", "Yasuo.wad.client", 1);
+            game.GrepWad(engine, new ArraySegment<byte>(WriteTree(zoeMat, zoeSkin)), "data/characters/zoe/skins/skin46.bin", "Zoe.wad.client", 2);
+
+            Assert.Contains(engine.Matches.Values, match => match.Path == expectedWaveScreen);
+            Assert.Contains(engine.Matches.Values, match => match.Path == expectedHairBubbles);
+            Assert.Equal(0, engine.RemainingUnknownCount);
+        }
     }
 }

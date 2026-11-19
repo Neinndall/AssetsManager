@@ -2249,6 +2249,136 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                     finally { if (rentedRole != null) ArrayPool<byte>.Shared.Return(rentedRole); }
                 }
             }
+
+            if (targetHashes.Count > 0 && engine.RemainingUnknownCount > 0)
+            {
+                ProbeSkinBinWordPairs(
+                    engine, data, champ, $"{assetFolder}/{champ}_{skinFile}_",
+                    roles, samplerRoles, targetHashes, sourceWadPath, sourceChunkHash, cancellationToken);
+            }
+        }
+
+        private static readonly Regex BinIdentifierRegex = new(@"[A-Za-z][A-Za-z0-9_]{2,48}", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+        private static readonly Regex CamelCaseTokenRegex = new(@"[A-Z]?[a-z]+|[A-Z]+(?=[A-Z][a-z]|\d|\b)|\d+", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+        private static readonly byte[][] BinWordPairSuffixes =
+        {
+            "_tx_cm.tex"u8.ToArray(),
+            "_tx.tex"u8.ToArray(),
+            ".tex"u8.ToArray(),
+            "_mask_tx_cm.tex"u8.ToArray(),
+            "_mask.tex"u8.ToArray()
+        };
+        private static readonly string[] CoreBinWordPairAnchors =
+        {
+            "body", "hair", "weapon", "mask", "outline", "pattern", "deform", "noise",
+            "screen", "wave", "bottom", "top", "alpha", "flipbook", "lut", "fresnel",
+            "bloom", "distort", "distortion"
+        };
+
+        // Artists often coin two-word texture names (e.g. wavescreen, hair_bubbles, jokeglow)
+        // from submesh/shader terms already present in the skin BIN.
+        private void ProbeSkinBinWordPairs(
+            HashGuessEngine engine,
+            ArraySegment<byte> data,
+            string champ,
+            string pathPrefix,
+            HashSet<string> submeshRoles,
+            HashSet<string> samplerRoles,
+            HashSet<ulong> targetHashes,
+            string sourceWadPath,
+            ulong sourceChunkHash,
+            CancellationToken cancellationToken)
+        {
+            string rawText = Encoding.Latin1.GetString(data.Array, data.Offset, data.Count);
+            var binWords = new HashSet<string>(StringComparer.Ordinal);
+            foreach (Match match in BinIdentifierRegex.Matches(rawText))
+            {
+                string token = match.Value;
+                foreach (string part in token.Split('_', StringSplitOptions.RemoveEmptyEntries))
+                {
+                    AddBinWord(part, champ, binWords);
+                    foreach (Match camel in CamelCaseTokenRegex.Matches(part))
+                        AddBinWord(camel.Value, champ, binWords);
+                }
+                if (binWords.Count >= 1600) break;
+            }
+            if (binWords.Count == 0) return;
+
+            var anchors = new HashSet<string>(CoreBinWordPairAnchors, StringComparer.Ordinal);
+            foreach (string role in submeshRoles)
+            {
+                AddBinWord(role, champ, anchors);
+                foreach (Match camel in CamelCaseTokenRegex.Matches(role))
+                    AddBinWord(camel.Value, champ, anchors);
+            }
+            foreach (string role in samplerRoles)
+                AddBinWord(role, champ, anchors);
+
+            byte[] prefixBytes = Encoding.UTF8.GetBytes(pathPrefix.ToLowerInvariant());
+            byte[][] anchorBytes = anchors.Take(140).Select(Encoding.UTF8.GetBytes).ToArray();
+            byte[][] wordBytes = binWords.Select(Encoding.UTF8.GetBytes).ToArray();
+            Span<byte> pairBuf = stackalloc byte[64];
+
+            foreach (byte[] w1 in anchorBytes)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (targetHashes.Count == 0 || engine.RemainingUnknownCount == 0) return;
+
+                foreach (byte[] w2 in wordBytes)
+                {
+                    if (targetHashes.Count == 0) return;
+                    int gluedLen = w1.Length + w2.Length;
+                    if (gluedLen + 1 > pairBuf.Length) continue;
+
+                    // w1 + w2
+                    w1.CopyTo(pairBuf);
+                    w2.CopyTo(pairBuf[w1.Length..]);
+                    ProbeSuffixes(pairBuf[..gluedLen]);
+
+                    // w1 + '_' + w2
+                    pairBuf[w1.Length] = (byte)'_';
+                    w2.CopyTo(pairBuf[(w1.Length + 1)..]);
+                    ProbeSuffixes(pairBuf[..(gluedLen + 1)]);
+
+                    if (targetHashes.Count == 0) return;
+
+                    // w2 + w1
+                    w2.CopyTo(pairBuf);
+                    w1.CopyTo(pairBuf[w2.Length..]);
+                    ProbeSuffixes(pairBuf[..gluedLen]);
+
+                    // w2 + '_' + w1
+                    pairBuf[w2.Length] = (byte)'_';
+                    w1.CopyTo(pairBuf[(w2.Length + 1)..]);
+                    ProbeSuffixes(pairBuf[..(gluedLen + 1)]);
+                }
+            }
+
+            void ProbeSuffixes(ReadOnlySpan<byte> stem)
+            {
+                foreach (byte[] suffix in BinWordPairSuffixes)
+                {
+                    if (targetHashes.Count > 0 &&
+                        MaterialTexturePathMatcher.TryMatchParts(prefixBytes, stem, suffix, ReadOnlySpan<byte>.Empty,
+                            targetHashes, out ulong hitHash, out string hitPath))
+                    {
+                        targetHashes.Remove(hitHash);
+                        Check(engine, hitPath, HashGuessStrategy.CharacterTemplate, sourceWadPath, sourceChunkHash);
+                    }
+                }
+            }
+
+            static void AddBinWord(string raw, string champion, HashSet<string> target)
+            {
+                if (raw.Length is < 2 or > 14) return;
+                string low = raw.ToLowerInvariant();
+                if (low == champion || low.StartsWith("skin", StringComparison.Ordinal)) return;
+                for (int i = 0; i < low.Length; i++)
+                {
+                    if (!char.IsAsciiLetterOrDigit(low[i])) return;
+                }
+                target.Add(low);
+            }
         }
 
         private IReadOnlyDictionary<string, HashSet<string>> SkinFolderStems =>
