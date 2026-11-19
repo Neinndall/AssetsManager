@@ -1,6 +1,7 @@
 AssetsManager - League of Legends | v4.1.0.11
 
 HOTFIX UPDATE
+This hotfix adds MP4 export, Cut transitions, and zoom-region cropping to Image Diff, expands GAME hash guessing patterns and speeds up GrepWad material and skin scanning in Hash Guessing Lab, improves Asset Tracker bundle discovery, and fixes particle, shader, and rendering issues in 3D Studio.
 
 New Features
   - Image Diff / Export Timeline sequences as H.264 MP4 video alongside animated GIF.
@@ -16,6 +17,7 @@ Improvements
   - Hash Guessing Lab / Resolve hashed-name character materials, glued submesh and sampler roles (bloom, outline, flipbook, lut, pattern, deform, rma), container channel siblings, and .png/.dds-to-.tex literals in GrepWad.
   - Hash Guessing Lab / Rewrite skin numbers and character-skin prefixes on identical-checksum WAD copies, expand Jade /animations/ and .tex ability icon projections, and add recent 2025/2026 esports banner event prefixes.
   - Hash Guessing Lab / Traverse item icon _jade and autoatlas .tex variants, animation sound-event, stance, and transition links, and gear upgrade, companion theme, and TFT submesh textures.
+  - Hash Guessing Lab / Speed up GrepWad skin and material texture scanning while keeping full hash coverage.
 
 Changes
   - Image Diff / Sweep Timeline Wipe from left to right while keeping OLD top-left and NEW top-right with both labels and the divider line visible during transitions.
