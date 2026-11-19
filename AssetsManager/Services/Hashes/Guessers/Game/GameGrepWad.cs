@@ -2062,6 +2062,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
 
             var directTargets = new HashSet<ulong>();
             var roles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var rawSubmeshes = new HashSet<string>(StringComparer.Ordinal);
 
             var meshRoots = tree.Objects.Values.SelectMany(obj => obj.Properties.Values)
                 .Concat(tree.DataOverrides.Select(overrideData => overrideData.Property));
@@ -2098,6 +2099,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                         directTargets.Add(directLink.Value);
                     }
 
+                    rawSubmeshes.Add(submesh.Value);
                     HarvestSubmeshRoleTokens(submesh.Value, roles);
                 }
             }
@@ -2254,7 +2256,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             {
                 ProbeSkinBinWordPairs(
                     engine, data, champ, $"{assetFolder}/{champ}_{skinFile}_",
-                    roles, samplerRoles, targetHashes, sourceWadPath, sourceChunkHash, cancellationToken);
+                    rawSubmeshes, roles, samplerRoles, targetHashes, sourceWadPath, sourceChunkHash, cancellationToken);
             }
         }
 
@@ -2268,12 +2270,6 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             "_mask_tx_cm.tex"u8.ToArray(),
             "_mask.tex"u8.ToArray()
         };
-        private static readonly string[] CoreBinWordPairAnchors =
-        {
-            "body", "hair", "weapon", "mask", "outline", "pattern", "deform", "noise",
-            "screen", "wave", "bottom", "top", "alpha", "flipbook", "lut", "fresnel",
-            "bloom", "distort", "distortion"
-        };
 
         // Artists often coin two-word texture names (e.g. wavescreen, hair_bubbles, jokeglow)
         // from submesh/shader terms already present in the skin BIN.
@@ -2282,6 +2278,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             ArraySegment<byte> data,
             string champ,
             string pathPrefix,
+            HashSet<string> rawSubmeshes,
             HashSet<string> submeshRoles,
             HashSet<string> samplerRoles,
             HashSet<ulong> targetHashes,
@@ -2304,15 +2301,21 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             }
             if (binWords.Count == 0) return;
 
-            var anchors = new HashSet<string>(CoreBinWordPairAnchors, StringComparer.Ordinal);
-            foreach (string role in submeshRoles)
+            var anchors = new HashSet<string>(StringComparer.Ordinal);
+            foreach (string rawSubmesh in rawSubmeshes)
             {
-                AddBinWord(role, champ, anchors);
-                foreach (Match camel in CamelCaseTokenRegex.Matches(role))
-                    AddBinWord(camel.Value, champ, anchors);
+                foreach (string part in rawSubmesh.Split('_', StringSplitOptions.RemoveEmptyEntries))
+                {
+                    AddBinWord(part, champ, anchors);
+                    foreach (Match camel in CamelCaseTokenRegex.Matches(part))
+                        AddBinWord(camel.Value, champ, anchors);
+                }
             }
+            foreach (string role in submeshRoles)
+                AddBinWord(role, champ, anchors);
             foreach (string role in samplerRoles)
                 AddBinWord(role, champ, anchors);
+            if (anchors.Count == 0) return;
 
             byte[] prefixBytes = Encoding.UTF8.GetBytes(pathPrefix.ToLowerInvariant());
             byte[][] anchorBytes = anchors.Take(140).Select(Encoding.UTF8.GetBytes).ToArray();
