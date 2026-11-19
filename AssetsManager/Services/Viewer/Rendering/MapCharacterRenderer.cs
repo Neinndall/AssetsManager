@@ -80,7 +80,8 @@ namespace AssetsManager.Services.Viewer.Rendering
             float TimeSeconds,
             float SelfIllumination = 0f,
             int PassIndex = -1,
-            int Order = 0);
+            int Order = 0,
+            GameMaterialState GameState = null);
 
         private static readonly Vector3 PreviewWireColor = new(67f / 255f, 1f, 163f / 255f);
         private static readonly Vector3 DefaultUntextured = new(0.5f);
@@ -444,7 +445,15 @@ namespace AssetsManager.Services.Viewer.Rendering
                 if (submeshHidden)
                     continue;
 
-                var command = new DrawCommand(resources, range, world, palette, distance, timeSeconds, group.Asset?.Materials?.SelfIllumination ?? 0f);
+                var command = new DrawCommand(
+                    resources,
+                    range,
+                    world,
+                    palette,
+                    distance,
+                    timeSeconds,
+                    group.Asset?.Materials?.SelfIllumination ?? 0f,
+                    GameState: previewVisibility ? group.PreviewGameState : null);
                 if (range.Transparent) _transparent.Add(command);
                 else _opaque.Add(command);
             }
@@ -641,6 +650,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                     in drawFrame,
                     command.Resources.ProgramTextureLookup ??= CreateProgramTextureLookup(command.Resources),
                     command.SelfIllumination,
+                    state: command.GameState,
                     hasColors: command.Resources.ColorVbo != 0))
             {
                 _gameBindingsActive = previousBindings;

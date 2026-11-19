@@ -145,6 +145,9 @@ public sealed class VfxSpellFlightPath
         if (stepper == null) return null;
 
         int most = (int)Math.Ceiling(LongestFlight / FlightStep);
+        double? splineGravityDuration = heightKind == VfxSpellMissileHeightKind.Gravity && stepper is SplineStepper spline
+            ? spline.GravityDuration(most)
+            : null;
         var positions = new List<Vector3>(most + 1) { start };
         var velocities = new List<Vector3>(most + 1) { stepper.InitialVelocity };
         Vector3 position = start;
@@ -156,7 +159,16 @@ public sealed class VfxSpellFlightPath
             MovementTick tick = stepper.Step(position, now, FlightStep);
             Vector3 next = position + tick.Displacement;
 
-            if (heightKind != VfxSpellMissileHeightKind.None)
+            if (splineGravityDuration is double flightTime)
+            {
+                // The spline reports a unit tangent for facing, not an engine-units-per-second velocity.
+                // Gravity must use the flight clock rather than the spline's Hermite parameter.
+                double fraction = tick.Arrived ? 1d : flightTime > 0d ? Math.Min(now / flightTime, 1d) : 0d;
+                double gravity = FiniteOr(missile.HeightSolverGravity, FiniteOr(missile.Gravity, 0f));
+                double arc = 0.5d * gravity * flightTime * flightTime * fraction * (1d - fraction);
+                next.Y = (float)(start.Y + (target.Y - start.Y) * fraction + arc);
+            }
+            else if (heightKind != VfxSpellMissileHeightKind.None)
             {
                 float fraction = tick.Fraction ?? TravelFraction(start, next, target, tick.Arrived);
                 next.Y = SolveHeight(missile, heightKind, start, target, position, next, tick.Velocity, fraction);
@@ -673,21 +685,44 @@ public sealed class VfxSpellFlightPath
         private Vector3 WorldDirection(Vector3 p)
             => UnitOrForward(new(p.X*_right.X+p.Z*_forward.X, p.Y, p.X*_right.Z+p.Z*_forward.Z));
 
+        public double GravityDuration(int most)
+        {
+            if (_travelTime is float travelTime) return travelTime;
+
+            double progress = 0d;
+            for (int step = 1; step <= most; step++)
+            {
+                double next = AdvanceAtFixedSpeed(progress, FlightStep);
+                if (next >= 1d) return step * FlightStep;
+                if (next == progress) return 0d;
+                progress = next;
+            }
+            return LongestFlight;
+        }
+
+        private double AdvanceAtFixedSpeed(double progress, double dt)
+        {
+            double left = dt * (_speed ?? 0f);
+            while (left > 0d && progress < 1d)
+            {
+                double piece = Flat(Tangent((float)progress)) * ArcStep;
+                if (piece <= 0d) break;
+                if (piece >= left)
+                {
+                    progress += ArcStep * left / piece;
+                    break;
+                }
+                progress += ArcStep;
+                left -= piece;
+            }
+            return progress;
+        }
+
         public MovementTick Step(Vector3 position, double now, double dt)
         {
-            if (_travelTime.HasValue)
-                _t = _travelTime.Value > 0f ? _t + dt / _travelTime.Value : 1d;
-            else
-            {
-                double left = dt * (_speed ?? 0f);
-                while (left > 0d && _t < 1d)
-                {
-                    double piece = Flat(Tangent((float)_t)) * ArcStep;
-                    if (piece <= 0d) break;
-                    if (piece >= left) { _t += ArcStep * left / piece; left = 0d; }
-                    else { _t += ArcStep; left -= piece; }
-                }
-            }
+            _t = _travelTime is float travelTime
+                ? travelTime > 0f ? _t + dt / travelTime : 1d
+                : AdvanceAtFixedSpeed(_t, dt);
             bool arrived = _t >= 1d;
             float at = (float)Math.Min(_t,1d);
             float speed = _speed ?? (_travelTime is > 0f ? _distance / _travelTime.Value : 0f);

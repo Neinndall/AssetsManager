@@ -33,7 +33,7 @@ namespace AssetsManager.Views.Models.Monitor
             };
             foreach (var category in categories)
                 if (category.BaseUrl.EndsWith("/bundles/", System.StringComparison.Ordinal))
-                    category.FileNameSuffixes = new() { "", "_1" };
+                    category.FileNameSuffixes = new() { "", "_1", "_2", "_3" };
             return categories;
         }
     }

@@ -103,6 +103,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             Vector4? structFallback = null)
         {
             if (!p.TryGetValue(field, out var prop)) return null;
+            return ReadCurve4Property(prop, structFallback);
+        }
+
+        internal static VfxCurve4? ReadCurve4Property(BinTreeProperty prop, Vector4? structFallback = null)
+        {
             if (prop is BinTreeStruct v)
             {
                 Func<BinTreeProperty, AuthoredValue<Vector4>?> reader =
@@ -322,6 +327,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
 
         internal static byte NormalizeEnumByte(int? value, int maxInclusive, byte fallback)
             => value is >= 0 && value <= maxInclusive ? (byte)value.Value : fallback;
+
+        /// <summary>Reads an emitter blendMode byte/u32 enum property, returning the authored default when absent or out of range.</summary>
+        internal static byte ReadBlendMode(IReadOnlyDictionary<uint, BinTreeProperty> p, uint blendModeHash)
+            => p is null
+                ? (byte)VfxAuthoredDefaults.BlendMode
+                : NormalizeEnumByte(GetU8(p, blendModeHash) ?? (int?)AsU32(Get(p, blendModeHash)), 8, (byte)VfxAuthoredDefaults.BlendMode);
 
         internal static float? GetF32(IReadOnlyDictionary<uint, BinTreeProperty> p, uint hash) => AsF32(Get(p, hash));
 

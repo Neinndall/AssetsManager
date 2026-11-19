@@ -16,7 +16,11 @@ namespace AssetsManager.Services.Hashes.Guessers.Game;
 // Sampler roles share vocabulary, but candidates must match the exact owning WAD link.
 internal sealed class GameMaterialTextureIndex
 {
-    private static readonly string[] Roles = { "matcap", "flow", "mask", "noise", "scroll", "distort", "iridescen" };
+    private static readonly string[] Roles =
+    {
+        "matcap", "flow", "mask", "noise", "scroll", "distort", "iridescen",
+        "bloom", "outline", "flipbook", "lut", "pattern", "deform", "rma"
+    };
     private static readonly uint MaterialClass = Fnv1a.HashLower("StaticMaterialDef");
     private static readonly uint Samplers = Fnv1a.HashLower("samplerValues");
     private static readonly uint TextureName = Fnv1a.HashLower("TextureName");
@@ -157,26 +161,31 @@ internal sealed class GameMaterialTextureIndex
         if (!skin.Success) return 0;
         string directory = $"assets/characters/{skin.Groups[1].Value}/{skin.Groups[2].Value}/{skin.Groups[3].Value}/particles/";
         var scanned = _scanned.GetOrCreateValue(engine);
+        var targets = SamplerTargets(engine, tree, cancellationToken).ToHashSet();
+        targets.RemoveWhere(target => !scanned.TryAdd(new Scope(target, directory, "shared-particles"), 0));
+        if (targets.Count == 0) return 0;
         long checkedCandidates = 0;
-        foreach (ulong target in SamplerTargets(engine, tree, cancellationToken).Distinct())
+        bool complete = false;
+        try
         {
-            var scope = new Scope(target, directory, "shared-particles");
-            if (!scanned.TryAdd(scope, 0)) continue;
-            bool complete = false;
-            try
+            // Hash each shared particle basename once per directory against all pending sampler links.
+            foreach (string name in _sharedParticleNames)
             {
-                foreach (string name in _sharedParticleNames)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    if (!engine.UnknownHashes.Contains(target)) break;
-                    if (checkedCandidates >= candidateBudget) return checkedCandidates;
-                    checkedCandidates++;
-                    engine.CheckNormalizedParts(directory, name, ReadOnlySpan<char>.Empty,
-                        HashGuessStrategy.BinLinkSibling, wad, chunk, expectedHash: target);
-                }
-                complete = true;
+                cancellationToken.ThrowIfCancellationRequested();
+                if (targets.Count == 0) break;
+                if (checkedCandidates >= candidateBudget) return checkedCandidates;
+                checkedCandidates++;
+                if (engine.CheckNormalizedParts(directory, name, ReadOnlySpan<char>.Empty,
+                    HashGuessStrategy.BinLinkSibling, wad, chunk, expectedHashes: targets))
+                    targets.RemoveWhere(target => !engine.UnknownHashes.Contains(target));
             }
-            finally { if (!complete) scanned.TryRemove(scope, out _); }
+            complete = true;
+        }
+        finally
+        {
+            if (!complete)
+                foreach (ulong target in targets)
+                    scanned.TryRemove(new Scope(target, directory, "shared-particles"), out _);
         }
         return checkedCandidates;
     }
@@ -208,25 +217,36 @@ internal sealed class GameMaterialTextureIndex
         string directory = $"assets/characters/{character}/{skin.Groups[2].Value}/{container}/";
         string[] prefixes = { directory, directory + character + "_", directory + character + "_" + container + "_", directory + "particles/" };
         var scanned = _scanned.GetOrCreateValue(engine);
-        long checkedCandidates = 0;
+        var targetsByRole = new Dictionary<string, HashSet<ulong>>(StringComparer.Ordinal);
         foreach (var (target, role) in Targets(engine, tree, cancellationToken))
         {
-            var scope = new Scope(target, directory, role);
-            if (!scanned.TryAdd(scope, 0)) continue;
+            if (!scanned.TryAdd(new Scope(target, directory, role), 0)) continue;
+            if (!targetsByRole.TryGetValue(role, out HashSet<ulong> set))
+                targetsByRole[role] = set = new HashSet<ulong>();
+            set.Add(target);
+        }
+
+        long checkedCandidates = 0;
+        foreach (var (role, roleTargets) in targetsByRole)
+        {
             bool complete = false;
             try
             {
+                // Hash each role filename once per directory against all pending links of that role.
                 foreach (string file in _names[role])
                 {
-                    if (!engine.UnknownHashes.Contains(target)) break;
+                    if (roleTargets.Count == 0) break;
                     foreach (string prefix in prefixes)
                     {
                         cancellationToken.ThrowIfCancellationRequested();
                         if (checkedCandidates >= candidateBudget) return checkedCandidates;
                         checkedCandidates++;
-                        engine.CheckNormalizedParts(prefix, file, ReadOnlySpan<char>.Empty,
-                            HashGuessStrategy.BinLinkSibling, wad, chunk, expectedHash: target);
-                        if (!engine.UnknownHashes.Contains(target)) break;
+                        if (engine.CheckNormalizedParts(prefix, file, ReadOnlySpan<char>.Empty,
+                            HashGuessStrategy.BinLinkSibling, wad, chunk, expectedHashes: roleTargets))
+                        {
+                            roleTargets.RemoveWhere(target => !engine.UnknownHashes.Contains(target));
+                            if (roleTargets.Count == 0) break;
+                        }
                     }
                 }
                 complete = true;
@@ -234,7 +254,9 @@ internal sealed class GameMaterialTextureIndex
             finally
             {
                 // Interrupted scopes must remain eligible when the same engine resumes.
-                if (!complete) scanned.TryRemove(scope, out _);
+                if (!complete)
+                    foreach (ulong target in roleTargets)
+                        scanned.TryRemove(new Scope(target, directory, role), out _);
             }
         }
         return checkedCandidates;

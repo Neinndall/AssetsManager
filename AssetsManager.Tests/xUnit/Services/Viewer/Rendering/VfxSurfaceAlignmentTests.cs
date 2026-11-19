@@ -23,18 +23,21 @@ public sealed class VfxSurfaceAlignmentTests
             RenderState: VfxEmitterRenderState.Default with { DisableBackfaceCull = true });
 
     [Theory]
-    [InlineData(VfxPrimitiveKind.AttachedMesh, false, -1f)]
-    [InlineData(VfxPrimitiveKind.AttachedMesh, true, 0f)]
-    [InlineData(VfxPrimitiveKind.Mesh, true, -1f)]
-    [InlineData(VfxPrimitiveKind.CameraQuad, true, -1f)]
-    [InlineData(VfxPrimitiveKind.CameraTrail, true, -1f)]
-    public void AlignmentPreservesOffsetsOutsideStandardAttachedSurfaces(VfxPrimitiveKind kind, bool align, float expected)
+    [InlineData(VfxPrimitiveKind.AttachedMesh, false, -1f, -1f)]
+    [InlineData(VfxPrimitiveKind.AttachedMesh, true, -1f, 0f)]
+    [InlineData(VfxPrimitiveKind.AttachedMesh, true, 1f, 1f)]
+    [InlineData(VfxPrimitiveKind.AttachedMesh, true, 3f, 3f)]
+    [InlineData(VfxPrimitiveKind.Mesh, true, -1f, -1f)]
+    [InlineData(VfxPrimitiveKind.CameraQuad, true, -1f, -1f)]
+    [InlineData(VfxPrimitiveKind.CameraTrail, true, -1f, -1f)]
+    public void AlignmentPreservesOffsetsOutsideStandardAttachedSurfaces(
+        VfxPrimitiveKind kind, bool align, float authored, float expected)
     {
-        var definition = Definition(kind);
+        var definition = Definition(kind) with { DepthPushPull = authored };
         var parameters = new Dictionary<string, Vector4>();
         VfxShaderParameterUtils.PopulateNativeParameters(parameters, definition, 0, align);
         Assert.Equal(expected, parameters["PARTICLE_DEPTH_PUSH_PULL"].X);
-        Assert.Equal(-1f, definition.DepthPushPull);
+        Assert.Equal(authored, definition.DepthPushPull);
     }
 
     [Fact]

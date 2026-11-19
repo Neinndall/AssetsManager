@@ -70,7 +70,7 @@ internal sealed class GameBinLinkTemplateIndex
                 if (!unresolved && !resolved) continue;
                 foreach (var identifier in identifiers)
                 {
-                    for (int variant = 0; variant < (identifier.Key.Kind == 3 ? 1 : 5); variant++)
+                    for (int variant = 0; variant < (identifier.Key.Kind == 3 ? 1 : 6); variant++)
                     {
                         cancellationToken.ThrowIfCancellationRequested();
                         string value = Transform(identifier.Value, variant);
@@ -191,6 +191,7 @@ internal sealed class GameBinLinkTemplateIndex
         2 => value.Replace("_", "", StringComparison.Ordinal).Replace("-", "", StringComparison.Ordinal).ToLowerInvariant(),
         3 => value.Contains('_') ? value[..value.LastIndexOf('_')].ToLowerInvariant() : value.ToLowerInvariant(),
         4 => string.Join('_', value.Split('_').SkipLast(2)).ToLowerInvariant(),
+        5 => value.TrimEnd('0', '1', '2', '3', '4', '5', '6', '7', '8', '9').TrimEnd('_').ToLowerInvariant(),
         _ => value.ToLowerInvariant()
     };
 }

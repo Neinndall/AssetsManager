@@ -61,6 +61,7 @@ namespace AssetsManager.Shaders
             BaseInstanceZero,
             MipLevelsOne,
             SafeReciprocal,
+            SafeHalfUnpack,
             OrthographicParticleDepth
         }
 
@@ -811,6 +812,9 @@ namespace AssetsManager.Shaders
         private static readonly Regex ExtensionRegex = new(
             @"#extension GL_EXT_texture_(buffer|cube_map_array) : require\n",
             RegexOptions.Compiled | RegexOptions.CultureInvariant);
+        private static readonly Regex UnpackHalfRegex = new(
+            @"\bunpackHalf2x16\s*\(",
+            RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
         private static string NormalizeConstantBuffers(string source, ShaderReflectionData reflection)
         {
@@ -847,6 +851,9 @@ namespace AssetsManager.Shaders
             (result, int reciprocals) = SafeReciprocal(result);
             if (reciprocals > 0)
                 applied.Add(AppliedPatch.SafeReciprocal);
+            (result, int halfUnpacks) = SafeHalfUnpack(result);
+            if (halfUnpacks > 0)
+                applied.Add(AppliedPatch.SafeHalfUnpack);
             result = LinkFixup(result, stage);
             return (result, applied.Distinct().OrderBy(value => value).ToArray());
         }
@@ -983,6 +990,44 @@ namespace AssetsManager.Shaders
 
             builder.Append(source, at, source.Length - at);
             return (WithHelpers(builder.ToString(), SafeReciprocalHelper), count);
+        }
+
+        // IEEE 754 binary16 decode using bit-field assembly for normals/Inf/NaN and exact float scaling
+        // (m * 2^-24) for subnormals avoids GLSL constant-folding or driver FTZ flushing subnormals to zero,
+        // matching D3D11 f16tof32 and preserving NaN payloads.
+        private const string SafeHalfUnpackHelper =
+            "highp vec2 dxbcUnpackHalf2x16(highp uint v)\n" +
+            "{\n" +
+            "    highp uvec2 h = uvec2(v & 0xFFFFu, v >> 16u);\n" +
+            "    highp uvec2 s = (h & 0x8000u) << 16u;\n" +
+            "    highp uvec2 e = (h >> 10u) & 0x1Fu;\n" +
+            "    highp uvec2 m = h & 0x03FFu;\n" +
+            "    highp uvec2 subBits = floatBitsToUint(vec2(m) * uintBitsToFloat(0x33800000u)) | s;\n" +
+            "    highp uvec2 normBits = s | ((e + 112u) << 23u) | (m << 13u);\n" +
+            "    highp uvec2 infNanBits = s | 0x7F800000u | (m << 13u) | uvec2(m.x != 0u ? 0x00400000u : 0u, m.y != 0u ? 0x00400000u : 0u);\n" +
+            "    return vec2(\n" +
+            "        uintBitsToFloat(e.x == 0u ? subBits.x : (e.x == 31u ? infNanBits.x : normBits.x)),\n" +
+            "        uintBitsToFloat(e.y == 0u ? subBits.y : (e.y == 31u ? infNanBits.y : normBits.y)));\n" +
+            "}\n";
+
+        /// <summary>Routes <c>unpackHalf2x16</c> through an IEEE 754 bit-assembly helper matching D3D11 <c>f16tof32</c>.</summary>
+        public static (string Source, int Count) SafeHalfUnpack(string source)
+        {
+            if (string.IsNullOrEmpty(source))
+                return (source ?? string.Empty, 0);
+
+            int count = 0;
+            string rewritten = UnpackHalfRegex.Replace(source, _ =>
+            {
+                count++;
+                return "dxbcUnpackHalf2x16(";
+            });
+            if (count == 0)
+                return (source, 0);
+
+            bool hasHelper = rewritten.Contains("dxbcUnpackHalf2x16(highp uint", StringComparison.Ordinal) ||
+                             rewritten.Contains("dxbcUnpackHalf2x16(uint", StringComparison.Ordinal);
+            return (hasHelper ? rewritten : WithHelpers(rewritten, SafeHalfUnpackHelper), count);
         }
 
         private static int MatchingParenthesis(string source, int open)

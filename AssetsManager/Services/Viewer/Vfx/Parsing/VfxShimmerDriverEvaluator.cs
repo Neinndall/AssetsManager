@@ -32,6 +32,33 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             return result is null ? null : new Vector4(result[0], result[1], result[2], result[3]);
         }
 
+        internal static bool TryGetParticleCurveProperty(BinTreeProperty value, int width, out BinTreeProperty curveValue)
+        {
+            curveValue = null;
+            if (value is BinTreeOptional optional) value = optional.Value;
+            if (value is BinTreeStruct wrapper &&
+                Registry.TryGetValue(wrapper.ClassHash, out Driver wrapperDriver) &&
+                wrapperDriver.Operation == "property" &&
+                wrapperDriver.Width == width &&
+                wrapperDriver.Inputs.Length > 0)
+            {
+                value = wrapper.Properties.GetValueOrDefault(wrapperDriver.Inputs[0].Field);
+                if (value is BinTreeOptional innerOptional) value = innerOptional.Value;
+            }
+            if (value is not BinTreeStruct node ||
+                !Registry.TryGetValue(node.ClassHash, out Driver driver) ||
+                driver.Operation != "curve" ||
+                driver.Width != width)
+                return false;
+            if (VfxValueParser.AsF32(node.Properties.GetValueOrDefault(Hash("frequency"))) != 2f)
+                return false;
+            BinTreeProperty held = node.Properties.GetValueOrDefault(driver.Slot);
+            if (!HasAnimatedDynamics(held))
+                return false;
+            curveValue = held;
+            return true;
+        }
+
         internal static float[] Evaluate(BinTreeProperty value, int width, int depth = 0)
         {
             if (width < 1 || width > 4) throw new ArgumentOutOfRangeException(nameof(width));
@@ -47,16 +74,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 return Fit(Components(Field(driver.Slot)) ?? driver.Defaults, width);
             if (driver.Operation == "curve")
             {
-                var held = Field(driver.Slot) as BinTreeStruct;
-                var dynamics = held?.Properties.GetValueOrDefault(Hash("dynamics")) as BinTreeStruct;
-                if (dynamics?.Properties.GetValueOrDefault(Hash("times")) is BinTreeContainer times &&
-                    dynamics.Properties.GetValueOrDefault(Hash("values")) is BinTreeContainer values)
-                {
-                    for (int i = 0; i < Math.Min(times.Elements.Count, values.Elements.Count); i++)
-                        if (Components(times.Elements[i]) is { Length: 1 } && Components(values.Elements[i]) is not null)
-                            return null;
-                }
-                return Fit(Components(held?.Properties.GetValueOrDefault(Hash("constantValue"))) ?? driver.Defaults, width);
+                BinTreeProperty held = Field(driver.Slot);
+                if (HasAnimatedDynamics(held))
+                    return null;
+                return Fit(Components((held as BinTreeStruct)?.Properties.GetValueOrDefault(Hash("constantValue"))) ?? driver.Defaults, width);
             }
             if (driver.Operation == "dynamic") return null;
             if (driver.Operation == "easing")
@@ -129,6 +150,19 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                     break;
             }
             return result;
+        }
+
+        private static bool HasAnimatedDynamics(BinTreeProperty value)
+        {
+            if ((value as BinTreeStruct)?.Properties.GetValueOrDefault(Hash("dynamics")) is not BinTreeStruct dynamics)
+                return false;
+            if (dynamics.Properties.GetValueOrDefault(Hash("times")) is not BinTreeContainer times ||
+                dynamics.Properties.GetValueOrDefault(Hash("values")) is not BinTreeContainer values)
+                return false;
+            for (int i = 0; i < Math.Min(times.Elements.Count, values.Elements.Count); i++)
+                if (Components(times.Elements[i]) is { Length: 1 } && Components(values.Elements[i]) is not null)
+                    return true;
+            return false;
         }
 
         private static float[] Components(BinTreeProperty value)

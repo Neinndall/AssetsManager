@@ -14,6 +14,10 @@ namespace AssetsManager.Services.Viewer.Rendering
         bool HasPreparedEarlyDistortion => false;
         bool NeedsPreparedSceneCapture => false;
         void CapturePreparedSceneInputs() { }
+        bool NeedsPreparedPostGroundColorCapture => false;
+        void CapturePreparedPostGroundColorInputs() { }
+        bool NeedsPreparedPostColorCapture => false;
+        void CapturePreparedPostColorInputs() { }
         void RenderPreparedShadowPass(System.Numerics.Matrix4x4 lightViewProjection, System.Numerics.Matrix4x4 eyeView) { }
         void PrepareStencilScene(VfxStencilScene scene) { }
         IDisposable BeginPreparedRenderBatch();
@@ -56,6 +60,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             bool groundBeforeCharacters = ground && !earlyDistortion;
             bool depthPrepared = groundBeforeCharacters && needsScene && renderSceneDepth != null;
             if (depthPrepared) renderSceneDepth(CaptureDepth);
+            else if (groundBeforeCharacters && needsScene) CaptureDepth();
 
             // End particle state scopes before another renderer binds character programs and textures.
             foreach (IPreparedParticlePass pass in passes)
@@ -82,11 +87,17 @@ namespace AssetsManager.Services.Viewer.Rendering
                     foreach (IPreparedParticlePass pass in passes)
                         pass.RenderPreparedGroundPass();
                 foreach (IPreparedParticlePass pass in passes)
+                    if (pass.NeedsPreparedPostGroundColorCapture)
+                        pass.CapturePreparedPostGroundColorInputs();
+                foreach (IPreparedParticlePass pass in passes)
                     pass.RenderPreparedColorPass();
                 foreach (IPreparedParticlePass pass in passes)
                     pass.CapturePreparedDistortionFrame();
                 foreach (IPreparedParticlePass pass in passes)
                     pass.RenderPreparedDistortionPass();
+                foreach (IPreparedParticlePass pass in passes)
+                    if (pass.NeedsPreparedPostColorCapture)
+                        pass.CapturePreparedPostColorInputs();
                 foreach (IPreparedParticlePass pass in passes)
                     pass.RenderPreparedPostColorPass();
             }

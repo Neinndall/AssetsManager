@@ -1,7 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
-using System.Linq;
+using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -9,9 +10,9 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using AssetsManager.Views.Helpers;
-using AssetsManager.Views.Models.Dialogs.Controls;
 using AssetsManager.Services.Core;
 using AssetsManager.Utils;
+using Material.Icons;
 using Microsoft.Win32;
 
 namespace AssetsManager.Views.Dialogs
@@ -55,6 +56,8 @@ namespace AssetsManager.Views.Dialogs
         private Point _lastMousePosition;
         private bool _isDragging = false;
         private double _currentZoom = 1.0;
+        private double _panX = 0;
+        private double _panY = 0;
 
         // Timeline Frame Sequence State
         private readonly DispatcherTimer _timelineTimer;
@@ -66,6 +69,7 @@ namespace AssetsManager.Views.Dialogs
         private double _timelineDuration = 2.0;
         private bool _timelineRoundTrip = false;
         private int _timelineCycles = 1;
+        private CancellationTokenSource _exportCts;
 
         // DURATION is the hold time per state; transitions are folded into the state
         // boundaries, so the total stays an exact multiple of the hold time
@@ -168,6 +172,50 @@ namespace AssetsManager.Views.Dialogs
 
             OldFileNameLabel.Text = oldFileName ?? "N/A";
             NewFileNameLabel.Text = newFileName ?? "N/A";
+
+            if (OverlayFileNameLabel != null)
+            {
+                string displayPath = !string.IsNullOrWhiteSpace(newFileName) ? newFileName : oldFileName;
+                OverlayFileNameLabel.Text = displayPath ?? string.Empty;
+                OverlayFileNameLabel.Visibility = string.IsNullOrWhiteSpace(displayPath) ? Visibility.Collapsed : Visibility.Visible;
+            }
+
+            UpdateResolutionMetadata(oldImage, newImage);
+
+            if (ExportSequenceBtn != null)
+                ExportSequenceBtn.IsEnabled = oldImage != null && newImage != null;
+        }
+
+        private void UpdateResolutionMetadata(BitmapSource oldImage, BitmapSource newImage)
+        {
+            bool hasOld = oldImage != null;
+            bool hasNew = newImage != null;
+            bool sizeChanged = hasOld && hasNew && (oldImage.PixelWidth != newImage.PixelWidth || oldImage.PixelHeight != newImage.PixelHeight);
+
+            if (OverlaySizeBadge != null && OverlaySizeBadgeText != null)
+            {
+                if (sizeChanged)
+                {
+                    OverlaySizeBadgeText.Text = $"{oldImage.PixelWidth}×{oldImage.PixelHeight} → {newImage.PixelWidth}×{newImage.PixelHeight}";
+                    OverlaySizeBadge.Visibility = Visibility.Visible;
+                }
+                else
+                {
+                    OverlaySizeBadge.Visibility = Visibility.Collapsed;
+                }
+            }
+
+            if (ResolutionLabel != null)
+            {
+                if (sizeChanged)
+                    ResolutionLabel.Text = $"Resolution: {oldImage.PixelWidth}×{oldImage.PixelHeight} → {newImage.PixelWidth}×{newImage.PixelHeight}";
+                else if (hasNew)
+                    ResolutionLabel.Text = $"Resolution: {newImage.PixelWidth}×{newImage.PixelHeight}";
+                else if (hasOld)
+                    ResolutionLabel.Text = $"Resolution: {oldImage.PixelWidth}×{oldImage.PixelHeight}";
+                else
+                    ResolutionLabel.Text = "Resolution: N/A";
+            }
         }
 
         public void LoadAndDisplayPreloadedBatchAsync(
@@ -220,8 +268,8 @@ namespace AssetsManager.Views.Dialogs
 
             Point mousePos = e.GetPosition(MainContentArea);
             double factor = newZoom / _currentZoom;
-            double dx = (mousePos.X - OldTranslate.X) * (1 - factor);
-            double dy = (mousePos.Y - OldTranslate.Y) * (1 - factor);
+            double dx = (mousePos.X - _panX) * (1 - factor);
+            double dy = (mousePos.Y - _panY) * (1 - factor);
 
             _currentZoom = newZoom;
             ApplyTransform(scale: _currentZoom, deltaX: dx, deltaY: dy);
@@ -264,12 +312,16 @@ namespace AssetsManager.Views.Dialogs
 
         private void ApplyTransform(double? scale = null, double deltaX = 0, double deltaY = 0)
         {
+            _panX += deltaX;
+            _panY += deltaY;
+
             UpdateTransformGroup(OldScale, OldTranslate, scale, deltaX, deltaY);
             UpdateTransformGroup(NewScale, NewTranslate, scale, deltaX, deltaY);
-            UpdateTransformGroup(OldOverlayScale, OldOverlayTranslate, scale, deltaX, deltaY);
-            UpdateTransformGroup(NewOverlayScale, NewOverlayTranslate, scale, deltaX, deltaY);
-            if (SliderSeparatorScale != null && SliderSeparatorTranslate != null)
-                UpdateTransformGroup(SliderSeparatorScale, SliderSeparatorTranslate, scale, deltaX, deltaY);
+            UpdateTransformGroup(OverlayStageScale, OverlayStageTranslate, scale, deltaX, deltaY);
+
+            if (ZoomPercentLabel != null)
+                ZoomPercentLabel.Text = $"{Math.Round(_currentZoom * 100):0}%";
+
             UpdateSliderEffect();
         }
 
@@ -313,26 +365,31 @@ namespace AssetsManager.Views.Dialogs
                 }
                 else
                 {
-                    // Restore the mode's style binding after Timeline's local opacity override.
+                    // Restore style/default opacity after Timeline's local overrides.
+                    OldImageOverlay.ClearValue(UIElement.OpacityProperty);
                     NewImageOverlay.ClearValue(UIElement.OpacityProperty);
-                    if (SliderClip != null) SliderClip.Rect = new Rect(0, 0, 99999, 99999);
+                    ResetOverlayClips();
                     if (OldBadge != null) OldBadge.Visibility = Visibility.Collapsed;
                     if (NewBadge != null) NewBadge.Visibility = Visibility.Collapsed;
                     if (SliderSeparatorLine != null) SliderSeparatorLine.Visibility = SliderBtn.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
                 }
             }
 
-            // Reset Slider Clip if not in Slider mode
-            if (SliderBtn.IsChecked != true && SliderClip != null && !timeline)
+            if (SliderBtn.IsChecked != true && !timeline)
             {
-                SliderClip.Rect = new Rect(0, 0, 99999, 99999);
+                ResetOverlayClips();
             }
 
             if (SliderBtn.IsChecked == true)
             {
-                // Force layout update and then update the effect
                 this.Dispatcher.InvokeAsync(() => UpdateSliderEffect(), DispatcherPriority.Loaded);
             }
+        }
+
+        private void ResetOverlayClips()
+        {
+            if (SliderClip != null) SliderClip.Rect = new Rect(0, 0, 99999, 99999);
+            if (OldSliderClip != null) OldSliderClip.Rect = new Rect(0, 0, 99999, 99999);
         }
 
         private void OverlaySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -343,24 +400,48 @@ namespace AssetsManager.Views.Dialogs
 
         private void UpdateSliderEffect()
         {
-            if (SliderBtn.IsChecked != true || NewImageOverlay == null || SliderSeparatorLine == null) return;
-            
+            if (SliderBtn.IsChecked != true || OverlayStage == null || SliderSeparatorLine == null) return;
+
             double percentage = OverlaySlider.Value / 100.0;
-            double width = NewImageOverlay.ActualWidth;
-            double height = NewImageOverlay.ActualHeight;
+            ApplyHorizontalSplit(percentage, newOnLeft: true);
+        }
 
-            if (width <= 0) return;
+        // Applies mutually exclusive horizontal clips so transparent or differently sized
+        // OLD/NEW images never show through or stack behind each other.
+        private void ApplyHorizontalSplit(double stageFraction, bool newOnLeft)
+        {
+            if (OverlayStage == null || NewImageOverlay == null || OldImageOverlay == null) return;
 
-            // Natural movement: xPos follows the slider
-            double xPos = width * percentage;
-            
-            // Revelado desde la izquierda (NEW oculta a OLD progresivamente)
-            SliderClip.Rect = new Rect(0, 0, xPos, height);
+            double stageW = OverlayStage.ActualWidth;
+            if (stageW <= 0) return;
+
+            double cutX = stageW * Math.Clamp(stageFraction, 0, 1);
+            double newW = NewImageOverlay.ActualWidth;
+            double newH = NewImageOverlay.ActualHeight;
+            double oldW = OldImageOverlay.ActualWidth;
+            double oldH = OldImageOverlay.ActualHeight;
+
+            double newOffsetX = (stageW - newW) / 2.0;
+            double oldOffsetX = (stageW - oldW) / 2.0;
+
+            double localNewCut = Math.Clamp(cutX - newOffsetX, 0, newW);
+            double localOldCut = Math.Clamp(cutX - oldOffsetX, 0, oldW);
+
+            if (newOnLeft)
+            {
+                if (SliderClip != null) SliderClip.Rect = new Rect(0, 0, localNewCut, newH);
+                if (OldSliderClip != null) OldSliderClip.Rect = new Rect(localOldCut, 0, Math.Max(0, oldW - localOldCut), oldH);
+            }
+            else
+            {
+                if (OldSliderClip != null) OldSliderClip.Rect = new Rect(0, 0, localOldCut, oldH);
+                if (SliderClip != null) SliderClip.Rect = new Rect(localNewCut, 0, Math.Max(0, newW - localNewCut), newH);
+            }
 
             if (SliderOffsetTranslate != null)
             {
-                SliderOffsetTranslate.X = xPos;
-                SliderSeparatorLine.Margin = new Thickness(0); 
+                SliderOffsetTranslate.X = cutX;
+                SliderSeparatorLine.Margin = new Thickness(0);
             }
         }
 
@@ -376,13 +457,11 @@ namespace AssetsManager.Views.Dialogs
             {
                 if (_timelineLoop)
                 {
-                    // Loop: restart the cycle from the first frame
                     _timelineStartTime = DateTime.Now;
                     elapsed = 0;
                 }
                 else
                 {
-                    // End of sequence: hold the final frame
                     PauseTimeline();
                     ApplyTimelineFrame(1.0);
                     return;
@@ -403,12 +482,13 @@ namespace AssetsManager.Views.Dialogs
         {
             if (NewImageOverlay.Source == null) return;
 
-            // If the sequence finished without loop, restart from the beginning
+            // Restart from start only when already at the end; otherwise resume from the scrubber position.
             if (TimelineSlider.Value >= 100) TimelineSlider.Value = 0;
 
             _isTimelinePlaying = true;
-            _timelineStartTime = DateTime.Now;
-            TimelinePlayIcon.Kind = Material.Icons.MaterialIconKind.Pause;
+            double resumeSeconds = (TimelineSlider.Value / 100.0) * TotalTimelineDuration;
+            _timelineStartTime = DateTime.Now - TimeSpan.FromSeconds(resumeSeconds);
+            TimelinePlayIcon.Kind = MaterialIconKind.Pause;
             _timelineTimer.Start();
         }
 
@@ -416,7 +496,7 @@ namespace AssetsManager.Views.Dialogs
         {
             _isTimelinePlaying = false;
             _timelineTimer.Stop();
-            if (TimelinePlayIcon != null) TimelinePlayIcon.Kind = Material.Icons.MaterialIconKind.Play;
+            if (TimelinePlayIcon != null) TimelinePlayIcon.Kind = MaterialIconKind.Play;
         }
 
         private void TimelineStopBtn_Click(object sender, RoutedEventArgs e)
@@ -438,7 +518,6 @@ namespace AssetsManager.Views.Dialogs
             if (!_isInitialized || !_timelineModeActive) return;
             if (_isTimelinePlaying || _isApplyingTimelineFrame) return;
 
-            // Manual scrubbing: render the exact frame at the slider position
             ApplyTimelineFrame(TimelineSlider.Value / 100.0);
         }
 
@@ -451,10 +530,14 @@ namespace AssetsManager.Views.Dialogs
         private void TimelineDuration_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (TimelineDurationCombo.SelectedItem is ComboBoxItem item &&
-                int.TryParse(item.Tag as string, out int duration) && duration > 0)
+                double.TryParse(item.Tag as string, NumberStyles.Float, CultureInfo.InvariantCulture, out double duration) &&
+                duration > 0)
             {
                 _timelineDuration = duration;
-                UpdateTimelineTimeCode(TimelineSlider.Value / 100.0);
+                if (_isInitialized && _timelineModeActive)
+                    ApplyTimelineFrame(TimelineSlider.Value / 100.0);
+                else
+                    UpdateTimelineTimeCode(TimelineSlider.Value / 100.0);
             }
         }
 
@@ -488,7 +571,7 @@ namespace AssetsManager.Views.Dialogs
         private void ZoomResetBtn_Click(object sender, RoutedEventArgs e)
         {
             _currentZoom = 1.0;
-            ApplyTransform(scale: 1.0, deltaX: -OldTranslate.X, deltaY: -OldTranslate.Y);
+            ApplyTransform(scale: 1.0, deltaX: -_panX, deltaY: -_panY);
             ZoomSlider.Value = 100;
         }
 
@@ -499,12 +582,19 @@ namespace AssetsManager.Views.Dialogs
 
             double factor = newZoom / _currentZoom;
             Point center = new Point(MainContentArea.ActualWidth / 2, MainContentArea.ActualHeight / 2);
-            double dx = (center.X - OldTranslate.X) * (1 - factor);
-            double dy = (center.Y - OldTranslate.Y) * (1 - factor);
+            double dx = (center.X - _panX) * (1 - factor);
+            double dy = (center.Y - _panY) * (1 - factor);
 
             _currentZoom = newZoom;
             ApplyTransform(scale: _currentZoom, deltaX: dx, deltaY: dy);
             if (Math.Abs(ZoomSlider.Value - _currentZoom * 100) > 0.01) ZoomSlider.Value = _currentZoom * 100;
+        }
+
+        private TimelineTransitionEffect GetSelectedEffect()
+        {
+            if (FadeEffectBtn?.IsChecked == true) return TimelineTransitionEffect.Fade;
+            if (CutEffectBtn?.IsChecked == true) return TimelineTransitionEffect.Cut;
+            return TimelineTransitionEffect.Wipe;
         }
 
         private void ApplyTimelineFrame(double progress)
@@ -515,35 +605,39 @@ namespace AssetsManager.Views.Dialogs
             try
             {
                 progress = Math.Max(0, Math.Min(1, progress));
-                // Always sync the slider (the ValueChanged guard prevents feedback loops)
                 TimelineSlider.Value = progress * 100;
                 UpdateTimelineTimeCode(progress);
 
                 double t = ImageExportUtils.TimelineProgress(progress, _timelineRoundTrip, _timelineCycles, _timelineDuration);
-                UpdateTimelineBadges(t);
+                TimelineTransitionEffect effect = GetSelectedEffect();
+                UpdateTimelineBadges(effect, t);
 
-                if (WipeEffectBtn?.IsChecked == true)
+                switch (effect)
                 {
-                    // Wipe: reveal NEW over OLD horizontally; the separator line is only
-                    // shown while the wipe is actually sweeping (during holds it stays idle)
-                    bool sweeping = t > 0 && t < 1;
-                    if (SliderSeparatorLine != null) SliderSeparatorLine.Visibility = sweeping ? Visibility.Visible : Visibility.Collapsed;
-                    double width = NewImageOverlay.ActualWidth;
-                    double height = NewImageOverlay.ActualHeight;
-                    if (width > 0 && SliderClip != null)
-                    {
-                        double xPos = width * t;
-                        SliderClip.Rect = new Rect(0, 0, xPos, height);
-                        if (SliderOffsetTranslate != null) SliderOffsetTranslate.X = xPos;
-                    }
-                    NewImageOverlay.Opacity = 1.0;
-                }
-                else
-                {
-                    // Fade: NEW fades in over OLD
-                    if (SliderSeparatorLine != null) SliderSeparatorLine.Visibility = Visibility.Collapsed;
-                    NewImageOverlay.Opacity = t;
-                    if (SliderClip != null) SliderClip.Rect = new Rect(0, 0, 99999, 99999);
+                    case TimelineTransitionEffect.Wipe:
+                        // Sweep the divider left to right (revealing NEW) while keeping OLD top-left and NEW top-right.
+                        bool sweeping = t > 0.001 && t < 0.999;
+                        if (SliderSeparatorLine != null)
+                            SliderSeparatorLine.Visibility = sweeping ? Visibility.Visible : Visibility.Collapsed;
+                        ApplyHorizontalSplit(t, newOnLeft: true);
+                        OldImageOverlay.Opacity = 1.0;
+                        NewImageOverlay.Opacity = 1.0;
+                        break;
+
+                    case TimelineTransitionEffect.Cut:
+                        if (SliderSeparatorLine != null) SliderSeparatorLine.Visibility = Visibility.Collapsed;
+                        ResetOverlayClips();
+                        bool showNew = t >= 0.5;
+                        OldImageOverlay.Opacity = showNew ? 0.0 : 1.0;
+                        NewImageOverlay.Opacity = showNew ? 1.0 : 0.0;
+                        break;
+
+                    default: // Fade (true cross-dissolve so transparent OLD/NEW silhouettes never ghost)
+                        if (SliderSeparatorLine != null) SliderSeparatorLine.Visibility = Visibility.Collapsed;
+                        ResetOverlayClips();
+                        OldImageOverlay.Opacity = 1.0 - t;
+                        NewImageOverlay.Opacity = t;
+                        break;
                 }
             }
             finally
@@ -552,16 +646,26 @@ namespace AssetsManager.Views.Dialogs
             }
         }
 
-        // Only the badge of the dominant image is shown: OLD below 50%, NEW above
-        private void UpdateTimelineBadges(double t)
+        private void UpdateTimelineBadges(TimelineTransitionEffect effect, double t)
         {
             if (OldBadge == null || NewBadge == null) return;
+
+            OldBadge.HorizontalAlignment = HorizontalAlignment.Left;
+            NewBadge.HorizontalAlignment = HorizontalAlignment.Right;
+
+            if (effect == TimelineTransitionEffect.Wipe)
+            {
+                bool sweeping = t > 0.001 && t < 0.999;
+                OldBadge.Visibility = t < 0.999 ? Visibility.Visible : Visibility.Collapsed;
+                NewBadge.Visibility = (sweeping || t >= 0.999) ? Visibility.Visible : Visibility.Collapsed;
+                return;
+            }
+
             bool showNew = t >= 0.5;
             OldBadge.Visibility = showNew ? Visibility.Collapsed : Visibility.Visible;
             NewBadge.Visibility = showNew ? Visibility.Visible : Visibility.Collapsed;
         }
 
-        // Timecode readout for the transport bar (editor-style mm:ss.f / total)
         private void UpdateTimelineTimeCode(double progress)
         {
             if (TimelineTimeCode == null) return;
@@ -573,73 +677,193 @@ namespace AssetsManager.Views.Dialogs
 
         #endregion
 
-        #region GIF Export
+        #region Timeline Sequence Export (MP4 / GIF)
 
-        private async void ExportGifBtn_Click(object sender, RoutedEventArgs e)
+        private void ExportOptionsBtn_Click(object sender, RoutedEventArgs e)
         {
-            if (!_timelineModeActive) return;
-            if (OldImage.Source is not BitmapSource oldS || NewImage.Source is not BitmapSource newS || newS == null)
+            if (ExportOptionsPopup != null)
+                ExportOptionsPopup.IsOpen = !ExportOptionsPopup.IsOpen;
+        }
+
+        private void ExportFormat_Checked(object sender, RoutedEventArgs e)
+        {
+            if (!_isInitialized || ExportSequenceLabel == null || ExportSequenceIcon == null) return;
+
+            bool isMp4 = ExportMp4Radio?.IsChecked == true;
+            ExportSequenceLabel.Text = isMp4 ? "EXPORT MP4" : "EXPORT GIF";
+            ExportSequenceIcon.Kind = isMp4 ? MaterialIconKind.MovieOpenOutline : MaterialIconKind.FileGifBox;
+        }
+
+        private void CancelExportBtn_Click(object sender, RoutedEventArgs e)
+        {
+            _exportCts?.Cancel();
+        }
+
+        private async void ExportSequenceBtn_Click(object sender, RoutedEventArgs e)
+        {
+            if (!_timelineModeActive || _exportCts != null) return;
+            if (OldImage.Source is not BitmapSource oldS || NewImage.Source is not BitmapSource newS)
             {
-                _logService?.LogError(new InvalidOperationException("Missing OLD or NEW image"), "GIF export requires both OLD and NEW images.");
+                _logService?.LogError(new InvalidOperationException("Missing OLD or NEW image"), "Timeline export requires both OLD and NEW images.");
                 return;
             }
 
             PauseTimeline();
+            if (ExportOptionsPopup != null) ExportOptionsPopup.IsOpen = false;
 
-            int fps = 24;
-            if (TimelineFpsCombo.SelectedItem is ComboBoxItem fpsItem &&
-                int.TryParse(fpsItem.Tag as string, out int fpsValue)) fps = fpsValue;
-            int frameCount = Math.Max(2, (int)Math.Ceiling(TotalTimelineDuration * fps));
-
-            int maxDimension = 1024;
-            if (TimelineSizeCombo.SelectedItem is ComboBoxItem sizeItem &&
-                int.TryParse(sizeItem.Tag as string, out int sizeValue) && sizeValue >= 0) maxDimension = sizeValue;
+            TimelineExportFormat format = ExportMp4Radio?.IsChecked == true
+                ? TimelineExportFormat.Mp4
+                : TimelineExportFormat.Gif;
 
             var saveDialog = new SaveFileDialog
             {
-                Filter = "Animated GIF (*.gif)|*.gif",
-                Title = "Export Frame Sequence as GIF",
-                FileName = BuildGifFileName()
+                Filter = format == TimelineExportFormat.Mp4
+                    ? "MP4 Video (*.mp4)|*.mp4"
+                    : "Animated GIF (*.gif)|*.gif",
+                Title = format == TimelineExportFormat.Mp4
+                    ? "Export Frame Sequence as MP4 Video"
+                    : "Export Frame Sequence as Animated GIF",
+                FileName = BuildExportFileName(format)
             };
             if (saveDialog.ShowDialog(this) != true) return;
 
             string path = saveDialog.FileName;
-            bool wipe = WipeEffectBtn?.IsChecked == true;
-            bool roundTrip = _timelineRoundTrip;
-            int cycles = _timelineCycles;
-            Cursor = Cursors.Wait;
+            var options = new TimelineExportOptions(
+                Format: format,
+                Effect: GetSelectedEffect(),
+                RoundTrip: _timelineRoundTrip,
+                Cycles: _timelineCycles,
+                HoldDuration: _timelineDuration,
+                Fps: GetSelectedFps(),
+                TargetSize: GetSelectedTargetSize(),
+                UpscaleSmallImages: UpscaleSmallCheckBox?.IsChecked == true,
+                BackgroundMode: GetSelectedBackgroundMode(),
+                NormalizedCropRect: GetNormalizedViewportCrop());
+
+            _exportCts = new CancellationTokenSource();
+            SetExportProgressState(active: true);
+
+            SixLabors.ImageSharp.Image<SixLabors.ImageSharp.PixelFormats.Bgra32> oldBadgeImg = null;
+            SixLabors.ImageSharp.Image<SixLabors.ImageSharp.PixelFormats.Bgra32> newBadgeImg = null;
+
             try
             {
-                // Prepare pixel data and OLD/NEW badges on the UI thread, encode off-thread
-                var (oldPixels, oldW, oldH, newPixels, newW, newH, width, height) =
-                    ImageExportUtils.PrepareGifPixels(oldS, newS, maxDimension);
-                var badges = ImageExportUtils.RenderGifBadges(OldBadge, NewBadge);
-                await ImageExportUtils.SaveAsGifSequenceAsync(
-                    oldPixels, oldW, oldH, newPixels, newW, newH, width, height, frameCount, fps, _timelineDuration, wipe, roundTrip, cycles, path,
-                    badges.Old, badges.New);
+                var (oldPixels, oldW, oldH, newPixels, newW, newH) = ImageExportUtils.PrepareTimelineSourcePixels(oldS, newS);
+                (oldBadgeImg, newBadgeImg) = ImageExportUtils.RenderTimelineBadges(
+                    TryFindResource("AccentOrange") as Brush,
+                    TryFindResource("AccentGreen") as Brush,
+                    FontFamily);
+
+                var progress = new Progress<(int Completed, int Total)>(p =>
+                {
+                    if (ExportProgressBar != null && p.Total > 0)
+                        ExportProgressBar.Value = p.Completed * 100.0 / p.Total;
+                    if (ExportProgressText != null)
+                        ExportProgressText.Text = $"{p.Completed} / {p.Total}";
+                });
+
+                await ImageExportUtils.SaveTimelineSequenceAsync(
+                    oldPixels, oldW, oldH,
+                    newPixels, newW, newH,
+                    options,
+                    path,
+                    oldBadgeImg,
+                    newBadgeImg,
+                    progress,
+                    _exportCts.Token);
+
+                _logService?.LogInteractiveSuccess($"Exported timeline sequence to {Path.GetFileName(path)}", path, Path.GetFileName(path));
+            }
+            catch (OperationCanceledException)
+            {
+                // User cancelled export cleanly.
             }
             catch (Exception ex)
             {
-                _logService?.LogError(ex, "Failed to export timeline GIF.");
-                MessageBox.Show(this, "Failed to export GIF: " + ex.Message, "Export GIF", MessageBoxButton.OK, MessageBoxImage.Error);
+                _logService?.LogError(ex, $"Failed to export timeline {format}.");
+                MessageBox.Show(this, $"Failed to export {format.ToString().ToUpperInvariant()}: {ex.Message}", "Export Timeline", MessageBoxButton.OK, MessageBoxImage.Error);
             }
             finally
             {
-                Cursor = Cursors.Arrow;
+                oldBadgeImg?.Dispose();
+                newBadgeImg?.Dispose();
+                _exportCts?.Dispose();
+                _exportCts = null;
+                SetExportProgressState(active: false);
             }
         }
 
-        private string BuildGifFileName()
+        private void SetExportProgressState(bool active)
+        {
+            if (ExportProgressPanel != null) ExportProgressPanel.Visibility = active ? Visibility.Visible : Visibility.Collapsed;
+            if (ExportActionsPanel != null) ExportActionsPanel.Visibility = active ? Visibility.Collapsed : Visibility.Visible;
+            if (ExportProgressBar != null) ExportProgressBar.Value = 0;
+            if (ExportProgressText != null) ExportProgressText.Text = "0 / 0";
+        }
+
+        private int GetSelectedFps()
+        {
+            if (ExportFpsCombo?.SelectedItem is ComboBoxItem item &&
+                int.TryParse(item.Tag as string, out int fps) && fps > 0)
+                return fps;
+            return 30;
+        }
+
+        private int GetSelectedTargetSize()
+        {
+            if (ExportSizeCombo?.SelectedItem is ComboBoxItem item &&
+                int.TryParse(item.Tag as string, out int size) && size >= 0)
+                return size;
+            return 1024;
+        }
+
+        private TimelineBackgroundMode GetSelectedBackgroundMode()
+        {
+            if (BgGridBtn?.IsChecked == true) return TimelineBackgroundMode.Checkerboard;
+            if (BgLightBtn?.IsChecked == true) return TimelineBackgroundMode.Light;
+            return TimelineBackgroundMode.Dark;
+        }
+
+        private Rect? GetNormalizedViewportCrop()
+        {
+            if (CropToZoomCheckBox?.IsChecked != true || ImageContainer == null || OverlayStage == null)
+                return null;
+
+            double stageW = OverlayStage.ActualWidth;
+            double stageH = OverlayStage.ActualHeight;
+            if (stageW <= 0 || stageH <= 0 || ImageContainer.ActualWidth <= 0 || ImageContainer.ActualHeight <= 0)
+                return null;
+
+            GeneralTransform toStage = ImageContainer.TransformToDescendant(OverlayStage);
+            Rect visibleBounds = toStage.TransformBounds(new Rect(0, 0, ImageContainer.ActualWidth, ImageContainer.ActualHeight));
+
+            Rect stageRect = new Rect(0, 0, stageW, stageH);
+            visibleBounds.Intersect(stageRect);
+            if (visibleBounds.IsEmpty || visibleBounds.Width <= 1 || visibleBounds.Height <= 1)
+                return null;
+
+            double nx = visibleBounds.X / stageW;
+            double ny = visibleBounds.Y / stageH;
+            double nw = visibleBounds.Width / stageW;
+            double nh = visibleBounds.Height / stageH;
+
+            if (nw >= 0.99 && nh >= 0.99) return null;
+            return new Rect(nx, ny, nw, nh);
+        }
+
+        private string BuildExportFileName(TimelineExportFormat format)
         {
             string baseName = Path.GetFileNameWithoutExtension(NewFileNameLabel?.Text ?? "image_comparison");
             if (string.IsNullOrWhiteSpace(baseName)) baseName = "image_comparison";
-            return $"{baseName}_timeline.gif";
+            string ext = format == TimelineExportFormat.Mp4 ? "mp4" : "gif";
+            return $"{baseName}_timeline.{ext}";
         }
 
         #endregion
 
         private void OnWindowClosed(object sender, EventArgs e)
         {
+            _exportCts?.Cancel();
             PauseTimeline();
             _timelineTimer?.Stop();
             OldImage.Source = null;

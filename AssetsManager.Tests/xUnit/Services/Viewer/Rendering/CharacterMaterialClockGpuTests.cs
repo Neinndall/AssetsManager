@@ -162,6 +162,123 @@ public sealed class CharacterMaterialClockGpuTests
         });
     }
 
+    [InstalledChampionFact("Akali")]
+    public async Task SelectedMapClipForwardsPreviewGameStateToCustomModelShaders()
+    {
+        await WithSkin((asset, _, animation, clip, settings) =>
+        {
+            var body = asset.Materials.ResolveMaterialDefinition("Body");
+            var driven = body with
+            {
+                DynamicParameters = body.DynamicParameters
+                    .Where(parameter => parameter.Name != "BloomColorIntensity")
+                    .Append(new GameMaterialDynamicParameter(
+                        "BloomColorIntensity",
+                        state => state.IsPlaying(clip.OwnerPathHash) ? new Vector4(10f, 0f, 0f, 0f) : Vector4.Zero))
+                    .ToArray()
+            };
+            var overridden = new Dictionary<string, ModelMaterialDefinition>(
+                asset.Materials.MaterialDefinitions,
+                StringComparer.OrdinalIgnoreCase)
+            {
+                [SknMaterialTextureResolver.NormalizeMaterialKey("Body")] = driven
+            };
+            var overriddenAsset = asset with { Materials = asset.Materials with { MaterialDefinitions = overridden } };
+
+            using var target = new Target();
+            using var renderer = new MapCharacterRenderer(settings);
+            renderer.Initialize(target.Gl);
+            var placement = new MapCharacterData(new MapPlaceableData(1, 1, 0, "selected", Matrix4x4.Identity,
+                255, null, null), "Characters/Akali/Skins/Skin102", null, null);
+            using var baselineGroup = new MapCharacterRuntimeGroup(asset, animation, new[] { placement });
+            using var drivenGroup = new MapCharacterRuntimeGroup(overriddenAsset, animation, new[] { placement });
+
+            byte[] Draw(MapCharacterRuntimeGroup subject, bool selected)
+            {
+                if (selected)
+                {
+                    subject.SetPreviewClip(clip, placement);
+                    subject.PreviewTimeSeconds = 0f;
+                }
+                else
+                {
+                    subject.ClearPreviewClip();
+                }
+                subject.SetPreviewHiddenSubmeshes(subject.Asset.Vfx.OwnerSceneContext.InitialHiddenSubmeshHashes.ToHashSet());
+                target.Clear();
+                renderer.Render(new[] { subject }, target.ViewProjection, target.View, target.Projection,
+                    Target.Eye, 0f, null);
+                Assert.Equal(GLEnum.NoError, target.Gl.GetError());
+                return target.Pixels();
+            }
+
+            Assert.Equal(Draw(baselineGroup, selected: false), Draw(drivenGroup, selected: false));
+            byte[] baselinePlaying = Draw(baselineGroup, selected: true);
+            byte[] drivenPlaying = Draw(drivenGroup, selected: true);
+            Assert.False(baselinePlaying.SequenceEqual(drivenPlaying),
+                "Selected map preview must apply PreviewGameState to dynamic model parameters.");
+            Assert.Equal(Draw(baselineGroup, selected: false), Draw(drivenGroup, selected: false));
+        });
+    }
+
+    [InstalledChampionFact("Akali")]
+    public async Task SelectedMapClipSuppliesAnimationFractionAcrossTheClipDuration()
+    {
+        await WithSkin((asset, _, animation, clip, settings) =>
+        {
+            float duration = animation.PreparedClipDuration(clip);
+            Assert.True(duration > 0f);
+            var body = asset.Materials.ResolveMaterialDefinition("Body");
+            var driven = body with
+            {
+                DynamicParameters = body.DynamicParameters
+                    .Where(parameter => parameter.Name != "BloomColorIntensity")
+                    .Append(new GameMaterialDynamicParameter(
+                        "BloomColorIntensity",
+                        state => new Vector4(state.AnimationFraction(clip.OwnerPathHash) * 20f, 0f, 0f, 0f)))
+                    .ToArray()
+            };
+            var overridden = new Dictionary<string, ModelMaterialDefinition>(
+                asset.Materials.MaterialDefinitions,
+                StringComparer.OrdinalIgnoreCase)
+            {
+                [SknMaterialTextureResolver.NormalizeMaterialKey("Body")] = driven
+            };
+            var overriddenAsset = asset with { Materials = asset.Materials with { MaterialDefinitions = overridden } };
+
+            using var target = new Target();
+            using var renderer = new MapCharacterRenderer(settings);
+            renderer.Initialize(target.Gl);
+            var placement = new MapCharacterData(new MapPlaceableData(1, 1, 0, "fraction", Matrix4x4.Identity,
+                255, null, null), "Characters/Akali/Skins/Skin102", null, null);
+            using var baselineGroup = new MapCharacterRuntimeGroup(asset, animation, new[] { placement });
+            using var drivenGroup = new MapCharacterRuntimeGroup(overriddenAsset, animation, new[] { placement });
+            var hidden = asset.Vfx.OwnerSceneContext.InitialHiddenSubmeshHashes.ToHashSet();
+
+            baselineGroup.SetPreviewClip(clip, placement);
+            drivenGroup.SetPreviewClip(clip, placement);
+            baselineGroup.SetPreviewHiddenSubmeshes(hidden);
+            drivenGroup.SetPreviewHiddenSubmeshes(hidden);
+
+            Assert.Equal(0f, (drivenGroup.PreviewGameState with { Time = 0f }).AnimationFraction(clip.OwnerPathHash), 4);
+            Assert.Equal(0.5f, (drivenGroup.PreviewGameState with { Time = duration * 0.5f }).AnimationFraction(clip.OwnerPathHash), 4);
+
+            byte[] DrawAt(MapCharacterRuntimeGroup subject, float timeSeconds)
+            {
+                subject.PreviewTimeSeconds = timeSeconds;
+                target.Clear();
+                renderer.Render(new[] { subject }, target.ViewProjection, target.View, target.Projection,
+                    Target.Eye, 0f, null);
+                Assert.Equal(GLEnum.NoError, target.Gl.GetError());
+                return target.Pixels();
+            }
+
+            Assert.Equal(DrawAt(baselineGroup, 0f), DrawAt(drivenGroup, 0f));
+            Assert.False(DrawAt(baselineGroup, duration * 0.5f).SequenceEqual(DrawAt(drivenGroup, duration * 0.5f)),
+                "Selected map preview must supply the clip's AnimationFraction at midpoint.");
+        });
+    }
+
     private static async Task WithSkin(Action<MapCharacterAssetData, SkinnedMesh, MapCharacterAnimationRuntime,
         AnimationClipDefinition, AppSettings> check)
     {

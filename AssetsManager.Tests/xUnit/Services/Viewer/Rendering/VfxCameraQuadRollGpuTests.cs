@@ -92,7 +92,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
                 {
                     var point = new Vector2((x + 0.5f) * 2 / width - 1, (y + 0.5f) * 2 / width - 1);
                     // Invert the geometric contract, independently of shader corner construction.
-                    Vector2 local = orientation == "plane" ? Turn(point / size, -angle) : Turn(point, -angle) / size;
+                    Vector2 local = Turn(point, -angle) / size;
                     local.Y -= pivot ? 0.5f : 0;
                     float margin = MathF.Min(0.5f - MathF.Abs(local.X), 0.5f - MathF.Abs(local.Y));
                     if (MathF.Abs(margin) < 0.035f) continue;

@@ -103,7 +103,7 @@ namespace AssetsManager.Views.Controls.Viewer
             string playbackContext = "standalone system";
             _vfxRenderer?.SetWorldTransform(CharacterVfxPlacement());
             if (adopted == null) _vfxRenderer?.SetVfxSystem(systemModel);
-            ApplyChampionBindPose();
+            ResetChampionToBindPose();
             if (_vfxRenderer != null)
             {
                 if (adopted == null) _vfxRenderer.RigSettings = rigSettings;

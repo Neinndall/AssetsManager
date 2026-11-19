@@ -9,12 +9,18 @@ namespace AssetsManager.Services.Formatting
     /// <summary>Transcodes local video through Windows Media Foundation without a bundled codec runtime.</summary>
     internal static class WindowsVideoTranscoder
     {
+        private static readonly Guid MajorType = new("48eba18e-f8c9-4687-bf11-0a74c9f96a8f");
+        private static readonly Guid MediaTypeVideo = new("73646976-0000-0010-8000-00aa00389b71");
         private static readonly Guid Subtype = new("f7e34c9a-42e8-4714-b74b-cb29d72c35e5");
+        private static readonly Guid VideoFormatH264 = new("34363248-0000-0010-8000-00aa00389b71");
+        private static readonly Guid VideoFormatRgb32 = new("00000016-0000-0010-8000-00aa00389b71");
         private static readonly Guid FrameSize = new("1652c33d-d6b2-4012-b834-72030849a37d");
         private static readonly Guid FrameRate = new("c459a2e8-3d2c-4e44-b132-fee5156c7bb0");
         private static readonly Guid PixelAspectRatio = new("c6376a1e-8d0a-4027-be45-6d9a0ad39bb6");
         private static readonly Guid AverageBitrate = new("20332624-fb0d-4d9e-bd0d-cbf6786c102e");
         private static readonly Guid InterlaceMode = new("e2724bb8-e676-4806-b4b2-a8d6efb44ccd");
+        private static readonly Guid DefaultStride = new("644b4e48-1e02-4516-b0eb-c01ca9d49ac6");
+        private static readonly Guid DisableThrottling = new("08b845d8-2b74-4afe-9d53-be16d2d5ae4f");
         private static readonly Guid AudioChannels = new("37e48bf5-645e-4c5b-89de-ada9e29b696a");
         private static readonly Guid AudioSampleRate = new("5faeeae7-0290-4c31-9e8a-c534f68d9dba");
         private static readonly Guid AudioBytesPerSecond = new("1aab75c8-cfef-451c-ab95-ac034b8e1731");
@@ -35,16 +41,137 @@ namespace AssetsManager.Services.Formatting
                 cancellationToken.ThrowIfCancellationRequested();
                 if (!File.Exists(stagingPath) || new FileInfo(stagingPath).Length == 0)
                     throw new InvalidDataException("Windows did not produce an MP4 file.");
-                File.Move(stagingPath, destinationPath);
+                File.Move(stagingPath, destinationPath, overwrite: true);
             }
             finally
             {
-                File.Delete(stagingPath);
+                if (File.Exists(stagingPath)) File.Delete(stagingPath);
+            }
+        }
+
+        /// <summary>Encodes an in-memory sequence of top-down BGRA32 frames into an H.264 MP4 file.</summary>
+        public static async Task EncodeBgraSequenceAsync(
+            string destinationPath,
+            int width,
+            int height,
+            int fps,
+            int frameCount,
+            Action<int, Span<byte>> writeBgraFrame,
+            IProgress<int> completedFramesProgress = null,
+            CancellationToken cancellationToken = default)
+        {
+            if (width <= 0 || height <= 0 || (width & 1) != 0 || (height & 1) != 0)
+                throw new ArgumentOutOfRangeException(nameof(width), "H.264 encoding requires positive even dimensions.");
+            if (fps <= 0) throw new ArgumentOutOfRangeException(nameof(fps));
+            if (frameCount <= 0) throw new ArgumentOutOfRangeException(nameof(frameCount));
+            ArgumentNullException.ThrowIfNull(writeBgraFrame);
+
+            cancellationToken.ThrowIfCancellationRequested();
+            destinationPath = Path.GetFullPath(destinationPath);
+            string stagingPath = Path.Combine(Path.GetDirectoryName(destinationPath), $".video-export-{Guid.NewGuid():N}.mp4");
+            try
+            {
+                await Task.Run(() => EncodeBgraSequence(stagingPath, (uint)width, (uint)height, (uint)fps, frameCount, writeBgraFrame, completedFramesProgress, cancellationToken), cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!File.Exists(stagingPath) || new FileInfo(stagingPath).Length == 0)
+                    throw new InvalidDataException("Windows did not produce an MP4 file.");
+                File.Move(stagingPath, destinationPath, overwrite: true);
+            }
+            finally
+            {
+                if (File.Exists(stagingPath)) File.Delete(stagingPath);
             }
         }
 
         private static Task TranscodeAsync(string sourcePath, string destinationPath, CancellationToken cancellationToken)
             => Task.Run(() => Transcode(sourcePath, destinationPath, cancellationToken), cancellationToken);
+
+        private static unsafe void EncodeBgraSequence(
+            string destinationPath,
+            uint width,
+            uint height,
+            uint fps,
+            int frameCount,
+            Action<int, Span<byte>> writeBgraFrame,
+            IProgress<int> completedFramesProgress,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            int coInit = CoInitializeEx(0, 0);
+            bool comInitialized = coInit == 0 || coInit == 1;
+            if (!comInitialized && coInit != unchecked((int)0x80010106)) Marshal.ThrowExceptionForHR(coInit);
+
+            bool started = false;
+            try
+            {
+                Check(MFStartup(0x20070, 0));
+                started = true;
+
+                using var sinkAttr = CreateAttributes();
+                sinkAttr.SetUInt32(DisableThrottling, 1);
+                Check(MFCreateSinkWriterFromURL(destinationPath, 0, sinkAttr.Pointer, out nint sinkPointer));
+                using var sinkWriter = new ComObject(sinkPointer);
+
+                using var outType = CreateMediaType();
+                outType.SetGuid(MajorType, MediaTypeVideo);
+                outType.SetGuid(Subtype, VideoFormatH264);
+                outType.SetUInt32(AverageBitrate, (uint)Math.Clamp(width * (double)height * fps * 0.25, 2_500_000, 25_000_000));
+                outType.SetUInt32(InterlaceMode, 2); // MFVideoInterlace_Progressive
+                outType.SetUInt64(FrameSize, PackRatio(width, height));
+                outType.SetUInt64(FrameRate, PackRatio(fps, 1));
+                outType.SetUInt64(PixelAspectRatio, PackRatio(1, 1));
+                uint streamIndex = sinkWriter.AddStream(outType);
+
+                uint stride = checked(width * 4);
+                uint bufferBytes = checked(stride * height);
+                using var inType = CreateMediaType();
+                inType.SetGuid(MajorType, MediaTypeVideo);
+                inType.SetGuid(Subtype, VideoFormatRgb32);
+                inType.SetUInt32(InterlaceMode, 2); // MFVideoInterlace_Progressive
+                inType.SetUInt32(DefaultStride, stride); // Positive stride = top-down BGRA32
+                inType.SetUInt64(FrameSize, PackRatio(width, height));
+                inType.SetUInt64(FrameRate, PackRatio(fps, 1));
+                inType.SetUInt64(PixelAspectRatio, PackRatio(1, 1));
+                sinkWriter.SetInputMediaType(streamIndex, inType);
+
+                sinkWriter.BeginWriting();
+
+                long frameDuration = 10_000_000L / fps;
+                for (int i = 0; i < frameCount; i++)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    Check(MFCreateMemoryBuffer(bufferBytes, out nint bufferPointer));
+                    using var buffer = new ComObject(bufferPointer);
+                    byte* locked = buffer.LockBuffer();
+                    try
+                    {
+                        writeBgraFrame(i, new Span<byte>(locked, (int)bufferBytes));
+                    }
+                    finally
+                    {
+                        buffer.UnlockBuffer();
+                    }
+                    buffer.SetCurrentLength(bufferBytes);
+
+                    Check(MFCreateSample(out nint samplePointer));
+                    using var sample = new ComObject(samplePointer);
+                    sample.AddBuffer(buffer);
+                    sample.SetSampleTime(i * frameDuration);
+                    sample.SetSampleDuration(frameDuration);
+                    sinkWriter.WriteSample(streamIndex, sample);
+
+                    completedFramesProgress?.Report(i + 1);
+                }
+
+                sinkWriter.FinalizeSink();
+            }
+            finally
+            {
+                if (started) MFShutdown();
+                if (comInitialized) CoUninitialize();
+            }
+        }
 
         private static void Transcode(string sourcePath, string destinationPath, CancellationToken cancellationToken)
         {
@@ -198,9 +325,15 @@ namespace AssetsManager.Services.Formatting
             Check(MFCreateAttributes(out nint pointer, 8));
             return new ComObject(pointer);
         }
+        private static ComObject CreateMediaType()
+        {
+            Check(MFCreateMediaType(out nint pointer));
+            return new ComObject(pointer);
+        }
 
         // The slots below follow IMFAttributes, IMFSourceReader, IMFSourceResolver,
-        // IMFTranscodeProfile, IMFMediaSession and IMFMediaEvent in the Windows SDK.
+        // IMFTranscodeProfile, IMFMediaSession, IMFMediaEvent, IMFSinkWriter,
+        // IMFSample and IMFMediaBuffer in the Windows SDK.
         // Calling the native ABI directly avoids shipping the Windows SDK's managed projections.
         private sealed unsafe class ComObject(nint pointer) : IDisposable
         {
@@ -280,6 +413,30 @@ namespace AssetsManager.Services.Formatting
                 Check(((delegate* unmanaged[Stdcall]<nint, int*, int>)Slot(slot))(Pointer, &value));
                 return value;
             }
+            public uint AddStream(ComObject targetMediaType)
+            {
+                uint streamIndex;
+                Check(((delegate* unmanaged[Stdcall]<nint, nint, uint*, int>)Slot(3))(Pointer, targetMediaType.Pointer, &streamIndex));
+                return streamIndex;
+            }
+            public void SetInputMediaType(uint streamIndex, ComObject inputMediaType)
+                => Check(((delegate* unmanaged[Stdcall]<nint, uint, nint, nint, int>)Slot(4))(Pointer, streamIndex, inputMediaType.Pointer, 0));
+            public void BeginWriting() => Check(((delegate* unmanaged[Stdcall]<nint, int>)Slot(5))(Pointer));
+            public void WriteSample(uint streamIndex, ComObject sample)
+                => Check(((delegate* unmanaged[Stdcall]<nint, uint, nint, int>)Slot(6))(Pointer, streamIndex, sample.Pointer));
+            public void FinalizeSink() => Check(((delegate* unmanaged[Stdcall]<nint, int>)Slot(11))(Pointer));
+            public byte* LockBuffer()
+            {
+                byte* data;
+                uint maxLen, curLen;
+                Check(((delegate* unmanaged[Stdcall]<nint, byte**, uint*, uint*, int>)Slot(3))(Pointer, &data, &maxLen, &curLen));
+                return data;
+            }
+            public void UnlockBuffer() => Check(((delegate* unmanaged[Stdcall]<nint, int>)Slot(4))(Pointer));
+            public void SetCurrentLength(uint length) => Check(((delegate* unmanaged[Stdcall]<nint, uint, int>)Slot(6))(Pointer, length));
+            public void SetSampleTime(long hnsTime) => Check(((delegate* unmanaged[Stdcall]<nint, long, int>)Slot(36))(Pointer, hnsTime));
+            public void SetSampleDuration(long hnsDuration) => Check(((delegate* unmanaged[Stdcall]<nint, long, int>)Slot(38))(Pointer, hnsDuration));
+            public void AddBuffer(ComObject buffer) => Check(((delegate* unmanaged[Stdcall]<nint, nint, int>)Slot(42))(Pointer, buffer.Pointer));
         }
 
         [DllImport("ole32.dll")] private static extern int CoInitializeEx(nint reserved, uint flags);
@@ -287,7 +444,11 @@ namespace AssetsManager.Services.Formatting
         [DllImport("mfplat.dll")] private static extern int MFStartup(uint version, uint flags);
         [DllImport("mfplat.dll")] private static extern int MFShutdown();
         [DllImport("mfplat.dll")] private static extern int MFCreateAttributes(out nint attributes, uint initialSize);
+        [DllImport("mfplat.dll")] private static extern int MFCreateMediaType(out nint mediaType);
+        [DllImport("mfplat.dll")] private static extern int MFCreateMemoryBuffer(uint maxLength, out nint buffer);
+        [DllImport("mfplat.dll")] private static extern int MFCreateSample(out nint sample);
         [DllImport("mfreadwrite.dll", CharSet = CharSet.Unicode)] private static extern int MFCreateSourceReaderFromURL(string url, nint attributes, out nint reader);
+        [DllImport("mfreadwrite.dll", CharSet = CharSet.Unicode)] private static extern int MFCreateSinkWriterFromURL(string url, nint byteStream, nint attributes, out nint sinkWriter);
         [DllImport("mf.dll")] private static extern int MFCreateSourceResolver(out nint resolver);
         [DllImport("mf.dll")] private static extern int MFCreateTranscodeProfile(out nint profile);
         [DllImport("mf.dll", CharSet = CharSet.Unicode)] private static extern int MFCreateTranscodeTopology(nint source, string outputPath, nint profile, out nint topology);

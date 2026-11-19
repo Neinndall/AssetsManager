@@ -48,6 +48,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             Vector3 velocity = Vector3.Zero, acceleration = Vector3.Zero;
             Vector3 keyedScale = Vector3.One;
             Vector4 keyedColor = Vector4.One;
+            VfxCurve3? scaleOverLifeCurve = null;
+            VfxCurve4? colorOverLifeCurve = null;
             bool uniformScale = false;
             if (components != null)
             {
@@ -78,7 +80,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 BinTreeStruct Writer(string field) => modifiers?.Elements.OfType<BinTreeStruct>()
                     .FirstOrDefault(m => m.Properties.ContainsKey(VfxParsingHash.Fnv1a(field)));
                 scale = Vector(Writer("InitialScale"), "InitialScale", Vector3.One);
-                keyedScale = Vector(Writer("KeyedScale"), "KeyedScale", Vector3.One);
+                BinTreeProperty keyedScaleProp = Field(Writer("KeyedScale"), "KeyedScale");
+                scaleOverLifeCurve = keyedScaleProp is not null && VfxShimmerDriverEvaluator.TryGetParticleCurveProperty(keyedScaleProp, 3, out BinTreeProperty scaleCurveProp)
+                    ? ReadCurve3Property(scaleCurveProp, Vector3.One) : null;
+                keyedScale = scaleOverLifeCurve is null ? Vector(Writer("KeyedScale"), "KeyedScale", Vector3.One) : Vector3.One;
                 rotation = Vector(Writer("InitialRotation"), "InitialRotation", Vector3.Zero);
                 velocity = Vector(Writer("InitialVelocity"), "InitialVelocity", Vector3.Zero);
                 foreach (string field in new[] { "InitialAcceleration", "Acceleration", "WorldAcceleration", "LocalAcceleration" })
@@ -87,9 +92,15 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 if (uniformScale) { scale = new Vector3(scale.X); keyedScale = new Vector3(keyedScale.X); }
                 var colors = Node(render, "Color");
                 color = Color(colors, "InitialColor", color);
-                keyedColor = Color(colors, "ColorOverLife", Vector4.One);
+                BinTreeProperty colorOverLifeProp = Field(colors, "ColorOverLife");
+                colorOverLifeCurve = colorOverLifeProp is not null && VfxShimmerDriverEvaluator.TryGetParticleCurveProperty(colorOverLifeProp, 4, out BinTreeProperty colorCurveProp)
+                    ? ReadCurve4Property(colorCurveProp, Vector4.One) : null;
+                keyedColor = colorOverLifeCurve is null ? Color(colors, "ColorOverLife", Vector4.One) : Vector4.One;
                 offset = Vector3.Zero;
             }
+
+            var renderProps = (render as BinTreeStruct)?.Properties ?? (render as BinTreeEmbedded)?.Properties;
+            byte blendMode = ReadBlendMode(renderProps is not null && Get(renderProps, F_blendMode) is not null ? renderProps : p, F_blendMode);
 
             return new VfxEmitterDefinition(
                 Name: name,
@@ -100,11 +111,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 TimeBeforeFirstEmission: 0f,
                 IsSingleParticle: true,
                 Disabled: disabled,
-                BlendMode: 0,
+                BlendMode: blendMode,
                 BirthScale: VfxCurve3.Const(scale),
-                ScaleOverLife: shimmer is null ? null : VfxCurve3.Const(keyedScale),
+                ScaleOverLife: shimmer is null ? null : scaleOverLifeCurve ?? VfxCurve3.Const(keyedScale),
                 BirthColor: VfxCurve4.Const(color),
-                ColorOverLife: shimmer is null ? null : VfxCurve4.Const(keyedColor),
+                ColorOverLife: shimmer is null ? null : colorOverLifeCurve ?? VfxCurve4.Const(keyedColor),
                 BirthVelocity: shimmer is null ? null : VfxCurve3.Const(velocity),
                 Acceleration: null,
                 BirthRotationalVelocity: null,

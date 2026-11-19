@@ -184,9 +184,17 @@ namespace AssetsManager.Views.Controls.Viewer
                             _championAnimationService.TrySampleBoneTransform(
                                 SpellAnimationTime(time, castDuration), name, hash, out var transform)
                                 ? transform : null);
+                        _vfxRenderer.SetOwnerSkinningMatrices(_championModel.SkinningMatrices);
                     }
-                    _vfxRenderer.SetOwnerSkinningMatrices(_championModel.SkinningMatrices);
+                    else
+                    {
+                        ApplyChampionBindPose();
+                    }
                     if (ready && !startPaused) _vfxRenderer.Play();
+                }
+                else if (animation?.AnimationAsset == null)
+                {
+                    ApplyChampionBindPose();
                 }
 
                 double duration = _vfxRenderer?.RigDuration ?? Math.Max(
@@ -257,7 +265,8 @@ namespace AssetsManager.Views.Controls.Viewer
                     !AnimationService.TryGetBindBoneTransform(
                         _championModel.Skeleton,
                         boneName,
-                        out boneTransform))
+                        out boneTransform,
+                        _championModel.PoseDefinition))
                 {
                     return null;
                 }

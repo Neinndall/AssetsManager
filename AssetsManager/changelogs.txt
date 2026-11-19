@@ -1,6 +1,55 @@
+AssetsManager - League of Legends | v4.1.0.11
+
+HOTFIX UPDATE
+This hotfix adds MP4 export, Cut transitions, and zoom-region cropping to Image Diff, expands GAME hash guessing patterns and speeds up GrepWad material and skin scanning in Hash Guessing Lab, improves Asset Tracker bundle discovery, and fixes particle, shader, and rendering issues in 3D Studio.
+
+New Features
+  - Image Diff / Export Timeline sequences as H.264 MP4 video alongside animated GIF.
+  - Image Diff / Add a Cut transition effect for instant A/B comparisons in Timeline mode.
+  - Image Diff / Add an option to crop exported sequences to the currently zoomed viewport region.
+
+Improvements
+  - Image Diff / Move Timeline export settings (format, FPS, resolution, upscaling, and zoom crop) into a dedicated popover.
+  - Image Diff / Place zoom and reset-to-fit controls in the footer so they work across all comparison modes.
+  - Image Diff / Upscale small textures sharply with nearest-neighbor scaling and match the active Dark, Checkerboard, or Light background on export.
+  - Image Diff / Add 1s and 1.5s hold presets, 60 FPS export, active filename and resolution-change indicators in Overlay mode, and cancellable export progress.
+  - Asset Tracker / Discover and retain _2 and _3 bundle filename variants alongside base and _1 images when scanning numeric bundle ranges.
+  - Hash Guessing Lab / Resolve hashed-name character materials, glued submesh and sampler roles (bloom, outline, flipbook, lut, pattern, deform, rma), container channel siblings, and .png/.dds-to-.tex literals in GrepWad.
+  - Hash Guessing Lab / Rewrite skin numbers and character-skin prefixes on identical-checksum WAD copies, expand Jade /animations/ and .tex ability icon projections, and add recent 2025/2026 esports banner event prefixes.
+  - Hash Guessing Lab / Traverse item icon _jade and autoatlas .tex variants, animation sound-event, stance, and transition links, and gear upgrade, companion theme, and TFT submesh textures.
+  - Hash Guessing Lab / Speed up GrepWad skin and material texture scanning while keeping full hash coverage.
+
+Changes
+  - Image Diff / Sweep Timeline Wipe from left to right while keeping OLD top-left and NEW top-right with both labels and the divider line visible during transitions.
+
+Bug Fixes
+  - Image Diff / Render OLD and NEW labels cleanly in exported GIF and MP4 sequences.
+  - Image Diff / Prevent transparent or differently sized assets (such as emotes and banners) from stacking underneath each other in Slider, Wipe, Fade, and exported sequences.
+  - Image Diff / Keep differently sized overlays aligned when zooming and panning.
+  - Image Diff / Update the Overlay mode title dynamically when switching between Slider, Onion Skin, and Timeline.
+  - Image Diff / Resume Timeline playback from the paused or scrubbed position instead of jumping back to the start.
+  - Hash Guessing Lab / Include single-word .anm filenames in BIN-referenced animation suffix guessing instead of skipping clips without underscores.
+  - 3D Studio / Preserve positive depth-push offsets on attached character VFX meshes so behind-surface layers do not cover lit submeshes or body details in skin previews.
+  - 3D Studio / Keep curved missiles with gravity in view by calculating their arc over the flight duration.
+  - 3D Studio / Apply particle size before roll on legacy plane quads so rotated non-square effects keep their authored proportions.
+  - 3D Studio / Respect authored blend modes on component-driven emitters instead of defaulting them to premultiplied blend state.
+  - 3D Studio / Preserve camera forward direction across mirrored map viewports so camera trails and orthographic depth pushes align correctly.
+  - 3D Studio / Clamp scene color lookups and unbound shared textures on custom particle shaders so screen edges and missing inputs do not wrap.
+  - 3D Studio / Invalidate stale scene color and depth captures after resource clears, resizes, or disabled channels in custom particle passes.
+  - 3D Studio / Capture updated scene color after ground effects and before post-color custom particle passes across characters and map effects.
+  - 3D Studio / Decode 16-bit half-float shader inputs bitwise so subnormal particle values remain accurate and no longer require the desktop packing extension.
+  - 3D Studio / Preserve bind-pose owner transforms, socket attachments, and attached effect meshes when inspecting standalone systems or spells without a clip.
+  - 3D Studio / Forward active clip state and playback progress to custom character shaders during map previews so animation-driven surface parameters update.
+  - 3D Studio / Support screen-space and separate-alpha UV modes accurately on the fallback particle mesh shader, matching native axis flips and atlas divisions.
+  - 3D Studio / Fall back to shader default textures when character or VFX materials omit a sampler texturePath while preserving sampler wrap modes.
+  - 3D Studio / Evaluate particle-lifetime KeyedScale and ColorOverLife curves on component-driven emitters instead of freezing them at constant fallback values.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
 AssetsManager - League of Legends | v4.1.0.10
 
 HOTFIX UPDATE
+This hotfix expands SKN Diff with vertex attribute comparison and inspection, preserves each actor's VFX and playback when switching characters in 3D Studio, links actor selection to the asset tree, fixes shader and effect rendering issues, and separates current-patch and historical hashes in Hash Guessing Lab.
 
 New Features
   - SKN Diff / Compare vertex normals, UV, colors, tangents and bone data, with per-part details and highlighted affected surfaces.

@@ -30,14 +30,24 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
         [Theory]
         [MemberData(nameof(UvCases))]
         public void NativeMeshKeepsTheAffineUvMapping(
-            VfxPrimitiveKind primitive, int mode, bool mult, int flips, bool perspective, bool atlas)
+            VfxPrimitiveKind primitive, int mode, bool mult, int flips, bool perspective, bool atlas) =>
+            AssertMeshUvMapping(game: true, primitive, mode, mult, flips, perspective, atlas);
+
+        [Theory]
+        [MemberData(nameof(UvCases))]
+        public void StockMeshKeepsTheAffineUvMapping(
+            VfxPrimitiveKind primitive, int mode, bool mult, int flips, bool perspective, bool atlas) =>
+            AssertMeshUvMapping(game: false, primitive, mode, mult, flips, perspective, atlas);
+
+        private static void AssertMeshUvMapping(
+            bool game, VfxPrimitiveKind primitive, int mode, bool mult, int flips, bool perspective, bool atlas)
         {
-            string install = InstalledSkins.FindInstall();
-            Assert.NotNull(install);
+            string install = game ? InstalledSkins.FindInstall() : null;
+            if (game) Assert.NotNull(install);
             using var context = new HiddenWglContext();
             using GL gl = GL.GetApi(context.GetProcAddress);
             using var renderer = new VfxOpenGlRenderer();
-            renderer.Initialize(gl, InstalledSkins.Settings(install));
+            renderer.Initialize(gl, game ? InstalledSkins.Settings(install) : null);
             uint target = Texture(gl, 64, 64, new byte[64 * 64 * 4]);
             uint framebuffer = gl.GenFramebuffer();
             gl.BindFramebuffer(FramebufferTarget.Framebuffer, framebuffer);
@@ -53,7 +63,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
                 texels[at] = (byte)(4 * x + 2);
                 texels[at + 1] = (byte)(4 * y + 2);
                 texels[at + 2] = 128;
-                texels[at + 3] = (byte)(128 + 2 * x);
+                texels[at + 3] = (byte)(64 + x + 2 * y);
             }
             uint gradient = Texture(gl, 64, 64, texels);
             try
@@ -111,7 +121,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
                 gl.ClearColor(0, 0, 0, 0);
                 gl.Clear(ClearBufferMask.ColorBufferBit);
                 renderer.Render(new[] { new VfxRenderQueueEntry(emitter, 0, 0) }, viewProjection, view);
-                Assert.Null(renderer.GameParticleFallback(emitter, true));
+                if (game) Assert.Null(renderer.GameParticleFallback(emitter, true));
                 var pixels = new byte[64 * 64 * 4];
                 gl.ReadPixels(0, 0, 64, 64, PixelFormat.Rgba, PixelType.UnsignedByte, pixels.AsSpan());
                 for (int y = 28; y <= 36; y += 4)
@@ -134,17 +144,20 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
                     Vector2 uv = (local + new Vector2(cell % divisions.X, MathF.Floor(cell / divisions.X))) / divisions;
                     Vector2 clamped = Vector2.Clamp(uv, new Vector2(0.5f / 64), new Vector2(63.5f / 64));
                     float alphaU = clamped.X;
+                    float alphaV = clamped.Y;
                     if (mode == 2 && !mult)
                     {
                         Vector2 alphaUv = Turn(meshUv * scale, rotation);
                         if ((flips & 1) != 0) alphaUv.X = -alphaUv.X;
+                        if ((flips & 2) != 0) alphaUv.Y = -alphaUv.Y;
                         alphaU = Math.Clamp(alphaUv.X / divisions.X, 0.5f / 64, 63.5f / 64);
+                        alphaV = Math.Clamp(alphaUv.Y / divisions.Y, 0.5f / 64, 63.5f / 64);
                     }
-                    float[] expected = { clamped.X * 256, clamped.Y * 256, 128, 127 + 128 * alphaU };
+                    float[] expected = { clamped.X * 256, clamped.Y * 256, 128, 62.5f + 64f * alphaU + 128f * alphaV };
                     int at = (y * 64 + x) * 4;
                     for (int channel = 0; channel < 4; channel++)
                         Assert.True(Math.Abs(pixels[at + channel] - expected[channel]) <= 2,
-                            $"{primitive}, uv={mode}, mult={mult}, flips={flips}, perspective={perspective}, atlas={atlas}, " +
+                            $"{(game ? "native" : "stock")} {primitive}, uv={mode}, mult={mult}, flips={flips}, perspective={perspective}, atlas={atlas}, " +
                             $"pixel=({x},{y}), channel={channel}: expected {expected[channel]}, got {pixels[at + channel]}.");
                 }
                 Assert.Equal(GLEnum.NoError, gl.GetError());

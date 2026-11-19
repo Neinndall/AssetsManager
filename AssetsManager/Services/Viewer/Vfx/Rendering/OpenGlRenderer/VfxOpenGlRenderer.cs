@@ -219,10 +219,102 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
 
         internal void RetainActiveTextures(IReadOnlySet<uint> textures) => _textures.SetActive(textures);
 
+        private bool _hasValidColorCapture;
+        private bool _hasValidDepthCapture;
+        private uint _capturedColorWidth;
+        private uint _capturedColorHeight;
+        private uint _capturedDepthWidth;
+        private uint _capturedDepthHeight;
+
+        internal readonly record struct VfxPreparedSceneInputs(
+            bool NeedsDepth,
+            bool NeedsGroundColor,
+            bool NeedsUnderColor,
+            bool NeedsOverColor)
+        {
+            internal bool NeedsInitialColor => NeedsGroundColor;
+            internal bool NeedsPostGroundColor => NeedsUnderColor;
+            internal bool NeedsPostColor => NeedsOverColor;
+            internal bool NeedsAnyColor => NeedsGroundColor || NeedsUnderColor || NeedsOverColor;
+        }
+
+        internal bool HasValidColorCapture => _hasValidColorCapture && _capture != null && _capture.ColorTexture != 0;
+        internal bool HasValidDepthCapture => _hasValidDepthCapture && _capture != null && _capture.DepthTexture != 0;
+
+        internal void InvalidateSceneCaptures(bool color = true, bool depth = true)
+        {
+            if (color) _hasValidColorCapture = false;
+            if (depth) _hasValidDepthCapture = false;
+        }
+
+        internal VfxPreparedSceneInputs BuildPreparedPhaseQueues(
+            IReadOnlyList<VfxRenderQueueEntry> queue,
+            List<VfxRenderQueueEntry> ground,
+            List<VfxRenderQueueEntry> shaded,
+            List<VfxRenderQueueEntry> earlyDistortion,
+            List<VfxRenderQueueEntry> distortion,
+            List<VfxRenderQueueEntry> postColor)
+        {
+            shaded.Clear();
+            ground.Clear();
+            distortion.Clear();
+            earlyDistortion.Clear();
+            postColor.Clear();
+            bool needsDepth = false;
+            bool needsGroundColor = false;
+            bool needsUnderColor = false;
+            bool needsOverColor = false;
+            foreach (VfxRenderQueueEntry entry in queue)
+            {
+                VfxRenderPhases phases = VfxRenderPhaseSemantics.Resolve(entry.Emitter.Def, entry.Emitter.HudLayer);
+                bool active = entry.Emitter.IsVisible && !entry.Emitter.Def.Disabled && entry.Emitter.InstanceCount > 0;
+                (bool Depth, bool Color) inputs = active ? SceneInputsFor(entry.Emitter.Def) : default;
+                needsDepth |= inputs.Depth;
+                if (phases.EarlyDistortion) earlyDistortion.Add(entry);
+                if (phases.LateDistortion) distortion.Add(entry);
+                if (phases.Under)
+                {
+                    if (entry.Emitter.Def.IsGroundLayer)
+                    {
+                        ground.Add(entry);
+                        needsGroundColor |= inputs.Color;
+                    }
+                    else
+                    {
+                        shaded.Add(entry);
+                        needsUnderColor |= inputs.Color;
+                    }
+                }
+                if (phases.Over)
+                {
+                    postColor.Add(entry);
+                    needsOverColor |= inputs.Color;
+                }
+            }
+            return new VfxPreparedSceneInputs(needsDepth, needsGroundColor, needsUnderColor, needsOverColor);
+        }
+
+        internal void SyncPreparedSceneCaptures(bool shaded, in VfxPreparedSceneInputs inputs)
+            => InvalidateSceneCaptures(color: !shaded || !inputs.NeedsAnyColor, depth: !shaded || !inputs.NeedsDepth);
+
+        internal void CapturePreparedInitialInputs(uint width, uint height, bool shaded, in VfxPreparedSceneInputs inputs)
+        {
+            if (!shaded)
+            {
+                InvalidateSceneCaptures();
+                return;
+            }
+            if (inputs.NeedsInitialColor || inputs.NeedsDepth)
+                CaptureScene(width, height, inputs.NeedsInitialColor, inputs.NeedsDepth);
+            if (!inputs.NeedsInitialColor) InvalidateSceneCaptures(color: true, depth: false);
+            if (!inputs.NeedsDepth) InvalidateSceneCaptures(color: false, depth: true);
+        }
+
         internal void ResetGraphResources()
         {
             _gameShaders?.ClearParticlePrograms();
             _gameUniforms.Clear();
+            InvalidateSceneCaptures();
             if (_ready) ReleaseMeshes();
         }
 
@@ -230,7 +322,45 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             => _textures.UploadCube(cube);
 
         public void CaptureScene(uint width, uint height, bool captureColor, bool captureDepth)
-            => _capture.Capture(width, height, captureColor, captureDepth);
+        {
+            if (_capture == null) return;
+            try
+            {
+                _capture.Capture(width, height, captureColor, captureDepth);
+            }
+            catch
+            {
+                InvalidateSceneCaptures(
+                    color: captureColor || !HasValidColorCapture,
+                    depth: captureDepth || !HasValidDepthCapture);
+                throw;
+            }
+            if (!_ready || width == 0 || height == 0)
+            {
+                InvalidateSceneCaptures(color: captureColor || !HasValidColorCapture, depth: captureDepth || !HasValidDepthCapture);
+                return;
+            }
+            if (captureColor)
+            {
+                _hasValidColorCapture = _capture.ColorTexture != 0;
+                _capturedColorWidth = width;
+                _capturedColorHeight = height;
+            }
+            else if (_hasValidColorCapture && (_capturedColorWidth != width || _capturedColorHeight != height))
+            {
+                _hasValidColorCapture = false;
+            }
+            if (captureDepth)
+            {
+                _hasValidDepthCapture = _capture.DepthTexture != 0;
+                _capturedDepthWidth = width;
+                _capturedDepthHeight = height;
+            }
+            else if (_hasValidDepthCapture && (_capturedDepthWidth != width || _capturedDepthHeight != height))
+            {
+                _hasValidDepthCapture = false;
+            }
+        }
 
         internal bool SupportsWireframe => !_gles;
 
@@ -388,6 +518,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             Matrix4x4.Invert(view, out var inv);
             var camRight = Vector3.Normalize(Vector3.TransformNormal(Vector3.UnitX, inv));
             var camUp = Vector3.Normalize(Vector3.TransformNormal(Vector3.UnitY, inv));
+            // Derive forward directly from inv so mirrored viewports (det < 0) preserve camera look sign.
+            var camForward = Vector3.Normalize(Vector3.TransformNormal(-Vector3.UnitZ, inv));
             var camPos = inv.Translation;
             Matrix4x4 projection = inv * viewProj;
             _depthProjectionValue = new Vector4(projection.M33, projection.M43, projection.M34, projection.M44);
@@ -419,7 +551,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             // Shadow corners face the scene eye, but their orthographic depth push follows the light.
             var depthPushDirection = _drawingShadows
                 ? Vector3.Normalize(new Vector3(viewProj.M13, viewProj.M23, viewProj.M33))
-                : -Vector3.Cross(camRight, camUp);
+                : camForward;
             _particleUniforms.Uniform3(_particleUniforms.DepthPushDirection,
                 depthPushDirection.X, depthPushDirection.Y, depthPushDirection.Z);
             _particleUniforms.Uniform1(_particleUniforms.Tex, 0);
@@ -571,7 +703,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                     RenderProjection(es, instancesSpan, renderInstanceCount, viewProj, sharedPalettePhase, useWireframe, wireOpacity);
                     continue;
                 }
-                RenderQuadEmitter(es, instancesSpan, renderInstanceCount, sharedPalettePhase, useWireframe, wireOpacity, camPos, camRight, camUp, passIndex);
+                RenderQuadEmitter(es, instancesSpan, renderInstanceCount, sharedPalettePhase, useWireframe, wireOpacity, camPos, camRight, camUp, camForward, passIndex);
             }
 
             }

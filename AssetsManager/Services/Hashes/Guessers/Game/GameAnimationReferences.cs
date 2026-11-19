@@ -22,7 +22,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
         private static readonly Regex AnimationBinPathRegex = new(
             @"^(?:assets|data)/characters/(?<character>[^/]+)/(?:animations/(?<skin>[^/]+)|skins/(?<skin>[^/]+)(?:/animations)?(?:/[^/]+)?|themes/(?<skin>[^/]+)(?:/animations)?(?:/[^/]+)?)\.(?:bin|inibin)$",
             RegexOptions.Compiled | RegexOptions.IgnoreCase);
-        private readonly record struct AnimationFileLink(uint NameHash, ulong PathHash, string Path);
+        private readonly record struct AnimationFileLink(uint NameHash, ulong PathHash, string Path, string EventHint = null);
 
         private void GuessAnimationBinPaths(
             HashGuessEngine engine,
@@ -362,6 +362,8 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             foreach (AnimationFileLink link in namedLinks)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                if (!string.IsNullOrEmpty(link.EventHint))
+                    yield return link.EventHint;
                 string resolved = _resolveBinHash?.Invoke(link.NameHash);
                 if (IsAnimationStem(resolved))
                 {
@@ -391,16 +393,41 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             HashSet<string> prefixes = Corpus.GetOrCreate($"animation-reusable-prefixes/{character.ToLowerInvariant()}",
                 _ => GetReusableAnimationPrefixes(sourceNames));
 
+            string charPrefix = character + "_";
             foreach (string name in sourceNames)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 string stem = name.EndsWith(".anm", StringComparison.OrdinalIgnoreCase) ? name[..^4] : name;
-                if (nameHashes.Contains(Fnv1a.HashLower(stem))) yield return stem;
+                string shortStem = stem.StartsWith(charPrefix, StringComparison.OrdinalIgnoreCase) ? stem[charPrefix.Length..] : stem;
+                if (shortStem.StartsWith("base_", StringComparison.OrdinalIgnoreCase)) shortStem = shortStem[5..];
+                else if (Regex.IsMatch(shortStem, @"^skin\d+_", RegexOptions.IgnoreCase))
+                    shortStem = shortStem[(shortStem.IndexOf('_') + 1)..];
+
+                foreach (string s in string.Equals(shortStem, stem, StringComparison.OrdinalIgnoreCase)
+                             ? new[] { stem }
+                             : new[] { stem, shortStem })
+                {
+                    if (nameHashes.Contains(Fnv1a.HashLower(s))) yield return s;
+                    foreach (string extra in new[] { s + "_incombat", s + "_outofcombat", s + "_to_" + s, s + "_to_" + s + "_incombat" })
+                    {
+                        if (nameHashes.Contains(Fnv1a.HashLower(extra))) yield return extra;
+                    }
+                }
                 foreach (string prefix in prefixes)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     string prefixed = prefix + "_" + stem;
                     if (nameHashes.Contains(Fnv1a.HashLower(prefixed))) yield return prefixed;
+                }
+            }
+
+            foreach (string baseAction in BaseAnimationActions)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                for (int slot = 1; slot <= 4; slot++)
+                {
+                    string spellAction = $"spell{slot}_{baseAction}";
+                    if (nameHashes.Contains(Fnv1a.HashLower(spellAction))) yield return spellAction;
                 }
             }
 
@@ -671,6 +698,21 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                 yield return stem.Replace("_out", "out", StringComparison.OrdinalIgnoreCase);
             if (stem.Contains("_cycle", StringComparison.OrdinalIgnoreCase))
                 yield return stem.Replace("_cycle", "cycle", StringComparison.OrdinalIgnoreCase);
+            if (stem.Contains("_to_", StringComparison.OrdinalIgnoreCase))
+                yield return stem.Replace("_to_", "_to", StringComparison.OrdinalIgnoreCase);
+
+            string stance = null;
+            if (stem.StartsWith("spell1_", StringComparison.OrdinalIgnoreCase)) stance = "tiger_";
+            else if (stem.StartsWith("spell2_", StringComparison.OrdinalIgnoreCase)) stance = "turtle_";
+            else if (stem.StartsWith("spell3_", StringComparison.OrdinalIgnoreCase)) stance = "bear_";
+            else if (stem.StartsWith("spell4_", StringComparison.OrdinalIgnoreCase)) stance = "phoenix_";
+            if (stance != null)
+            {
+                string replaced = stance + stem[7..];
+                yield return replaced;
+                if (replaced.EndsWith("_idle", StringComparison.OrdinalIgnoreCase))
+                    yield return replaced + "1";
+            }
         }
 
         private static bool IsThemeAnimationContext(string character, string container)
@@ -711,6 +753,46 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
 
         private static readonly string[] AnimationRootPrefixes = { "assets", "data" };
 
+        private static readonly Regex SoundEventNameRegex = new(
+            @"^play_(?:sfx|vo|mus)_(?:[a-z0-9]+?(?:skin\d+)?_)?(?<action>.+?)(?:_(?:buffactivate|oncast|onhit|precast|end|loop|cast))?$",
+            RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+        private static IEnumerable<string> ExtractAnimationEventHints(BinTreeProperty clipProperty)
+        {
+            uint eventDataMapHash = Fnv1a.HashLower("mEventDataMap");
+            uint soundNameHash = Fnv1a.HashLower("mSoundName");
+            var hints = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (BinTreeProperty eventMap in FindProperties(clipProperty, eventDataMapHash))
+            foreach (BinTreeProperty strProp in FindProperties(eventMap, soundNameHash))
+            {
+                if (strProp is not BinTreeString soundStr || string.IsNullOrWhiteSpace(soundStr.Value)) continue;
+                Match match = SoundEventNameRegex.Match(soundStr.Value.Trim());
+                if (!match.Success) continue;
+                string action = match.Groups["action"].Value.ToLowerInvariant();
+                if (string.IsNullOrEmpty(action)) continue;
+
+                hints.Add(action);
+                if (action.Contains("3d", StringComparison.Ordinal))
+                {
+                    string no3d = action.Replace("3d", "", StringComparison.Ordinal);
+                    hints.Add(no3d);
+                    Match tailLetter = Regex.Match(no3d, @"^(?<stem>.+?)(?<letter>[a-z])$", RegexOptions.CultureInvariant);
+                    if (tailLetter.Success && tailLetter.Groups["stem"].Length >= 3)
+                    {
+                        string underscored = $"{tailLetter.Groups["stem"].Value}_{tailLetter.Groups["letter"].Value}";
+                        hints.Add(underscored);
+                        if (underscored.EndsWith("_a", StringComparison.Ordinal))
+                            hints.Add(underscored[..^1] + "b");
+                        else if (underscored.EndsWith("_b", StringComparison.Ordinal))
+                            hints.Add(underscored[..^1] + "a");
+                    }
+                }
+            }
+
+            return hints;
+        }
+
         private static IEnumerable<AnimationFileLink> EnumerateAnimationFileLinks(BinTree tree)
         {
             uint clipDataMapNameHash = Fnv1a.HashLower("mClipDataMap");
@@ -727,12 +809,16 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             foreach (var pair in map)
             {
                 uint nameHash = pair.Key is BinTreeHash hash ? hash.Value : 0;
+                List<string> eventHints = null;
                 foreach (BinTreeProperty path in FindProperties(pair.Value, animationFilePathNameHash))
                 {
                     if (path is BinTreeWadChunkLink link && link.Value != 0)
                     {
                         namedPathHashes.Add(link.Value);
                         yield return new AnimationFileLink(nameHash, link.Value, null);
+                        eventHints ??= ExtractAnimationEventHints(pair.Value).ToList();
+                        foreach (string hint in eventHints)
+                            yield return new AnimationFileLink(nameHash, link.Value, null, hint);
                     }
                     else if (path is BinTreeString text && !string.IsNullOrWhiteSpace(text.Value))
                     {
