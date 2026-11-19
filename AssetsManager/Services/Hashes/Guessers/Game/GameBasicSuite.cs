@@ -169,8 +169,69 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                     format.Suffix, HashGuessStrategy.NumberVariant, "GAME learned numeric padding");
                 if ((++checkedCount & 0xff) == 0) progress?.Invoke(checkedCount);
             }
+            if (checkedCount < candidateBudget && engine.RemainingUnknownCount > 0)
+                checkedCount += SubstituteYears(engine, cancellationToken, candidateBudget - checkedCount,
+                    c => progress?.Invoke(checkedCount + c));
             return Finish();
             int Finish() { progress?.Invoke(checkedCount); return checkedCount; }
+        }
+
+        private static readonly Regex PathYearRegex = new(@"(?<!\d)(20[12]\d)(?!\d)", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
+        internal int SubstituteYears(HashGuessEngine engine, CancellationToken cancellationToken,
+            int candidateBudget = int.MaxValue, Action<int> progress = null)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (candidateBudget <= 0 || engine.RemainingUnknownCount == 0) return 0;
+
+            // Year tokens often repeat in both directory and filename (e.g. season2025eos/season2025eos_*),
+            // so synchronized replacement catches new-season assets missed by single-number substitution.
+            var yearPaths = Corpus.GetOrCreate("game-basic-year-paths", paths =>
+            {
+                var list = new List<(string Path, string[] Years)>();
+                foreach (string path in paths)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    MatchCollection matches = PathYearRegex.Matches(path);
+                    if (matches.Count == 0) continue;
+                    var years = new HashSet<string>(StringComparer.Ordinal);
+                    foreach (Match match in matches) years.Add(match.Groups[1].Value);
+                    list.Add((path, years.ToArray()));
+                }
+                return list.ToArray();
+            });
+
+            int checkedCount = 0;
+            int[] offsets = { 1, 2, -1 };
+            foreach (var (path, years) in yearPaths)
+            {
+                if (checkedCount >= candidateBudget || engine.RemainingUnknownCount == 0) break;
+                foreach (string yearText in years)
+                {
+                    if (!int.TryParse(yearText, NumberStyles.None, CultureInfo.InvariantCulture, out int year)) continue;
+                    foreach (int delta in offsets)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        if (checkedCount >= candidateBudget || engine.RemainingUnknownCount == 0) goto Done;
+                        string nextYear = (year + delta).ToString(CultureInfo.InvariantCulture);
+                        string candidate = path.Replace(yearText, nextYear, StringComparison.Ordinal);
+                        engine.CheckNormalizedPath(candidate, HashGuessStrategy.NumberVariant, "GAME year substitution");
+                        checkedCount++;
+                        if (candidate.EndsWith(".dds", StringComparison.OrdinalIgnoreCase) &&
+                            checkedCount < candidateBudget && engine.RemainingUnknownCount > 0)
+                        {
+                            engine.CheckNormalizedParts(candidate.AsSpan(0, candidate.Length - 4), ".tex",
+                                ReadOnlySpan<char>.Empty, HashGuessStrategy.NumberVariant, "GAME year substitution");
+                            checkedCount++;
+                        }
+                        if ((checkedCount & 0xff) == 0) progress?.Invoke(checkedCount);
+                    }
+                }
+            }
+
+            Done:
+            progress?.Invoke(checkedCount);
+            return checkedCount;
         }
 
         internal int CheckBasenamePrefixes(
@@ -564,8 +625,11 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                         string marker = knownPath.StartsWith(assetsMarker, StringComparison.OrdinalIgnoreCase) ? assetsMarker : dataMarker;
                         string subpath = knownPath[(marker.Length + character.Length)..];
 
-                        // Candidate 1: same subpath under jade_{character}
+                        // Candidate 1: same subpath under jade_{character} (plus .dds -> .tex for migrated Jade textures)
                         if (pathBuf.TryWrite(CultureInfo.InvariantCulture, $"{marker}jade_{character}{subpath}", out w))
+                            if (!CheckSpan(pathBuf[..w])) goto ChampionDone;
+                        if (subpath.EndsWith(".dds", StringComparison.OrdinalIgnoreCase) &&
+                            pathBuf.TryWrite(CultureInfo.InvariantCulture, $"{marker}jade_{character}{subpath.AsSpan(0, subpath.Length - 4)}.tex", out w))
                             if (!CheckSpan(pathBuf[..w])) goto ChampionDone;
 
                         const string baseAnimationsMarker = "/skins/base/animations/";

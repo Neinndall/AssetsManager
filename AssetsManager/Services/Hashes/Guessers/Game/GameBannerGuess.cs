@@ -168,7 +168,10 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
             int eventCandidateLimit = checkedCandidates + EsportsBannerEventCandidateBudget;
             const string eventStage = "GAME Banner: event and version patterns";
             progress?.Report(engine.CreateProgress(eventStage, checkedCandidates));
-            var middleStems = new HashSet<string>(StringComparer.Ordinal);
+            var middleStems = new HashSet<string>(StringComparer.Ordinal)
+            {
+                "lol_esports", "riot_games", "secret_lab"
+            };
             foreach (string name in names)
             {
                 int dot = name.LastIndexOf('.');

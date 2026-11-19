@@ -1,3 +1,18 @@
+AssetsManager - League of Legends | v4.1.0.12
+
+HOTFIX UPDATE
+
+New Features
+
+Improvements
+  - Hash Guessing Lab / Substitute synchronized year tokens across paths, project legacy .dds character assets to Jade .tex paths, strip Mat_ submesh prefixes, and cover multi-word esports banner sponsors.
+
+Changes
+
+Bug Fixes
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
 AssetsManager - League of Legends | v4.1.0.11
 
 HOTFIX UPDATE

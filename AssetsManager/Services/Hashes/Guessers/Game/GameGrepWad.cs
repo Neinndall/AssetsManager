@@ -1788,15 +1788,26 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                 string sKey = champMatch.Success ? champMatch.Groups["skin"].Value.ToLowerInvariant() : "";
                 if (!string.IsNullOrEmpty(sKey) && submeshesBySkin.TryGetValue(sKey, out var smList))
                 {
+                    string unjadedFileStem = fileStem.StartsWith("jade_", StringComparison.OrdinalIgnoreCase) && fileStem.Length > 5
+                        ? fileStem[5..]
+                        : null;
                     foreach (string sm in smList)
                     {
-                        candidateStems.Add(sm);
-                        candidateStems.Add($"{fileStem}_{sm}");
-                        if (!string.IsNullOrEmpty(droppedSkinPrefix))
-                            candidateStems.Add($"{droppedSkinPrefix}_{sm}");
-                        foreach (string stem in themeTextureStems) candidateStems.Add($"{stem}_{sm}");
-                        if (!string.IsNullOrEmpty(cleanChamp))
-                            candidateStems.Add($"{cleanChamp}_{sm}");
+                        string trimmedSm = sm.StartsWith("mat_", StringComparison.OrdinalIgnoreCase) && sm.Length > 4
+                            ? sm[4..]
+                            : null;
+                        foreach (string smVariant in trimmedSm != null ? new[] { sm, trimmedSm } : new[] { sm })
+                        {
+                            candidateStems.Add(smVariant);
+                            candidateStems.Add($"{fileStem}_{smVariant}");
+                            if (!string.IsNullOrEmpty(unjadedFileStem))
+                                candidateStems.Add($"{unjadedFileStem}_{smVariant}");
+                            if (!string.IsNullOrEmpty(droppedSkinPrefix))
+                                candidateStems.Add($"{droppedSkinPrefix}_{smVariant}");
+                            foreach (string stem in themeTextureStems) candidateStems.Add($"{stem}_{smVariant}");
+                            if (!string.IsNullOrEmpty(cleanChamp))
+                                candidateStems.Add($"{cleanChamp}_{smVariant}");
+                        }
                     }
                 }
 

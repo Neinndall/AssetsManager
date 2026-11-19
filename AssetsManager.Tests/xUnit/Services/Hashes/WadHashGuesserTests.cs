@@ -4401,5 +4401,69 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
             Assert.Contains(engine.Matches.Values, match => match.Path == tftPaddedOuterwear);
             Assert.Equal(0, engine.RemainingUnknownCount);
         }
+
+        [Fact]
+        public void GameBasicSuiteSubstitutesSynchronizedYearsAndJadeDdsToTex()
+        {
+            const string expectedBorder = "assets/rewards/ranked/season2026eos/season2026eos_victorious_border_gold.tex";
+            const string expectedBanner = "assets/loadouts/summonerbanners/flags/worlds2026/flag_worlds2026_1_tx.tex";
+            const string expectedJadeTex = "assets/characters/jade_volibear/skins/skin01/volibear_king_tx_cm.tex";
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
+            {
+                "assets/rewards/ranked/season2025eos/season2025eos_victorious_border_gold.tex",
+                "assets/loadouts/summonerbanners/flags/worlds2025/flag_worlds2025_1_tx.tex",
+                "assets/characters/volibear/skins/skin01/volibear_king_tx_cm.dds"
+            }));
+            var engine = CreateEngine(HashGuessDomain.Game, expectedBorder, expectedBanner, expectedJadeTex);
+
+            game.GuessLearnedPaddedNumbers(engine, CancellationToken.None);
+            game.GuessCharactersFiles(engine, CancellationToken.None);
+
+            Assert.Contains(engine.Matches.Values, match => match.Path == expectedBorder);
+            Assert.Contains(engine.Matches.Values, match => match.Path == expectedBanner);
+            Assert.Contains(engine.Matches.Values, match => match.Path == expectedJadeTex);
+            Assert.Equal(0, engine.RemainingUnknownCount);
+        }
+
+        [Fact]
+        public void GameGrepWadResolvesMatPrefixedSubmeshesAndBannerMultiwordSponsors()
+        {
+            const string expectedUdyr = "assets/characters/jade_udyr/skins/skin02/udyr_primal_turtle_tx_cm.tex";
+            const string expectedBanner = "assets/esports/sponsoredbanners/secret/msi_lol_esports_2026.tex";
+            var udyrSkin = new BinTreeObject(
+                "Characters/Jade_Udyr/Skins/Skin2",
+                "SkinCharacterDataProperties",
+                new BinTreeProperty[]
+                {
+                    new BinTreeEmbedded(Fnv1a.HashLower("skinMeshProperties"), Fnv1a.HashLower("SkinMeshDataProperties"), new BinTreeProperty[]
+                    {
+                        new BinTreeString(Fnv1a.HashLower("simpleSkin"), "ASSETS/Characters/Jade_Udyr/Skins/Skin02/Jade_Udyr_Primal.skn"),
+                        new BinTreeUnorderedContainer(Fnv1a.HashLower("materialOverride"), BinPropertyType.Embedded, new[]
+                        {
+                            new BinTreeEmbedded(0, Fnv1a.HashLower("SkinMeshDataProperties_MaterialOverride"), new BinTreeProperty[]
+                            {
+                                new BinTreeString(Fnv1a.HashLower("submesh"), "Mat_Turtle"),
+                                new BinTreeWadChunkLink(Fnv1a.HashLower("texture"), XxHash64Ext.Hash(expectedUdyr))
+                            })
+                        })
+                    })
+                });
+
+            using var stream = new MemoryStream();
+            new BinTree(new[] { udyrSkin }, Array.Empty<string>()).Write(stream);
+
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
+            {
+                "assets/esports/sponsoredbanners/secret/msi_2025_lolesports.tex"
+            }));
+            var engine = CreateEngine(HashGuessDomain.Game, expectedUdyr, expectedBanner);
+
+            game.GrepWad(engine, new ArraySegment<byte>(stream.ToArray()), "data/characters/jade_udyr/skins/skin2.bin", "Udyr.wad.client", 1);
+            game.GuessEsportsBanners(engine, null, CancellationToken.None);
+
+            Assert.Contains(engine.Matches.Values, match => match.Path == expectedUdyr);
+            Assert.Contains(engine.Matches.Values, match => match.Path == expectedBanner);
+            Assert.Equal(0, engine.RemainingUnknownCount);
+        }
     }
 }
