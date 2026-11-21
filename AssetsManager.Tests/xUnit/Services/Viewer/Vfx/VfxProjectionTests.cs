@@ -9,6 +9,7 @@ using AssetsManager.Views.Models.Viewer;
 using LeagueToolkit.Core.Meta;
 using LeagueToolkit.Core.Meta.Properties;
 using LeagueToolkit.Hashing;
+using Silk.NET.OpenGL;
 using Xunit;
 
 namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx;
@@ -142,6 +143,94 @@ public sealed class VfxProjectionTests
             Assert.True(gl.GetUniformLocation(program, "uColorMap") >= 0);
         }
         finally { gl.DeleteProgram(program); }
+    }
+
+    [Fact]
+    public void ProjectionMultEmitterScrollPreservesDirectionWhenFlipped()
+    {
+        using var context = new AssetsManager.Tests.Support.HiddenWglContext();
+        using var gl = Silk.NET.OpenGL.GL.GetApi(context.GetProcAddress);
+        using var renderer = new VfxOpenGlRenderer();
+        renderer.Initialize(gl);
+
+        uint CreateTex(uint width, uint height, byte[] rgba)
+        {
+            uint tex = gl.GenTexture();
+            gl.BindTexture(Silk.NET.OpenGL.TextureTarget.Texture2D, tex);
+            gl.TexImage2D(Silk.NET.OpenGL.TextureTarget.Texture2D, 0, Silk.NET.OpenGL.InternalFormat.Rgba8,
+                width, height, 0, Silk.NET.OpenGL.PixelFormat.Rgba, Silk.NET.OpenGL.PixelType.UnsignedByte, new ReadOnlySpan<byte>(rgba));
+            gl.TexParameter(Silk.NET.OpenGL.TextureTarget.Texture2D, Silk.NET.OpenGL.TextureParameterName.TextureMinFilter, (int)Silk.NET.OpenGL.GLEnum.Nearest);
+            gl.TexParameter(Silk.NET.OpenGL.TextureTarget.Texture2D, Silk.NET.OpenGL.TextureParameterName.TextureMagFilter, (int)Silk.NET.OpenGL.GLEnum.Nearest);
+            return tex;
+        }
+
+        uint target = CreateTex(64, 64, new byte[64 * 64 * 4]);
+        uint white = CreateTex(1, 1, new byte[] { 255, 255, 255, 255 });
+        // Four horizontal quarter bands: Red [0, 0.25), Green [0.25, 0.5), Blue [0.5, 0.75), Yellow [0.75, 1.0].
+        uint multBands = CreateTex(4, 1, new byte[]
+        {
+            255,   0,   0, 255,
+              0, 255,   0, 255,
+              0,   0, 255, 255,
+            255, 255,   0, 255
+        });
+        uint framebuffer = gl.GenFramebuffer();
+        gl.BindFramebuffer(Silk.NET.OpenGL.FramebufferTarget.Framebuffer, framebuffer);
+        gl.FramebufferTexture2D(Silk.NET.OpenGL.FramebufferTarget.Framebuffer,
+            Silk.NET.OpenGL.FramebufferAttachment.ColorAttachment0,
+            Silk.NET.OpenGL.TextureTarget.Texture2D, target, 0);
+        Assert.Equal(Silk.NET.OpenGL.GLEnum.FramebufferComplete,
+            gl.CheckFramebufferStatus(Silk.NET.OpenGL.FramebufferTarget.Framebuffer));
+
+        try
+        {
+            var definition = ReadEmitter(true) with
+            {
+                BlendMode = 1,
+                TexturePath = "white.tex",
+                TextureMultPath = "mult.tex",
+                TextureMultFlipU = true,
+                TextureMultAddressMode = 0,
+                TextureMultEmitterUvScrollRate = new Vector2(0.125f, 0f),
+                RenderState = VfxEmitterRenderState.Default with { AlphaReference = 0 }
+            };
+
+            var instance = new float[VfxPlaybackRuntime.InstanceStride];
+            instance[3] = instance[4] = instance[18] = 1f;
+            instance[5] = instance[6] = instance[7] = instance[8] = 1f;
+            instance[21] = instance[22] = instance[31] = instance[32] = 1f;
+            instance[36] = instance[40] = instance[44] = 1f;
+
+            var emitter = new VfxPlaybackRuntime.EmitterState
+            {
+                Def = definition,
+                Texture = white,
+                TextureMult = multBands,
+                Instances = instance,
+                InstanceCount = 1,
+                RenderTime = 1f
+            };
+
+            Matrix4x4 view = Matrix4x4.CreateLookAt(new Vector3(0f, 3f, 0f), Vector3.Zero, new Vector3(0f, 0f, -1f));
+            Matrix4x4 projection = Matrix4x4.CreateOrthographic(2f, 2f, 0.1f, 10f);
+
+            gl.Viewport(0, 0, 64, 64);
+            gl.ClearColor(0f, 0f, 0f, 0f);
+            gl.Clear(Silk.NET.OpenGL.ClearBufferMask.ColorBufferBit);
+            renderer.Render(new[] { new VfxRenderQueueEntry(emitter, 0, 0) }, view * projection, view);
+
+            var centerPixel = new byte[4];
+            gl.ReadPixels(32, 32, 1, 1, Silk.NET.OpenGL.PixelFormat.Rgba, Silk.NET.OpenGL.PixelType.UnsignedByte, centerPixel.AsSpan());
+            Assert.Equal(Silk.NET.OpenGL.GLEnum.NoError, gl.GetError());
+            Assert.True(centerPixel[2] > 200 && centerPixel[0] < 20 && centerPixel[1] < 20,
+                $"Expected flipped post-pan coordinate 0.625 (Blue band), got RGBA=({centerPixel[0]}, {centerPixel[1]}, {centerPixel[2]}, {centerPixel[3]}).");
+        }
+        finally
+        {
+            gl.BindFramebuffer(Silk.NET.OpenGL.FramebufferTarget.Framebuffer, 0);
+            gl.DeleteFramebuffer(framebuffer);
+            foreach (uint tex in new[] { target, white, multBands }) gl.DeleteTexture(tex);
+        }
     }
 
     private static float[] Instance()
