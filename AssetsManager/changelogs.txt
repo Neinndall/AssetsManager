@@ -14,6 +14,7 @@ Changes
 Bug Fixes
   - 3D Studio / Align map particle shadows with their mirrored scene positions instead of projecting them onto the opposite side of the map.
   - 3D Studio / Keep front-face culling consistent for mesh and attached-skin particles across mirrored characters, map scenes, and native or fallback shaders.
+  - 3D Studio / Keep sun direction and fallback ambient lighting aligned with map space for map particle shaders.
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
