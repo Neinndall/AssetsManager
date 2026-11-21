@@ -145,8 +145,10 @@ public sealed class VfxProjectionTests
         finally { gl.DeleteProgram(program); }
     }
 
-    [Fact]
-    public void ProjectionMultEmitterScrollPreservesDirectionWhenFlipped()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ProjectionMultEmitterScrollPreservesDirectionWhenFlipped(bool grouped)
     {
         using var context = new AssetsManager.Tests.Support.HiddenWglContext();
         using var gl = Silk.NET.OpenGL.GL.GetApi(context.GetProcAddress);
@@ -217,6 +219,8 @@ public sealed class VfxProjectionTests
             gl.Viewport(0, 0, 64, 64);
             gl.ClearColor(0f, 0f, 0f, 0f);
             gl.Clear(Silk.NET.OpenGL.ClearBufferMask.ColorBufferBit);
+            if (grouped)
+                renderer.SharedDrawGroups = new System.Collections.Generic.Dictionary<object, object> { [emitter] = "shared-projection-group" };
             renderer.Render(new[] { new VfxRenderQueueEntry(emitter, 0, 0) }, view * projection, view);
 
             var centerPixel = new byte[4];

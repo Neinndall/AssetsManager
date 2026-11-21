@@ -113,10 +113,8 @@ public sealed partial class VfxOpenGlRenderer
         var state = definition.RenderState;
         Vector2 first = VfxUvSemantics.PreFlipEmitterScroll(definition.EmitterUvScrollRate, source.RenderTime,
             state?.FlipU ?? false, state?.FlipV ?? false);
-        Vector2 second = definition.DrawsAsProjection
-            ? definition.TextureMultEmitterUvScrollRate * source.RenderTime
-            : VfxUvSemantics.PreFlipEmitterScroll(definition.TextureMultEmitterUvScrollRate, source.RenderTime,
-                definition.TextureMultFlipU, definition.TextureMultFlipV);
+        Vector2 second = VfxUvSemantics.PreFlipEmitterScroll(definition.TextureMultEmitterUvScrollRate, source.RenderTime,
+            definition.TextureMultFlipU, definition.TextureMultFlipV);
         first = VfxUvSemantics.Periodic(first, state?.TextureAddressMode ?? 0);
         second = VfxUvSemantics.Periodic(second, definition.TextureMultAddressMode);
         // Preserve the original coordinate: custom samplers can clamp a raw offset outside
