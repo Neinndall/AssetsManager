@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Numerics;
+using AssetsManager.Services.Viewer.Semantics;
 using AssetsManager.Services.Viewer.Vfx.Rendering;
 using AssetsManager.Services.Viewer.Vfx.Runtime;
 using AssetsManager.Services.Viewer.Vfx.Session;
@@ -219,6 +220,108 @@ public sealed class VfxAttachedPlacementGpuTests
             finally
             {
                 if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+            }
+        }
+
+        [Theory]
+        [InlineData(true, true, true, false, false)]
+        [InlineData(false, true, true, false, false)]
+        [InlineData(true, false, false, false, false)]
+        [InlineData(false, false, false, false, false)]
+        [InlineData(true, false, false, true, false)]
+        [InlineData(false, false, false, true, false)]
+        [InlineData(true, true, true, false, true)]
+        [InlineData(false, false, false, false, true)]
+        public void MeshBackfaceCullingMatchesTransformHandednessForAttachedAndStandaloneMeshes(
+            bool fallback,
+            bool attached,
+            bool mirroredOwner,
+            bool mirroredView,
+            bool flipWinding)
+        {
+            string install = InstalledSkins.FindInstall();
+            if (!fallback) Assert.NotNull(install);
+            using var context = new HiddenWglContext();
+            using GL gl = GL.GetApi(context.GetProcAddress);
+            using var renderer = new VfxOpenGlRenderer();
+            renderer.Initialize(gl, fallback ? null : InstalledSkins.Settings(install));
+
+            uint target = Texture(gl, 64, new byte[64 * 64 * 4]);
+            uint white = Texture(gl, 1, new byte[] { 255, 255, 255, 255 });
+            uint framebuffer = gl.GenFramebuffer();
+            try
+            {
+                gl.BindFramebuffer(FramebufferTarget.Framebuffer, framebuffer);
+                gl.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment0,
+                    TextureTarget.Texture2D, target, 0);
+                Assert.Equal(GLEnum.FramebufferComplete, gl.CheckFramebufferStatus(FramebufferTarget.Framebuffer));
+
+                var definition = new VfxEmitterDefinition("culled_mesh", VfxCurveF.Const(1f), VfxCurveF.Const(1f),
+                    null, 0f, 0f, false, false, 3, VfxCurve3.Const(Vector3.One), null,
+                    VfxCurve4.Const(Vector4.One), null, null, null, null, VfxCurve3.Const(Vector3.Zero),
+                    "white.tex", Vector2.One, 1, false, true,
+                    PrimitiveKind: attached ? VfxPrimitiveKind.AttachedMesh : VfxPrimitiveKind.Mesh,
+                    RenderState: VfxEmitterRenderState.Default with { DisableBackfaceCull = false, FlipWinding = flipWinding });
+
+                var instance = new float[VfxPlaybackRuntime.InstanceStride];
+                instance[3] = instance[4] = instance[18] = 1f;
+                instance[5] = instance[6] = instance[7] = instance[8] = 1f;
+                instance[21] = instance[22] = instance[31] = instance[32] = 1f;
+                instance[36] = instance[40] = instance[44] = 1f;
+
+                var emitter = new VfxPlaybackRuntime.EmitterState
+                {
+                    Def = definition,
+                    Texture = white,
+                    TextureWidth = 1,
+                    TextureHeight = 1,
+                    Instances = instance,
+                    InstanceCount = 1,
+                    MeshOwnerScale = 1f
+                };
+
+                // Front-facing CCW triangle centered at origin facing +Z (toward camera).
+                renderer.UploadEmitterMesh(
+                    emitter,
+                    new float[] { -4f, -4f, 0f, 4f, -4f, 0f, 0f, 4f, 0f },
+                    new float[] { 0f, 0f, 1f, 0f, 0f, 1f, 0f, 0f, 1f },
+                    new float[] { 0f, 0f, 1f, 0f, 0.5f, 1f },
+                    null,
+                    boneIndices: new float[12],
+                    boneWeights: new float[] { 1f, 0f, 0f, 0f, 1f, 0f, 0f, 0f, 1f, 0f, 0f, 0f });
+
+                renderer.SetOwnerSkinningMatrices(new[] { Matrix4x4.Identity });
+                renderer.SetOwnerWorldTransform(mirroredOwner ? Matrix4x4.CreateScale(-1f, 1f, 1f) : Matrix4x4.Identity);
+
+                Matrix4x4 baseView = Matrix4x4.CreateLookAt(new Vector3(0f, 0f, 10f), Vector3.Zero, Vector3.UnitY);
+                Matrix4x4 baseProj = Matrix4x4.CreateOrthographic(20f, 20f, 0.1f, 100f);
+                Matrix4x4 view = mirroredView ? MapParticleSemantics.ViewportView(baseView) : baseView;
+                Matrix4x4 viewProjection = mirroredView
+                    ? MapParticleSemantics.ViewportViewProjection(baseView * baseProj)
+                    : baseView * baseProj;
+
+                gl.Viewport(0, 0, 64, 64);
+                gl.ClearColor(0f, 0f, 0f, 0f);
+                gl.Clear(ClearBufferMask.ColorBufferBit);
+                renderer.Render(new[] { new VfxRenderQueueEntry(emitter, 0, 0) }, viewProjection, view);
+                if (!fallback) Assert.Null(renderer.GameParticleFallback(emitter, true));
+
+                var pixels = new byte[64 * 64 * 4];
+                gl.ReadPixels(0, 0, 64, 64, PixelFormat.Rgba, PixelType.UnsignedByte, pixels.AsSpan());
+                byte centerAlpha = pixels[(32 * 64 + 32) * 4 + 3];
+                if (flipWinding)
+                    Assert.Equal(0, centerAlpha);
+                else
+                    Assert.True(centerAlpha > 200,
+                        $"Front-facing triangle should not be culled (fallback={fallback}, attached={attached}, mirroredOwner={mirroredOwner}, mirroredView={mirroredView}, alpha={centerAlpha}).");
+                Assert.Equal(GLEnum.NoError, gl.GetError());
+            }
+            finally
+            {
+                gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+                gl.DeleteFramebuffer(framebuffer);
+                gl.DeleteTexture(target);
+                gl.DeleteTexture(white);
             }
         }
 

@@ -350,12 +350,28 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _meshUniforms.Uniform2(_meshUniforms.EmitterUvOffset, 0f, 0f);
             // Material parameters and textures are shared by every particle in this emitter pass.
             if (native) BindGameParticle(es, true, passIndex, sharedPalettePhase);
-            else _gl.FrontFace(es.Def.RenderState?.FlipWinding == true ? FrontFaceDirection.CW : FrontFaceDirection.Ccw);
+            else _gl.FrontFace(ResolveMeshFrontFace(es.Def, _ownerWorldTransform, _gameFrame.View));
             _meshUniforms.Uniform1(_meshUniforms.MeshInstanced, 1);
             RenderMeshInstances(es, instances, instanceCount, camPos, camUp, native, useParticleMeshSkinning, attachedMesh);
             _meshUniforms = _stockMeshUniforms;
             _particleUniforms = _stockParticleUniforms;
             _gl.BindVertexArray(_vao);
+        }
+
+        internal static FrontFaceDirection ResolveMeshFrontFace(
+            VfxEmitterDefinition definition,
+            Matrix4x4 ownerWorldTransform,
+            Matrix4x4 view)
+        {
+            bool mirrored = view.GetDeterminant() < 0f;
+            if (definition.PrimitiveKind == VfxPrimitiveKind.AttachedMesh &&
+                ownerWorldTransform.GetDeterminant() < 0f)
+            {
+                mirrored = !mirrored;
+            }
+            if (definition.RenderState?.FlipWinding == true)
+                mirrored = !mirrored;
+            return mirrored ? FrontFaceDirection.CW : FrontFaceDirection.Ccw;
         }
     }
 }

@@ -64,7 +64,11 @@ namespace AssetsManager.Services.Viewer.Rendering
             e.Emitter.IsVisible && !e.Emitter.Def.Disabled && e.Emitter.InstanceCount > 0 && VfxRenderPhaseSemantics.CastsShadow(e.Emitter.Def));
         void IPreparedParticlePass.RenderPreparedShadowPass(Matrix4x4 lightViewProjection, Matrix4x4 eyeView)
         {
-            if (_preparedShaded) _renderer.RenderShadows(_queue, lightViewProjection, eyeView);
+            if (_preparedShaded)
+                _renderer.RenderShadows(
+                    _queue,
+                    MapParticleSemantics.ViewportViewProjection(lightViewProjection),
+                    MapParticleSemantics.ViewportView(eyeView));
         }
         internal bool CacheDrawBindings { set => _renderer.CacheDrawBindings = value; }
         internal (int Programs, int UniformBuffers) LastDrawBindingCounts => _renderer.LastDrawBindingCounts;
