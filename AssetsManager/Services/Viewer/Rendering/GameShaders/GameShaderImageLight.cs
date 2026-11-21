@@ -36,10 +36,12 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             _gl.BindTexture(TextureTarget.Texture2DArray, _previewSky);
             _gl.TexImage3D(TextureTarget.Texture2DArray, 0, InternalFormat.Rgba16f,
                 16, 16, 6, 0, PixelFormat.Rgba, PixelType.Float, new ReadOnlySpan<float>(SkyTexels(sun)));
-            _gl.TexParameter(TextureTarget.Texture2DArray, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
+            _gl.GenerateMipmap(TextureTarget.Texture2DArray);
+            _gl.TexParameter(TextureTarget.Texture2DArray, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.LinearMipmapLinear);
             _gl.TexParameter(TextureTarget.Texture2DArray, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
             _gl.TexParameter(TextureTarget.Texture2DArray, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);
             _gl.TexParameter(TextureTarget.Texture2DArray, TextureParameterName.TextureWrapT, (int)TextureWrapMode.ClampToEdge);
+            _gl.BindTexture(TextureTarget.Texture2DArray, 0);
             return _previewSky;
         }
 

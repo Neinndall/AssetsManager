@@ -206,6 +206,37 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                         _maxTextureUnits = Math.Max(_maxTextureUnits, checked((int)unit + 1));
                     }
                 }
+                // Any active sampler uniform not covered by the sidecar (for example a lowered raw
+                // texel-buffer register such as usampler2D t3) would otherwise remain on unit 0 and
+                // collide with a different sampler target assigned to unit 0.
+                _gl.GetProgram(program, ProgramPropertyARB.ActiveUniforms, out int activeUniforms);
+                for (uint i = 0; i < activeUniforms; i++)
+                {
+                    string uniformName = _gl.GetActiveUniform(program, i, out _, out UniformType uniformType);
+                    GameShaderTranslator.TextureDimension? fallbackDimension = uniformType switch
+                    {
+                        UniformType.UnsignedIntSampler2D or UniformType.IntSampler2D => GameShaderTranslator.TextureDimension.Buffer,
+                        UniformType.Sampler2D or UniformType.Sampler2DShadow => GameShaderTranslator.TextureDimension.Texture2D,
+                        UniformType.Sampler2DArray or UniformType.Sampler2DArrayShadow => GameShaderTranslator.TextureDimension.Texture2DArray,
+                        UniformType.SamplerCube or UniformType.SamplerCubeShadow => GameShaderTranslator.TextureDimension.Cube,
+                        UniformType.Sampler3D => GameShaderTranslator.TextureDimension.Texture3D,
+                        _ => null
+                    };
+                    if (!fallbackDimension.HasValue || !seen.Add(uniformName))
+                        continue;
+                    int location = _gl.GetUniformLocation(program, uniformName);
+                    if (location < 0)
+                        continue;
+                    uint unit = checked((uint)samplers.Count);
+                    _gl.Uniform1(location, checked((int)unit));
+                    samplers.Add(new SamplerRuntime(
+                        uniformName,
+                        fallbackDimension.Value,
+                        null,
+                        location,
+                        unit));
+                    _maxTextureUnits = Math.Max(_maxTextureUnits, checked((int)unit + 1));
+                }
                 _gl.UseProgram(0);
                 return new ProgramRuntime(_gl, program, blocks, samplers, attributes);
             }

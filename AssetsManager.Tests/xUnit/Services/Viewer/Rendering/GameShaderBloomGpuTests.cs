@@ -204,4 +204,112 @@ public sealed class GameShaderBloomGpuTests
             gl.DeleteProgram(program);
         }
     }
+
+    [Theory]
+    [InlineData(1)] // Inherited ScissorTest
+    [InlineData(2)] // Inherited StencilTest
+    [InlineData(3)] // Inherited FramebufferSrgb
+    public void BloomIsolatesInheritedClippingStencilAndSrgb(int inheritedState)
+    {
+        using var context = new HiddenWglContext();
+        using GL gl = GL.GetApi(context.GetProcAddress);
+        using var bloom = new GameShaderBloom();
+        bloom.Initialize(gl);
+        uint program = GlShaderCompiler.CreateProgram(gl, false,
+            "void main(){ vec2 p=vec2((gl_VertexID << 1) & 2, gl_VertexID & 2); gl_Position=vec4(p*2.0-1.0,0.0,1.0); }",
+            "uniform vec3 tint;\nlayout(location=0) out vec4 color;\nlayout(location=1) out vec4 glow;\n" +
+            "void main(){ color=vec4(0.0); glow=vec4(tint,1.0); }");
+        const uint size = 32;
+        uint framebuffer = gl.GenFramebuffer(), target = gl.GenTexture(), depthStencil = gl.GenRenderbuffer(), vao = gl.GenVertexArray();
+        try
+        {
+            gl.BindTexture(TextureTarget.Texture2D, target);
+            gl.TexImage2D<byte>(TextureTarget.Texture2D, 0, InternalFormat.Srgb8Alpha8, size, size, 0,
+                PixelFormat.Rgba, PixelType.UnsignedByte, ReadOnlySpan<byte>.Empty);
+            gl.BindFramebuffer(FramebufferTarget.Framebuffer, framebuffer);
+            gl.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment0,
+                TextureTarget.Texture2D, target, 0);
+            gl.BindRenderbuffer(RenderbufferTarget.Renderbuffer, depthStencil);
+            gl.RenderbufferStorage(RenderbufferTarget.Renderbuffer, InternalFormat.Depth24Stencil8, size, size);
+            gl.FramebufferRenderbuffer(FramebufferTarget.Framebuffer, FramebufferAttachment.DepthStencilAttachment,
+                RenderbufferTarget.Renderbuffer, depthStencil);
+            Assert.Equal(GLEnum.FramebufferComplete, gl.CheckFramebufferStatus(FramebufferTarget.Framebuffer));
+
+            byte[] RunPair(int state)
+            {
+                void SetInherited(bool active)
+                {
+                    gl.Disable(EnableCap.ScissorTest);
+                    gl.Disable(EnableCap.StencilTest);
+                    gl.Disable(EnableCap.FramebufferSrgb);
+                    if (!active) return;
+                    if (state == 1) { gl.Scissor(0, 0, 2, 2); gl.Enable(EnableCap.ScissorTest); }
+                    else if (state == 2) { gl.Enable(EnableCap.StencilTest); gl.StencilFunc(StencilFunction.Equal, 99, 0xFF); }
+                    else if (state == 3) { gl.Enable(EnableCap.FramebufferSrgb); }
+                }
+
+                void DrawFrame(bool seed)
+                {
+                    SetInherited(false);
+                    gl.BindFramebuffer(FramebufferTarget.Framebuffer, framebuffer);
+                    gl.Viewport(0, 0, size, size);
+                    gl.ColorMask(true, true, true, true);
+                    gl.DepthMask(true);
+                    gl.StencilMask(0xFF);
+                    gl.ClearColor(0.0625f, 0.125f, 0.1875f, 1f);
+                    gl.ClearDepth(1);
+                    gl.ClearStencil(0);
+                    gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit | ClearBufferMask.StencilBufferBit);
+
+                    if (!seed) SetInherited(true);
+                    Assert.True(bloom.BeginPasses());
+                    Assert.Equal(!seed && state == 1, gl.IsEnabled(EnableCap.ScissorTest));
+                    SetInherited(false);
+                    gl.Disable(EnableCap.DepthTest);
+                    gl.Disable(EnableCap.CullFace);
+                    gl.Disable(EnableCap.Blend);
+                    gl.BindVertexArray(vao);
+                    gl.UseProgram(program);
+                    gl.Uniform3(gl.GetUniformLocation(program, "tint"), seed ? 0.75f : 0f, 0f, seed ? 0f : 0.75f);
+                    gl.DrawArrays(PrimitiveType.Triangles, 0, 3);
+                    bloom.EndPasses();
+
+                    if (!seed) SetInherited(true);
+                    bloom.Compose();
+                    Assert.Equal(!seed && state == 1, gl.IsEnabled(EnableCap.ScissorTest));
+                    Assert.Equal(!seed && state == 2, gl.IsEnabled(EnableCap.StencilTest));
+                    Assert.Equal(!seed && state == 3, gl.IsEnabled(EnableCap.FramebufferSrgb));
+                }
+
+                DrawFrame(seed: true);
+                DrawFrame(seed: false);
+                SetInherited(false);
+                var pixels = new byte[size * size * 4];
+                gl.ReadPixels<byte>(0, 0, size, size, PixelFormat.Rgba, PixelType.UnsignedByte, pixels);
+                Assert.Equal(GLEnum.NoError, gl.GetError());
+                return pixels;
+            }
+
+            byte[] expected = RunPair(0);
+            byte[] actual = RunPair(inheritedState);
+            for (int at = 0; at < actual.Length; at++)
+            {
+                Assert.True(Math.Abs(actual[at] - expected[at]) <= 2,
+                    $"inheritedState={inheritedState}, byte={at}: expected {expected[at]}, got {actual[at]}.");
+            }
+        }
+        finally
+        {
+            gl.Disable(EnableCap.ScissorTest);
+            gl.Disable(EnableCap.StencilTest);
+            gl.Disable(EnableCap.FramebufferSrgb);
+            gl.UseProgram(0);
+            gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+            gl.DeleteVertexArray(vao);
+            gl.DeleteFramebuffer(framebuffer);
+            gl.DeleteTexture(target);
+            gl.DeleteRenderbuffer(depthStencil);
+            gl.DeleteProgram(program);
+        }
+    }
 }

@@ -16,6 +16,8 @@ Bug Fixes
   - 3D Studio / Keep front-face culling consistent for mesh and attached-skin particles across mirrored characters, map scenes, and native or fallback shaders.
   - 3D Studio / Keep sun direction and fallback ambient lighting aligned with map space for map particle shaders.
   - 3D Studio / Keep flipped secondary texture scrolling moving in the authored direction on planar ground projections.
+  - 3D Studio / Generate mipmaps for the fallback sky image light and assign dedicated texture units to all active shader samplers so PBR characters without a sky cubemap render ambient lighting cleanly without OpenGL sampler collisions.
+  - 3D Studio / Isolate sampler, scissor, stencil, and sRGB state in map post-effects and bloom passes so inherited viewport state cannot corrupt screen effects.
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
