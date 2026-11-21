@@ -23,6 +23,11 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             Span<Vector3> cube = stackalloc Vector3[6];
             foreach (SamplerRuntime sampler in runtime.Samplers)
             {
+                if (sampler.IsFallback)
+                {
+                    BindFallbackSampler(sampler);
+                    continue;
+                }
                 // Resolving a texture may upload it, and an upload binds on the active unit. Activating this
                 // sampler's unit first keeps a lazy upload from replacing the previous sampler's texture.
                 _gl.ActiveTexture((TextureUnit)((int)TextureUnit.Texture0 + sampler.Unit));
@@ -111,6 +116,11 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
         {
             foreach (SamplerRuntime sampler in runtime.Samplers)
             {
+                if (sampler.IsFallback)
+                {
+                    BindFallbackSampler(sampler);
+                    continue;
+                }
                 // Resolving a texture may upload it, and an upload binds on the active unit. Activating this
                 // sampler's unit first keeps a lazy upload from replacing the previous sampler's texture.
                 _gl.ActiveTexture((TextureUnit)((int)TextureUnit.Texture0 + sampler.Unit));
@@ -404,6 +414,139 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Nearest);
             _gl.BindTexture(TextureTarget.Texture2D, 0);
             return _neutralBuffer2D;
+        }
+
+        private uint NeutralSignedBuffer2D()
+        {
+            if (_neutralSignedBuffer2D != 0)
+                return _neutralSignedBuffer2D;
+
+            _neutralSignedBuffer2D = _gl.GenTexture();
+            _gl.BindTexture(TextureTarget.Texture2D, _neutralSignedBuffer2D);
+            int[] zero = { 0 };
+            _gl.TexImage2D(
+                TextureTarget.Texture2D,
+                0,
+                InternalFormat.R32i,
+                1,
+                1,
+                0,
+                PixelFormat.RedInteger,
+                PixelType.Int,
+                new ReadOnlySpan<int>(zero));
+            _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Nearest);
+            _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Nearest);
+            _gl.BindTexture(TextureTarget.Texture2D, 0);
+            return _neutralSignedBuffer2D;
+        }
+
+        internal void BindFallbackSampler(SamplerRuntime sampler)
+        {
+            _gl.ActiveTexture((TextureUnit)((int)TextureUnit.Texture0 + sampler.Unit));
+            (uint texture, TextureTarget target) = sampler.Fallback switch
+            {
+                FallbackSamplerKind.SignedInteger => (NeutralSignedBuffer2D(), TextureTarget.Texture2D),
+                FallbackSamplerKind.UnsignedInteger => (NeutralBuffer2D(), TextureTarget.Texture2D),
+                FallbackSamplerKind.DepthCompare => NeutralDepthFor(sampler.Dimension),
+                FallbackSamplerKind.Color when sampler.Dimension == GameShaderTranslator.TextureDimension.CubeArray =>
+                    (NeutralColorCubeMapArray(), TextureTarget.TextureCubeMapArray),
+                _ => NeutralFor(sampler.Dimension, black: true)
+            };
+            uint samplerObject = sampler.Fallback == FallbackSamplerKind.DepthCompare
+                ? ResolveDepthCompareSampler()
+                : ResolveNeutralSampler(clamp: true, sampler.Dimension);
+            _gl.ActiveTexture((TextureUnit)((int)TextureUnit.Texture0 + sampler.Unit));
+            _gl.BindTexture(target, texture);
+            _gl.BindSampler(sampler.Unit, samplerObject);
+        }
+
+        private uint NeutralColorCubeMapArray()
+        {
+            if (_neutralCubeMapArray != 0)
+                return _neutralCubeMapArray;
+
+            _neutralCubeMapArray = _gl.GenTexture();
+            _gl.BindTexture(TextureTarget.TextureCubeMapArray, _neutralCubeMapArray);
+            byte[] pixels = new byte[6 * 4];
+            _gl.TexImage3D(
+                TextureTarget.TextureCubeMapArray,
+                0,
+                InternalFormat.Rgba8,
+                1,
+                1,
+                6,
+                0,
+                PixelFormat.Rgba,
+                PixelType.UnsignedByte,
+                pixels.AsSpan());
+            _gl.TexParameter(TextureTarget.TextureCubeMapArray, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
+            _gl.TexParameter(TextureTarget.TextureCubeMapArray, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
+            _gl.TexParameter(TextureTarget.TextureCubeMapArray, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);
+            _gl.TexParameter(TextureTarget.TextureCubeMapArray, TextureParameterName.TextureWrapT, (int)TextureWrapMode.ClampToEdge);
+            _gl.BindTexture(TextureTarget.TextureCubeMapArray, 0);
+            return _neutralCubeMapArray;
+        }
+
+        private uint ResolveDepthCompareSampler()
+        {
+            var key = (MapTextureWrap.Clamp, MapTextureWrap.Clamp, true, true, "neutral-depth-compare");
+            if (_samplers.TryGetValue(key, out uint sampler))
+                return sampler;
+            sampler = _gl.GenSampler();
+            _gl.SamplerParameter(sampler, SamplerParameterI.MinFilter, (int)TextureMinFilter.Linear);
+            _gl.SamplerParameter(sampler, SamplerParameterI.MagFilter, (int)TextureMagFilter.Linear);
+            _gl.SamplerParameter(sampler, SamplerParameterI.WrapS, (int)TextureWrapMode.ClampToEdge);
+            _gl.SamplerParameter(sampler, SamplerParameterI.WrapT, (int)TextureWrapMode.ClampToEdge);
+            _gl.SamplerParameter(sampler, SamplerParameterI.CompareMode, (int)TextureCompareMode.CompareRefToTexture);
+            _gl.SamplerParameter(sampler, SamplerParameterI.CompareFunc, (int)DepthFunction.Lequal);
+            _samplers[key] = sampler;
+            return sampler;
+        }
+
+        private (uint Texture, TextureTarget Target) NeutralDepthFor(GameShaderTranslator.TextureDimension dimension)
+        {
+            TextureTarget target = dimension switch
+            {
+                GameShaderTranslator.TextureDimension.Texture2DArray => TextureTarget.Texture2DArray,
+                GameShaderTranslator.TextureDimension.CubeArray => TextureTarget.TextureCubeMapArray,
+                GameShaderTranslator.TextureDimension.Cube => TextureTarget.TextureCubeMap,
+                _ => TextureTarget.Texture2D
+            };
+            if (_neutralDepthTextures.TryGetValue(dimension, out uint cached))
+                return (cached, target);
+
+            uint texture = _gl.GenTexture();
+            _gl.BindTexture(target, texture);
+            if (target is TextureTarget.Texture2DArray or TextureTarget.TextureCubeMapArray)
+            {
+                int layers = target == TextureTarget.TextureCubeMapArray ? 6 : 1;
+                ushort[] depth = new ushort[layers];
+                Array.Fill(depth, ushort.MaxValue);
+                _gl.TexImage3D(target, 0, InternalFormat.DepthComponent16,
+                    1, 1, (uint)layers, 0, PixelFormat.DepthComponent, PixelType.UnsignedShort, depth.AsSpan());
+            }
+            else if (target == TextureTarget.TextureCubeMap)
+            {
+                ushort[] depth = { ushort.MaxValue };
+                for (int face = 0; face < 6; face++)
+                    _gl.TexImage2D((TextureTarget)((int)TextureTarget.TextureCubeMapPositiveX + face), 0,
+                        InternalFormat.DepthComponent16, 1, 1, 0, PixelFormat.DepthComponent, PixelType.UnsignedShort, depth.AsSpan());
+            }
+            else
+            {
+                ushort[] depth = { ushort.MaxValue };
+                _gl.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.DepthComponent16,
+                    1, 1, 0, PixelFormat.DepthComponent, PixelType.UnsignedShort, depth.AsSpan());
+            }
+            _gl.TexParameter(target, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
+            _gl.TexParameter(target, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
+            _gl.TexParameter(target, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);
+            _gl.TexParameter(target, TextureParameterName.TextureWrapT, (int)TextureWrapMode.ClampToEdge);
+            _gl.TexParameter(target, TextureParameterName.TextureCompareMode, (int)TextureCompareMode.CompareRefToTexture);
+            _gl.TexParameter(target, TextureParameterName.TextureCompareFunc, (int)DepthFunction.Lequal);
+            _gl.BindTexture(target, 0);
+            _neutralDepthTextures[dimension] = texture;
+            return (texture, target);
         }
 
         private uint CreateNeutral(byte r, byte g, byte b, byte a)

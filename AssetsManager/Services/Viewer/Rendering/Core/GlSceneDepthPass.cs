@@ -1,4 +1,5 @@
 using System;
+using AssetsManager.Utils.Rendering;
 using Silk.NET.OpenGL;
 
 namespace AssetsManager.Services.Viewer.Rendering.Core;
@@ -6,6 +7,7 @@ namespace AssetsManager.Services.Viewer.Rendering.Core;
 /// <summary>Renders scene depth on a copy of the backdrop without changing the visible framebuffer.</summary>
 internal sealed class GlSceneDepthPass(GL gl) : IDisposable
 {
+    private readonly bool _embedded = GlShaderCompiler.UsesEmbeddedProfile(gl);
     private uint _framebuffer;
     private uint _color;
     private uint _depth;
@@ -27,16 +29,19 @@ internal sealed class GlSceneDepthPass(GL gl) : IDisposable
             gl.BindFramebuffer(FramebufferTarget.ReadFramebuffer, (uint)draw);
             gl.BindFramebuffer(FramebufferTarget.DrawFramebuffer, _framebuffer);
             bool scissor = gl.IsEnabled(EnableCap.ScissorTest);
+            bool srgb = !_embedded && gl.IsEnabled(EnableCap.FramebufferSrgb);
             try
             {
-                // Copy the whole backdrop before restoring clipping for the scene draw itself.
+                // Copy the whole backdrop without sRGB conversion before restoring state for the scene draw.
                 if (scissor) gl.Disable(EnableCap.ScissorTest);
+                if (srgb) gl.Disable(EnableCap.FramebufferSrgb);
                 gl.BlitFramebuffer(0, 0, (int)width, (int)height, 0, 0, (int)width, (int)height,
                     ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit | ClearBufferMask.StencilBufferBit,
                     BlitFramebufferFilter.Nearest);
             }
             finally
             {
+                if (srgb) gl.Enable(EnableCap.FramebufferSrgb);
                 if (scissor) gl.Enable(EnableCap.ScissorTest);
             }
             gl.BindFramebuffer(FramebufferTarget.Framebuffer, _framebuffer);
