@@ -33,8 +33,11 @@ namespace AssetsManager.Services.Viewer.Interaction
         private SceneModel _activeModel;
         private Point _pointerDownPosition;
         private Point _originScreen;
+        private Point _dragOriginScreen;
+        private Point _dragAxisEndpoint;
         private TransformAxis _dragAxis;
         private double _axisWorldLength;
+        private double _dragAxisWorldLength;
         private bool _pointerMoved;
         private bool _isDragging;
         private bool _isEnabled = true;
@@ -166,10 +169,25 @@ namespace AssetsManager.Services.Viewer.Interaction
             _pointerMoved = false;
             if (!_isEnabled || _activeModel == null) return;
 
-            TransformAxis axis = HitTestAxis(_pointerDownPosition);
-            if (axis == TransformAxis.None) return;
+            if (!TryBeginAxisDrag(_pointerDownPosition)) return;
 
+            _inputSurface.CaptureMouse();
+            _inputSurface.Cursor = Cursors.SizeAll;
+            e.Handled = true;
+        }
+
+        internal bool TryBeginAxisDrag(Point pointerPosition)
+        {
+            _pointerDownPosition = pointerPosition;
+            TransformAxis axis = HitTestAxis(pointerPosition);
+            if (axis == TransformAxis.None || !_axisEndpoints.TryGetValue(axis, out Point endpoint)) return false;
+
+            // Snapshot the drag-start screen projection and world length so Update() frames
+            // at the moved depth cannot feed back exponentially into total pointer deltas.
             _dragAxis = axis;
+            _dragOriginScreen = _originScreen;
+            _dragAxisEndpoint = endpoint;
+            _dragAxisWorldLength = _axisWorldLength;
             _isDragging = true;
             _dragStartPositions.Clear();
             IEnumerable<SceneModel> targets = _selectedModels.Count > 0
@@ -184,10 +202,7 @@ namespace AssetsManager.Services.Viewer.Interaction
                         (float)model.PositionY,
                         (float)model.PositionZ)));
             }
-
-            _inputSurface.CaptureMouse();
-            _inputSurface.Cursor = Cursors.SizeAll;
-            e.Handled = true;
+            return true;
         }
 
         private void OnPreviewMouseMove(object sender, MouseEventArgs e)
@@ -197,13 +212,23 @@ namespace AssetsManager.Services.Viewer.Interaction
             if (movement.Length > 4) _pointerMoved = true;
             if (!_isDragging || e.LeftButton != MouseButtonState.Pressed) return;
 
-            Point endpoint = _axisEndpoints[_dragAxis];
-            WpfVector screenAxis = endpoint - _originScreen;
+            if (ApplyDragAtScreenPoint(current))
+            {
+                e.Handled = true;
+            }
+        }
+
+        internal bool ApplyDragAtScreenPoint(Point current)
+        {
+            if (!_isDragging) return false;
+
+            WpfVector movement = current - _pointerDownPosition;
+            WpfVector screenAxis = _dragAxisEndpoint - _dragOriginScreen;
             double screenLength = screenAxis.Length;
-            if (screenLength <= 1) return;
+            if (screenLength <= 1) return false;
             screenAxis.Normalize();
 
-            double worldDelta = WpfVector.Multiply(movement, screenAxis) * _axisWorldLength / screenLength;
+            double worldDelta = WpfVector.Multiply(movement, screenAxis) * _dragAxisWorldLength / screenLength;
             foreach ((SceneModel model, Vector3 start) in _dragStartPositions)
             {
                 switch (_dragAxis)
@@ -220,7 +245,7 @@ namespace AssetsManager.Services.Viewer.Interaction
                 }
             }
             TransformChanged?.Invoke(_activeModel);
-            e.Handled = true;
+            return true;
         }
 
         private void OnMouseUp(object sender, MouseButtonEventArgs e)
