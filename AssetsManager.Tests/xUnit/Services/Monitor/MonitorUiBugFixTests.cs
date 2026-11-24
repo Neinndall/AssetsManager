@@ -1,5 +1,7 @@
 using System;
+using AssetsManager.Services.Monitor;
 using AssetsManager.Views.Controls.Monitor;
+using AssetsManager.Views.Models.Home;
 using AssetsManager.Views.Models.Monitor;
 using Xunit;
 
@@ -56,6 +58,42 @@ namespace AssetsManager.Tests.xUnit.Services.Monitor
             Assert.Equal("Patch 16.20 Snapshot", entry.FileName);
             Assert.Contains(nameof(HistoryEntry.DisplayName), notified);
             Assert.Contains(nameof(HistoryEntry.FileName), notified);
+        }
+
+        [Fact]
+        public void PbeMaintenanceStatusDistinguishesFutureAndPastAndCapitalizesDashboardSubtitle()
+        {
+            var now = new DateTimeOffset(2026, 11, 24, 12, 0, 0, TimeSpan.Zero);
+            var futureStart = now.AddHours(2);
+            var pastStart = now.AddHours(-1);
+
+            string futureStatus = PbeStatusService.FormatMaintenanceConciseStatus(futureStart, now);
+            string pastStatus = PbeStatusService.FormatMaintenanceConciseStatus(pastStart, now);
+
+            Assert.StartsWith("Maintenance starts at ", futureStatus, StringComparison.Ordinal);
+            Assert.StartsWith("Maintenance started at ", pastStatus, StringComparison.Ordinal);
+            Assert.StartsWith("Starts at ", MonitorDashboardModel.FormatPbeMaintenanceSubtitle(futureStatus), StringComparison.Ordinal);
+            Assert.StartsWith("Started at ", MonitorDashboardModel.FormatPbeMaintenanceSubtitle(pastStatus), StringComparison.Ordinal);
+            Assert.Equal("Detected", MonitorDashboardModel.FormatPbeMaintenanceSubtitle("Maintenance detected"));
+        }
+
+        [Fact]
+        public void ConverterCanConvertReflectsItemCountAndProcessingState()
+        {
+            var model = new ConverterModel();
+            Assert.False(model.CanConvert);
+
+            model.Items.Add(new ConverterItem { FileName = "skin.tex", FileType = ConverterFileType.Image });
+            Assert.True(model.CanConvert);
+
+            model.IsProcessing = true;
+            Assert.False(model.CanConvert);
+
+            model.IsProcessing = false;
+            Assert.True(model.CanConvert);
+
+            model.Items.Clear();
+            Assert.False(model.CanConvert);
         }
     }
 }

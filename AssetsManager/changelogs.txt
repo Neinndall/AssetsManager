@@ -12,6 +12,8 @@ Improvements
 Changes
 
 Bug Fixes
+  - Universal Converter / Disable the Convert All button when no files are queued.
+  - Monitor / Show future PBE maintenance as "Starts at HH:mm" instead of "started at HH:mm" and capitalize the dashboard subtitle.
   - Explorer / Update the toolbar mode icon when switching to LOCAL folders or backup RESULT views.
   - Sidebar / Restore the active section highlight after closing the Settings or Help dialog.
   - Manage Versions / Reset the progress timer and ETA when moving between verification and update phases and keep durations beyond 24 hours accurate.
