@@ -20,46 +20,49 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Grid x:Name="RootGrid" RenderTransformOrigin="0.5,0.5">
-                            <Grid.RenderTransform>
-                                <TranslateTransform X="0" Y="0"/>
-                            </Grid.RenderTransform>
-                            
-                            <!-- 1. Glow Layer -->
-                            <Border x:Name="GlowBorder" CornerRadius="12" Opacity="0" IsHitTestVisible="False">
-                                <Border.Background>
-                                    <SolidColorBrush Color="{Binding Tag.Color, RelativeSource={RelativeSource TemplatedParent}}"/>
-                                </Border.Background>
-                                <Border.Effect>
-                                    <BlurEffect Radius="20"/>
-                                </Border.Effect>
-                            </Border>
+                        <!-- Stationary hit-test shell prevents hover oscillation when RootGrid lifts on IsMouseOver -->
+                        <Grid Background="Transparent">
+                            <Grid x:Name="RootGrid" RenderTransformOrigin="0.5,0.5">
+                                <Grid.RenderTransform>
+                                    <TranslateTransform X="0" Y="0"/>
+                                </Grid.RenderTransform>
+                                
+                                <!-- 1. Glow Layer -->
+                                <Border x:Name="GlowBorder" CornerRadius="12" Opacity="0" IsHitTestVisible="False">
+                                    <Border.Background>
+                                        <SolidColorBrush Color="{Binding Tag.Color, RelativeSource={RelativeSource TemplatedParent}}"/>
+                                    </Border.Background>
+                                    <Border.Effect>
+                                        <BlurEffect Radius="20"/>
+                                    </Border.Effect>
+                                </Border>
 
-                            <!-- 2. Background Layer -->
-                            <Border x:Name="BackgroundBorder" 
-                                    Background="{TemplateBinding Background}" 
-                                    CornerRadius="12"/>
+                                <!-- 2. Background Layer -->
+                                <Border x:Name="BackgroundBorder" 
+                                        Background="{TemplateBinding Background}" 
+                                        CornerRadius="12"/>
 
-                            <!-- 3. Accent Strip Layer (Bottom Highlight) -->
-                            <Border x:Name="AccentStrip" 
-                                    BorderThickness="0,0,0,4"
-                                    BorderBrush="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}"
-                                    CornerRadius="12"
-                                    Opacity="0.6"
-                                    Margin="0"
-                                    IsHitTestVisible="False"/>
+                                <!-- 3. Accent Strip Layer (Bottom Highlight) -->
+                                <Border x:Name="AccentStrip" 
+                                        BorderThickness="0,0,0,4"
+                                        BorderBrush="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}"
+                                        CornerRadius="12"
+                                        Opacity="0.6"
+                                        Margin="0"
+                                        IsHitTestVisible="False"/>
 
-                            <!-- 4. Content Layer (With Clipping) -->
-                            <Border CornerRadius="12" ClipToBounds="True">
-                                <ContentPresenter Margin="1"/>
-                            </Border>
+                                <!-- 4. Content Layer (With Clipping) -->
+                                <Border CornerRadius="12" ClipToBounds="True">
+                                    <ContentPresenter Margin="1"/>
+                                </Border>
 
-                            <!-- 5. Border Overlay -->
-                            <Border x:Name="CardBorder"
-                                    BorderBrush="{TemplateBinding BorderBrush}"
-                                    BorderThickness="{TemplateBinding BorderThickness}"
-                                    CornerRadius="12"
-                                    IsHitTestVisible="False"/>
+                                <!-- 5. Border Overlay -->
+                                <Border x:Name="CardBorder"
+                                        BorderBrush="{TemplateBinding BorderBrush}"
+                                        BorderThickness="{TemplateBinding BorderThickness}"
+                                        CornerRadius="12"
+                                        IsHitTestVisible="False"/>
+                            </Grid>
                         </Grid>
                         
                         <ControlTemplate.Triggers>
@@ -494,12 +497,15 @@
                                         <DataTrigger Binding="{Binding IsConfigIncomplete}" Value="True">
                                             <Setter Property="Foreground" Value="{StaticResource AccentOrange}"/>
                                             <DataTrigger.EnterActions>
-                                                <BeginStoryboard>
+                                                <BeginStoryboard x:Name="ConfigIncompletePulseStoryboard">
                                                     <Storyboard>
                                                         <DoubleAnimation Storyboard.TargetProperty="Opacity" From="1" To="0.5" Duration="0:0:0.8" AutoReverse="True" RepeatBehavior="Forever"/>
                                                     </Storyboard>
                                                 </BeginStoryboard>
                                             </DataTrigger.EnterActions>
+                                            <DataTrigger.ExitActions>
+                                                <StopStoryboard BeginStoryboardName="ConfigIncompletePulseStoryboard"/>
+                                            </DataTrigger.ExitActions>
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>

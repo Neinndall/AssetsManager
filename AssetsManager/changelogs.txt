@@ -12,6 +12,7 @@ Improvements
 Changes
 
 Bug Fixes
+  - Home / Prevent dashboard tiles from bouncing when hovering their bottom edge and stop the status icon from pulsing once setup is complete.
   - Explorer / Stop file and folder icons from continuing to spin after loading audio banks.
   - Image Diff / Render .svg vector images properly in single, batch, and local file comparisons.
   - 3D Studio / Align map particle shadows with their mirrored scene positions instead of projecting them onto the opposite side of the map.
