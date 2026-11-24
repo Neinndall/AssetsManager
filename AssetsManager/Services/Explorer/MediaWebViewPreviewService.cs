@@ -101,8 +101,11 @@ namespace AssetsManager.Services.Explorer
             }
         }
 
+        internal int DeactivateCallCount { get; private set; }
+
         public void Deactivate()
         {
+            DeactivateCallCount++;
             PrepareTransition();
             if (_webView?.CoreWebView2 != null)
             {

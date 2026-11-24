@@ -278,13 +278,40 @@ namespace AssetsManager.Services.Explorer
 
         public void CloseSlotByCategory(FileSystemNodeModel node)
         {
-            if (node == null) return;
+            if (node == null || _viewModel == null) return;
 
             bool isImage = SupportedFileTypes.IsImage(node.Extension);
 
             bool hasMoreOfSameCategory = _viewModel.PinnedFilesManager.PinnedFiles.Any(p =>
                 p.Node != node &&
                 SupportedFileTypes.IsImage(p.Node.Extension) == isImage);
+
+            if (isImage)
+            {
+                if (!hasMoreOfSameCategory || _currentImageNode == node)
+                {
+                    _currentImageNode = null;
+                    _activeImagePreviewer = Previewer.None;
+                    if (_imagePreview != null)
+                    {
+                        _imagePreview.Source = null;
+                    }
+                }
+            }
+            else
+            {
+                if (!hasMoreOfSameCategory || _currentContentNode == node)
+                {
+                    // Stop resident WebView2 media playback so closed audio/video tabs cannot keep playing invisibly.
+                    if (_activeContentPreviewer == Previewer.WebView)
+                    {
+                        _mediaWebViewPreviewService.Deactivate();
+                    }
+
+                    _currentContentNode = null;
+                    _activeContentPreviewer = Previewer.None;
+                }
+            }
 
             _viewModel.UnloadSlotByCategory(isImage, hasMoreOfSameCategory);
         }
