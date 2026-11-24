@@ -12,6 +12,7 @@ Improvements
 Changes
 
 Bug Fixes
+  - Manage Versions / Reset the progress timer and ETA when moving between verification and update phases and keep durations beyond 24 hours accurate.
   - Image Diff / Center Side-by-Side mouse-wheel zoom on the hovered panel instead of offsetting images when zooming on the right side.
   - History / Update the visible card title immediately when renaming a history entry.
   - Monitor / Show a pending label instead of year 0001 on newly watched assets, avoid false initial update alerts, and use English labels in Sales and Pass Rewards.
