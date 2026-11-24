@@ -72,6 +72,6 @@ namespace AssetsManager.Views.Models.Monitor
         public string FormattedEndDate => _formattedEndDate ??= FormatUtils.FormatTimeRemaining(EndDateValue);
 
         private string _formattedSaleDetails;
-        public string FormattedSaleDetails => _formattedSaleDetails ??= $"Sale: {Rp} RP ({PercentOff}% dto)";
+        public string FormattedSaleDetails => _formattedSaleDetails ??= $"Sale: {Rp} RP ({PercentOff}% off)";
     }
 }

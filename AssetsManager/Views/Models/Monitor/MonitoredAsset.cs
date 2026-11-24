@@ -33,7 +33,7 @@ namespace AssetsManager.Views.Models.Monitor
         public MonitoredAsset()
         {
             Status = AssetStatus.Pending;
-            StatusColor = (SolidColorBrush)Application.Current.FindResource("TextMuted");
+            StatusColor = Application.Current?.TryFindResource("TextMuted") as SolidColorBrush;
         }
 
         public string Version
@@ -88,8 +88,21 @@ namespace AssetsManager.Views.Models.Monitor
         public DateTime LastUpdated
         {
             get => _lastUpdated;
-            set { if (_lastUpdated != value) { _lastUpdated = value; _cachedLastCheckedInfo = null; OnPropertyChanged(); UpdateStatusInfo(); } }
+            set
+            {
+                if (_lastUpdated != value)
+                {
+                    _lastUpdated = value;
+                    _cachedLastCheckedInfo = null;
+                    OnPropertyChanged();
+                    OnPropertyChanged(nameof(FormattedLastUpdated));
+                    UpdateStatusInfo();
+                }
+            }
         }
+
+        public string FormattedLastUpdated =>
+            LastUpdated == DateTime.MinValue ? "Not checked yet" : LastUpdated.ToString("dd MMM yyyy · HH:mm");
 
         public AssetStatus Status
         {

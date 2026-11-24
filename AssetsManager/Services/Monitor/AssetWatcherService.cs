@@ -88,7 +88,9 @@ namespace AssetsManager.Services.Monitor
                 InternalPath = internalPath,
                 SourceType = sourceType,
                 Version = currentVersion,
-                LastKnownHash = node.SourceChunkPathHash != 0 ? node.SourceChunkPathHash : 0
+                // Leave content checksum at 0 so the first check records the baseline instead of
+                // comparing a path hash against the chunk content checksum and firing a false update.
+                LastKnownHash = 0
             };
 
             _appSettings.MonitoredAssets.Add(newAsset);
