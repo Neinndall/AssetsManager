@@ -12,6 +12,7 @@ Improvements
 Changes
 
 Bug Fixes
+  - 3D Studio / Keep spring physics trailing in the mirrored character direction, pause dynamics when playback is paused, and avoid resetting springs across animation loop boundaries.
   - 3D Studio / Keep viewport gizmo dragging linear instead of accelerating away when moving models along depth.
   - Explorer / Stop audio playback when closing the active media tab in Dual View or removing the playing track in Audio Player.
   - Home / Prevent dashboard tiles from bouncing when hovering their bottom edge and stop the status icon from pulsing once setup is complete.

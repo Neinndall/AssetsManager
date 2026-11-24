@@ -210,6 +210,18 @@ namespace AssetsManager.Services.Viewer.Animation
             _dynamicsAnimation = null;
         }
 
+        internal static Matrix4x4 CreatePoseRootTransform(SceneModel scene, bool mirrorCharacterX)
+        {
+            Matrix4x4 world = GlMeshRenderer.CreateWorldMatrix(scene);
+            if (mirrorCharacterX)
+            {
+                // Character meshes render with scaleX = -scale, so bone-local X offsets are negated
+                // on screen. Negating root translation X keeps spring translation trailing behind world X.
+                world.M41 = -world.M41;
+            }
+            return world;
+        }
+
         public void Update(
             float totalSeconds,
             IAnimationAsset animation,
@@ -218,7 +230,9 @@ namespace AssetsManager.Services.Viewer.Animation
             IList<ModelPart> modelParts,
             string modelName,
             SceneModel scene = null,
-            float deltaSeconds = 0f)
+            float deltaSeconds = 0f,
+            bool mirrorCharacterX = false,
+            bool advanceDynamics = true)
         {
             if (_isDisposed) return;
             if (animation == null || skeleton == null || skin == null)
@@ -230,17 +244,24 @@ namespace AssetsManager.Services.Viewer.Animation
             EnsureBuffers(skeleton, skin, modelParts, modelName);
             _lastAnimation = animation;
 
-            if (scene != null) ConfigurePose(scene.PoseDefinition, GlMeshRenderer.CreateWorldMatrix(scene));
+            if (scene != null) ConfigurePose(scene.PoseDefinition, CreatePoseRootTransform(scene, mirrorCharacterX));
             if (!ReferenceEquals(_dynamicsAnimation, animation))
             {
                 _poseDynamics?.ResetLive();
                 _dynamicsAnimation = animation;
             }
-            long now = Stopwatch.GetTimestamp();
-            float elapsed = deltaSeconds > 0f ? deltaSeconds : _lastDynamicsTick == 0 ? 1f / 60f
-                : (float)Stopwatch.GetElapsedTime(_lastDynamicsTick, now).TotalSeconds;
-            _lastDynamicsTick = now;
-            _poseDynamics?.Advance(FoldAnimationTime(totalSeconds, animation.Duration), _unitTransform, elapsed);
+            if (advanceDynamics)
+            {
+                long now = Stopwatch.GetTimestamp();
+                float elapsed = deltaSeconds > 0f ? deltaSeconds : _lastDynamicsTick == 0 ? 1f / 60f
+                    : (float)Stopwatch.GetElapsedTime(_lastDynamicsTick, now).TotalSeconds;
+                _lastDynamicsTick = now;
+                _poseDynamics?.Advance(FoldAnimationTime(totalSeconds, animation.Duration), _unitTransform, elapsed, animation.Duration);
+            }
+            else
+            {
+                _lastDynamicsTick = 0;
+            }
             if (_poseDefinition.HasDynamics || _poseCues.OfType<AnimationLockOrientationCue>().Any())
                 _evaluatedTime = float.NaN;
 
