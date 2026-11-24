@@ -9,6 +9,7 @@ namespace AssetsManager.Views.Controls
     public partial class SidebarView : UserControl
     {
         private readonly SidebarViewModel _viewModel;
+        private string _activeNavigationTag = "Home";
         public MainWindow ParentWindow { get; set; }
 
         public SidebarView()
@@ -18,12 +19,30 @@ namespace AssetsManager.Views.Controls
             DataContext = _viewModel;
         }
 
+        internal static bool IsModalNavigationTag(string viewTag)
+        {
+            return string.Equals(viewTag, "Settings", StringComparison.Ordinal) ||
+                   string.Equals(viewTag, "Help", StringComparison.Ordinal);
+        }
+
         private void MenuButton_Click(object sender, RoutedEventArgs e)
         {
             var button = sender as RadioButton;
             if (button?.Tag is string viewTag)
             {
+                bool isModal = IsModalNavigationTag(viewTag);
+                if (!isModal)
+                {
+                    _activeNavigationTag = viewTag;
+                }
+
                 ParentWindow?.OnSidebarNavigationRequested(viewTag);
+
+                if (isModal)
+                {
+                    button.IsChecked = false;
+                    SelectNavigationItem(_activeNavigationTag);
+                }
             }
         }
 
@@ -57,10 +76,16 @@ namespace AssetsManager.Views.Controls
 
         public void SelectNavigationItem(string viewTag)
         {
+            if (string.IsNullOrWhiteSpace(viewTag)) return;
+
             foreach (var child in ((StackPanel)JsonDiffToolButton.Parent).Children)
             {
                 if (child is RadioButton rb && rb.Tag?.ToString() == viewTag)
                 {
+                    if (!IsModalNavigationTag(viewTag))
+                    {
+                        _activeNavigationTag = viewTag;
+                    }
                     rb.IsChecked = true;
                     return;
                 }
