@@ -53,6 +53,22 @@ namespace AssetsManager.Views.Models.Explorer
             set { if (_currentClientIcon != value) { _currentClientIcon = value; OnPropertyChanged(); } }
         }
 
+        public void SetClientBadge(string clientName, Brush brush)
+        {
+            CurrentClientName = clientName;
+            CurrentClientBrush = brush;
+            CurrentClientIcon = ResolveClientIcon(clientName);
+        }
+
+        public static MaterialIconKind ResolveClientIcon(string clientName) => clientName switch
+        {
+            "PBE" => MaterialIconKind.FlaskOutline,
+            "LIVE" => MaterialIconKind.SealVariant,
+            "LOCAL" => MaterialIconKind.FolderOpenOutline,
+            "RESULT" => MaterialIconKind.FileCompare,
+            _ => MaterialIconKind.FolderOutline
+        };
+
         public bool IsBackupMode
         {
             get => _isBackupMode;

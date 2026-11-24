@@ -528,9 +528,9 @@ namespace AssetsManager.Views.Controls.Explorer
             if (BackupManager != null)
             {
                 var (isPbe, _) = BackupManager.GetPathIdentification(rootPath);
-                _viewModel.Toolbar.CurrentClientName = isPbe ? "PBE" : "LIVE";
-                _viewModel.Toolbar.CurrentClientBrush = (System.Windows.Media.Brush)Application.Current.FindResource(isPbe ? "AccentBlue" : "AccentBrush");
-                _viewModel.Toolbar.CurrentClientIcon = isPbe ? Material.Icons.MaterialIconKind.FlaskOutline : Material.Icons.MaterialIconKind.SealVariant;
+                _viewModel.Toolbar.SetClientBadge(
+                    isPbe ? "PBE" : "LIVE",
+                    (System.Windows.Media.Brush)Application.Current.FindResource(isPbe ? "AccentBlue" : "AccentBrush"));
             }
 
             await ExecuteTreeBuildInternalAsync(
@@ -548,8 +548,9 @@ namespace AssetsManager.Views.Controls.Explorer
             NewLolPath = null;
             OldLolPath = null;
 
-            _viewModel.Toolbar.CurrentClientName = "LOCAL";
-            _viewModel.Toolbar.CurrentClientBrush = (System.Windows.Media.Brush)Application.Current.FindResource("TextMuted");
+            _viewModel.Toolbar.SetClientBadge(
+                "LOCAL",
+                (System.Windows.Media.Brush)Application.Current.FindResource("TextMuted"));
 
             await ExecuteTreeBuildInternalAsync(
                 async ct => await TreeBuilderService.BuildDirectoryTreeAsync(rootPath, ct, 
@@ -564,8 +565,9 @@ namespace AssetsManager.Views.Controls.Explorer
         {
             _backupJsonPath = jsonPath;
 
-            _viewModel.Toolbar.CurrentClientName = "RESULT";
-            _viewModel.Toolbar.CurrentClientBrush = (System.Windows.Media.Brush)Application.Current.FindResource("AccentTeal");
+            _viewModel.Toolbar.SetClientBadge(
+                "RESULT",
+                (System.Windows.Media.Brush)Application.Current.FindResource("AccentTeal"));
 
             await ExecuteTreeBuildInternalAsync(
                 async ct => 
