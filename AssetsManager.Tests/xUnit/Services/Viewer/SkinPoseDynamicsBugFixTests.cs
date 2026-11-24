@@ -64,7 +64,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer
         }
 
         [Fact]
-        public void PausedUpdateFreezesLiveSpringDynamics()
+        public void LiveSpringDynamicsContinueSteppingWhenAnimationTimeIsPaused()
         {
             uint hairHash = Fnv1a.HashLower("Hair");
             var definition = new SkinPoseDefinition
@@ -77,16 +77,16 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer
             var rig = CreateTwoBoneRig();
             var skin = (SkinnedMesh)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(SkinnedMesh));
 
-            service.Update(0.1f, anim, rig, skin, Array.Empty<ModelPart>(), "test", model, deltaSeconds: 1f / 60f, mirrorCharacterX: true, advanceDynamics: true);
-            service.Update(0.12f, anim, rig, skin, Array.Empty<ModelPart>(), "test", model, deltaSeconds: 1f / 60f, mirrorCharacterX: true, advanceDynamics: true);
-            Vector3 beforePause = service.WorldBoneTransforms[1].Translation;
+            service.Update(0.12f, anim, rig, skin, Array.Empty<ModelPart>(), "test", model, deltaSeconds: 1f / 60f, mirrorCharacterX: true);
+            service.Update(0.12f, anim, rig, skin, Array.Empty<ModelPart>(), "test", model, deltaSeconds: 1f / 60f, mirrorCharacterX: true);
+            Vector3 beforeMove = service.WorldBoneTransforms[1].Translation;
 
-            // While paused, moving the model must not step live spring dynamics.
-            model.PositionX = 25;
-            service.Update(0.12f, anim, rig, skin, Array.Empty<ModelPart>(), "test", model, deltaSeconds: 1f / 60f, mirrorCharacterX: true, advanceDynamics: false);
-            Vector3 afterPausedMove = service.WorldBoneTransforms[1].Translation;
+            // Even with animation time paused at 0.12s, moving the model steps live springs in real time (LTK parity).
+            model.PositionX = 10;
+            service.Update(0.12f, anim, rig, skin, Array.Empty<ModelPart>(), "test", model, deltaSeconds: 1f / 60f, mirrorCharacterX: true);
+            Vector3 afterMove = service.WorldBoneTransforms[1].Translation;
 
-            Assert.Equal(beforePause.X, afterPausedMove.X, 3);
+            Assert.True(MathF.Abs(afterMove.X - beforeMove.X) > 9f, $"Expected live spring to react while paused, got deltaX={afterMove.X - beforeMove.X}.");
         }
 
         private static RigResource CreateTwoBoneRig()

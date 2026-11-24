@@ -231,8 +231,7 @@ namespace AssetsManager.Services.Viewer.Animation
             string modelName,
             SceneModel scene = null,
             float deltaSeconds = 0f,
-            bool mirrorCharacterX = false,
-            bool advanceDynamics = true)
+            bool mirrorCharacterX = false)
         {
             if (_isDisposed) return;
             if (animation == null || skeleton == null || skin == null)
@@ -250,18 +249,11 @@ namespace AssetsManager.Services.Viewer.Animation
                 _poseDynamics?.ResetLive();
                 _dynamicsAnimation = animation;
             }
-            if (advanceDynamics)
-            {
-                long now = Stopwatch.GetTimestamp();
-                float elapsed = deltaSeconds > 0f ? deltaSeconds : _lastDynamicsTick == 0 ? 1f / 60f
-                    : (float)Stopwatch.GetElapsedTime(_lastDynamicsTick, now).TotalSeconds;
-                _lastDynamicsTick = now;
-                _poseDynamics?.Advance(FoldAnimationTime(totalSeconds, animation.Duration), _unitTransform, elapsed, animation.Duration);
-            }
-            else
-            {
-                _lastDynamicsTick = 0;
-            }
+            long now = Stopwatch.GetTimestamp();
+            float elapsed = deltaSeconds > 0f ? deltaSeconds : _lastDynamicsTick == 0 ? 1f / 60f
+                : (float)Stopwatch.GetElapsedTime(_lastDynamicsTick, now).TotalSeconds;
+            _lastDynamicsTick = now;
+            _poseDynamics?.Advance(FoldAnimationTime(totalSeconds, animation.Duration), _unitTransform, elapsed, animation.Duration);
             if (_poseDefinition.HasDynamics || _poseCues.OfType<AnimationLockOrientationCue>().Any())
                 _evaluatedTime = float.NaN;
 
