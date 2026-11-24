@@ -293,16 +293,49 @@ namespace AssetsManager.Views.Dialogs
             double newZoom = Math.Max(0.25, Math.Min(4.0, _currentZoom * zoomFactor));
             if (Math.Abs(newZoom - _currentZoom) < 0.001) return;
 
-            Point mousePos = e.GetPosition(MainContentArea);
+            IInputElement zoomTarget = ResolveZoomTarget(
+                isSideBySide: SideBySideBtn?.IsChecked == true,
+                oldImageBorder: OldImageBorder,
+                newImageBorder: NewImageBorder,
+                overlayContainer: ImageContainer,
+                fallback: MainContentArea);
+            Point mousePos = e.GetPosition(zoomTarget);
             double factor = newZoom / _currentZoom;
-            double dx = (mousePos.X - _panX) * (1 - factor);
-            double dy = (mousePos.Y - _panY) * (1 - factor);
+            (double dx, double dy) = ComputeZoomPanDelta(mousePos, _panX, _panY, factor);
 
             _currentZoom = newZoom;
             ApplyTransform(scale: _currentZoom, deltaX: dx, deltaY: dy);
             if (Math.Abs(ZoomSlider.Value - _currentZoom * 100) > 0.01) ZoomSlider.Value = _currentZoom * 100;
 
             e.Handled = true;
+        }
+
+        internal static IInputElement ResolveZoomTarget(
+            bool isSideBySide,
+            UIElement oldImageBorder,
+            UIElement newImageBorder,
+            UIElement overlayContainer,
+            IInputElement fallback)
+        {
+            if (isSideBySide)
+            {
+                if (newImageBorder?.IsMouseOver == true) return newImageBorder;
+                if (oldImageBorder?.IsMouseOver == true) return oldImageBorder;
+                return oldImageBorder ?? fallback;
+            }
+
+            return overlayContainer ?? fallback;
+        }
+
+        internal static (double DeltaX, double DeltaY) ComputeZoomPanDelta(
+            Point localCursorPosition,
+            double currentPanX,
+            double currentPanY,
+            double zoomRatio)
+        {
+            double dx = (localCursorPosition.X - currentPanX) * (1 - zoomRatio);
+            double dy = (localCursorPosition.Y - currentPanY) * (1 - zoomRatio);
+            return (dx, dy);
         }
 
         private void ImageDiffWindow_MouseDown(object sender, MouseButtonEventArgs e)
