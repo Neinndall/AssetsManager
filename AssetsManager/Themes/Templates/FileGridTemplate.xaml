@@ -25,24 +25,47 @@
 
                 <!-- 1. Thumbnail / Icon Presentation (Fixed height ensures 100% horizontal alignment across rows) -->
                 <Grid Grid.Row="0" HorizontalAlignment="Center" VerticalAlignment="Center">
-                    <!-- A. Placeholder / File / Folder Icon -->
+                    <!-- A. Placeholder / File / Folder Icon (kept free of spin transforms for container recycling) -->
                     <materialIcons:MaterialIcon Kind="{Binding Node, Converter={StaticResource PathToIconConverter}}" 
                                                 Width="52" Height="52" 
                                                 Foreground="{StaticResource TextSecondary}"
+                                                HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <materialIcons:MaterialIcon.Style>
+                            <Style TargetType="materialIcons:MaterialIcon">
+                                <Setter Property="Visibility" Value="{Binding ImagePreview, Converter={StaticResource NullToVisibilityConverter}, ConverterParameter=Invert}"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Node.Name}" Value="Loading...">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </materialIcons:MaterialIcon.Style>
+                    </materialIcons:MaterialIcon>
+
+                    <!-- A2. Dedicated Loading Spinner Icon -->
+                    <materialIcons:MaterialIcon Kind="Loading"
+                                                Width="52" Height="52"
+                                                Foreground="{StaticResource TextSecondary}"
                                                 HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                RenderTransformOrigin="0.5,0.5"
-                                                Visibility="{Binding ImagePreview, Converter={StaticResource NullToVisibilityConverter}, ConverterParameter=Invert}">
+                                                RenderTransformOrigin="0.5,0.5">
                         <materialIcons:MaterialIcon.RenderTransform>
                             <RotateTransform Angle="0"/>
                         </materialIcons:MaterialIcon.RenderTransform>
                         <materialIcons:MaterialIcon.Style>
                             <Style TargetType="materialIcons:MaterialIcon">
+                                <Setter Property="Visibility" Value="Collapsed"/>
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding Node.Name}" Value="Loading...">
-                                        <DataTrigger.EnterActions>
-                                            <BeginStoryboard Storyboard="{StaticResource SpinningIconAnimation}"/>
-                                        </DataTrigger.EnterActions>
+                                        <Setter Property="Visibility" Value="Visible"/>
                                     </DataTrigger>
+                                    <Trigger Property="Visibility" Value="Visible">
+                                        <Trigger.EnterActions>
+                                            <BeginStoryboard x:Name="GridLoadingSpinStoryboard" Storyboard="{StaticResource SpinningIconAnimation}"/>
+                                        </Trigger.EnterActions>
+                                        <Trigger.ExitActions>
+                                            <StopStoryboard BeginStoryboardName="GridLoadingSpinStoryboard"/>
+                                        </Trigger.ExitActions>
+                                    </Trigger>
                                 </Style.Triggers>
                             </Style>
                         </materialIcons:MaterialIcon.Style>
