@@ -8,6 +8,15 @@ namespace AssetsManager.Services.Hashes.Guessers.Game;
 
 internal sealed partial class GameHashGuesser
 {
+    private static readonly string[] GluedMaterialRoleSuffixes =
+    {
+        "bloommask", "outlinemask", "alphamask", "scrollmask", "fresnelmask", "emissivemask", "glowmask",
+        "colormask", "deformmask", "mask", "effect", "gradient", "grad", "ramp", "lut", "alpha", "opacity",
+        "bloom", "outline", "glow", "emissive", "color", "diffuse", "matcap", "iridescent", "fresnel",
+        "normal", "nm", "rough", "metal", "rma", "rmsa", "orm", "pattern", "noise", "distortion", "fbm",
+        "deform", "flow", "scroll", "flipbook", "detail", "layer", "screen", "fx", "vfx", "base", "tex", "map", "tint"
+    };
+
     internal long GuessLocalNamePatterns(HashGuessEngine engine, string rootDirectory, bool animations,
         CancellationToken cancellationToken, long candidateBudget, Action<long> progress, GameWadPathCache wadPathCache = null)
     {
@@ -107,6 +116,16 @@ internal sealed partial class GameHashGuesser
                                 !Check(path.AsSpan(0, tokenEnd - 1), letter, path.AsSpan(tokenEnd))) return Finish();
                     if (TryToggleZeroPadding(path.AsSpan(at, tokenEnd - at), out string toggledPadding) &&
                         !Check(path.AsSpan(0, at), toggledPadding, path.AsSpan(tokenEnd))) return Finish();
+                    if (!path.EndsWith(".anm", StringComparison.Ordinal) &&
+                        TrySplitGluedMaterialRole(path.AsSpan(at, tokenEnd - at), out string gluedPrefix, out string matchedRole))
+                    {
+                        foreach (string role in GluedMaterialRoleSuffixes)
+                        {
+                            if (string.Equals(role, matchedRole, StringComparison.Ordinal)) continue;
+                            if (!Check(path.AsSpan(0, at), gluedPrefix + role, path.AsSpan(tokenEnd))) return Finish();
+                            if (!Check(path.AsSpan(0, at), gluedPrefix + "_" + role, path.AsSpan(tokenEnd))) return Finish();
+                        }
+                    }
                     if (separator < 0) break;
                     at = separator + 1;
                 }
@@ -161,6 +180,26 @@ internal sealed partial class GameHashGuesser
         if (digitLength == 2 && token[digitStart] == '0' && token[digitStart + 1] != '0')
         {
             toggled = string.Concat(token[..digitStart], token[(digitStart + 1)..]);
+            return true;
+        }
+        return false;
+    }
+
+    private static bool TrySplitGluedMaterialRole(ReadOnlySpan<char> token, out string prefix, out string role)
+    {
+        prefix = null;
+        role = null;
+        if (token.Length < 6) return false;
+        foreach (string suffix in GluedMaterialRoleSuffixes)
+        {
+            if (token.Length <= suffix.Length + 2 || !token.EndsWith(suffix, StringComparison.Ordinal)) continue;
+            ReadOnlySpan<char> head = token[..^suffix.Length];
+            bool allLetters = true;
+            for (int i = 0; i < head.Length; i++)
+                if (!char.IsAsciiLetterLower(head[i])) { allLetters = false; break; }
+            if (!allLetters) continue;
+            prefix = head.ToString();
+            role = suffix;
             return true;
         }
         return false;
