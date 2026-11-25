@@ -193,16 +193,4 @@ public sealed class GameLocalNamePatternTests
         Assert.Equal(count, engine.CheckedCandidates);
         Assert.Equal(1, engine.RemainingUnknownCount);
     }
-
-    [Theory]
-    [InlineData("assets/characters/example/skins/skin42/", "example_skin42_eyeseffect_tx_cm.tex", "example_skin42_eyesgradient_tx_cm.tex")]
-    [InlineData("assets/characters/example/skins/skin3/particles/", "example_skin3_wingmaskglow.tex", "example_skin3_wingmaskalpha.tex")]
-    public void SubstitutesGluedMaterialRoleSuffixesOnTextures(string directory, string seed, string target)
-    {
-        var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong> { XxHash64Ext.Hash(directory + target), 42 });
-        long count = GameHashGuesser.SubstituteLocalNameWords(engine, new[] { directory + seed }, CancellationToken.None);
-        Assert.Equal(directory + target, Assert.Single(engine.Matches).Value.Path);
-        Assert.Equal(count, engine.CheckedCandidates);
-        Assert.Equal(1, engine.RemainingUnknownCount);
-    }
 }

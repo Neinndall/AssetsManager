@@ -2,10 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.Hashes;
 using LeagueToolkit.Core.Meta;
+using LeagueToolkit.Core.Meta.Properties;
 using LeagueToolkit.Core.Wad;
 using LeagueToolkit.Hashing;
 
@@ -77,4 +79,134 @@ internal sealed partial class GameHashGuesser
 
     private GameMaterialTextureIndex GetMaterialTextureIndex(CancellationToken cancellationToken) =>
         Corpus.GetOrCreate("game-material-texture-roles", paths => new GameMaterialTextureIndex(paths, cancellationToken));
+
+    private static readonly Regex BinPropertyWordRegex = new(
+        @"[A-Z]+(?=[A-Z][a-z]|\b)|[A-Z]?[a-z]+|[0-9]+",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
+    // Derives glued compound texture names (e.g. eyesgradient, headbase, visoralpha) using only words from the owning BIN's properties.
+    private void GuessBinPropertyGluedTextures(
+        HashGuessEngine engine,
+        BinTree tree,
+        string sourceWadPath,
+        ulong sourceChunkHash,
+        CancellationToken cancellationToken)
+    {
+        if (tree == null || engine.RemainingUnknownCount == 0) return;
+
+        var known = HashFile.Load();
+        var pendingTargets = new HashSet<ulong>();
+        var knownTextures = new HashSet<string>(StringComparer.Ordinal);
+        var binWords = new HashSet<string>(StringComparer.Ordinal);
+
+        void Collect(BinTreeProperty property)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            switch (property)
+            {
+                case BinTreeWadChunkLink link:
+                    if (engine.UnknownHashes.Contains(link.Value))
+                    {
+                        pendingTargets.Add(link.Value);
+                    }
+                    else
+                    {
+                        if (!known.TryGetValue(link.Value, out string resolved) &&
+                            engine.Matches.TryGetValue(link.Value, out var match))
+                            resolved = match.Path;
+                        if (resolved != null &&
+                            (resolved.EndsWith(".tex", StringComparison.Ordinal) || resolved.EndsWith(".dds", StringComparison.Ordinal)) &&
+                            !resolved.StartsWith("assets/shared/materials/", StringComparison.Ordinal) &&
+                            resolved.Contains('/'))
+                        {
+                            knownTextures.Add(resolved);
+                        }
+                    }
+                    break;
+                case BinTreeString text when !string.IsNullOrEmpty(text.Value) && text.Value.Length <= 80 && !text.Value.Contains('/'):
+                    foreach (Match m in BinPropertyWordRegex.Matches(text.Value))
+                    {
+                        string word = m.Value.ToLowerInvariant();
+                        if (word.Length is >= 3 and <= 16 && word.All(char.IsAsciiLetterLower))
+                            binWords.Add(word);
+                    }
+                    break;
+                case BinTreeStruct structure:
+                    foreach (var child in structure.Properties.Values) Collect(child);
+                    break;
+                case BinTreeContainer container:
+                    foreach (var element in container.Elements) Collect(element);
+                    break;
+                case BinTreeOptional optional when optional.Value != null:
+                    Collect(optional.Value);
+                    break;
+                case BinTreeMap map:
+                    foreach (var pair in map)
+                    {
+                        Collect(pair.Key);
+                        Collect(pair.Value);
+                    }
+                    break;
+            }
+        }
+
+        foreach (var obj in tree.Objects.Values)
+            foreach (var property in obj.Properties.Values)
+                Collect(property);
+
+        if (pendingTargets.Count == 0 || knownTextures.Count == 0 || binWords.Count == 0) return;
+
+        string[] words = binWords.OrderBy(word => word, StringComparer.Ordinal).Take(200).ToArray();
+        foreach (string path in knownTextures.OrderBy(value => value, StringComparer.Ordinal))
+        {
+            if (pendingTargets.Count == 0 || engine.RemainingUnknownCount == 0) return;
+            int slash = path.LastIndexOf('/');
+            string directory = path[..(slash + 1)];
+            string extension = path[^4..];
+            string stem = path[(slash + 1)..^4];
+            if (stem.Contains('.')) continue;
+
+            string[] tokens = stem.Split('_');
+            for (int i = 0; i < tokens.Length; i++)
+            {
+                string token = tokens[i];
+                if (token.Length < 3 || !token.All(char.IsAsciiLetterLower)) continue;
+                string before = i == 0 ? directory : directory + string.Join('_', tokens[..i]) + "_";
+                string after = i == tokens.Length - 1 ? extension : "_" + string.Join('_', tokens[(i + 1)..]) + extension;
+
+                foreach (string word in words)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (string.Equals(token, word, StringComparison.Ordinal)) continue;
+                    if (engine.CheckNormalizedParts(before, token + word, after, HashGuessStrategy.BinLinkSibling,
+                        sourceWadPath, sourceChunkHash, expectedHashes: pendingTargets))
+                    {
+                        pendingTargets.RemoveWhere(hash => !engine.UnknownHashes.Contains(hash));
+                        if (pendingTargets.Count == 0) return;
+                    }
+                }
+
+                if (token.Length >= 7)
+                {
+                    int maxPrefix = Math.Min(8, token.Length - 3);
+                    for (int prefixLen = 3; prefixLen <= maxPrefix; prefixLen++)
+                    {
+                        string head = token[..prefixLen];
+                        string tail = token[prefixLen..];
+                        foreach (string word in words)
+                        {
+                            cancellationToken.ThrowIfCancellationRequested();
+                            if (string.Equals(word, tail, StringComparison.Ordinal)) continue;
+                            if (engine.CheckNormalizedParts(before, head + word, after, HashGuessStrategy.BinLinkSibling,
+                                sourceWadPath, sourceChunkHash, expectedHashes: pendingTargets))
+                            {
+                                pendingTargets.RemoveWhere(hash => !engine.UnknownHashes.Contains(hash));
+                                if (pendingTargets.Count == 0) return;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
