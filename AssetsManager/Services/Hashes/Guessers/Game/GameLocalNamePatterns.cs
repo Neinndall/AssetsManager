@@ -60,10 +60,15 @@ internal sealed partial class GameHashGuesser
         {
             cancellationToken.ThrowIfCancellationRequested();
             // A small vocabulary learned in this directory avoids unrelated global word combinations.
-            string[] words = family.SelectMany(path => path[(path.LastIndexOf('/') + 1)..^4].Split('_'))
+            var baseWords = family.SelectMany(path => path[(path.LastIndexOf('/') + 1)..^4].Split('_'))
                 .Where(word => word.Length is >= 2 and <= 32 && !word.Contains('.'))
                 .GroupBy(word => word, StringComparer.Ordinal).OrderByDescending(group => group.Count())
-                .ThenBy(group => group.Key, StringComparer.Ordinal).Take(24).Select(group => group.Key).ToArray();
+                .ThenBy(group => group.Key, StringComparer.Ordinal).Take(24).Select(group => group.Key).ToList();
+            var expandedWords = new HashSet<string>(baseWords, StringComparer.Ordinal);
+            foreach (string word in baseWords)
+                if (TryToggleZeroPadding(word, out string paddedVariant))
+                    expandedWords.Add(paddedVariant);
+            string[] words = expandedWords.ToArray();
             string[] insertions = words.Select(word => word + "_").ToArray();
             string[] endings = words.Select(word => "_" + word).ToArray();
             var prefixes = new HashSet<string>(StringComparer.Ordinal);
@@ -100,6 +105,8 @@ internal sealed partial class GameHashGuesser
                         foreach (string letter in variantLetters)
                             if (letter[0] != path[tokenEnd - 1] &&
                                 !Check(path.AsSpan(0, tokenEnd - 1), letter, path.AsSpan(tokenEnd))) return Finish();
+                    if (TryToggleZeroPadding(path.AsSpan(at, tokenEnd - at), out string toggledPadding) &&
+                        !Check(path.AsSpan(0, at), toggledPadding, path.AsSpan(tokenEnd))) return Finish();
                     if (separator < 0) break;
                     at = separator + 1;
                 }
@@ -133,5 +140,29 @@ internal sealed partial class GameHashGuesser
             return true;
         }
         long Finish() { progress?.Invoke(checkedCandidates); return checkedCandidates; }
+    }
+
+    private static bool TryToggleZeroPadding(ReadOnlySpan<char> token, out string toggled)
+    {
+        toggled = null;
+        if (token.Length < 2 || !char.IsAsciiDigit(token[^1])) return false;
+        int digitStart = token.Length - 1;
+        while (digitStart > 0 && char.IsAsciiDigit(token[digitStart - 1])) digitStart--;
+        if (digitStart == 0) return false;
+        for (int i = 0; i < digitStart; i++)
+            if (!char.IsAsciiLetterLower(token[i])) return false;
+
+        int digitLength = token.Length - digitStart;
+        if (digitLength == 1 && token[digitStart] != '0')
+        {
+            toggled = string.Concat(token[..digitStart], "0", token[digitStart..]);
+            return true;
+        }
+        if (digitLength == 2 && token[digitStart] == '0' && token[digitStart + 1] != '0')
+        {
+            toggled = string.Concat(token[..digitStart], token[(digitStart + 1)..]);
+            return true;
+        }
+        return false;
     }
 }

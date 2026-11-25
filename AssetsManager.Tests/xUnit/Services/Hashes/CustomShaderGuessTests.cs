@@ -205,5 +205,34 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
                 Assert.Equal(expectedPath, match.Path);
             }
         }
+
+        [Fact]
+        public void SubstituteShaderVocabWords_DiscoversCompoundShaderNames()
+        {
+            var knownShaders = new[]
+            {
+                "assets/shaders/hlsl/font/font.ps-dx11",
+                "assets/shaders/hlsl/font/font.ps-dx11_0",
+                "assets/shaders/hlsl/ui/arc_fill.ps-dx11"
+            };
+            var hashFile = new HashFile(HashGuessDomain.Game, knownShaders);
+            var guesser = new GameHashGuesser(hashFile, null, _ => string.Empty);
+
+            var targets = new HashSet<ulong>
+            {
+                XxHash64Ext.Hash("assets/shaders/hlsl/font/fontfill.ps-dx11"),
+                XxHash64Ext.Hash("assets/shaders/hlsl/font/fontfill.ps-dx11_0")
+            };
+
+            var matches = new List<HashGuessMatch>();
+            var engine = new HashGuessEngine(HashGuessDomain.Game, targets, m => matches.Add(m));
+
+            int checkedCount = guesser.SubstituteShaderVocabWords(engine, System.Threading.CancellationToken.None);
+
+            Assert.True(checkedCount > 0);
+            Assert.Contains(matches, m => m.Path == "assets/shaders/hlsl/font/fontfill.ps-dx11");
+            Assert.Contains(matches, m => m.Path == "assets/shaders/hlsl/font/fontfill.ps-dx11_0");
+            Assert.Equal(0, engine.RemainingUnknownCount);
+        }
     }
 }

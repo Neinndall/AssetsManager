@@ -180,4 +180,17 @@ public sealed class GameLocalNamePatternTests
         Assert.Equal(count, engine.CheckedCandidates);
         Assert.Equal(1, engine.RemainingUnknownCount);
     }
+
+    [Theory]
+    [InlineData("assets/characters/example/animations/", "genre1_recall.anm", "transition_in.anm", "genre01_transition_in.anm")]
+    [InlineData("assets/characters/example/skins/skin10/", "example_gear02_mask.tex", "example_gear2_body.tex", "example_gear2_mask.tex")]
+    public void DiscoversZeroPaddingVariantsInLocalDirectory(string directory, string seed, string vocabulary, string target)
+    {
+        var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong> { XxHash64Ext.Hash(directory + target), 42 });
+        long count = GameHashGuesser.SubstituteLocalNameWords(engine,
+            new[] { directory + seed, directory + vocabulary }, CancellationToken.None);
+        Assert.Equal(directory + target, Assert.Single(engine.Matches).Value.Path);
+        Assert.Equal(count, engine.CheckedCandidates);
+        Assert.Equal(1, engine.RemainingUnknownCount);
+    }
 }
