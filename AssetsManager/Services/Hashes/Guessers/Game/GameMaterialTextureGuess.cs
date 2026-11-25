@@ -84,32 +84,65 @@ internal sealed partial class GameHashGuesser
         @"[A-Z]+(?=[A-Z][a-z]|\b)|[A-Z]?[a-z]+|[0-9]+",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
-    // Derives glued compound texture names (e.g. eyesgradient, headbase, visoralpha) using only words from the owning BIN's properties.
+    // Derives glued compound texture names (e.g. eyesgradient, headbase, visoralpha) using only words from the owning skin BIN's properties.
     private void GuessBinPropertyGluedTextures(
         HashGuessEngine engine,
         BinTree tree,
+        string sourcePath,
         string sourceWadPath,
         ulong sourceChunkHash,
         CancellationToken cancellationToken)
     {
-        if (tree == null || engine.RemainingUnknownCount == 0) return;
+        if (tree == null || engine.RemainingUnknownCount == 0 || !GameMaterialTextureIndex.IsSkinBin(sourcePath)) return;
 
-        var known = HashFile.Load();
+        // Pass 1: find pending links without allocating strings or running regexes on BINs that have no unresolved links.
         var pendingTargets = new HashSet<ulong>();
-        var knownTextures = new HashSet<string>(StringComparer.Ordinal);
-        var binWords = new HashSet<string>(StringComparer.Ordinal);
-
-        void Collect(BinTreeProperty property)
+        void CollectPendingLinks(BinTreeProperty property)
         {
             cancellationToken.ThrowIfCancellationRequested();
             switch (property)
             {
                 case BinTreeWadChunkLink link:
                     if (engine.UnknownHashes.Contains(link.Value))
-                    {
                         pendingTargets.Add(link.Value);
+                    break;
+                case BinTreeStruct structure:
+                    foreach (var child in structure.Properties.Values) CollectPendingLinks(child);
+                    break;
+                case BinTreeContainer container:
+                    foreach (var element in container.Elements) CollectPendingLinks(element);
+                    break;
+                case BinTreeOptional optional when optional.Value != null:
+                    CollectPendingLinks(optional.Value);
+                    break;
+                case BinTreeMap map:
+                    foreach (var pair in map)
+                    {
+                        CollectPendingLinks(pair.Key);
+                        CollectPendingLinks(pair.Value);
                     }
-                    else
+                    break;
+            }
+        }
+
+        foreach (var obj in tree.Objects.Values)
+            foreach (var property in obj.Properties.Values)
+                CollectPendingLinks(property);
+
+        if (pendingTargets.Count == 0) return;
+
+        // Pass 2: only for skin BINs with pending links, collect non-particle sibling textures and BIN property words.
+        var known = HashFile.Load();
+        var knownTextures = new HashSet<string>(StringComparer.Ordinal);
+        var binWords = new HashSet<string>(StringComparer.Ordinal);
+
+        void CollectContext(BinTreeProperty property)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            switch (property)
+            {
+                case BinTreeWadChunkLink link:
+                    if (!pendingTargets.Contains(link.Value))
                     {
                         if (!known.TryGetValue(link.Value, out string resolved) &&
                             engine.Matches.TryGetValue(link.Value, out var match))
@@ -117,6 +150,7 @@ internal sealed partial class GameHashGuesser
                         if (resolved != null &&
                             (resolved.EndsWith(".tex", StringComparison.Ordinal) || resolved.EndsWith(".dds", StringComparison.Ordinal)) &&
                             !resolved.StartsWith("assets/shared/materials/", StringComparison.Ordinal) &&
+                            !resolved.Contains("/particles/", StringComparison.Ordinal) &&
                             resolved.Contains('/'))
                         {
                             knownTextures.Add(resolved);
@@ -132,19 +166,19 @@ internal sealed partial class GameHashGuesser
                     }
                     break;
                 case BinTreeStruct structure:
-                    foreach (var child in structure.Properties.Values) Collect(child);
+                    foreach (var child in structure.Properties.Values) CollectContext(child);
                     break;
                 case BinTreeContainer container:
-                    foreach (var element in container.Elements) Collect(element);
+                    foreach (var element in container.Elements) CollectContext(element);
                     break;
                 case BinTreeOptional optional when optional.Value != null:
-                    Collect(optional.Value);
+                    CollectContext(optional.Value);
                     break;
                 case BinTreeMap map:
                     foreach (var pair in map)
                     {
-                        Collect(pair.Key);
-                        Collect(pair.Value);
+                        CollectContext(pair.Key);
+                        CollectContext(pair.Value);
                     }
                     break;
             }
@@ -152,9 +186,9 @@ internal sealed partial class GameHashGuesser
 
         foreach (var obj in tree.Objects.Values)
             foreach (var property in obj.Properties.Values)
-                Collect(property);
+                CollectContext(property);
 
-        if (pendingTargets.Count == 0 || knownTextures.Count == 0 || binWords.Count == 0) return;
+        if (knownTextures.Count == 0 || binWords.Count == 0) return;
 
         string[] words = binWords.OrderBy(word => word, StringComparer.Ordinal).Take(200).ToArray();
         foreach (string path in knownTextures.OrderBy(value => value, StringComparer.Ordinal))
