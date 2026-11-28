@@ -72,7 +72,15 @@ namespace AssetsManager.Views.Models.Explorer
         public bool IsBackupMode
         {
             get => _isBackupMode;
-            set { if (_isBackupMode != value) { _isBackupMode = value; OnPropertyChanged(); } }
+            set
+            {
+                if (_isBackupMode != value)
+                {
+                    _isBackupMode = value;
+                    OnPropertyChanged();
+                    OnPropertyChanged(nameof(IsFavoritesToggleVisible));
+                }
+            }
         }
 
         public bool IsGroupingEnabled
@@ -117,9 +125,12 @@ namespace AssetsManager.Views.Models.Explorer
                     OnPropertyChanged(); 
                     OnPropertyChanged(nameof(SwitchModeText));
                     OnPropertyChanged(nameof(SwitchModeIcon));
+                    OnPropertyChanged(nameof(IsFavoritesToggleVisible));
                 } 
             }
         }
+
+        public bool IsFavoritesToggleVisible => IsWadMode && !IsBackupMode;
 
         // Action-Oriented: Show destination mode
         public string SwitchModeText => IsWadMode ? "Local Dir" : "WAD Mode";

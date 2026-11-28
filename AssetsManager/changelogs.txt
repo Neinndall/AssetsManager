@@ -42,6 +42,7 @@ Bug Fixes
   - Video Export / Allow WebM-to-MP4 transcoding to succeed on threads already initialized in STA COM mode.
   - Explorer / Preserve active search filters and match highlights when expanding SoundBank nodes.
   - Explorer / Guard media WebView2 initialization against closing or cancelling previews mid-load.
+  - Explorer / Hide the Favorites toolbar toggle when browsing local directories or backup comparison results.
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 

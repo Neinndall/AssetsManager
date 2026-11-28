@@ -222,7 +222,7 @@
                                   Content="{Binding IsFavoritesEnabled, Converter={StaticResource BooleanToMaterialIconConverter}, ConverterParameter='Star,StarOutline'}"
                                   Margin="0,0,1,0"
                                   IsChecked="{Binding IsFavoritesEnabled}"
-                                  Visibility="{Binding DataContext.IsFavoritesToggleVisible, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                  Visibility="{Binding IsFavoritesToggleVisible, Converter={StaticResource BoolToVisibilityConverter}}"/>
 
                     <!-- 7. Image Merger -->
                     <Button x:Name="ImageMergerButton" 
