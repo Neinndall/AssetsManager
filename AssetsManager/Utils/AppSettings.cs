@@ -451,6 +451,7 @@ namespace AssetsManager.Utils
             AudioExportFormat = defaultSettings.AudioExportFormat;
             VideoExportFormat = defaultSettings.VideoExportFormat;
             ImageExportFormat = defaultSettings.ImageExportFormat;
+            DataExportFormat = defaultSettings.DataExportFormat;
             SaveJsonHistory = defaultSettings.SaveJsonHistory;
             SaveWadComparisonHistory = defaultSettings.SaveWadComparisonHistory;
             BackgroundUpdates = defaultSettings.BackgroundUpdates;

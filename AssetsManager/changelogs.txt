@@ -45,6 +45,7 @@ Bug Fixes
   - Explorer / Hide the Favorites toolbar toggle when browsing local directories or backup comparison results.
   - Parsers / Validate stringtable data bounds and truncated TRENC entries instead of crashing or reading past the buffer.
   - Manage Versions / Cancel sibling bundle downloads immediately on failure and fix file progress counting for resized files.
+  - Settings / Include the default 60-minute interval in the Asset Tracker frequency selector and reset Data Export Format on Reset Defaults.
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
