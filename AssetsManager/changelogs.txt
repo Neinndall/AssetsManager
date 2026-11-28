@@ -46,6 +46,7 @@ Bug Fixes
   - Parsers / Validate stringtable data bounds and truncated TRENC entries instead of crashing or reading past the buffer.
   - Manage Versions / Cancel sibling bundle downloads immediately on failure and fix file progress counting for resized files.
   - Settings / Include the default 60-minute interval in the Asset Tracker frequency selector and reset Data Export Format on Reset Defaults.
+  - Hash Guessing Lab / Refresh the BIN and RST unknown hash count immediately after a guessing run completes.
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 

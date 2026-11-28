@@ -1061,8 +1061,6 @@ namespace AssetsManager.Views
                 _viewModel.ProgressText = "100%";
                 _viewModel.IsProgressIndeterminate = false;
                 _viewModel.StatusText = $"Completed {domainName} {action} in {elapsedTime}: {result.Matches.Count:N0} matches discovered.";
-
-                UpdateUnknownCountAsync();
             }
             catch (OperationCanceledException)
             {
@@ -1085,6 +1083,7 @@ namespace AssetsManager.Views
                 _viewModel.IsRunning = false;
                 _viewModel.IsProgressIndeterminate = false;
                 _cancellationTokenSource = null;
+                UpdateUnknownCountAsync();
                 if (_progressUIManager != null)
                 {
                     await _progressUIManager.OnHashGuessingCompletedAsync();
