@@ -40,6 +40,7 @@ Bug Fixes
   - Explorer / Fix Smart Export for loose local files (textures, data, JS, Lua, and audio) instead of skipping them silently.
   - Hashes / Synchronize hash cache reloads and clear disposed memory-mapped accessors to prevent crashes during reloads.
   - Video Export / Allow WebM-to-MP4 transcoding to succeed on threads already initialized in STA COM mode.
+  - Explorer / Preserve active search filters and match highlights when expanding SoundBank nodes.
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 

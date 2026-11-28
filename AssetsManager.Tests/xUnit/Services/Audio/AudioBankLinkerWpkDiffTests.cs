@@ -71,5 +71,33 @@ namespace AssetsManager.Tests.xUnit.Services.Audio
             Assert.Null(oldEvents);
             Assert.Null(oldWpk);
         }
+
+        [Fact]
+        public void FindNodeByVirtualPathFindsTargetBinWithoutMutatingSearchFilterState()
+        {
+            var wadNode = new AssetsManager.Views.Models.Explorer.FileSystemNodeModel("Ahri.wad.client", AssetsManager.Views.Models.Explorer.NodeType.WadFile);
+            var hiddenSibling = new AssetsManager.Views.Models.Explorer.FileSystemNodeModel("other.bin", AssetsManager.Views.Models.Explorer.NodeType.VirtualFile)
+            {
+                VirtualPath = "data/characters/ahri/skins/other.bin",
+                Parent = wadNode,
+                IsVisible = false,
+                HasMatch = false
+            };
+            var targetBin = new AssetsManager.Views.Models.Explorer.FileSystemNodeModel("skin0.bin", AssetsManager.Views.Models.Explorer.NodeType.VirtualFile)
+            {
+                VirtualPath = "data/characters/ahri/skins/skin0.bin",
+                Parent = wadNode,
+                IsVisible = true,
+                HasMatch = true
+            };
+            wadNode.Children.Add(hiddenSibling);
+            wadNode.Children.Add(targetBin);
+
+            var found = AudioBankLinkerService.FindNodeByVirtualPath(wadNode, "data/characters/ahri/skins/skin0.bin");
+
+            Assert.Same(targetBin, found);
+            Assert.False(hiddenSibling.IsVisible);
+            Assert.True(targetBin.HasMatch);
+        }
     }
 }

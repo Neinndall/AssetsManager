@@ -404,7 +404,7 @@ namespace AssetsManager.Services.Audio
                 if (targetWadNode != null)
                 {
                     _logService.LogDebug($"[FindAssociatedBinFileAsync] [LIVE] Target WAD '{strategy.TargetWadName}' found in tree. Searching for BIN '{strategy.BinPath}'...");
-                    var binNode = await _wadSearchBoxService.PerformSearchAsync(strategy.BinPath, new ObservableRangeCollection<FileSystemNodeModel> { targetWadNode });
+                    var binNode = FindNodeByVirtualPath(targetWadNode, strategy.BinPath);
                     if (binNode != null) return (binNode, baseName, strategy.Type);
                 }
                 else
@@ -419,7 +419,7 @@ namespace AssetsManager.Services.Audio
                            if (match != null)
                            {
                                _logService.LogDebug($"[FindAssociatedBinFileAsync] [LIVE] Fallback: Found target WAD '{strategy.TargetWadName}' in sub-hierarchy.");
-                               var binNode = await _wadSearchBoxService.PerformSearchAsync(strategy.BinPath, new ObservableRangeCollection<FileSystemNodeModel> { match });
+                               var binNode = FindNodeByVirtualPath(match, strategy.BinPath);
                                if (binNode != null) return (binNode, baseName, strategy.Type);
                            }
                         }
@@ -429,11 +429,58 @@ namespace AssetsManager.Services.Audio
                 var commonWadNode = FindNodeByName(rootNodes, "Common.wad.client");
                 if (commonWadNode != null && commonWadNode != targetWadNode)
                 {
-                    var binNodeInCommon = await _wadSearchBoxService.PerformSearchAsync(strategy.BinPath, new ObservableRangeCollection<FileSystemNodeModel> { commonWadNode });
+                    var binNodeInCommon = FindNodeByVirtualPath(commonWadNode, strategy.BinPath);
                     if (binNodeInCommon != null) return (binNodeInCommon, baseName, strategy.Type);
                 }
             }
             return (null, baseName, strategy.Type);
+        }
+
+        internal static FileSystemNodeModel FindNodeByVirtualPath(FileSystemNodeModel root, string targetPath)
+        {
+            if (root == null || string.IsNullOrWhiteSpace(targetPath)) return null;
+
+            string normalizedTarget = PathUtils.NormalizePath(targetPath);
+            string targetFileName = Path.GetFileName(normalizedTarget);
+            var stack = new Stack<FileSystemNodeModel>();
+            stack.Push(root);
+
+            while (stack.Count > 0)
+            {
+                var current = stack.Pop();
+                if (!string.IsNullOrEmpty(current.VirtualPath))
+                {
+                    string normalizedCurrent = PathUtils.NormalizePath(current.VirtualPath);
+                    if (string.Equals(normalizedCurrent, normalizedTarget, StringComparison.OrdinalIgnoreCase) ||
+                        normalizedCurrent.EndsWith("/" + normalizedTarget, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return current;
+                    }
+                }
+                else if (current.Type != NodeType.VirtualDirectory &&
+                         current.Type != NodeType.WadFile &&
+                         string.Equals(current.Name, targetFileName, StringComparison.OrdinalIgnoreCase))
+                {
+                    // Fallback when a node only tracks hierarchy segments without VirtualPath
+                    var segments = new List<string>();
+                    for (var n = current; n != null && n != root; n = n.Parent)
+                        segments.Add(n.Name);
+                    segments.Reverse();
+                    string reconstructed = PathUtils.NormalizePath(string.Join("/", segments));
+                    if (string.Equals(reconstructed, normalizedTarget, StringComparison.OrdinalIgnoreCase))
+                        return current;
+                }
+
+                if (current.Children != null)
+                {
+                    for (int i = current.Children.Count - 1; i >= 0; i--)
+                    {
+                        stack.Push(current.Children[i]);
+                    }
+                }
+            }
+
+            return null;
         }
 
         // LIVE mode entry point for direct (non-archived) comparison: opens the
