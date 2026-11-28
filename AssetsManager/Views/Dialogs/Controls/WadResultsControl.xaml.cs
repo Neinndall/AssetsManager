@@ -186,26 +186,6 @@ namespace AssetsManager.Views.Dialogs.Controls
             }
         }
 
-        protected override void OnPreviewKeyDown(System.Windows.Input.KeyEventArgs e)
-        {
-            base.OnPreviewKeyDown(e);
-
-            if (e.Key == System.Windows.Input.Key.Escape && ResultsListBox.SelectedItems.Count > 0)
-            {
-                ClearSelection();
-                e.Handled = true;
-            }
-            else if (e.Key == System.Windows.Input.Key.C && System.Windows.Input.Keyboard.Modifiers == System.Windows.Input.ModifierKeys.Control)
-            {
-                var selected = ResultsListBox.SelectedItems.OfType<WadResultItemModel>().ToList();
-                if (selected.Count > 0)
-                {
-                    ParentWindow?.HandleResultsAction("CopyPaths", selected);
-                    e.Handled = true;
-                }
-            }
-        }
-
         private void ClearSelection()
         {
             foreach (var item in ResultsListBox.SelectedItems.OfType<WadResultItemModel>())
