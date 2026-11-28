@@ -173,10 +173,17 @@ namespace AssetsManager.Services.Formatting
             }
         }
 
+        internal static bool TryEvaluateComInitResult(int hr, out bool shouldUninitialize)
+        {
+            shouldUninitialize = hr == 0 || hr == 1;
+            return shouldUninitialize || hr == unchecked((int)0x80010106);
+        }
+
         private static void Transcode(string sourcePath, string destinationPath, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            Check(CoInitializeEx(0, 0));
+            int coInit = CoInitializeEx(0, 0);
+            if (!TryEvaluateComInitResult(coInit, out bool comInitialized)) Check(coInit);
             bool started = false;
             try
             {
@@ -211,7 +218,7 @@ namespace AssetsManager.Services.Formatting
             finally
             {
                 if (started) MFShutdown();
-                CoUninitialize();
+                if (comInitialized) CoUninitialize();
             }
         }
 
