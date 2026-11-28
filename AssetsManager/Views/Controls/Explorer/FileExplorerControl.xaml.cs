@@ -977,16 +977,24 @@ namespace AssetsManager.Views.Controls.Explorer
         {
             if (e.NewValue is FileSystemNodeModel selectedNode)
             {
-                if (selectedNode.Type == NodeType.SoundBank && selectedNode.Children.Count == 1 && selectedNode.Children[0].Name == "Loading...")
+                try
                 {
-                    await TreeBuilderService.ExpandAudioBankAsync(selectedNode, _viewModel.RootNodes, _currentRootPath, NewLolPath, OldLolPath);
-                    WadSearchBoxService.InvalidateIndex(_viewModel.RootNodes);
+                    if (selectedNode.Type == NodeType.SoundBank && selectedNode.Children.Count == 1 && selectedNode.Children[0].Name == "Loading...")
+                    {
+                        await TreeBuilderService.ExpandAudioBankAsync(selectedNode, _viewModel.RootNodes, _currentRootPath, NewLolPath, OldLolPath);
+                        WadSearchBoxService.InvalidateIndex(_viewModel.RootNodes);
+                    }
+                    
+                    if (FilePreviewer != null)
+                    {
+                        FilePreviewer.UpdateSelectedNode(selectedNode, RootNodes);
+                        await FilePreviewer.ShowPreviewAsync(selectedNode);
+                    }
                 }
-                
-                if (FilePreviewer != null)
+                catch (OperationCanceledException) { }
+                catch (Exception ex)
                 {
-                    FilePreviewer.UpdateSelectedNode(selectedNode, RootNodes);
-                    await FilePreviewer.ShowPreviewAsync(selectedNode);
+                    LogService?.LogError(ex, $"Failed to load selected Explorer node '{selectedNode.Name}'.");
                 }
             }
         }

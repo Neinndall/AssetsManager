@@ -94,101 +94,127 @@ namespace AssetsManager.Services.Explorer.Tree
             return (new ObservableRangeCollection<FileSystemNodeModel>(nodes), newLolPath, oldLolPath);
         }
 
+        private static Task RunOnUiThreadAsync(Action action)
+        {
+            if (Application.Current?.Dispatcher != null)
+                return Application.Current.Dispatcher.InvokeAsync(action).Task;
+
+            action();
+            return Task.CompletedTask;
+        }
+
         public async Task ExpandAudioBankAsync(FileSystemNodeModel clickedNode, ObservableRangeCollection<FileSystemNodeModel> rootNodes, string currentRootPath, string newLolPath = null, string oldLolPath = null)
         {
-            var linkedBank = await _audioBankLinkerService.LinkAudioBankAsync(clickedNode, rootNodes, currentRootPath);
-            if (linkedBank == null)
+            try
             {
-                return; // Errors are logged by the service
-            }
-
-            // Read other file data from the WAD in parallel (3 independent I/O operations).
-            var eventsTask = linkedBank.EventsBnkNode != null ? _wadContentProvider.GetVirtualFileBytesAsync(linkedBank.EventsBnkNode) : Task.FromResult<byte[]>(null);
-            var wpkTask = linkedBank.WpkNode != null ? _wadContentProvider.GetVirtualFileBytesAsync(linkedBank.WpkNode) : Task.FromResult<byte[]>(null);
-            var audioBnkTask = linkedBank.AudioBnkNode != null ? _wadContentProvider.GetVirtualFileBytesAsync(linkedBank.AudioBnkNode) : Task.FromResult<byte[]>(null);
-
-            await Task.WhenAll(eventsTask, wpkTask, audioBnkTask);
-            var eventsData = eventsTask.Result;
-            byte[] wpkData = wpkTask.Result;
-            byte[] audioBnkFileData = audioBnkTask.Result;
-
-            List<AudioEventNode> audioTree;
-            if (linkedBank.BinData != null)
-            {
-                // BIN-based parsing (Champions, Maps)
-                if (wpkData != null)
+                var linkedBank = await _audioBankLinkerService.LinkAudioBankAsync(clickedNode, rootNodes, currentRootPath);
+                if (linkedBank == null)
                 {
-                    audioTree = _audioBankService.ParseAudioBank(wpkData, audioBnkFileData, eventsData, linkedBank.BinData, linkedBank.BaseName);
+                    await RunOnUiThreadAsync(() => clickedNode?.Children.Clear());
+                    return; // Errors are logged by the service
+                }
+
+                // Read other file data from the WAD in parallel (3 independent I/O operations).
+                var eventsTask = linkedBank.EventsBnkNode != null ? _wadContentProvider.GetVirtualFileBytesAsync(linkedBank.EventsBnkNode) : Task.FromResult<byte[]>(null);
+                var wpkTask = linkedBank.WpkNode != null ? _wadContentProvider.GetVirtualFileBytesAsync(linkedBank.WpkNode) : Task.FromResult<byte[]>(null);
+                var audioBnkTask = linkedBank.AudioBnkNode != null ? _wadContentProvider.GetVirtualFileBytesAsync(linkedBank.AudioBnkNode) : Task.FromResult<byte[]>(null);
+
+                await Task.WhenAll(eventsTask, wpkTask, audioBnkTask);
+                var eventsData = eventsTask.Result;
+                byte[] wpkData = wpkTask.Result;
+                byte[] audioBnkFileData = audioBnkTask.Result;
+
+                List<AudioEventNode> audioTree;
+                if (linkedBank.BinData != null)
+                {
+                    // BIN-based parsing (Champions, Maps)
+                    if (wpkData != null)
+                    {
+                        audioTree = _audioBankService.ParseAudioBank(wpkData, audioBnkFileData, eventsData, linkedBank.BinData, linkedBank.BaseName);
+                    }
+                    else
+                    {
+                        audioTree = _audioBankService.ParseSfxAudioBank(audioBnkFileData, eventsData, linkedBank.BinData, linkedBank.BaseName);
+                    }
                 }
                 else
                 {
-                    audioTree = _audioBankService.ParseSfxAudioBank(audioBnkFileData, eventsData, linkedBank.BinData, linkedBank.BaseName);
-                }
-            }
-            else
-            {
-                // Generic parsing (no BIN file)
-                audioTree = _audioBankService.ParseGenericAudioBank(wpkData, audioBnkFileData, eventsData);
-            }
-
-            // 5. Populate the tree view with the results.
-            await Application.Current.Dispatcher.InvokeAsync(() =>
-            {
-                clickedNode.Children.Clear();
-
-                // Determine the absolute source WAD path for the child sound nodes.
-                string absoluteSourceWadPath = null;
-                bool isBackup = clickedNode.ChunkDiff != null && (!string.IsNullOrEmpty(newLolPath) || !string.IsNullOrEmpty(oldLolPath));
-
-                if (!isBackup)
-                {
-                    absoluteSourceWadPath = clickedNode.SourceWadPath;
+                    // Generic parsing (no BIN file)
+                    audioTree = _audioBankService.ParseGenericAudioBank(wpkData, audioBnkFileData, eventsData);
                 }
 
-                var eventNodesToAdd = new List<FileSystemNodeModel>();
-                foreach (var eventNode in audioTree)
+                // 5. Populate the tree view with the results.
+                await RunOnUiThreadAsync(() =>
                 {
-                    if (eventNode.IsTechnicalNode) continue;
+                    clickedNode.Children.Clear();
 
-                    var newEventNode = new FileSystemNodeModel(eventNode.Name, NodeType.AudioEvent)
-                    {
-                        Parent = clickedNode,
-                        IsTechnicalNode = eventNode.IsTechnicalNode
-                    };
+                    // Determine the absolute source WAD path for the child sound nodes.
+                    string absoluteSourceWadPath = null;
+                    bool isBackup = clickedNode.ChunkDiff != null && (!string.IsNullOrEmpty(newLolPath) || !string.IsNullOrEmpty(oldLolPath));
 
-                    var families = new Stack<(AudioContainerNode Family, FileSystemNodeModel Parent)>();
-                    for (int i = eventNode.Containers.Count - 1; i >= 0; i--)
-                        families.Push((eventNode.Containers[i], newEventNode));
-                    while (families.TryPop(out var family))
+                    if (!isBackup)
                     {
-                        var newContainerNode = new FileSystemNodeModel(family.Family.Name, NodeType.VirtualDirectory)
+                        absoluteSourceWadPath = clickedNode.SourceWadPath;
+                    }
+
+                    var eventNodesToAdd = new List<FileSystemNodeModel>();
+                    foreach (var eventNode in audioTree)
+                    {
+                        if (eventNode.IsTechnicalNode) continue;
+
+                        var newEventNode = new FileSystemNodeModel(eventNode.Name, NodeType.AudioEvent)
                         {
-                            Parent = family.Parent,
-                            IsGroupingFolder = true
+                            Parent = clickedNode,
+                            IsTechnicalNode = eventNode.IsTechnicalNode
                         };
-                        family.Parent.Children.Add(newContainerNode);
-                        var containerSoundsToAdd = new List<FileSystemNodeModel>();
-                        foreach (var soundNode in family.Family.Sounds)
-                        {
-                            containerSoundsToAdd.Add(CreateSoundNode(soundNode, newContainerNode, linkedBank, clickedNode, absoluteSourceWadPath));
-                        }
-                        newContainerNode.Children.AddRange(containerSoundsToAdd);
-                        for (int i = family.Family.Containers.Count - 1; i >= 0; i--)
-                            families.Push((family.Family.Containers[i], newContainerNode));
-                    }
 
-                    // Add remaining root-level sounds of the event (if any)
-                    var soundNodesToAdd = new List<FileSystemNodeModel>();
-                    foreach (var soundNode in eventNode.Sounds)
-                    {
-                        soundNodesToAdd.Add(CreateSoundNode(soundNode, newEventNode, linkedBank, clickedNode, absoluteSourceWadPath));
+                        var families = new Stack<(AudioContainerNode Family, FileSystemNodeModel Parent)>();
+                        for (int i = eventNode.Containers.Count - 1; i >= 0; i--)
+                            families.Push((eventNode.Containers[i], newEventNode));
+                        while (families.TryPop(out var family))
+                        {
+                            var newContainerNode = new FileSystemNodeModel(family.Family.Name, NodeType.VirtualDirectory)
+                            {
+                                Parent = family.Parent,
+                                IsGroupingFolder = true
+                            };
+                            family.Parent.Children.Add(newContainerNode);
+                            var containerSoundsToAdd = new List<FileSystemNodeModel>();
+                            foreach (var soundNode in family.Family.Sounds)
+                            {
+                                containerSoundsToAdd.Add(CreateSoundNode(soundNode, newContainerNode, linkedBank, clickedNode, absoluteSourceWadPath));
+                            }
+                            newContainerNode.Children.AddRange(containerSoundsToAdd);
+                            for (int i = family.Family.Containers.Count - 1; i >= 0; i--)
+                                families.Push((family.Family.Containers[i], newContainerNode));
+                        }
+
+                        // Add remaining root-level sounds of the event (if any)
+                        var soundNodesToAdd = new List<FileSystemNodeModel>();
+                        foreach (var soundNode in eventNode.Sounds)
+                        {
+                            soundNodesToAdd.Add(CreateSoundNode(soundNode, newEventNode, linkedBank, clickedNode, absoluteSourceWadPath));
+                        }
+                        newEventNode.Children.AddRange(soundNodesToAdd);
+                        eventNodesToAdd.Add(newEventNode);
                     }
-                    newEventNode.Children.AddRange(soundNodesToAdd);
-                    eventNodesToAdd.Add(newEventNode);
-                }
-                clickedNode.Children.AddRange(eventNodesToAdd);
-                clickedNode.IsExpanded = true;
-            });
+                    clickedNode.Children.AddRange(eventNodesToAdd);
+                    clickedNode.IsExpanded = true;
+                });
+            }
+            catch (Exception ex)
+            {
+                _logService?.LogError(ex, $"Failed to expand audio bank '{clickedNode?.Name}'.");
+                await RunOnUiThreadAsync(() =>
+                {
+                    if (clickedNode?.Children != null &&
+                        clickedNode.Children.Count == 1 &&
+                        clickedNode.Children[0].Name == "Loading...")
+                    {
+                        clickedNode.Children.Clear();
+                    }
+                });
+            }
         }
 
         internal static FileSystemNodeModel CreateSoundNode(
