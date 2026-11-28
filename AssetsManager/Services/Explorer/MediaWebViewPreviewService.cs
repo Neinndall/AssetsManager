@@ -143,6 +143,10 @@ namespace AssetsManager.Services.Explorer
 
                 WebView2 webView = await GetOrCreateWebViewAsync();
                 cancellationToken.ThrowIfCancellationRequested();
+                if (_webView != webView || webView?.CoreWebView2 == null)
+                {
+                    return false;
+                }
                 webView.Visibility = Visibility.Hidden;
 
                 CoreWebView2 coreWebView = webView.CoreWebView2;
@@ -207,6 +211,10 @@ namespace AssetsManager.Services.Explorer
 
         private Task<WebView2> GetOrCreateWebViewAsync()
         {
+            if (_initializationTask != null && (_initializationTask.IsFaulted || _initializationTask.IsCanceled))
+            {
+                _initializationTask = null;
+            }
             return _initializationTask ??= InitializePersistentWebViewAsync();
         }
 
@@ -226,17 +234,38 @@ namespace AssetsManager.Services.Explorer
             _webView = webView;
             _container.Children.Add(webView);
 
-            CoreWebView2Environment environment = await GetEnvironmentAsync();
-            await webView.EnsureCoreWebView2Async(environment);
-            webView.CoreWebView2.SetVirtualHostNameToFolderMapping(
-                "preview.assets",
-                _directoriesCreator.TempPreviewPath,
-                CoreWebView2HostResourceAccessKind.Allow);
-            webView.CoreWebView2.Settings.AreDefaultContextMenusEnabled = false;
-            webView.CoreWebView2.Settings.AreDevToolsEnabled = false;
-            webView.CoreWebView2.Settings.IsSwipeNavigationEnabled = false;
-            webView.CoreWebView2.NavigationCompleted += PersistentWebView_NavigationCompleted;
-            return webView;
+            try
+            {
+                CoreWebView2Environment environment = await GetEnvironmentAsync();
+                if (_webView != webView || _container == null)
+                {
+                    throw new OperationCanceledException("WebView2 was released during initialization.");
+                }
+
+                await webView.EnsureCoreWebView2Async(environment);
+                if (_webView != webView || _container == null || webView.CoreWebView2 == null)
+                {
+                    throw new OperationCanceledException("WebView2 was released during initialization.");
+                }
+
+                webView.CoreWebView2.SetVirtualHostNameToFolderMapping(
+                    "preview.assets",
+                    _directoriesCreator.TempPreviewPath,
+                    CoreWebView2HostResourceAccessKind.Allow);
+                webView.CoreWebView2.Settings.AreDefaultContextMenusEnabled = false;
+                webView.CoreWebView2.Settings.AreDevToolsEnabled = false;
+                webView.CoreWebView2.Settings.IsSwipeNavigationEnabled = false;
+                webView.CoreWebView2.NavigationCompleted += PersistentWebView_NavigationCompleted;
+                return webView;
+            }
+            catch
+            {
+                if (_webView == webView)
+                {
+                    _initializationTask = null;
+                }
+                throw;
+            }
         }
 
         private async Task<CoreWebView2Environment> GetEnvironmentAsync()

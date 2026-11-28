@@ -41,6 +41,7 @@ Bug Fixes
   - Hashes / Synchronize hash cache reloads and clear disposed memory-mapped accessors to prevent crashes during reloads.
   - Video Export / Allow WebM-to-MP4 transcoding to succeed on threads already initialized in STA COM mode.
   - Explorer / Preserve active search filters and match highlights when expanding SoundBank nodes.
+  - Explorer / Guard media WebView2 initialization against closing or cancelling previews mid-load.
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
