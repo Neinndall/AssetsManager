@@ -37,6 +37,7 @@ Bug Fixes
   - Explorer / Handle malformed or unsupported audio banks safely without crashing or leaving nodes stuck on "Loading...".
   - Explorer / Prevent image previews from failing when a configured LoL client directory is missing or moved.
   - Audio Diff / Route clicked .wpk packages as WPK audio instead of parsing them as BNK banks.
+  - Explorer / Fix Smart Export for loose local files (textures, data, JS, Lua, and audio) instead of skipping them silently.
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 

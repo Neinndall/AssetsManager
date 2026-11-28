@@ -504,6 +504,19 @@ namespace AssetsManager.Services.Formatting
             onFileSavedCallback?.Invoke(outputPath);
         }
 
+        internal async Task<byte[]> ReadNodeBytesAsync(FileSystemNodeModel node, CancellationToken cancellationToken)
+        {
+            if (node == null) return null;
+            if (node.Type == NodeType.RealFile)
+            {
+                return !string.IsNullOrEmpty(node.VirtualPath) && File.Exists(node.VirtualPath)
+                    ? await File.ReadAllBytesAsync(node.VirtualPath, cancellationToken)
+                    : null;
+            }
+
+            return await _wadContentProvider.GetVirtualFileBytesAsync(node, cancellationToken);
+        }
+
         private async Task HandleTextureFile(FileSystemNodeModel node, string destinationPath, ImageExportFormat format, CancellationToken cancellationToken, Action<string> onFileSavedCallback)
         {
             if (format == ImageExportFormat.Original)
@@ -512,7 +525,7 @@ namespace AssetsManager.Services.Formatting
                 return;
             }
 
-            var fileBytes = await _wadContentProvider.GetVirtualFileBytesAsync(node, cancellationToken);
+            var fileBytes = await ReadNodeBytesAsync(node, cancellationToken);
             if (fileBytes == null) return;
 
             using (var memoryStream = new MemoryStream(fileBytes))
@@ -533,7 +546,7 @@ namespace AssetsManager.Services.Formatting
                 return;
             }
 
-            var fileBytes = await _wadContentProvider.GetVirtualFileBytesAsync(node, cancellationToken);
+            var fileBytes = await ReadNodeBytesAsync(node, cancellationToken);
             if (fileBytes == null) return;
 
             var formattedContent = await _contentFormatterService.GetFormattedStringAsync(type, fileBytes);
@@ -552,7 +565,7 @@ namespace AssetsManager.Services.Formatting
                 return;
             }
 
-            var fileBytes = await _wadContentProvider.GetVirtualFileBytesAsync(node, cancellationToken);
+            var fileBytes = await ReadNodeBytesAsync(node, cancellationToken);
             if (fileBytes == null) return;
 
             var formattedContent = await _contentFormatterService.GetFormattedStringAsync("js", fileBytes);
@@ -570,7 +583,7 @@ namespace AssetsManager.Services.Formatting
                 return;
             }
 
-            var fileBytes = await _wadContentProvider.GetVirtualFileBytesAsync(node, cancellationToken);
+            var fileBytes = await ReadNodeBytesAsync(node, cancellationToken);
             if (fileBytes == null) return;
 
             var formattedContent = await _contentFormatterService.GetFormattedStringAsync("luabin64", fileBytes);
@@ -583,7 +596,7 @@ namespace AssetsManager.Services.Formatting
 
         private async Task HandleStandardAudioFileAsync(FileSystemNodeModel node, string destinationPath, AudioExportFormat targetFormat, CancellationToken cancellationToken, Action<string> onFileSavedCallback)
         {
-            var fileBytes = await _wadContentProvider.GetVirtualFileBytesAsync(node, cancellationToken);
+            var fileBytes = await ReadNodeBytesAsync(node, cancellationToken);
             if (fileBytes == null) return;
 
             string currentExtension = Path.GetExtension(node.Name).ToLower();
