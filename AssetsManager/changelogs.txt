@@ -43,6 +43,7 @@ Bug Fixes
   - Explorer / Preserve active search filters and match highlights when expanding SoundBank nodes.
   - Explorer / Guard media WebView2 initialization against closing or cancelling previews mid-load.
   - Explorer / Hide the Favorites toolbar toggle when browsing local directories or backup comparison results.
+  - Parsers / Validate stringtable data bounds and truncated TRENC entries instead of crashing or reading past the buffer.
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 

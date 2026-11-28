@@ -75,7 +75,7 @@ namespace AssetsManager.Services.Parsers
             writer.Flush();
         }
 
-        private (Dictionary<ulong, string> Entries, int HashBits, int Version) Parse(Stream stream, int gameVersion = 1502)
+        internal static (Dictionary<ulong, string> Entries, int HashBits, int Version) Parse(Stream stream, int gameVersion = 1502)
         {
             var entries = new Dictionary<ulong, string>();
             int hashBits;
@@ -136,7 +136,13 @@ namespace AssetsManager.Services.Parsers
 
                 // The rest of the stream is the data block
                 long dataOffset = reader.BaseStream.Position;
-                int dataLength = (int)(reader.BaseStream.Length - dataOffset);
+                long remaining = reader.BaseStream.Length - dataOffset;
+                if (remaining <= 0)
+                {
+                    return (entries, hashBits, version);
+                }
+
+                int dataLength = (int)Math.Min(remaining, int.MaxValue);
                 byte[] data = ArrayPool<byte>.Shared.Rent(dataLength);
                 try
                 {
@@ -150,27 +156,36 @@ namespace AssetsManager.Services.Parsers
 
                     foreach (var (offset, hash) in entryInfos)
                     {
-                        long relativeOffset = (long)offset;
-
-                        if (relativeOffset < 0 || relativeOffset >= dataLength)
+                        if (offset < 0 || offset >= bytesRead)
                         {
                             // Invalid offset, skip this entry
                             continue;
                         }
 
+                        int relativeOffset = (int)offset;
                         if (hasTrenc && data[relativeOffset] == 0xFF)
                         {
-                            int size = BitConverter.ToUInt16(data, (int)relativeOffset + 1);
-                            entries[hash] = Convert.ToBase64String(data, (int)relativeOffset + 3, size);
+                            if (relativeOffset + 3 > bytesRead)
+                            {
+                                continue;
+                            }
+
+                            int size = BitConverter.ToUInt16(data, relativeOffset + 1);
+                            if (size > bytesRead - (relativeOffset + 3))
+                            {
+                                continue;
+                            }
+
+                            entries[hash] = Convert.ToBase64String(data, relativeOffset + 3, size);
                         }
                         else
                         {
-                            int end = Array.IndexOf(data, (byte)0, (int)relativeOffset, dataLength - (int)relativeOffset);
+                            int end = Array.IndexOf(data, (byte)0, relativeOffset, bytesRead - relativeOffset);
                             if (end == -1)
                             {
-                                end = dataLength;
+                                end = bytesRead;
                             }
-                            string text = Encoding.UTF8.GetString(data, (int)relativeOffset, end - (int)relativeOffset);
+                            string text = Encoding.UTF8.GetString(data, relativeOffset, end - relativeOffset);
                             entries[hash] = text;
                         }
                     }
