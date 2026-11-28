@@ -375,27 +375,41 @@ namespace AssetsManager.Views.Dialogs
         public async void HandleViewDifferencesRequest()
         {
             if (ResultsTree.SelectedItem is not SerializableChunkDiff diff) return;
-            await _diffViewService.ShowWadDiffAsync(diff, _oldPbePath, _newPbePath, this, _sourceJsonPath);
+            try
+            {
+                await _diffViewService.ShowWadDiffAsync(diff, _oldPbePath, _newPbePath, this, _sourceJsonPath);
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, $"Failed to open diff viewer for '{diff.Path}'.");
+            }
         }
 
         public async void HandleBatchViewDifferencesRequest(List<SerializableChunkDiff> diffs)
         {
             if (diffs == null || diffs.Count == 0) return;
 
-            // Check if they are all images
-            bool isImageBatch = diffs.All(d => SupportedFileTypes.IsImage(d.Path));
-            
-            var validDiffs = isImageBatch
-                ? diffs.ToList()
-                : diffs.Where(d => d.Type == ChunkDiffType.Modified && SupportedFileTypes.IsNonImageDiffable(d.Path)).ToList();
-            
-            if (validDiffs.Count > 1)
+            try
             {
-                await _diffViewService.ShowBatchWadDiffAsync(validDiffs, 0, _oldPbePath, _newPbePath, this, _sourceJsonPath);
+                // Check if they are all images
+                bool isImageBatch = diffs.All(d => SupportedFileTypes.IsImage(d.Path));
+                
+                var validDiffs = isImageBatch
+                    ? diffs.ToList()
+                    : diffs.Where(d => d.Type == ChunkDiffType.Modified && SupportedFileTypes.IsNonImageDiffable(d.Path)).ToList();
+                
+                if (validDiffs.Count > 1)
+                {
+                    await _diffViewService.ShowBatchWadDiffAsync(validDiffs, 0, _oldPbePath, _newPbePath, this, _sourceJsonPath);
+                }
+                else if (validDiffs.Count == 1)
+                {
+                    await _diffViewService.ShowWadDiffAsync(validDiffs[0], _oldPbePath, _newPbePath, this, _sourceJsonPath);
+                }
             }
-            else if (validDiffs.Count == 1)
+            catch (Exception ex)
             {
-                await _diffViewService.ShowWadDiffAsync(validDiffs[0], _oldPbePath, _newPbePath, this, _sourceJsonPath);
+                _logService.LogError(ex, "Failed to open batch diff viewer.");
             }
         }
 
@@ -535,26 +549,36 @@ namespace AssetsManager.Views.Dialogs
 
         private async void ReloadHashesButton_Click(object sender, RoutedEventArgs e)
         {
+            var diffs = _serializableDiffs;
+            if (diffs == null) return;
+
             try
             {
                 _viewModel.SetLoadingState(ComparisonLoadingState.ReloadingHashes);
                 await Task.Run(async () =>
                 {
                     await _hashResolverService.ForceReloadHashesAsync();
-                    foreach (var diff in _serializableDiffs)
+                    foreach (var diff in diffs)
                     {
                         ResolveStoredPath(diff.OldPathHash, diff.OldPath, value => diff.OldPath = value);
                         ResolveStoredPath(diff.NewPathHash, diff.NewPath, value => diff.NewPath = value);
                     }
                 });
+
+                if (_serializableDiffs == null || !IsLoaded)
+                    return;
+
                 ApplyFilters();
                 _customMessageBoxService.ShowSuccess("Success", "Hashes have been reloaded and the result tree has been refreshed.", this);
             }
             catch (Exception ex)
             {
-                _viewModel.SetLoadingState(ComparisonLoadingState.Ready);
-                _customMessageBoxService.ShowError("Error", $"Failed to reload hashes: {ex.Message}", this);
                 _logService.LogError(ex, "Failed to reload hashes.");
+                if (_serializableDiffs != null && IsLoaded)
+                {
+                    _viewModel.SetLoadingState(ComparisonLoadingState.Ready);
+                    _customMessageBoxService.ShowError("Error", $"Failed to reload hashes: {ex.Message}", this);
+                }
             }
         }
 

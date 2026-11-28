@@ -190,6 +190,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
         internal void LoopStartHandle_PreviewMouseDown(object sender, MouseButtonEventArgs e)
         {
+            if (e.ChangedButton != MouseButton.Left) return;
             _isDraggingLoopStart = true;
             ((UIElement)sender).CaptureMouse();
             UpdateLoopStartFromMouse(e.GetPosition(StudioTimelineView.TracksCanvasContainer).X);
@@ -213,8 +214,14 @@ namespace AssetsManager.Views.Controls.Viewer
             e.Handled = true;
         }
 
+        internal void LoopStartHandle_LostMouseCapture(object sender, MouseEventArgs e)
+        {
+            _isDraggingLoopStart = false;
+        }
+
         internal void LoopBoundaryHandle_PreviewMouseDown(object sender, MouseButtonEventArgs e)
         {
+            if (e.ChangedButton != MouseButton.Left) return;
             _isDraggingLoopBoundary = true;
             ((UIElement)sender).CaptureMouse();
             UpdateLoopBoundaryFromMouse(e.GetPosition(StudioTimelineView.TracksCanvasContainer).X);
@@ -238,6 +245,11 @@ namespace AssetsManager.Views.Controls.Viewer
                 ((UIElement)sender).ReleaseMouseCapture();
                 e.Handled = true;
             }
+        }
+
+        internal void LoopBoundaryHandle_LostMouseCapture(object sender, MouseEventArgs e)
+        {
+            _isDraggingLoopBoundary = false;
         }
 
         private void UpdateLoopStartFromMouse(double mouseX)
@@ -429,6 +441,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
         internal void Ruler_PreviewMouseDown(object sender, MouseButtonEventArgs e)
         {
+            if (e.ChangedButton != MouseButton.Left) return;
             if (StudioTimelineView.TracksCanvasContainer == null || _model == null) return;
 
             double mouseX = e.GetPosition(StudioTimelineView.TracksCanvasContainer).X;
@@ -437,6 +450,12 @@ namespace AssetsManager.Views.Controls.Viewer
             _isRulerCreatingLoop = false;
             ((UIElement)sender).CaptureMouse();
             e.Handled = true;
+        }
+
+        internal void Ruler_LostMouseCapture(object sender, MouseEventArgs e)
+        {
+            _isRulerDragging = false;
+            _isRulerCreatingLoop = false;
         }
 
         internal void Ruler_PreviewMouseMove(object sender, MouseEventArgs e)

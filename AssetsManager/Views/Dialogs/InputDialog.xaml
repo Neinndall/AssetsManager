@@ -34,8 +34,8 @@
                                
                 <TextBox Name="textBoxInput" 
                          Style="{StaticResource ModernTextBoxEditable}" 
-                         AcceptsReturn="True" 
-                         TextWrapping="Wrap" 
+                         AcceptsReturn="False" 
+                         TextWrapping="NoWrap" 
                          VerticalScrollBarVisibility="Auto" 
                          MinHeight="44" MaxHeight="250"
                          FontSize="12"

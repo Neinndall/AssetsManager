@@ -234,6 +234,7 @@ namespace AssetsManager.Views.Controls.News
                 });
 
                 if (bytes == null || bytes.Length == 0) return;
+                if (!string.Equals(_lastLoadedImageUrl, url, StringComparison.Ordinal)) return;
 
                 var bitmap = new BitmapImage();
                 using (var stream = new MemoryStream(bytes))

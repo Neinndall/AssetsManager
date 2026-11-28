@@ -96,6 +96,8 @@ namespace AssetsManager.Views.Dialogs
 
             this.Closed += OnWindowClosed;
             this.SizeChanged += (s, e) => UpdateSliderEffect();
+            if (OverlayStage != null)
+                OverlayStage.SizeChanged += (_, _) => UpdateSliderEffect();
             this.PreviewKeyDown += ImageDiffWindow_PreviewKeyDown;
 
             // Register Mouse Events for Zoom & Pan on MainContentArea only
@@ -184,6 +186,9 @@ namespace AssetsManager.Views.Dialogs
 
             if (ExportSequenceBtn != null)
                 ExportSequenceBtn.IsEnabled = oldImage != null && newImage != null;
+
+            if (SliderBtn?.IsChecked == true)
+                Dispatcher.InvokeAsync(UpdateSliderEffect, DispatcherPriority.Loaded);
         }
 
         private void UpdateResolutionMetadata(ImageSource oldImage, ImageSource newImage)
@@ -635,13 +640,36 @@ namespace AssetsManager.Views.Dialogs
             ZoomSlider.Value = 100;
         }
 
+        internal static Point ResolveZoomCenter(
+            bool isSideBySide,
+            double oldWidth,
+            double oldHeight,
+            double overlayWidth,
+            double overlayHeight,
+            double fallbackWidth,
+            double fallbackHeight)
+        {
+            if (isSideBySide && oldWidth > 0 && oldHeight > 0)
+                return new Point(oldWidth / 2.0, oldHeight / 2.0);
+            if (!isSideBySide && overlayWidth > 0 && overlayHeight > 0)
+                return new Point(overlayWidth / 2.0, overlayHeight / 2.0);
+            return new Point(fallbackWidth / 2.0, fallbackHeight / 2.0);
+        }
+
         private void ZoomTo(double newZoom)
         {
             newZoom = Math.Max(0.25, Math.Min(4.0, newZoom));
             if (Math.Abs(newZoom - _currentZoom) < 0.001) return;
 
             double factor = newZoom / _currentZoom;
-            Point center = new Point(MainContentArea.ActualWidth / 2, MainContentArea.ActualHeight / 2);
+            Point center = ResolveZoomCenter(
+                isSideBySide: SideBySideBtn?.IsChecked == true,
+                oldWidth: OldImageBorder?.ActualWidth ?? 0,
+                oldHeight: OldImageBorder?.ActualHeight ?? 0,
+                overlayWidth: ImageContainer?.ActualWidth ?? 0,
+                overlayHeight: ImageContainer?.ActualHeight ?? 0,
+                fallbackWidth: MainContentArea.ActualWidth,
+                fallbackHeight: MainContentArea.ActualHeight);
             double dx = (center.X - _panX) * (1 - factor);
             double dy = (center.Y - _panY) * (1 - factor);
 
@@ -847,7 +875,10 @@ namespace AssetsManager.Views.Dialogs
             catch (Exception ex)
             {
                 _logService?.LogError(ex, $"Failed to export timeline {format}.");
-                MessageBox.Show(this, $"Failed to export {format.ToString().ToUpperInvariant()}: {ex.Message}", "Export Timeline", MessageBoxButton.OK, MessageBoxImage.Error);
+                if (IsLoaded)
+                {
+                    MessageBox.Show(this, $"Failed to export {format.ToString().ToUpperInvariant()}: {ex.Message}", "Export Timeline", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
             }
             finally
             {

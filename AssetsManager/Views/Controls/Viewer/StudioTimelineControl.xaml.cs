@@ -24,13 +24,16 @@ namespace AssetsManager.Views.Controls.Viewer
         private void LoopBoundaryHandle_PreviewMouseDown(object sender, MouseButtonEventArgs e) => Owner?.LoopBoundaryHandle_PreviewMouseDown(sender, e);
         private void LoopBoundaryHandle_PreviewMouseMove(object sender, MouseEventArgs e) => Owner?.LoopBoundaryHandle_PreviewMouseMove(sender, e);
         private void LoopBoundaryHandle_PreviewMouseUp(object sender, MouseButtonEventArgs e) => Owner?.LoopBoundaryHandle_PreviewMouseUp(sender, e);
+        private void LoopBoundaryHandle_LostMouseCapture(object sender, MouseEventArgs e) => Owner?.LoopBoundaryHandle_LostMouseCapture(sender, e);
         private void LoopStartHandle_PreviewMouseDown(object sender, MouseButtonEventArgs e) => Owner?.LoopStartHandle_PreviewMouseDown(sender, e);
         private void LoopStartHandle_PreviewMouseMove(object sender, MouseEventArgs e) => Owner?.LoopStartHandle_PreviewMouseMove(sender, e);
         private void LoopStartHandle_PreviewMouseUp(object sender, MouseButtonEventArgs e) => Owner?.LoopStartHandle_PreviewMouseUp(sender, e);
+        private void LoopStartHandle_LostMouseCapture(object sender, MouseEventArgs e) => Owner?.LoopStartHandle_LostMouseCapture(sender, e);
         private void PlayPauseToggle_Click(object sender, RoutedEventArgs e) => Owner?.PlayPauseToggle_Click(sender, e);
         private void Ruler_PreviewMouseDown(object sender, MouseButtonEventArgs e) => Owner?.Ruler_PreviewMouseDown(sender, e);
         private void Ruler_PreviewMouseMove(object sender, MouseEventArgs e) => Owner?.Ruler_PreviewMouseMove(sender, e);
         private void Ruler_PreviewMouseUp(object sender, MouseButtonEventArgs e) => Owner?.Ruler_PreviewMouseUp(sender, e);
+        private void Ruler_LostMouseCapture(object sender, MouseEventArgs e) => Owner?.Ruler_LostMouseCapture(sender, e);
         private void Speed_SelectionChanged(object sender, SelectionChangedEventArgs e) => Owner?.Speed_SelectionChanged(sender, e);
         private void StepBack_Click(object sender, RoutedEventArgs e) => Owner?.StepBack_Click(sender, e);
         private void StepForward_Click(object sender, RoutedEventArgs e) => Owner?.StepForward_Click(sender, e);

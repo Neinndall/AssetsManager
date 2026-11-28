@@ -157,14 +157,14 @@ namespace AssetsManager.Services.Core
                     string resetRaw = resetValues.FirstOrDefault();
                     if (long.TryParse(resetRaw, out long resetUnix))
                     {
-                        _rateLimitResetTime = DateTimeOffset.FromUnixTimeSeconds(resetUnix);
+                        _rateLimitResetTime = DateTimeOffset.FromUnixTimeSeconds(resetUnix).ToLocalTime();
                         return;
                     }
                 }
             }
             catch { }
 
-            _rateLimitResetTime = DateTimeOffset.UtcNow.AddMinutes(15);
+            _rateLimitResetTime = DateTimeOffset.Now.AddMinutes(15);
         }
 
         private async Task<T> SendCachedGetAsync<T>(string url, string cacheKey, string descriptor)

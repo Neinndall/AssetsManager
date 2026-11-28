@@ -47,5 +47,39 @@ namespace AssetsManager.Tests.xUnit.Views
             thread.Join();
             if (failure != null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
         }
+
+        [Fact]
+        public void ResolveZoomCenterUsesActivePanelDimensionsForSideBySideAndOverlay()
+        {
+            var sideBySideCenter = ImageDiffWindow.ResolveZoomCenter(
+                isSideBySide: true,
+                oldWidth: 400,
+                oldHeight: 300,
+                overlayWidth: 800,
+                overlayHeight: 600,
+                fallbackWidth: 1000,
+                fallbackHeight: 700);
+            Assert.Equal(new Point(200, 150), sideBySideCenter);
+
+            var overlayCenter = ImageDiffWindow.ResolveZoomCenter(
+                isSideBySide: false,
+                oldWidth: 400,
+                oldHeight: 300,
+                overlayWidth: 800,
+                overlayHeight: 600,
+                fallbackWidth: 1000,
+                fallbackHeight: 700);
+            Assert.Equal(new Point(400, 300), overlayCenter);
+
+            var fallbackCenter = ImageDiffWindow.ResolveZoomCenter(
+                isSideBySide: true,
+                oldWidth: 0,
+                oldHeight: 0,
+                overlayWidth: 0,
+                overlayHeight: 0,
+                fallbackWidth: 1000,
+                fallbackHeight: 700);
+            Assert.Equal(new Point(500, 350), fallbackCenter);
+        }
     }
 }

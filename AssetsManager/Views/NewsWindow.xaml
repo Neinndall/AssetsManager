@@ -235,6 +235,7 @@
                     <ComboBox Grid.Column="1" x:Name="CategoryComboBox"
                               Width="220" Height="36"
                               Style="{StaticResource ModernComboBox}"
+                              IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBooleanConverter}}"
                               ItemsSource="{Binding Categories}"
                               SelectedItem="{Binding SelectedCategory, UpdateSourceTrigger=PropertyChanged}"
                               SelectionChanged="CategoryComboBox_SelectionChanged">

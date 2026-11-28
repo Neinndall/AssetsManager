@@ -129,7 +129,7 @@ namespace AssetsManager.Services.Core
                         },
                         preparedImages =>
                         {
-                            var imageDiffWindow = new ImageDiffWindow();
+                            var imageDiffWindow = new ImageDiffWindow(_logService);
                             imageDiffWindow.Owner = owner;
                             imageDiffWindow.LoadingWindow = loadingWindow;
                             imageDiffWindow.LoadAndDisplayPreloadedBatchAsync(preparedImages, startIndex);
@@ -306,7 +306,7 @@ namespace AssetsManager.Services.Core
             var oldImage = await Task.Run(() => LoadDiffImage(oldData, extension));
             var newImage = await Task.Run(() => LoadDiffImage(newData, extension));
 
-            var imageDiffWindow = new ImageDiffWindow(oldImage, newImage, oldPath, newPath);
+            var imageDiffWindow = new ImageDiffWindow(oldImage, newImage, oldPath, newPath, _logService);
             imageDiffWindow.Owner = owner;
             imageDiffWindow.LoadingWindow = loadingWindow;
             

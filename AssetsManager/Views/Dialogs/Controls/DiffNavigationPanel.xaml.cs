@@ -147,8 +147,11 @@ namespace AssetsManager.Views.Dialogs.Controls
             // This prevents the map from being invisible upon initial load.
             Dispatcher.InvokeAsync(() => 
             {
-                DrawMapMarkers(OldDiffMapHost, _originalDiffModel.OldText);
-                DrawMapMarkers(NewDiffMapHost, _originalDiffModel.NewText);
+                var model = _originalDiffModel;
+                if (model == null) return;
+
+                DrawMapMarkers(OldDiffMapHost, model.OldText);
+                DrawMapMarkers(NewDiffMapHost, model.NewText);
                 
                 _oldViewportGuide = null;
                 _newViewportGuide = null;

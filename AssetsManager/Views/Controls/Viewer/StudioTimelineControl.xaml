@@ -356,7 +356,8 @@
                             <Grid Grid.Column="1" Margin="8,0,0,0" Cursor="Hand"
                                   PreviewMouseDown="Ruler_PreviewMouseDown"
                                   PreviewMouseMove="Ruler_PreviewMouseMove"
-                                  PreviewMouseUp="Ruler_PreviewMouseUp">
+                                  PreviewMouseUp="Ruler_PreviewMouseUp"
+                                  LostMouseCapture="Ruler_LostMouseCapture">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="*"/>
@@ -594,6 +595,7 @@
                                                  PreviewMouseDown="LoopStartHandle_PreviewMouseDown"
                                                  PreviewMouseMove="LoopStartHandle_PreviewMouseMove"
                                                  PreviewMouseUp="LoopStartHandle_PreviewMouseUp"
+                                                 LostMouseCapture="LoopStartHandle_LostMouseCapture"
                                                  ToolTip="Drag to adjust preview loop start">
                                             <Ellipse.Effect>
                                                 <DropShadowEffect Color="#FFD700" BlurRadius="6" ShadowDepth="0" Opacity="0.9"/>
@@ -604,6 +606,7 @@
                                                  PreviewMouseDown="LoopBoundaryHandle_PreviewMouseDown"
                                                  PreviewMouseMove="LoopBoundaryHandle_PreviewMouseMove"
                                                  PreviewMouseUp="LoopBoundaryHandle_PreviewMouseUp"
+                                                 LostMouseCapture="LoopBoundaryHandle_LostMouseCapture"
                                                  ToolTip="Drag to adjust preview loop end">
                                             <Ellipse.Effect>
                                                 <DropShadowEffect Color="#FFD700" BlurRadius="6" ShadowDepth="0" Opacity="0.9"/>

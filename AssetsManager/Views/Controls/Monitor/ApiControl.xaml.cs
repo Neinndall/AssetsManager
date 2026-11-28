@@ -356,27 +356,37 @@ namespace AssetsManager.Views.Controls.Monitor
             ViewModel?.IsBusy = true;
             ViewModel?.StatusText = "Status: Connecting to LCU...";
 
-            if (AppSettings != null)
+            try
             {
-                AppSettings.ApiSettings.Token = new TokenInfo();
-                UpdateAuthenticationStatus(); // Update UI to show "Not Authenticated" immediately
+                if (AppSettings != null)
+                {
+                    AppSettings.ApiSettings.Token = new TokenInfo();
+                    UpdateAuthenticationStatus(); // Update UI to show "Not Authenticated" immediately
+                }
+
+                bool lockfileRead = await RiotApiService.ReadLockfileAsync(true); // Con log de error
+                
+                UpdateConnectionStatus(lockfileRead); // This will set ViewModel?.IsConnected
+
+                if (lockfileRead)
+                {
+                    _lcuConnectionTimer.Stop(); // Stop any existing timer
+                    _lcuConnectionTimer.Start(); // Start monitoring
+                }
+                else
+                {
+                    _lcuConnectionTimer.Stop(); // Stop if connection failed
+                }
             }
-
-            bool lockfileRead = await RiotApiService.ReadLockfileAsync(true); // Con log de error
-            
-            UpdateConnectionStatus(lockfileRead); // This will set ViewModel?.IsConnected
-
-            if (lockfileRead)
+            catch (Exception ex)
             {
-                _lcuConnectionTimer.Stop(); // Stop any existing timer
-                _lcuConnectionTimer.Start(); // Start monitoring
+                LogService?.LogError(ex, "Failed to connect to LCU.");
+                UpdateConnectionStatus(false);
             }
-            else
+            finally
             {
-                _lcuConnectionTimer.Stop(); // Stop if connection failed
+                ViewModel?.IsBusy = false;
             }
-
-            ViewModel?.IsBusy = false;
         }
 
         private void UpdateConnectionStatus(bool isConnected)
@@ -431,30 +441,41 @@ namespace AssetsManager.Views.Controls.Monitor
             }
 
             ViewModel?.IsBusy = true;
-            var salesCatalog = await RiotApiService.GetSalesCatalogAsync();
-            ViewModel?.IsBusy = false;
-
-            if (salesCatalog != null)
+            try
             {
-                UpdateAuthenticationStatus();
-                var salesItems = salesCatalog.Catalog.Where(i => i.InventoryType == "CHAMPION_SKIN" && i.Sale != null && i.SubInventoryType != "RECOLOR").ToList();
+                var salesCatalog = await RiotApiService.GetSalesCatalogAsync();
 
-                if (salesItems.Any())
+                if (salesCatalog != null)
                 {
-                    ViewModel?.SetFullSalesCatalog(salesItems);
+                    UpdateAuthenticationStatus();
+                    var salesItems = salesCatalog.Catalog.Where(i => i.InventoryType == "CHAMPION_SKIN" && i.Sale != null && i.SubInventoryType != "RECOLOR").ToList();
 
-                    // Start background image extraction for Sales items
-                    _ = ExtractSkinImagesInBackgroundAsync(salesItems, "sales");
+                    if (salesItems.Any())
+                    {
+                        ViewModel?.SetFullSalesCatalog(salesItems);
+
+                        // Start background image extraction for Sales items
+                        _ = ExtractSkinImagesInBackgroundAsync(salesItems, "sales");
+                    }
+                    else
+                    {
+                        ViewModel?.SetFullSalesCatalog(Enumerable.Empty<CatalogItem>()); // Clear the view
+                        LogService.LogWarning("Sales data was retrieved, but it contains no valid skin sales information (this is common for PBE).");
+                    }
                 }
                 else
                 {
-                    ViewModel?.SetFullSalesCatalog(Enumerable.Empty<CatalogItem>()); // Clear the view
-                    LogService.LogWarning("Sales data was retrieved, but it contains no valid skin sales information (this is common for PBE).");
+                    CustomMessageBoxService.ShowError("Error", "Could not retrieve sales data.", Window.GetWindow(this));
                 }
             }
-            else
+            catch (Exception ex)
             {
-                CustomMessageBoxService.ShowError("Error", "Could not retrieve sales data.", Window.GetWindow(this));
+                LogService?.LogError(ex, "Failed to retrieve sales data.");
+                CustomMessageBoxService.ShowError("Error", $"Could not retrieve sales data: {ex.Message}", Window.GetWindow(this));
+            }
+            finally
+            {
+                ViewModel?.IsBusy = false;
             }
         }
 
@@ -599,8 +620,21 @@ namespace AssetsManager.Views.Controls.Monitor
             }
 
             ViewModel.IsBusy = true;
-            var mythicShopResponse = await RiotApiService.GetMythicShopResponseAsync();
-            ViewModel.IsBusy = false;
+            MythicShopResponse mythicShopResponse;
+            try
+            {
+                mythicShopResponse = await RiotApiService.GetMythicShopResponseAsync();
+            }
+            catch (Exception ex)
+            {
+                LogService?.LogError(ex, "Failed to retrieve Mythic Shop data.");
+                CustomMessageBoxService.ShowError("Error", $"Could not retrieve Mythic Shop data: {ex.Message}", Window.GetWindow(this));
+                return;
+            }
+            finally
+            {
+                ViewModel.IsBusy = false;
+            }
 
             if (mythicShopResponse == null)
             {
@@ -672,17 +706,31 @@ namespace AssetsManager.Views.Controls.Monitor
             });
         }
 
+        private bool _isPollingLcu;
+
         private async void LcuConnectionTimer_Tick(object sender, EventArgs e)
         {
-            if (RiotApiService == null) return;
+            if (RiotApiService == null || _isPollingLcu) return;
 
-            // Only update the status if there's a change, to avoid constant UI refreshes
-            // and potential race conditions if the user clicks "Connect" at the same time.
-            bool isStillConnected = await RiotApiService.ReadLockfileAsync(false); // Silenciosa
-            if (isStillConnected != ViewModel?.IsConnected)
+            _isPollingLcu = true;
+            try
             {
-                UpdateConnectionStatus(isStillConnected);
-            }        
+                // Only update the status if there's a change, to avoid constant UI refreshes
+                // and potential race conditions if the user clicks "Connect" at the same time.
+                bool isStillConnected = await RiotApiService.ReadLockfileAsync(false); // Silenciosa
+                if (isStillConnected != ViewModel?.IsConnected)
+                {
+                    UpdateConnectionStatus(isStillConnected);
+                }
+            }
+            catch (Exception ex)
+            {
+                LogService?.LogError(ex, "Failed to poll LCU connection status.");
+            }
+            finally
+            {
+                _isPollingLcu = false;
+            }
         }
 
         private void ApiControl_Unloaded(object sender, RoutedEventArgs e)

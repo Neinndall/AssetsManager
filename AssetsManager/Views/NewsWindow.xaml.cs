@@ -225,9 +225,13 @@ namespace AssetsManager.Views
             return null;
         }
 
+        private int _articleDetailRequestId;
+
         private async void OpenDetail(NewsItemModel item)
         {
             if (item == null) return;
+
+            int requestId = ++_articleDetailRequestId;
 
             if (!string.IsNullOrEmpty(item.ActionUrl))
             {
@@ -235,6 +239,7 @@ namespace AssetsManager.Views
             }
 
             _viewModel.SelectedArticle = item;
+            _viewModel.FullArticleHtml = null;
             _viewModel.FullArticleText = item.DescriptionDisplay;
             _viewModel.FullArticleBanner = null;
             _viewModel.FullArticleAuthors = null;
@@ -244,6 +249,9 @@ namespace AssetsManager.Views
             if (!string.IsNullOrEmpty(item.ActionUrl) && !item.IsVideo && !item.IsVideoLink)
             {
                 var content = await _newsService.FetchArticleFullContentAsync(item.ActionUrl);
+                if (requestId != _articleDetailRequestId || !ReferenceEquals(_viewModel.SelectedArticle, item))
+                    return;
+
                 if (content != null)
                 {
                     if (!string.IsNullOrWhiteSpace(content.Html))
@@ -268,7 +276,10 @@ namespace AssetsManager.Views
                 _logService.LogDebug($"OpenDetail: no fetch (IsVideo={item.IsVideo}, ActionUrl={item.ActionUrl}) for '{item.Title}'.");
             }
 
-            _viewModel.IsLoadingFullArticle = false;
+            if (requestId == _articleDetailRequestId && ReferenceEquals(_viewModel.SelectedArticle, item))
+            {
+                _viewModel.IsLoadingFullArticle = false;
+            }
         }
 
         private void NewsArticleReader_BackRequested(object sender, EventArgs e)

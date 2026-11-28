@@ -663,6 +663,10 @@ namespace AssetsManager.Views.Dialogs
         private void Viewport_CombinedModeToggled(object sender, bool isChecked)
         {
             if (_isSyncingToggles) return;
+            if (_oldScene == null || _newScene == null)
+            {
+                isChecked = false;
+            }
             _isSyncingToggles = true;
             try
             {

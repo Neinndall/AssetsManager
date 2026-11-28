@@ -16,6 +16,15 @@ Bug Fixes
   - Logs / Fix clickable path slicing when the link label differs from the logged path.
   - 3D Studio / Ignore cancelled folder expansions instead of crashing the project browser.
   - Image Merger / Fix concurrent preview cancellation races and support uppercase .TEX and .DDS file extensions.
+  - Dialogs / Respect single-line input mode so Enter confirms prompts and auto-select pre-filled text on open.
+  - Universal Converter / Switch the Convert All button label to "Processing..." while conversions are running.
+  - Image Diff / Center toolbar and slider zoom on the active panel in Side-by-Side mode, refresh Slider split bounds when switching batch image sizes, and log timeline exports.
+  - Diff Viewers / Guard deferred diff-map redraws against cleanup or mode switches.
+  - News Center / Prevent slow article or banner loads from overwriting newly opened articles and disable category switching while loading.
+  - SKN Diff / Prevent Combined Mode from toggling on single-sided new or removed models.
+  - 3D Studio / Reset timeline loop and ruler drags if mouse capture is lost.
+  - Monitor / Guard API fetch and LCU polling handlers against stuck busy states and overlapping checks, and display GitHub rate-limit reset times in local time.
+  - Comparator / Guard hash reloads and diff launches against closed windows or unexpected errors.
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
