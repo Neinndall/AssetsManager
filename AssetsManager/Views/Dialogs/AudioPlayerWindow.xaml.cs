@@ -157,18 +157,24 @@ namespace AssetsManager.Views.Dialogs
 
         private void RemoveItem_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is Button btn && btn.Tag is AudioPlaylistItem item)
+            if (sender is Button btn && btn.Tag is AudioPlaylistItem item && ViewModel.RemoveTrack(item))
             {
-                ViewModel.Service.RemoveFromPlaylist(item);
+                StopMediaPlayer();
             }
         }
 
         private void ClearPlaylist_Click(object sender, RoutedEventArgs e)
         {
             ViewModel.Service.ClearPlaylist();
-            _mediaPlayer.Stop();
-            ViewModel.IsPlaying = false;
+            StopMediaPlayer();
             ViewModel.ResetToDefault();
+        }
+
+        private void StopMediaPlayer()
+        {
+            _timer.Stop();
+            _mediaPlayer.Stop();
+            _mediaPlayer.Close();
         }
 
         private async void AddUrl_Click(object sender, RoutedEventArgs e)

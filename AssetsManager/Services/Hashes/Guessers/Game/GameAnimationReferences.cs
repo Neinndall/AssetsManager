@@ -700,6 +700,10 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                 yield return stem.Replace("_cycle", "cycle", StringComparison.OrdinalIgnoreCase);
             if (stem.Contains("_to_", StringComparison.OrdinalIgnoreCase))
                 yield return stem.Replace("_to_", "_to", StringComparison.OrdinalIgnoreCase);
+            if (stem.Contains("stealth_idle", StringComparison.OrdinalIgnoreCase))
+                yield return stem.Replace("stealth_idle", "stealthidle", StringComparison.OrdinalIgnoreCase);
+            if (stem.Contains("stealth_run", StringComparison.OrdinalIgnoreCase))
+                yield return stem.Replace("stealth_run", "stealthrun", StringComparison.OrdinalIgnoreCase);
 
             string stance = null;
             if (stem.StartsWith("spell1_", StringComparison.OrdinalIgnoreCase)) stance = "tiger_";

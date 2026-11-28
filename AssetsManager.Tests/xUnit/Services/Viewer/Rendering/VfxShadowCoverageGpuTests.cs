@@ -1,11 +1,15 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using AssetsManager.Services.Viewer.Parsing;
+using AssetsManager.Services.Viewer.Rendering;
+using AssetsManager.Services.Viewer.Runtime;
 using AssetsManager.Services.Viewer.Vfx.Rendering;
 using AssetsManager.Services.Viewer.Vfx.Runtime;
 using AssetsManager.Tests.Support;
 using AssetsManager.Tests.xUnit.Services.Viewer.Vfx;
 using AssetsManager.Views.Models.Viewer;
+using LeagueToolkit.Core.Meta;
 using Silk.NET.OpenGL;
 using Xunit;
 
@@ -85,6 +89,106 @@ public sealed class VfxShadowCoverageGpuTests
         {
             gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
             gl.DeleteFramebuffer(framebuffer); gl.DeleteTexture(depth);
+        }
+    }
+
+    [Fact]
+    public void MapParticleRendererShadowPassMirrorsEngineParticlesIntoViewportSpace()
+    {
+        using var context = new HiddenWglContext();
+        using GL gl = GL.GetApi(context.GetProcAddress);
+        using var renderer = new MapParticleRenderer();
+        renderer.Initialize(gl);
+
+        uint depth = gl.GenTexture();
+        uint white = gl.GenTexture();
+        uint framebuffer = gl.GenFramebuffer();
+        try
+        {
+            gl.BindTexture(TextureTarget.Texture2D, white);
+            gl.TexImage2D<byte>(TextureTarget.Texture2D, 0, InternalFormat.Rgba, 1, 1, 0,
+                PixelFormat.Rgba, PixelType.UnsignedByte, new byte[] { 255, 255, 255, 255 });
+            gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Nearest);
+            gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Nearest);
+
+            gl.BindTexture(TextureTarget.Texture2D, depth);
+            gl.TexImage2D<float>(TextureTarget.Texture2D, 0, InternalFormat.DepthComponent32f, 64, 64, 0,
+                PixelFormat.DepthComponent, PixelType.Float, ReadOnlySpan<float>.Empty);
+            gl.BindFramebuffer(FramebufferTarget.Framebuffer, framebuffer);
+            gl.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.DepthAttachment,
+                TextureTarget.Texture2D, depth, 0);
+            gl.DrawBuffer(DrawBufferMode.None);
+            gl.ReadBuffer(ReadBufferMode.None);
+            Assert.Equal(GLEnum.FramebufferComplete, gl.CheckFramebufferStatus(FramebufferTarget.Framebuffer));
+
+            var emitter = VfxQualityFlexTests.Definition() with
+            {
+                DoesCastShadow = true,
+                BlendMode = 3,
+                IsSingleParticle = true,
+                Rate = VfxCurveF.Const(1f),
+                ParticleLifetime = VfxCurveF.Const(5f),
+                BirthScale = VfxCurve3.Const(new Vector3(2f, 2f, 2f)),
+                BirthColor = VfxCurve4.Const(Vector4.One),
+                TexturePath = "white.dds",
+                PrimitiveKind = VfxPrimitiveKind.CameraQuad,
+                RenderState = VfxEmitterRenderState.Default with { DisableBackfaceCull = true, AlphaReference = 255 }
+            };
+            var system = new VfxSystemDefinition(42u, "shadow_map_particle", "Effects/ShadowMapParticle", new[] { emitter });
+            var placed = new MapPlaceableData(
+                1u,
+                2u,
+                MapParticleParser.MapParticleClass,
+                "shadow_at_plus4",
+                Matrix4x4.CreateTranslation(4f, 0f, 0f),
+                MapPlaceableData.EveryLayer,
+                null,
+                new Dictionary<uint, BinTreeProperty>());
+            var placement = new MapParticleData(placed, 42u, false, false);
+            MapParticleRuntime runtime = MapParticleRuntime.Create(
+                placement,
+                system,
+                new Dictionary<uint, VfxSystemDefinition> { [42u] = system },
+                new Dictionary<uint, uint>());
+            runtime.Graph.Root.Emitters[0].Texture = white;
+            runtime.Graph.Root.Emitters[0].TextureWidth = 1;
+            runtime.Graph.Root.Emitters[0].TextureHeight = 1;
+            runtime.Advance(0.05f);
+
+            Matrix4x4 eyeView = Matrix4x4.CreateLookAt(new Vector3(0f, 0f, 10f), Vector3.Zero, Vector3.UnitY);
+            Matrix4x4 ortho = Matrix4x4.CreateOrthographic(20f, 20f, 0.1f, 100f);
+            Matrix4x4 viewProjection = eyeView * ortho;
+
+            Assert.True(renderer.PrepareRenderFrame(new[] { runtime }, viewProjection, eyeView, 64, 64));
+            IPreparedParticlePass pass = renderer;
+            Assert.True(pass.HasPreparedShadowCasters);
+
+            gl.Viewport(0, 0, 64, 64);
+            gl.DepthMask(true);
+            gl.ClearDepth(1d);
+            gl.Clear(ClearBufferMask.DepthBufferBit);
+            pass.RenderPreparedShadowPass(viewProjection, eyeView);
+
+            var depths = new float[64 * 64];
+            gl.ReadPixels<float>(0, 0, 64, 64, PixelFormat.DepthComponent, PixelType.Float, depths);
+
+            float DepthAtViewportX(float viewportX)
+            {
+                int px = Math.Clamp((int)(((viewportX / 10f) + 1f) * 0.5f * 64f), 0, 63);
+                return depths[32 * 64 + px];
+            }
+
+            Assert.True(DepthAtViewportX(-4f) < 0.9f,
+                $"Expected MAP particle at engine X=+4 to cast shadow at viewport X=-4 (depth={DepthAtViewportX(-4f)}).");
+            Assert.Equal(1f, DepthAtViewportX(4f));
+            Assert.Equal(GLEnum.NoError, gl.GetError());
+        }
+        finally
+        {
+            gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+            gl.DeleteFramebuffer(framebuffer);
+            gl.DeleteTexture(depth);
+            gl.DeleteTexture(white);
         }
     }
 }

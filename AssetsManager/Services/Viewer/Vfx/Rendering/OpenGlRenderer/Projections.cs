@@ -83,7 +83,12 @@ public sealed partial class VfxOpenGlRenderer
         uniforms.Uniform1(uniforms.AddressModeMult, definition.TextureMultAddressMode);
         uniforms.Uniform2(uniforms.UvTransformCenterMult, definition.TextureMultTransformCenter.X, definition.TextureMultTransformCenter.Y);
         Vector2 emitterUvOffsetMult = VfxUvSemantics.Periodic(
-            definition.TextureMultEmitterUvScrollRate * (_activeSources != null ? 0f : emitter.RenderTime), definition.TextureMultAddressMode);
+            VfxUvSemantics.PreFlipEmitterScroll(
+                definition.TextureMultEmitterUvScrollRate,
+                _activeSources != null ? 0f : emitter.RenderTime,
+                definition.TextureMultFlipU,
+                definition.TextureMultFlipV),
+            definition.TextureMultAddressMode);
         uniforms.Uniform2(uniforms.UvScrollRateMult, emitterUvOffsetMult.X, emitterUvOffsetMult.Y);
         uniforms.Uniform1(uniforms.FlipUMult, definition.TextureMultFlipU ? 1 : 0);
         uniforms.Uniform1(uniforms.FlipVMult, definition.TextureMultFlipV ? 1 : 0);
@@ -123,7 +128,7 @@ public sealed partial class VfxOpenGlRenderer
         _gl.ActiveTexture(TextureUnit.Texture8);
         _gl.BindTexture(TextureTarget.Texture2D, emitter.PaletteTexture != 0
             ? emitter.PaletteTexture : _textures.FallbackTransparentTexture);
-        BindStockSampler(8, palette?.AddressMode ?? 1);
+        BindStockSampler(8, 2);
         if (emitter.TextureMult != 0)
         {
             _gl.ActiveTexture(TextureUnit.Texture1);

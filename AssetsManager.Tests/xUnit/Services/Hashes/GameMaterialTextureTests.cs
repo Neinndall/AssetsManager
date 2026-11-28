@@ -296,4 +296,31 @@ public class GameMaterialTextureTests
         if (identity != null) properties.Add(identity);
         return new BinTreeObject(name, "StaticMaterialDef", properties);
     }
+
+    [Theory]
+    [InlineData("assets/characters/example/skins/skin42/example_skin42_eyeseffect_tx_cm.tex", "Fading_In_Gradient", "assets/characters/example/skins/skin42/example_skin42_eyesgradient_tx_cm.tex")]
+    [InlineData("assets/characters/example/themes/t1/example_t1_head_tx_cm.tex", "Face_Head_Base", "assets/characters/example/themes/t1/example_t1_headbase_tx_cm.tex")]
+    public void GrepWadResolvesGluedTexturesFromOwningBinPropertyWords(string sibling, string propertyText, string target)
+    {
+        ulong targetHash = XxHash64Ext.Hash(target);
+        var tree = new BinTree(new[]
+        {
+            new BinTreeObject("Characters/Example/Skins/Skin42/Materials/Mat", "StaticMaterialDef", new BinTreeProperty[]
+            {
+                new BinTreeString(Fnv1a.HashLower("name"), propertyText),
+                new BinTreeWadChunkLink(Fnv1a.HashLower("texture"), XxHash64Ext.Hash(sibling)),
+                new BinTreeWadChunkLink(Fnv1a.HashLower("texturePath"), targetHash)
+            })
+        }, Array.Empty<string>());
+        using var stream = new MemoryStream();
+        tree.Write(stream);
+
+        var guesser = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[] { sibling }));
+        var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong> { targetHash, 42UL });
+        guesser.GrepWad(engine, new ArraySegment<byte>(stream.ToArray()),
+            "data/characters/example/skins/skin42.bin", "Example.wad.client", 99UL, CancellationToken.None);
+
+        Assert.Equal(target, Assert.Single(engine.Matches.Values).Path);
+        Assert.Contains(42UL, engine.UnknownHashes);
+    }
 }

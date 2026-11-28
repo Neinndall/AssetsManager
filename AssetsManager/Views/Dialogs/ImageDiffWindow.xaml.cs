@@ -50,7 +50,7 @@ namespace AssetsManager.Views.Dialogs
             set => SetValue(TotalFilesCountProperty, value);
         }
 
-        private List<(BitmapSource oldImage, BitmapSource newImage, string oldPath, string newPath)> _preloadedImages;
+        private List<(ImageSource oldImage, ImageSource newImage, string oldPath, string newPath)> _preloadedImages;
 
         private bool _isInitialized = false;
         private Point _lastMousePosition;
@@ -80,7 +80,7 @@ namespace AssetsManager.Views.Dialogs
         {
         }
 
-        public ImageDiffWindow(BitmapSource oldImage, BitmapSource newImage, string oldFileName, string newFileName, LogService logService = null)
+        public ImageDiffWindow(ImageSource oldImage, ImageSource newImage, string oldFileName, string newFileName, LogService logService = null)
         {
             InitializeComponent();
             _logService = logService;
@@ -154,7 +154,7 @@ namespace AssetsManager.Views.Dialogs
             }
         }
 
-        private void SetImageData(BitmapSource oldImage, BitmapSource newImage, string oldFileName, string newFileName)
+        private void SetImageData(ImageSource oldImage, ImageSource newImage, string oldFileName, string newFileName)
         {
             // Stop and reset the timeline before switching assets
             PauseTimeline();
@@ -186,17 +186,17 @@ namespace AssetsManager.Views.Dialogs
                 ExportSequenceBtn.IsEnabled = oldImage != null && newImage != null;
         }
 
-        private void UpdateResolutionMetadata(BitmapSource oldImage, BitmapSource newImage)
+        private void UpdateResolutionMetadata(ImageSource oldImage, ImageSource newImage)
         {
-            bool hasOld = oldImage != null;
-            bool hasNew = newImage != null;
-            bool sizeChanged = hasOld && hasNew && (oldImage.PixelWidth != newImage.PixelWidth || oldImage.PixelHeight != newImage.PixelHeight);
+            bool hasOld = TryGetDimensions(oldImage, out int oldW, out int oldH);
+            bool hasNew = TryGetDimensions(newImage, out int newW, out int newH);
+            bool sizeChanged = hasOld && hasNew && (oldW != newW || oldH != newH);
 
             if (OverlaySizeBadge != null && OverlaySizeBadgeText != null)
             {
                 if (sizeChanged)
                 {
-                    OverlaySizeBadgeText.Text = $"{oldImage.PixelWidth}×{oldImage.PixelHeight} → {newImage.PixelWidth}×{newImage.PixelHeight}";
+                    OverlaySizeBadgeText.Text = $"{oldW}×{oldH} → {newW}×{newH}";
                     OverlaySizeBadge.Visibility = Visibility.Visible;
                 }
                 else
@@ -208,18 +208,45 @@ namespace AssetsManager.Views.Dialogs
             if (ResolutionLabel != null)
             {
                 if (sizeChanged)
-                    ResolutionLabel.Text = $"Resolution: {oldImage.PixelWidth}×{oldImage.PixelHeight} → {newImage.PixelWidth}×{newImage.PixelHeight}";
+                    ResolutionLabel.Text = $"Resolution: {oldW}×{oldH} → {newW}×{newH}";
                 else if (hasNew)
-                    ResolutionLabel.Text = $"Resolution: {newImage.PixelWidth}×{newImage.PixelHeight}";
+                    ResolutionLabel.Text = $"Resolution: {newW}×{newH}";
                 else if (hasOld)
-                    ResolutionLabel.Text = $"Resolution: {oldImage.PixelWidth}×{oldImage.PixelHeight}";
+                    ResolutionLabel.Text = $"Resolution: {oldW}×{oldH}";
                 else
                     ResolutionLabel.Text = "Resolution: N/A";
             }
         }
 
+        private static bool TryGetDimensions(ImageSource image, out int width, out int height)
+        {
+            if (image is BitmapSource bmp)
+            {
+                width = bmp.PixelWidth;
+                height = bmp.PixelHeight;
+                return width > 0 && height > 0;
+            }
+
+            if (image != null &&
+                image.Width > 0 &&
+                image.Height > 0 &&
+                !double.IsNaN(image.Width) &&
+                !double.IsNaN(image.Height) &&
+                !double.IsInfinity(image.Width) &&
+                !double.IsInfinity(image.Height))
+            {
+                width = Math.Max(1, (int)Math.Round(image.Width));
+                height = Math.Max(1, (int)Math.Round(image.Height));
+                return true;
+            }
+
+            width = 0;
+            height = 0;
+            return false;
+        }
+
         public void LoadAndDisplayPreloadedBatchAsync(
-            List<(BitmapSource oldImage, BitmapSource newImage, string oldPath, string newPath)> items,
+            List<(ImageSource oldImage, ImageSource newImage, string oldPath, string newPath)> items,
             int startIndex)
         {
             _preloadedImages = items;
@@ -266,16 +293,49 @@ namespace AssetsManager.Views.Dialogs
             double newZoom = Math.Max(0.25, Math.Min(4.0, _currentZoom * zoomFactor));
             if (Math.Abs(newZoom - _currentZoom) < 0.001) return;
 
-            Point mousePos = e.GetPosition(MainContentArea);
+            IInputElement zoomTarget = ResolveZoomTarget(
+                isSideBySide: SideBySideBtn?.IsChecked == true,
+                oldImageBorder: OldImageBorder,
+                newImageBorder: NewImageBorder,
+                overlayContainer: ImageContainer,
+                fallback: MainContentArea);
+            Point mousePos = e.GetPosition(zoomTarget);
             double factor = newZoom / _currentZoom;
-            double dx = (mousePos.X - _panX) * (1 - factor);
-            double dy = (mousePos.Y - _panY) * (1 - factor);
+            (double dx, double dy) = ComputeZoomPanDelta(mousePos, _panX, _panY, factor);
 
             _currentZoom = newZoom;
             ApplyTransform(scale: _currentZoom, deltaX: dx, deltaY: dy);
             if (Math.Abs(ZoomSlider.Value - _currentZoom * 100) > 0.01) ZoomSlider.Value = _currentZoom * 100;
 
             e.Handled = true;
+        }
+
+        internal static IInputElement ResolveZoomTarget(
+            bool isSideBySide,
+            UIElement oldImageBorder,
+            UIElement newImageBorder,
+            UIElement overlayContainer,
+            IInputElement fallback)
+        {
+            if (isSideBySide)
+            {
+                if (newImageBorder?.IsMouseOver == true) return newImageBorder;
+                if (oldImageBorder?.IsMouseOver == true) return oldImageBorder;
+                return oldImageBorder ?? fallback;
+            }
+
+            return overlayContainer ?? fallback;
+        }
+
+        internal static (double DeltaX, double DeltaY) ComputeZoomPanDelta(
+            Point localCursorPosition,
+            double currentPanX,
+            double currentPanY,
+            double zoomRatio)
+        {
+            double dx = (localCursorPosition.X - currentPanX) * (1 - zoomRatio);
+            double dy = (localCursorPosition.Y - currentPanY) * (1 - zoomRatio);
+            return (dx, dy);
         }
 
         private void ImageDiffWindow_MouseDown(object sender, MouseButtonEventArgs e)
@@ -702,7 +762,7 @@ namespace AssetsManager.Views.Dialogs
         private async void ExportSequenceBtn_Click(object sender, RoutedEventArgs e)
         {
             if (!_timelineModeActive || _exportCts != null) return;
-            if (OldImage.Source is not BitmapSource oldS || NewImage.Source is not BitmapSource newS)
+            if (OldImage.Source == null || NewImage.Source == null)
             {
                 _logService?.LogError(new InvalidOperationException("Missing OLD or NEW image"), "Timeline export requires both OLD and NEW images.");
                 return;
@@ -748,6 +808,12 @@ namespace AssetsManager.Views.Dialogs
 
             try
             {
+                int rasterFallbackSize = options.TargetSize > 0 ? options.TargetSize : 1024;
+                BitmapSource oldS = EnsureBitmapSource(OldImage.Source, rasterFallbackSize);
+                BitmapSource newS = EnsureBitmapSource(NewImage.Source, rasterFallbackSize);
+                if (oldS == null || newS == null)
+                    throw new InvalidOperationException("Unable to rasterize vector image for timeline export.");
+
                 var (oldPixels, oldW, oldH, newPixels, newW, newH) = ImageExportUtils.PrepareTimelineSourcePixels(oldS, newS);
                 (oldBadgeImg, newBadgeImg) = ImageExportUtils.RenderTimelineBadges(
                     TryFindResource("AccentOrange") as Brush,
@@ -849,6 +915,31 @@ namespace AssetsManager.Views.Dialogs
 
             if (nw >= 0.99 && nh >= 0.99) return null;
             return new Rect(nx, ny, nw, nh);
+        }
+
+        private static BitmapSource EnsureBitmapSource(ImageSource source, int targetMaxDimension)
+        {
+            if (source is BitmapSource bitmap)
+                return bitmap;
+
+            if (!TryGetDimensions(source, out int sourceWidth, out int sourceHeight))
+                return null;
+
+            int maxDim = Math.Max(1, targetMaxDimension);
+            double scale = Math.Min((double)maxDim / sourceWidth, (double)maxDim / sourceHeight);
+            int width = Math.Max(1, (int)Math.Round(sourceWidth * scale));
+            int height = Math.Max(1, (int)Math.Round(sourceHeight * scale));
+
+            var visual = new DrawingVisual();
+            using (DrawingContext dc = visual.RenderOpen())
+            {
+                dc.DrawImage(source, new Rect(0, 0, width, height));
+            }
+
+            var rtb = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
+            rtb.Render(visual);
+            rtb.Freeze();
+            return rtb;
         }
 
         private string BuildExportFileName(TimelineExportFormat format)

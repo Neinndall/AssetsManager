@@ -270,8 +270,7 @@ namespace AssetsManager.Services.Monitor
                         else if (unit.StartsWith("minute")) duration = TimeSpan.FromMinutes(durationValue);
                     }
 
-                    var localMaintenanceStartTime = maintenanceStartTime.ToLocalTime();
-                    return $"Maintenance started at {localMaintenanceStartTime:HH:mm}";
+                    return FormatMaintenanceConciseStatus(maintenanceStartTime, DateTimeOffset.Now);
                 }
 
                 return "ONLINE";
@@ -281,6 +280,14 @@ namespace AssetsManager.Services.Monitor
                 _logService.LogError(ex, "Failed to parse PBE concise status JSON.");
                 return "Failed to parse PBE status information.";
             }
+        }
+
+        internal static string FormatMaintenanceConciseStatus(DateTimeOffset maintenanceStartTime, DateTimeOffset now)
+        {
+            var localStart = maintenanceStartTime.ToLocalTime();
+            return maintenanceStartTime > now
+                ? $"Maintenance starts at {localStart:HH:mm}"
+                : $"Maintenance started at {localStart:HH:mm}";
         }
     }
 }

@@ -11,6 +11,55 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Rendering
     public sealed class GameShaderRuntimeSemanticsTests
     {
         [Fact]
+        public void MirroredViewKeepsParticleSunDirectionAndAmbientCubeInEngineSpace()
+        {
+            var sun = new MapSunData(
+                Direction: new Vector3(1f, 0f, 0f),
+                Color: Vector4.One,
+                Intensity: 1f,
+                SkyColor: Vector4.Zero,
+                GroundColor: Vector4.Zero,
+                HorizonColor: Vector4.Zero,
+                SkyScale: 0f,
+                LightMapColorScale: 1f,
+                FogColor: Vector4.Zero,
+                FogAlternateColor: Vector4.Zero,
+                FogStartEnd: Vector2.Zero,
+                FogEmissiveRemap: 0f,
+                FogEnabled: false);
+
+            var directFrame = new GameShaderRuntime.Frame(
+                Matrix4x4.Identity,
+                Matrix4x4.Identity,
+                Vector3.Zero,
+                0f,
+                sun);
+            var mirroredFrame = directFrame with { View = Matrix4x4.CreateScale(-1f, 1f, 1f) };
+
+            var vsDirect = new float[136];
+            var psDirect = new float[120];
+            System.Span<Vector3> cubeDirect = stackalloc Vector3[6];
+            GameShaderRuntime.WritePerFrameVertex(vsDirect, directFrame, skinned: true);
+            GameShaderRuntime.WritePerFramePixel(psDirect, directFrame, skinned: true);
+            GameShaderRuntime.ResolveAmbientCube(directFrame, cubeDirect);
+            Assert.Equal(-1f, vsDirect[132], precision: 4);
+            Assert.Equal(-1f, psDirect[29], precision: 4);
+            Assert.Equal(0f, cubeDirect[0].X, precision: 4);
+            Assert.True(cubeDirect[1].X > 0.9f);
+
+            var vsMirrored = new float[136];
+            var psMirrored = new float[120];
+            System.Span<Vector3> cubeMirrored = stackalloc Vector3[6];
+            GameShaderRuntime.WritePerFrameVertex(vsMirrored, mirroredFrame, skinned: true);
+            GameShaderRuntime.WritePerFramePixel(psMirrored, mirroredFrame, skinned: true);
+            GameShaderRuntime.ResolveAmbientCube(mirroredFrame, cubeMirrored);
+            Assert.Equal(1f, vsMirrored[132], precision: 4);
+            Assert.Equal(1f, psMirrored[29], precision: 4);
+            Assert.True(cubeMirrored[0].X > 0.9f);
+            Assert.Equal(0f, cubeMirrored[1].X, precision: 4);
+        }
+
+        [Fact]
         public void BorderSamplingRetainsDerivativesAndOnlyRewritesTheNamedSamplerOnce()
         {
             const string source = "uniform highp sampler2D TEXTURE_TX;\n" +

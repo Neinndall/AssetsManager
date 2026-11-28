@@ -51,11 +51,17 @@ internal sealed class SkinPoseRuntime
         ResetLive();
     }
 
-    internal void Advance(float time, Matrix4x4 root, float dt)
+    internal void Advance(float time, Matrix4x4 root, float dt, float duration = 0f)
     {
         if (!Matrix4x4.Decompose(root, out Vector3 scale, out _, out Vector3 position) ||
             !SkinPoseReader.IsFinite(scale) || !SkinPoseReader.IsFinite(position)) root = Matrix4x4.Identity;
-        bool seek = float.IsFinite(_lastTime) && (time < _lastTime || time - _lastTime > 0.25f);
+        bool wrappedForward = float.IsFinite(_lastTime) &&
+            duration > 0.25f &&
+            time < _lastTime &&
+            _lastTime >= duration - 0.25f &&
+            time <= 0.25f &&
+            (duration - _lastTime) + time <= 0.25f;
+        bool seek = float.IsFinite(_lastTime) && !wrappedForward && (time < _lastTime || time - _lastTime > 0.25f);
         if (seek) ResetLive();
         _lastTime = time;
         if (_hasRoot && root != _root) _live = true;

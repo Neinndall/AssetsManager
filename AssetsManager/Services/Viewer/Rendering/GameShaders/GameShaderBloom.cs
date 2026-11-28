@@ -90,6 +90,7 @@ void main()
         private Target _glow;
         private Target[] _levels = Array.Empty<Target>();
         private uint _width, _height;
+        private bool _embedded;
         private bool _pending;
         private int _previousFramebuffer;
         private readonly int[] _previousViewport = new int[4];
@@ -101,10 +102,10 @@ void main()
             if (_gl != null)
                 return;
             _gl = gl;
-            bool embedded = GlShaderCompiler.UsesEmbeddedProfile(gl);
-            _downsampleProgram = GlShaderCompiler.CreateProgram(gl, embedded, FullscreenVertex, DownsampleFragment);
-            _upsampleProgram = GlShaderCompiler.CreateProgram(gl, embedded, FullscreenVertex, UpsampleFragment);
-            _composeProgram = GlShaderCompiler.CreateProgram(gl, embedded, FullscreenVertex, ComposeFragment);
+            _embedded = GlShaderCompiler.UsesEmbeddedProfile(gl);
+            _downsampleProgram = GlShaderCompiler.CreateProgram(gl, _embedded, FullscreenVertex, DownsampleFragment);
+            _upsampleProgram = GlShaderCompiler.CreateProgram(gl, _embedded, FullscreenVertex, UpsampleFragment);
+            _composeProgram = GlShaderCompiler.CreateProgram(gl, _embedded, FullscreenVertex, ComposeFragment);
             _vao = gl.GenVertexArray();
             _depth = new GlSceneCapture(gl);
         }
@@ -133,11 +134,14 @@ void main()
             {
                 Span<int> colorMask = stackalloc int[4];
                 _gl.GetInteger(GLEnum.ColorWritemask, colorMask);
-                // Clear every channel even when the preceding material disabled colour writes.
+                bool scissor = _gl.IsEnabled(EnableCap.ScissorTest);
+                // Clear every channel and pixel even when the preceding material restricted writes or clipping.
+                if (scissor) _gl.Disable(EnableCap.ScissorTest);
                 _gl.ColorMask(true, true, true, true);
                 _gl.ClearColor(0f, 0f, 0f, 0f);
                 _gl.Clear(ClearBufferMask.ColorBufferBit);
                 _gl.ColorMask(colorMask[0] != 0, colorMask[1] != 0, colorMask[2] != 0, colorMask[3] != 0);
+                if (scissor) _gl.Enable(EnableCap.ScissorTest);
                 _pending = true;
             }
             return true;
@@ -158,50 +162,69 @@ void main()
 
             _gl.ActiveTexture(TextureUnit.Texture0);
             _gl.GetInteger(GLEnum.SamplerBinding, out int previousSampler);
-            // Bloom's single-level targets use their own linear/clamp settings, not the last material's sampler.
-            _gl.BindSampler(0, 0);
             _gl.GetInteger(GLEnum.FramebufferBinding, out int target);
             _gl.GetInteger(GLEnum.Viewport, _previousViewport);
-            _gl.ColorMask(true, true, true, true);
-            _gl.Disable(EnableCap.DepthTest);
-            _gl.DepthMask(false);
-            _gl.Disable(EnableCap.CullFace);
-            _gl.Disable(EnableCap.Blend);
-            _gl.BindVertexArray(_vao);
-
-            _gl.UseProgram(_downsampleProgram);
-            Target source = _glow;
-            foreach (Target level in _levels)
+            bool scissor = _gl.IsEnabled(EnableCap.ScissorTest);
+            bool stencil = _gl.IsEnabled(EnableCap.StencilTest);
+            bool srgb = !_embedded && _gl.IsEnabled(EnableCap.FramebufferSrgb);
+            try
             {
-                Pass(_downsampleProgram, source, level);
-                source = level;
+                // Bloom's single-level targets use their own linear/clamp settings, not the last material's sampler.
+                _gl.BindSampler(0, 0);
+                _gl.Disable(EnableCap.ScissorTest);
+                _gl.Disable(EnableCap.StencilTest);
+                if (!_embedded) _gl.Disable(EnableCap.FramebufferSrgb);
+                _gl.ColorMask(true, true, true, true);
+                _gl.Disable(EnableCap.DepthTest);
+                _gl.DepthMask(false);
+                _gl.Disable(EnableCap.CullFace);
+                _gl.Disable(EnableCap.Blend);
+                _gl.BindVertexArray(_vao);
+
+                _gl.UseProgram(_downsampleProgram);
+                Target source = _glow;
+                foreach (Target level in _levels)
+                {
+                    Pass(_downsampleProgram, source, level);
+                    source = level;
+                }
+
+                // Each coarser level, tent-filtered, adds onto the finer one: the finest ends with every level's glow.
+                _gl.UseProgram(_upsampleProgram);
+                _gl.Enable(EnableCap.Blend);
+                _gl.BlendEquation(BlendEquationModeEXT.FuncAdd);
+                _gl.BlendFunc(BlendingFactor.One, BlendingFactor.One);
+                for (int at = _levels.Length - 1; at > 0; at--)
+                    Pass(_upsampleProgram, _levels[at], _levels[at - 1]);
+
+                _gl.BindFramebuffer(FramebufferTarget.Framebuffer, (uint)target);
+                _gl.Viewport(_previousViewport[0], _previousViewport[1], (uint)_previousViewport[2], (uint)_previousViewport[3]);
+                // Alpha stays as drawn, so a transparent-background capture keeps its coverage.
+                _gl.ColorMask(true, true, true, false);
+                _gl.UseProgram(_composeProgram);
+                Bind(0, _levels[0].Texture, _composeProgram, "uBloom");
+                _gl.Uniform1(_gl.GetUniformLocation(_composeProgram, "uStrength"), Strength);
+                _gl.DrawArrays(PrimitiveType.Triangles, 0, 3);
             }
-
-            // Each coarser level, tent-filtered, adds onto the finer one: the finest ends with every level's glow.
-            _gl.UseProgram(_upsampleProgram);
-            _gl.Enable(EnableCap.Blend);
-            _gl.BlendEquation(BlendEquationModeEXT.FuncAdd);
-            _gl.BlendFunc(BlendingFactor.One, BlendingFactor.One);
-            for (int at = _levels.Length - 1; at > 0; at--)
-                Pass(_upsampleProgram, _levels[at], _levels[at - 1]);
-
-            _gl.BindFramebuffer(FramebufferTarget.Framebuffer, (uint)target);
-            _gl.Viewport(_previousViewport[0], _previousViewport[1], (uint)_previousViewport[2], (uint)_previousViewport[3]);
-            // Alpha stays as drawn, so a transparent-background capture keeps its coverage.
-            _gl.ColorMask(true, true, true, false);
-            _gl.UseProgram(_composeProgram);
-            Bind(0, _levels[0].Texture, _composeProgram, "uBloom");
-            _gl.Uniform1(_gl.GetUniformLocation(_composeProgram, "uStrength"), Strength);
-            _gl.DrawArrays(PrimitiveType.Triangles, 0, 3);
-
-            _gl.ColorMask(true, true, true, true);
-            _gl.Disable(EnableCap.Blend);
-            _gl.Enable(EnableCap.DepthTest);
-            _gl.DepthMask(true);
-            _gl.BindVertexArray(0);
-            _gl.UseProgram(0);
-            _gl.ActiveTexture(TextureUnit.Texture0);
-            _gl.BindSampler(0, (uint)previousSampler);
+            finally
+            {
+                _gl.BindFramebuffer(FramebufferTarget.Framebuffer, (uint)target);
+                _gl.Viewport(_previousViewport[0], _previousViewport[1], (uint)_previousViewport[2], (uint)_previousViewport[3]);
+                _gl.ColorMask(true, true, true, true);
+                _gl.Disable(EnableCap.Blend);
+                _gl.Enable(EnableCap.DepthTest);
+                _gl.DepthMask(true);
+                if (scissor) _gl.Enable(EnableCap.ScissorTest); else _gl.Disable(EnableCap.ScissorTest);
+                if (stencil) _gl.Enable(EnableCap.StencilTest); else _gl.Disable(EnableCap.StencilTest);
+                if (!_embedded)
+                {
+                    if (srgb) _gl.Enable(EnableCap.FramebufferSrgb); else _gl.Disable(EnableCap.FramebufferSrgb);
+                }
+                _gl.BindVertexArray(0);
+                _gl.UseProgram(0);
+                _gl.ActiveTexture(TextureUnit.Texture0);
+                _gl.BindSampler(0, (uint)previousSampler);
+            }
         }
 
         // Filters `source` into `into`; UVStep is one texel of the source, as the game sets it.

@@ -52,12 +52,16 @@ namespace AssetsManager.Views.Dialogs
             else
             {
                 TimeSpan elapsed = DateTime.Now - _startTime;
-                ViewModel.EstimatedTimeText = $"Elapsed time: {elapsed.ToString(@"hh\:mm\:ss")}";
+                ViewModel.EstimatedTimeText = $"Elapsed time: {FormatDuration(elapsed)}";
             }
         }
 
         public void UpdateProgress(int completedFiles, int totalFiles, string currentFileName, bool isSuccess, string errorMessage, string customProgressText = null)
         {
+            int previousCompleted = _completedFiles;
+            int previousTotal = _totalFiles;
+            string previousVerb = ViewModel.OperationVerb;
+
             _completedFiles = completedFiles;
             _totalFiles = totalFiles;
 
@@ -129,11 +133,15 @@ namespace AssetsManager.Views.Dialogs
                 }
             }
 
+            if (IsNewProgressPhase(previousCompleted, previousTotal, previousVerb, completedFiles, totalFiles, verb))
+            {
+                _startTime = DateTime.Now;
+            }
+
             if (totalFiles > 0)
             {
                 ViewModel.IsIndeterminate = false;
                 ViewModel.ProgressValue = (double)completedFiles / totalFiles * 100;
-                UpdateEstimatedTime(completedFiles, totalFiles);
 
                 if (completedFiles >= totalFiles)
                 {
@@ -141,13 +149,19 @@ namespace AssetsManager.Views.Dialogs
                     ViewModel.EstimatedTimeText = "Estimated time remaining: 00:00:00";
                     ViewModel.ProgressValue = 100;
                 }
+                else
+                {
+                    if (!_timer.IsEnabled) _timer.Start();
+                    UpdateEstimatedTime(completedFiles, totalFiles);
+                }
             }
             else
             {
+                if (!_timer.IsEnabled) _timer.Start();
                 ViewModel.IsIndeterminate = true;
                 ViewModel.ProgressValue = 0;
                 TimeSpan elapsed = DateTime.Now - _startTime;
-                ViewModel.EstimatedTimeText = $"Elapsed time: {elapsed.ToString(@"hh\:mm\:ss")}";
+                ViewModel.EstimatedTimeText = $"Elapsed time: {FormatDuration(elapsed)}";
             }
         }
 
@@ -167,19 +181,49 @@ namespace AssetsManager.Views.Dialogs
                 TimeSpan estimatedTotalTime = TimeSpan.FromSeconds(elapsed.TotalSeconds / progress);
                 TimeSpan estimatedRemainingTime = estimatedTotalTime - elapsed;
 
-                if (estimatedRemainingTime.TotalSeconds < 0)
-                {
-                    ViewModel.EstimatedTimeText = "Estimated time remaining: 00:00:00";
-                }
-                else
-                {
-                    ViewModel.EstimatedTimeText = $"Estimated time remaining: {estimatedRemainingTime.ToString(@"hh\:mm\:ss")}";
-                }
+                ViewModel.EstimatedTimeText = $"Estimated time remaining: {FormatDuration(estimatedRemainingTime)}";
             }
             else
             {
                 ViewModel.EstimatedTimeText = "Estimated time: Calculating...";
             }
+        }
+
+        internal static bool IsNewProgressPhase(
+            int previousCompleted,
+            int previousTotal,
+            string previousVerb,
+            int completedFiles,
+            int totalFiles,
+            string currentVerb)
+        {
+            if (!string.IsNullOrEmpty(previousVerb) &&
+                !string.IsNullOrEmpty(currentVerb) &&
+                !string.Equals(previousVerb, currentVerb, StringComparison.Ordinal))
+            {
+                return true;
+            }
+
+            if (previousCompleted > 0 && completedFiles < previousCompleted)
+            {
+                return true;
+            }
+
+            return previousTotal > 0 &&
+                   previousCompleted >= previousTotal &&
+                   totalFiles > 0 &&
+                   completedFiles < totalFiles;
+        }
+
+        internal static string FormatDuration(TimeSpan duration)
+        {
+            if (duration <= TimeSpan.Zero)
+            {
+                return "00:00:00";
+            }
+
+            int totalHours = (int)Math.Floor(duration.TotalHours);
+            return $"{totalHours:D2}:{duration.Minutes:D2}:{duration.Seconds:D2}";
         }
 
         protected override void OnClosing(System.ComponentModel.CancelEventArgs e)

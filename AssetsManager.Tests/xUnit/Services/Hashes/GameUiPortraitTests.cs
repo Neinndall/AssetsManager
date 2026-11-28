@@ -174,4 +174,24 @@ public sealed class GameUiPortraitTests
         Assert.Equal(123UL, match.SourceChunkHash);
         Assert.Empty(engine.UnknownHashes);
     }
+
+    [Theory]
+    [InlineData("Maps/ModeSpecificData/ExampleCategory/Item_Alpha", "maps/modespecificdata/examplecategory.bin")]
+    [InlineData("Maps/ModeSpecificData/ExampleCategory/Item_Beta", "data/maps/modespecificdata/examplecategory.bin")]
+    public void UnknownBinsDerivePathFromResolvedRootEntryParent(string entry, string expected)
+    {
+        ulong target = XxHash64Ext.Hash(expected);
+        var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, Array.Empty<string>()),
+            resolveBinHash: hash => hash == Fnv1a.HashLower(entry) ? entry : null);
+        var tree = new BinTree(new[] { new BinTreeObject(Fnv1a.HashLower(entry), 123, Array.Empty<BinTreeProperty>()) },
+            Array.Empty<string>());
+        using var stream = new MemoryStream();
+        tree.Write(stream);
+        var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong> { target, 42 });
+
+        game.GrepWad(engine, new ArraySegment<byte>(stream.ToArray()), $"{target:x16}.bin", "Map12.wad.client", target);
+
+        Assert.Equal(expected, Assert.Single(engine.Matches.Values).Path);
+        Assert.Contains(42UL, engine.UnknownHashes);
+    }
 }

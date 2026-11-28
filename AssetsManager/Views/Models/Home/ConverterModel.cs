@@ -81,8 +81,18 @@ namespace AssetsManager.Views.Models.Home
         public bool IsProcessing
         {
             get => _isProcessing;
-            set { _isProcessing = value; OnPropertyChanged(); }
+            set
+            {
+                if (_isProcessing != value)
+                {
+                    _isProcessing = value;
+                    OnPropertyChanged();
+                    OnPropertyChanged(nameof(CanConvert));
+                }
+            }
         }
+
+        public bool CanConvert => Items.Count > 0 && !IsProcessing;
 
         private bool? _hasImages;
         private bool? _hasAudio;
@@ -110,6 +120,7 @@ namespace AssetsManager.Views.Models.Home
                 OnPropertyChanged(nameof(HasImages));
                 OnPropertyChanged(nameof(HasAudio));
                 OnPropertyChanged(nameof(HasVideo));
+                OnPropertyChanged(nameof(CanConvert));
             };
         }
 

@@ -20,7 +20,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 {
                     1 => TextureWrapMode.MirroredRepeat,
                     2 => TextureWrapMode.ClampToEdge,
-                    3 => TextureWrapMode.ClampToBorder,
+                    3 => _gles ? TextureWrapMode.ClampToEdge : TextureWrapMode.ClampToBorder,
                     _ => TextureWrapMode.Repeat,
                 };
                 _gl.SamplerParameter(sampler, SamplerParameterI.WrapS, (int)wrap);

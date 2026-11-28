@@ -1,4 +1,5 @@
 using System;
+using AssetsManager.Utils.Rendering;
 using Silk.NET.OpenGL;
 
 namespace AssetsManager.Services.Viewer.Rendering.Core
@@ -10,6 +11,7 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
     internal sealed class GlSceneCapture : IDisposable
     {
         private readonly GL _gl;
+        private readonly bool _embedded;
         private int _colorWidth;
         private int _colorHeight;
         private int _depthWidth;
@@ -20,6 +22,7 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
         internal GlSceneCapture(GL gl)
         {
             _gl = gl ?? throw new ArgumentNullException(nameof(gl));
+            _embedded = GlShaderCompiler.UsesEmbeddedProfile(_gl);
         }
 
         internal uint ColorTexture { get; private set; }
@@ -124,6 +127,7 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
                 {
                     if (_resolveFramebuffer == 0) _resolveFramebuffer = _gl.GenFramebuffer();
                     bool scissor = _gl.IsEnabled(EnableCap.ScissorTest);
+                    bool srgb = !_embedded && _gl.IsEnabled(EnableCap.FramebufferSrgb);
                     try
                     {
                         _gl.BindFramebuffer(FramebufferTarget.DrawFramebuffer, _resolveFramebuffer);
@@ -136,13 +140,15 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
                             throw new InvalidOperationException("Scene capture resolve framebuffer is incomplete.");
                         var mask = (captureColor ? ClearBufferMask.ColorBufferBit : 0) |
                                    (captureDepth ? ClearBufferMask.DepthBufferBit : 0);
-                        // Unlike CopyTexSubImage, a blit obeys the caller's scissor rectangle.
+                        // Unlike CopyTexSubImage, a blit obeys scissor and sRGB conversion.
                         if (scissor) _gl.Disable(EnableCap.ScissorTest);
+                        if (srgb) _gl.Disable(EnableCap.FramebufferSrgb);
                         _gl.BlitFramebuffer(0, 0, (int)width, (int)height, 0, 0, (int)width, (int)height,
                             mask, BlitFramebufferFilter.Nearest);
                     }
                     finally
                     {
+                        if (srgb) _gl.Enable(EnableCap.FramebufferSrgb);
                         if (scissor) _gl.Enable(EnableCap.ScissorTest);
                         _gl.BindFramebuffer(FramebufferTarget.DrawFramebuffer, (uint)drawFramebuffer);
                     }

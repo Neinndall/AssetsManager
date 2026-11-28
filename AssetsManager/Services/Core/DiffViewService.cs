@@ -6,10 +6,12 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Microsoft.Extensions.DependencyInjection;
 using LeagueToolkit.Core.Wad;
 using AssetsManager.Services.Formatting;
+using AssetsManager.Services.Parsers;
 using AssetsManager.Utils;
 using AssetsManager.Views.Dialogs;
 using AssetsManager.Views.Models.Wad;
@@ -31,6 +33,7 @@ namespace AssetsManager.Services.Core
         private readonly CustomMessageBoxService _customMessageBoxService;
         private readonly LogService _logService;
         private readonly AudioBankLinkerService _audioBankLinkerService;
+        private readonly SvgParser _svgParser;
 
         public DiffViewService(
             IServiceProvider serviceProvider,
@@ -38,7 +41,8 @@ namespace AssetsManager.Services.Core
             WadContentProvider wadContentProvider,
             CustomMessageBoxService customMessageBoxService,
             LogService logService,
-            AudioBankLinkerService audioBankLinkerService)
+            AudioBankLinkerService audioBankLinkerService,
+            SvgParser svgParser)
         {
             _serviceProvider = serviceProvider;
             _contentFormatterService = contentFormatterService;
@@ -46,6 +50,7 @@ namespace AssetsManager.Services.Core
             _customMessageBoxService = customMessageBoxService;
             _logService = logService;
             _audioBankLinkerService = audioBankLinkerService;
+            _svgParser = svgParser;
         }
 
         public async Task ShowWadDiffAsync(SerializableChunkDiff diff, string oldPbePath, string newPbePath, Window owner, string sourceJsonPath = null)
@@ -118,8 +123,8 @@ namespace AssetsManager.Services.Core
                         async (diff, dataType, oldData, newData, oldPath, newPath) =>
                         {
                             var ext = Path.GetExtension(diff.NewPath ?? diff.OldPath).ToLowerInvariant();
-                            var oldImage = await Task.Run(() => TextureUtils.LoadTexture((byte[])oldData, ext));
-                            var newImage = await Task.Run(() => TextureUtils.LoadTexture((byte[])newData, ext));
+                            var oldImage = await Task.Run(() => LoadDiffImage((byte[])oldData, ext));
+                            var newImage = await Task.Run(() => LoadDiffImage((byte[])newData, ext));
                             return (oldImage, newImage, oldPath ?? diff.OldPath, newPath ?? diff.NewPath);
                         },
                         preparedImages =>
@@ -298,8 +303,8 @@ namespace AssetsManager.Services.Core
         private async Task ShowImageComparisonInternal(byte[] oldData, byte[] newData, string oldPath, string newPath, string extension, Window owner, LoadingDiffWindow loadingWindow)
         {
             await SetStateAndRenderAsync(loadingWindow, DiffLoadingState.DecodingTextures);
-            var oldImage = await Task.Run(() => TextureUtils.LoadTexture(oldData, extension));
-            var newImage = await Task.Run(() => TextureUtils.LoadTexture(newData, extension));
+            var oldImage = await Task.Run(() => LoadDiffImage(oldData, extension));
+            var newImage = await Task.Run(() => LoadDiffImage(newData, extension));
 
             var imageDiffWindow = new ImageDiffWindow(oldImage, newImage, oldPath, newPath);
             imageDiffWindow.Owner = owner;
@@ -309,6 +314,18 @@ namespace AssetsManager.Services.Core
             await SetStateAndRenderAsync(loadingWindow, DiffLoadingState.Ready);
             await Task.Delay(300);
             imageDiffWindow.ShowDialog();
+        }
+
+        internal ImageSource LoadDiffImage(byte[] data, string extension)
+        {
+            if (data == null || data.Length == 0) return null;
+
+            if (SupportedFileTypes.VectorImages.Contains(extension))
+            {
+                return _svgParser.LoadSvg(data);
+            }
+
+            return TextureUtils.LoadTexture(data, extension);
         }
 
         private async Task HandleSknDiffAsync(SerializableChunkDiff diff, string oldPbePath, string newPbePath, Window owner, LoadingDiffWindow loadingWindow)

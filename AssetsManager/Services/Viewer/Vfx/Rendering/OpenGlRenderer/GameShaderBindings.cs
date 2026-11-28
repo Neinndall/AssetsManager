@@ -114,11 +114,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             var frame = _gameFrame with { TimeSeconds = emitter.RenderTime };
             _gameShaders.BindParticle(emitter.Def, mesh, pass, frame, _particleParameters,
                 name => ParticleTexture(emitter, name), _textures.Targets);
-            // LTK quad/ribbon preludes draw in WORLD; mesh preludes draw in mirrored ENGINE_WORLD.
-            bool mirrored = mesh && (emitter.Def.PrimitiveKind != VfxPrimitiveKind.AttachedMesh ||
-                _ownerWorldTransform.GetDeterminant() < 0f);
-            if (mesh && emitter.Def.RenderState?.FlipWinding == true) mirrored = !mirrored;
-            _gl.FrontFace(mirrored ? FrontFaceDirection.CW : FrontFaceDirection.Ccw);
+            _gl.FrontFace(mesh
+                ? ResolveMeshFrontFace(emitter.Def, _ownerWorldTransform, _gameFrame.View)
+                : FrontFaceDirection.Ccw);
         }
 
         private uint? ParticleTexture(VfxPlaybackRuntime.EmitterState emitter, string name) => name switch

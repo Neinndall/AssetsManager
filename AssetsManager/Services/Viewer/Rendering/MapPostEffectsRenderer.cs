@@ -242,6 +242,7 @@ void main()
         private uint _blurredFramebuffer;
         private int _aoWidth;
         private int _aoHeight;
+        private bool _embedded;
         private bool _ready;
 
         internal static bool DrawsAnything(MapPostEffectsData effects, MapSsaoData occlusion) =>
@@ -254,10 +255,10 @@ void main()
                 return;
 
             _gl = gl;
-            bool embedded = GlShaderCompiler.UsesEmbeddedProfile(gl);
-            _occlusionProgram = GlShaderCompiler.CreateProgram(gl, embedded, FullscreenVertex, OcclusionFragment);
-            _blurProgram = GlShaderCompiler.CreateProgram(gl, embedded, FullscreenVertex, BlurFragment);
-            _postProgram = GlShaderCompiler.CreateProgram(gl, embedded, FullscreenVertex, PostFragment);
+            _embedded = GlShaderCompiler.UsesEmbeddedProfile(gl);
+            _occlusionProgram = GlShaderCompiler.CreateProgram(gl, _embedded, FullscreenVertex, OcclusionFragment);
+            _blurProgram = GlShaderCompiler.CreateProgram(gl, _embedded, FullscreenVertex, BlurFragment);
+            _postProgram = GlShaderCompiler.CreateProgram(gl, _embedded, FullscreenVertex, PostFragment);
             _vao = gl.GenVertexArray();
             _capture = new GlSceneCapture(gl);
             BindFixedSamplers();
@@ -291,28 +292,53 @@ void main()
 
             _capture.Capture(width, height, captureColor: true, captureDepth: false);
             _gl.GetInteger(GLEnum.FramebufferBinding, out int previousFramebuffer);
-            Matrix4x4.Invert(projection, out Matrix4x4 projectionInverse);
-            Matrix4x4.Invert(view, out Matrix4x4 cameraWorld);
+            _gl.GetInteger(GLEnum.ActiveTexture, out int previousActiveTexture);
+            Span<int> previousViewport = stackalloc int[4];
+            _gl.GetInteger(GLEnum.Viewport, previousViewport);
+            bool previousScissor = _gl.IsEnabled(EnableCap.ScissorTest);
+            bool previousStencil = _gl.IsEnabled(EnableCap.StencilTest);
+            bool previousSrgb = !_embedded && _gl.IsEnabled(EnableCap.FramebufferSrgb);
+            Span<int> previousSamplers = stackalloc int[3];
+            for (int unit = 0; unit < 3; unit++)
+            {
+                _gl.ActiveTexture((TextureUnit)((int)TextureUnit.Texture0 + unit));
+                _gl.GetInteger(GLEnum.SamplerBinding, out previousSamplers[unit]);
+                _gl.BindSampler((uint)unit, 0);
+            }
 
-            bool drawsOcclusion = occlusion?.DrawsAnything == true;
-            if (drawsOcclusion)
-                DrawOcclusion(occlusion, projection, projectionInverse, width, height);
+            try
+            {
+                _gl.Disable(EnableCap.ScissorTest);
+                _gl.Disable(EnableCap.StencilTest);
+                if (!_embedded) _gl.Disable(EnableCap.FramebufferSrgb);
 
-            _gl.BindFramebuffer(FramebufferTarget.Framebuffer, (uint)previousFramebuffer);
-            _gl.Viewport(0, 0, width, height);
-            _gl.Disable(EnableCap.DepthTest);
-            _gl.DepthMask(false);
-            _gl.Disable(EnableCap.CullFace);
-            _gl.Disable(EnableCap.Blend);
-            _gl.ColorMask(true, true, true, true);
-            _gl.UseProgram(_postProgram);
-            BindTexture(0, _capture.ColorTexture);
-            BindTexture(1, _capture.DepthTexture);
-            BindTexture(2, drawsOcclusion ? _occludedTexture : _capture.ColorTexture);
-            WritePostEffects(effects, occlusion, projectionInverse, cameraWorld, width, height, drawsOcclusion);
-            DrawFullscreen();
+                Matrix4x4.Invert(projection, out Matrix4x4 projectionInverse);
+                Matrix4x4.Invert(view, out Matrix4x4 cameraWorld);
 
-            RestoreState();
+                bool drawsOcclusion = occlusion?.DrawsAnything == true;
+                if (drawsOcclusion)
+                    DrawOcclusion(occlusion, projection, projectionInverse, width, height);
+
+                _gl.BindFramebuffer(FramebufferTarget.Framebuffer, (uint)previousFramebuffer);
+                _gl.Viewport(0, 0, width, height);
+                _gl.Disable(EnableCap.DepthTest);
+                _gl.DepthMask(false);
+                _gl.Disable(EnableCap.CullFace);
+                _gl.Disable(EnableCap.Blend);
+                _gl.ColorMask(true, true, true, true);
+                _gl.UseProgram(_postProgram);
+                BindTexture(0, _capture.ColorTexture);
+                BindTexture(1, _capture.DepthTexture);
+                BindTexture(2, drawsOcclusion ? _occludedTexture : _capture.ColorTexture);
+                WritePostEffects(effects, occlusion, projectionInverse, cameraWorld, width, height, drawsOcclusion);
+                DrawFullscreen();
+            }
+            finally
+            {
+                _gl.BindFramebuffer(FramebufferTarget.Framebuffer, (uint)previousFramebuffer);
+                _gl.Viewport(previousViewport[0], previousViewport[1], (uint)previousViewport[2], (uint)previousViewport[3]);
+                RestoreState(previousSamplers, previousActiveTexture, previousScissor, previousStencil, previousSrgb);
+            }
         }
 
         private void DrawOcclusion(
@@ -503,23 +529,34 @@ void main()
             _gl.DrawArrays(PrimitiveType.Triangles, 0, 3);
         }
 
-        private void RestoreState()
+        private void RestoreState(
+            ReadOnlySpan<int> previousSamplers,
+            int previousActiveTexture,
+            bool previousScissor,
+            bool previousStencil,
+            bool previousSrgb)
         {
             _gl.UseProgram(0);
             _gl.BindVertexArray(0);
-            for (uint unit = 0; unit < 3; unit++)
+            for (int unit = 0; unit < 3; unit++)
             {
                 _gl.ActiveTexture((TextureUnit)((int)TextureUnit.Texture0 + unit));
                 _gl.BindTexture(TextureTarget.Texture2D, 0);
-                _gl.BindSampler(unit, 0);
+                _gl.BindSampler((uint)unit, (uint)previousSamplers[unit]);
             }
-            _gl.ActiveTexture(TextureUnit.Texture0);
+            _gl.ActiveTexture((TextureUnit)previousActiveTexture);
             _gl.Enable(EnableCap.DepthTest);
             _gl.DepthFunc(DepthFunction.Lequal);
             _gl.DepthMask(true);
             _gl.Disable(EnableCap.Blend);
             _gl.Disable(EnableCap.CullFace);
             _gl.ColorMask(true, true, true, true);
+            if (previousScissor) _gl.Enable(EnableCap.ScissorTest); else _gl.Disable(EnableCap.ScissorTest);
+            if (previousStencil) _gl.Enable(EnableCap.StencilTest); else _gl.Disable(EnableCap.StencilTest);
+            if (!_embedded)
+            {
+                if (previousSrgb) _gl.Enable(EnableCap.FramebufferSrgb); else _gl.Disable(EnableCap.FramebufferSrgb);
+            }
         }
 
         private static Vector4[] BuildKernel(int samples)

@@ -979,7 +979,7 @@ namespace AssetsManager.Views.Controls.Monitor
             return name;
         }
 
-        private string TransformTitle(string title, long quantity)
+        internal static string TransformTitle(string title, long quantity)
         {
             if (string.IsNullOrEmpty(title)) return title;
 
@@ -991,7 +991,7 @@ namespace AssetsManager.Views.Controls.Monitor
 
                 if (type.Equals("BE", StringComparison.OrdinalIgnoreCase))
                 {
-                    return $"{amount} esencias azules";
+                    return $"{amount} Blue Essence";
                 }
             }
             return title;

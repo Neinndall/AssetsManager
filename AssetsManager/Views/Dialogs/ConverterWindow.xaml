@@ -150,7 +150,7 @@
 
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                         <Button Content="Clear All" Style="{StaticResource SecondaryButton}" Width="100" Margin="0,0,10,0" Click="ClearAll_Click" IsEnabled="{Binding IsProcessing, Converter={StaticResource InverseBooleanConverter}}"/>
-                        <Button Content="Convert All" Click="Convert_Click" IsEnabled="{Binding Items.Count, Converter={StaticResource CountToVisibilityConverter}}">
+                        <Button Content="Convert All" Click="Convert_Click" IsEnabled="{Binding CanConvert}">
                             <Button.Style>
                                 <Style TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
                                     <Style.Triggers>

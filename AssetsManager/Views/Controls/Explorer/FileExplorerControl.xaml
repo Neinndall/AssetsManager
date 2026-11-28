@@ -105,27 +105,20 @@
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
                                 
-                            <!-- Icon -->
+                            <!-- Icon (kept free of spin transforms so recycled containers never spin regular icons) -->
                             <materialIcons:MaterialIcon Grid.Column="0" 
                                                         Width="18" Height="18" 
                                                         VerticalAlignment="Center" 
                                                         Margin="0,0,6,0" 
-                                                        RenderTransformOrigin="0.5,0.5"
                                                         Kind="{Binding Converter={StaticResource PathToIconConverter}}">
-                                <materialIcons:MaterialIcon.RenderTransform>
-                                    <RotateTransform Angle="0"/>
-                                </materialIcons:MaterialIcon.RenderTransform>
                                 <materialIcons:MaterialIcon.Style>
                                     <Style TargetType="materialIcons:MaterialIcon">
                                         <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                                        <Setter Property="Visibility" Value="Visible"/>
                                         <Style.Triggers>
-                                            <!-- Loading State Spinner -->
+                                            <!-- Hide regular icon while Loading... placeholder is shown -->
                                             <DataTrigger Binding="{Binding Name}" Value="Loading...">
-                                                <Setter Property="Kind" Value="Loading"/>
-                                                <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
-                                                <DataTrigger.EnterActions>
-                                                    <BeginStoryboard Storyboard="{StaticResource SpinningIconAnimation}"/>
-                                                </DataTrigger.EnterActions>
+                                                <Setter Property="Visibility" Value="Collapsed"/>
                                             </DataTrigger>
                                             
                                             <!-- Status Colors ONLY for Grouping Folders -->
@@ -165,6 +158,37 @@
                                                 <Setter Property="Foreground" Value="{StaticResource AccentTeal}"/>
                                             </MultiDataTrigger>
                                             
+                                        </Style.Triggers>
+                                    </Style>
+                                </materialIcons:MaterialIcon.Style>
+                            </materialIcons:MaterialIcon>
+
+                            <!-- Dedicated Loading Spinner Icon -->
+                            <materialIcons:MaterialIcon Grid.Column="0"
+                                                        Kind="Loading"
+                                                        Width="18" Height="18"
+                                                        VerticalAlignment="Center"
+                                                        Margin="0,0,6,0"
+                                                        Foreground="{StaticResource TextSecondary}"
+                                                        RenderTransformOrigin="0.5,0.5">
+                                <materialIcons:MaterialIcon.RenderTransform>
+                                    <RotateTransform Angle="0"/>
+                                </materialIcons:MaterialIcon.RenderTransform>
+                                <materialIcons:MaterialIcon.Style>
+                                    <Style TargetType="materialIcons:MaterialIcon">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Name}" Value="Loading...">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                            <Trigger Property="Visibility" Value="Visible">
+                                                <Trigger.EnterActions>
+                                                    <BeginStoryboard x:Name="TreeLoadingSpinStoryboard" Storyboard="{StaticResource SpinningIconAnimation}"/>
+                                                </Trigger.EnterActions>
+                                                <Trigger.ExitActions>
+                                                    <StopStoryboard BeginStoryboardName="TreeLoadingSpinStoryboard"/>
+                                                </Trigger.ExitActions>
+                                            </Trigger>
                                         </Style.Triggers>
                                     </Style>
                                 </materialIcons:MaterialIcon.Style>

@@ -17,6 +17,7 @@ internal sealed partial class GameHashGuesser
     {
         if (!engine.UnknownHashes.Contains(chunk)) return;
         string[] prefixes = null;
+        var checkedRoots = new HashSet<string>(StringComparer.Ordinal);
         foreach (var obj in tree.Objects.Values)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -27,8 +28,30 @@ internal sealed partial class GameHashGuesser
                 _ => null
             };
             name ??= _resolveBinHash?.Invoke(obj.PathHash);
-            name = name?.Replace('\\', '/').ToLowerInvariant();
-            if (name == null || !name.StartsWith("clientstates/", StringComparison.Ordinal)) continue;
+            name = name?.Replace('\\', '/').Trim('/').ToLowerInvariant();
+            if (string.IsNullOrEmpty(name)) continue;
+
+            // Root entry paths often mirror their owning .bin path or its parent directory, with or without data/.
+            if (name.Contains('/'))
+            {
+                string current = name;
+                for (int depth = 0; depth < 3 && current.Length > 0; depth++)
+                {
+                    if (checkedRoots.Add(current))
+                    {
+                        if (engine.CheckNormalizedParts(current, ".bin", "", HashGuessStrategy.BinEntry,
+                            wad, chunk, expectedHash: chunk)) return;
+                        if (!current.StartsWith("data/", StringComparison.Ordinal) &&
+                            engine.CheckNormalizedParts("data/", current, ".bin", HashGuessStrategy.BinEntry,
+                                wad, chunk, expectedHash: chunk)) return;
+                    }
+                    int parentSlash = current.LastIndexOf('/');
+                    if (parentSlash <= 0) break;
+                    current = current[..parentSlash];
+                }
+            }
+
+            if (!name.StartsWith("clientstates/", StringComparison.Ordinal)) continue;
             string leaf = name[(name.LastIndexOf('/') + 1)..];
             if (leaf.Length < 3 || !leaf.All(c => char.IsAsciiLetterOrDigit(c) || c is '_' or '-')) continue;
             prefixes ??= Corpus.GetOrCreate("ui-scene-bin-namespaces", paths => paths

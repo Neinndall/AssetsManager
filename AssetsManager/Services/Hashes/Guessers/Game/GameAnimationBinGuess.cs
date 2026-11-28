@@ -95,7 +95,15 @@ internal sealed partial class GameHashGuesser
             string[] folders = normalized[..slash].Split('/');
             if (!containerIndex.Contains(folders)) continue;
             for (int count = 1; count < Math.Min(4, words.Length); count++)
+            {
                 prefixes.Add(normalized[..(slash + 1)] + string.Join('_', words[..count]) + "_");
+                if (TryToggleZeroPadding(words[count - 1], out string toggled))
+                {
+                    string[] variant = words[..count];
+                    variant[^1] = toggled;
+                    prefixes.Add(normalized[..(slash + 1)] + string.Join('_', variant) + "_");
+                }
+            }
         }
         string[] orderedPrefixes = prefixes.OrderBy(value => value, StringComparer.Ordinal).ToArray();
         long checkedCandidates = 0;

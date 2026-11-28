@@ -149,13 +149,24 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             internal bool HasUploadedData;
         }
 
-        private sealed record SamplerRuntime(
+        internal enum FallbackSamplerKind
+        {
+            None,
+            Color,
+            UnsignedInteger,
+            SignedInteger,
+            DepthCompare
+        }
+
+        internal sealed record SamplerRuntime(
             string TextureName,
             GameShaderTranslator.TextureDimension Dimension,
             string LogicalSampler,
             int Location,
-            uint Unit)
+            uint Unit,
+            FallbackSamplerKind Fallback = FallbackSamplerKind.None)
         {
+            internal bool IsFallback => Fallback != FallbackSamplerKind.None;
             internal string MaterialName { get; } = TextureName.EndsWith(MaterialTextureSuffix, StringComparison.Ordinal)
                 ? TextureName[..^MaterialTextureSuffix.Length] : TextureName;
         }
@@ -265,7 +276,10 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
         private uint _neutralBlack2D;
         private uint _neutralWhite2D;
         private uint _neutralBuffer2D;
+        private uint _neutralSignedBuffer2D;
         private readonly Dictionary<(GameShaderTranslator.TextureDimension Dimension, bool Black), uint> _neutralTypedTextures = new();
+        private readonly Dictionary<GameShaderTranslator.TextureDimension, uint> _neutralDepthTextures = new();
+        private uint _neutralCubeMapArray;
         private int _maxTextureUnits;
         private bool _disposed;
 
@@ -459,11 +473,18 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             if (_neutralBlack2D != 0) _gl.DeleteTexture(_neutralBlack2D);
             if (_neutralWhite2D != 0) _gl.DeleteTexture(_neutralWhite2D);
             if (_neutralBuffer2D != 0) _gl.DeleteTexture(_neutralBuffer2D);
+            if (_neutralSignedBuffer2D != 0) _gl.DeleteTexture(_neutralSignedBuffer2D);
             foreach (uint texture in _neutralTypedTextures.Values)
                 if (texture != 0)
                     _gl.DeleteTexture(texture);
             _neutralTypedTextures.Clear();
-            _neutralGrey2D = _neutralBlack2D = _neutralWhite2D = _neutralBuffer2D = 0;
+            foreach (uint texture in _neutralDepthTextures.Values)
+                if (texture != 0)
+                    _gl.DeleteTexture(texture);
+            _neutralDepthTextures.Clear();
+            if (_neutralCubeMapArray != 0) _gl.DeleteTexture(_neutralCubeMapArray);
+            _neutralCubeMapArray = 0;
+            _neutralGrey2D = _neutralBlack2D = _neutralWhite2D = _neutralBuffer2D = _neutralSignedBuffer2D = 0;
         }
     }
 }

@@ -186,7 +186,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             Set(data, at + 3, channel?.Bias.Y ?? 0f);
         }
 
-        private static void WritePerFrameVertex(float[] data, in Frame frame, bool skinned)
+        internal static void WritePerFrameVertex(float[] data, in Frame frame, bool skinned)
         {
             Matrix4x4 mirror = Matrix4x4.CreateScale(-1f, 1f, 1f);
             Matrix4x4 clip = skinned
@@ -196,7 +196,8 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             Vector3 eye = skinned
                 ? frame.Eye
                 : new Vector3(-frame.Eye.X, frame.Eye.Y, frame.Eye.Z);
-            Vector3 direction = ResolveSunDirection(frame.Sun, skinned);
+            bool mirrorSun = skinned && frame.View.GetDeterminant() >= 0f;
+            Vector3 direction = ResolveSunDirection(frame.Sun, mirrorSun);
 
             WriteClipRows(data, 0, clip);
             WriteVector3(data, 16, eye);
@@ -217,7 +218,7 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
             Vector3 eye = skinned
                 ? frame.Eye
                 : new Vector3(-frame.Eye.X, frame.Eye.Y, frame.Eye.Z);
-            if (skinned)
+            if (skinned && frame.View.GetDeterminant() >= 0f)
                 direction.X = -direction.X;
             Vector3 sun = color * intensity;
             Vector3 shadow = sky * skyScale;
@@ -321,7 +322,8 @@ namespace AssetsManager.Services.Viewer.Rendering.GameShaders
                 out _,
                 out _,
                 out _);
-            direction.X = -direction.X;
+            if (frame.View.GetDeterminant() >= 0f)
+                direction.X = -direction.X;
             Vector3 ground = frame.Sun == null
                 ? sky
                 : new Vector3(frame.Sun.GroundColor.X, frame.Sun.GroundColor.Y, frame.Sun.GroundColor.Z);

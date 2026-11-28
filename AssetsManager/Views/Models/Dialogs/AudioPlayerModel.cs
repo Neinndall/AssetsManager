@@ -92,13 +92,44 @@ namespace AssetsManager.Views.Models.Dialogs
             }
         }
 
-        public void ResetToDefault()
+        public bool RemoveTrack(AudioPlaylistItem item)
         {
+            if (item == null) return false;
+
+            bool isCurrentTrack = string.Equals(CurrentTrackName, item.Name, System.StringComparison.Ordinal);
+            _service.RemoveFromPlaylist(item);
+
+            bool isEmpty = _service.Playlist.Count == 0;
+            if (!isCurrentTrack && !isEmpty)
+            {
+                return false;
+            }
+
+            if (isEmpty)
+            {
+                ResetToDefault();
+            }
+            else
+            {
+                ResetPlaybackState();
+            }
+
+            return true;
+        }
+
+        public void ResetPlaybackState()
+        {
+            IsPlaying = false;
             CurrentTrackName = "No track selected";
             CurrentTimeText = "0:00";
             TotalTimeText = "0:00";
             CurrentTime = 0;
             TotalTime = 100;
+        }
+
+        public void ResetToDefault()
+        {
+            ResetPlaybackState();
             ActivePackName = "New Playlist";
         }
 

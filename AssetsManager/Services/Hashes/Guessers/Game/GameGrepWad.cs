@@ -222,6 +222,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                     if (linkTree != null)
                     {
                         GuessUiSceneBinPath(engine, linkTree, sourceWadPath, sourceChunkHash, cancellationToken);
+                        GuessBinPropertyGluedTextures(engine, linkTree, sourcePath, sourceWadPath, sourceChunkHash, cancellationToken);
                         _linkTemplates.GetValue(engine, static _ => new GameBinLinkTemplateIndex()).Guess(engine, linkTree, HashFile.Load(),
                             _resolveBinHash, _resolveBinHash64, sourceWadPath, sourceChunkHash, cancellationToken);
                         _animationForms.GetValue(engine, static _ => new GameAnimationFormIndex()).Guess(
@@ -1788,15 +1789,26 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                 string sKey = champMatch.Success ? champMatch.Groups["skin"].Value.ToLowerInvariant() : "";
                 if (!string.IsNullOrEmpty(sKey) && submeshesBySkin.TryGetValue(sKey, out var smList))
                 {
+                    string unjadedFileStem = fileStem.StartsWith("jade_", StringComparison.OrdinalIgnoreCase) && fileStem.Length > 5
+                        ? fileStem[5..]
+                        : null;
                     foreach (string sm in smList)
                     {
-                        candidateStems.Add(sm);
-                        candidateStems.Add($"{fileStem}_{sm}");
-                        if (!string.IsNullOrEmpty(droppedSkinPrefix))
-                            candidateStems.Add($"{droppedSkinPrefix}_{sm}");
-                        foreach (string stem in themeTextureStems) candidateStems.Add($"{stem}_{sm}");
-                        if (!string.IsNullOrEmpty(cleanChamp))
-                            candidateStems.Add($"{cleanChamp}_{sm}");
+                        string trimmedSm = sm.StartsWith("mat_", StringComparison.OrdinalIgnoreCase) && sm.Length > 4
+                            ? sm[4..]
+                            : null;
+                        foreach (string smVariant in trimmedSm != null ? new[] { sm, trimmedSm } : new[] { sm })
+                        {
+                            candidateStems.Add(smVariant);
+                            candidateStems.Add($"{fileStem}_{smVariant}");
+                            if (!string.IsNullOrEmpty(unjadedFileStem))
+                                candidateStems.Add($"{unjadedFileStem}_{smVariant}");
+                            if (!string.IsNullOrEmpty(droppedSkinPrefix))
+                                candidateStems.Add($"{droppedSkinPrefix}_{smVariant}");
+                            foreach (string stem in themeTextureStems) candidateStems.Add($"{stem}_{smVariant}");
+                            if (!string.IsNullOrEmpty(cleanChamp))
+                                candidateStems.Add($"{cleanChamp}_{smVariant}");
+                        }
                     }
                 }
 
@@ -2051,6 +2063,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
 
             var directTargets = new HashSet<ulong>();
             var roles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var rawSubmeshes = new HashSet<string>(StringComparer.Ordinal);
 
             var meshRoots = tree.Objects.Values.SelectMany(obj => obj.Properties.Values)
                 .Concat(tree.DataOverrides.Select(overrideData => overrideData.Property));
@@ -2087,6 +2100,7 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                         directTargets.Add(directLink.Value);
                     }
 
+                    rawSubmeshes.Add(submesh.Value);
                     HarvestSubmeshRoleTokens(submesh.Value, roles);
                 }
             }
@@ -2237,6 +2251,137 @@ namespace AssetsManager.Services.Hashes.Guessers.Game
                     }
                     finally { if (rentedRole != null) ArrayPool<byte>.Shared.Return(rentedRole); }
                 }
+            }
+
+            if (targetHashes.Count > 0 && engine.RemainingUnknownCount > 0)
+            {
+                ProbeSkinBinWordPairs(
+                    engine, data, champ, $"{assetFolder}/{champ}_{skinFile}_",
+                    rawSubmeshes, roles, samplerRoles, targetHashes, sourceWadPath, sourceChunkHash, cancellationToken);
+            }
+        }
+
+        private static readonly Regex BinIdentifierRegex = new(@"[A-Za-z][A-Za-z0-9_]{2,48}", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+        private static readonly Regex CamelCaseTokenRegex = new(@"[A-Z]?[a-z]+|[A-Z]+(?=[A-Z][a-z]|\d|\b)|\d+", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+        private static readonly byte[][] BinWordPairSuffixes =
+        {
+            "_tx_cm.tex"u8.ToArray(),
+            "_tx.tex"u8.ToArray(),
+            ".tex"u8.ToArray(),
+            "_mask_tx_cm.tex"u8.ToArray(),
+            "_mask.tex"u8.ToArray()
+        };
+
+        // Artists often coin two-word texture names (e.g. wavescreen, hair_bubbles, jokeglow)
+        // from submesh/shader terms already present in the skin BIN.
+        private void ProbeSkinBinWordPairs(
+            HashGuessEngine engine,
+            ArraySegment<byte> data,
+            string champ,
+            string pathPrefix,
+            HashSet<string> rawSubmeshes,
+            HashSet<string> submeshRoles,
+            HashSet<string> samplerRoles,
+            HashSet<ulong> targetHashes,
+            string sourceWadPath,
+            ulong sourceChunkHash,
+            CancellationToken cancellationToken)
+        {
+            string rawText = Encoding.Latin1.GetString(data.Array, data.Offset, data.Count);
+            var binWords = new HashSet<string>(StringComparer.Ordinal);
+            foreach (Match match in BinIdentifierRegex.Matches(rawText))
+            {
+                string token = match.Value;
+                foreach (string part in token.Split('_', StringSplitOptions.RemoveEmptyEntries))
+                {
+                    AddBinWord(part, champ, binWords);
+                    foreach (Match camel in CamelCaseTokenRegex.Matches(part))
+                        AddBinWord(camel.Value, champ, binWords);
+                }
+                if (binWords.Count >= 1600) break;
+            }
+            if (binWords.Count == 0) return;
+
+            var anchors = new HashSet<string>(StringComparer.Ordinal);
+            foreach (string rawSubmesh in rawSubmeshes)
+            {
+                foreach (string part in rawSubmesh.Split('_', StringSplitOptions.RemoveEmptyEntries))
+                {
+                    AddBinWord(part, champ, anchors);
+                    foreach (Match camel in CamelCaseTokenRegex.Matches(part))
+                        AddBinWord(camel.Value, champ, anchors);
+                }
+            }
+            foreach (string role in submeshRoles)
+                AddBinWord(role, champ, anchors);
+            foreach (string role in samplerRoles)
+                AddBinWord(role, champ, anchors);
+            if (anchors.Count == 0) return;
+
+            byte[] prefixBytes = Encoding.UTF8.GetBytes(pathPrefix.ToLowerInvariant());
+            byte[][] anchorBytes = anchors.Take(140).Select(Encoding.UTF8.GetBytes).ToArray();
+            byte[][] wordBytes = binWords.Select(Encoding.UTF8.GetBytes).ToArray();
+            Span<byte> pairBuf = stackalloc byte[64];
+
+            foreach (byte[] w1 in anchorBytes)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (targetHashes.Count == 0 || engine.RemainingUnknownCount == 0) return;
+
+                foreach (byte[] w2 in wordBytes)
+                {
+                    if (targetHashes.Count == 0) return;
+                    int gluedLen = w1.Length + w2.Length;
+                    if (gluedLen + 1 > pairBuf.Length) continue;
+
+                    // w1 + w2
+                    w1.CopyTo(pairBuf);
+                    w2.CopyTo(pairBuf[w1.Length..]);
+                    ProbeSuffixes(pairBuf[..gluedLen]);
+
+                    // w1 + '_' + w2
+                    pairBuf[w1.Length] = (byte)'_';
+                    w2.CopyTo(pairBuf[(w1.Length + 1)..]);
+                    ProbeSuffixes(pairBuf[..(gluedLen + 1)]);
+
+                    if (targetHashes.Count == 0) return;
+
+                    // w2 + w1
+                    w2.CopyTo(pairBuf);
+                    w1.CopyTo(pairBuf[w2.Length..]);
+                    ProbeSuffixes(pairBuf[..gluedLen]);
+
+                    // w2 + '_' + w1
+                    pairBuf[w2.Length] = (byte)'_';
+                    w1.CopyTo(pairBuf[(w2.Length + 1)..]);
+                    ProbeSuffixes(pairBuf[..(gluedLen + 1)]);
+                }
+            }
+
+            void ProbeSuffixes(ReadOnlySpan<byte> stem)
+            {
+                foreach (byte[] suffix in BinWordPairSuffixes)
+                {
+                    if (targetHashes.Count > 0 &&
+                        MaterialTexturePathMatcher.TryMatchParts(prefixBytes, stem, suffix, ReadOnlySpan<byte>.Empty,
+                            targetHashes, out ulong hitHash, out string hitPath))
+                    {
+                        targetHashes.Remove(hitHash);
+                        Check(engine, hitPath, HashGuessStrategy.CharacterTemplate, sourceWadPath, sourceChunkHash);
+                    }
+                }
+            }
+
+            static void AddBinWord(string raw, string champion, HashSet<string> target)
+            {
+                if (raw.Length is < 2 or > 14) return;
+                string low = raw.ToLowerInvariant();
+                if (low == champion || low.StartsWith("skin", StringComparison.Ordinal)) return;
+                for (int i = 0; i < low.Length; i++)
+                {
+                    if (!char.IsAsciiLetterOrDigit(low[i])) return;
+                }
+                target.Add(low);
             }
         }
 

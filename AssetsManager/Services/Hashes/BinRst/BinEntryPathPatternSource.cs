@@ -68,7 +68,10 @@ internal sealed class BinEntryPathPatternSource
         else if (type == UnitPropertyType && Text(entry, "name") is string unit)
             yield return $"Maps/Shipping/Map22/UnitProperties/{unit}";
         else if (type == AnvilType && Text(entry, "AugmentNameId") is string augment)
+        {
+            yield return $"Maps/ModeSpecificData/StatAnvils/{augment}";
             foreach (int map in MapIds) yield return $"Maps/Shipping/Map{map}/Anvils/{augment}";
+        }
         else if (ScriptTypes.Contains(type) && Text(entry, "ScriptName") is string script)
         {
             if (type == CharScriptType)

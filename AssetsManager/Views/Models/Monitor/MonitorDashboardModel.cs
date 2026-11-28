@@ -425,6 +425,20 @@ namespace AssetsManager.Views.Models.Monitor
             }
         }
 
+        internal static string FormatPbeMaintenanceSubtitle(string status)
+        {
+            if (string.IsNullOrWhiteSpace(status)) return string.Empty;
+
+            const string prefix = "Maintenance ";
+            string trimmed = status.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
+                ? status.Substring(prefix.Length).Trim()
+                : status.Trim();
+
+            return trimmed.Length > 0
+                ? char.ToUpperInvariant(trimmed[0]) + trimmed.Substring(1)
+                : string.Empty;
+        }
+
         public void RefreshPbeData()
         {
             string status = _appSettings.LastPbeStatusMessage;
@@ -442,7 +456,7 @@ namespace AssetsManager.Views.Models.Monitor
                 if (status.StartsWith("Maintenance ", StringComparison.OrdinalIgnoreCase))
                 {
                     PbeStatusText = "Maintenance";
-                    PbeStatusSubtitle = status.Replace("Maintenance ", ""); // "Started at HH:mm"
+                    PbeStatusSubtitle = FormatPbeMaintenanceSubtitle(status);
                     PbeStatusColor = new SolidColorBrush(Color.FromRgb(231, 76, 60)); // Red
                     PbeStatusIconKind = MaterialIconKind.Wrench;
                 }

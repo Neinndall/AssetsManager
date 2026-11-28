@@ -112,4 +112,73 @@ public sealed class SceneCaptureStateGpuTests
             gl.DeleteRenderbuffer(depth);
         }
     }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void SceneCopiesPreserveEncodedColorWhenSourceIsSrgbAndFramebufferSrgbIsEnabled(bool prepass, bool multisampled)
+    {
+        using var context = new HiddenWglContext();
+        using GL gl = GL.GetApi(context.GetProcAddress);
+        uint source = gl.GenFramebuffer();
+        uint read = gl.GenFramebuffer();
+        uint color = gl.GenRenderbuffer();
+        uint depth = gl.GenRenderbuffer();
+        using var capture = new GlSceneCapture(gl);
+        using var scene = new GlSceneDepthPass(gl);
+        try
+        {
+            gl.BindFramebuffer(FramebufferTarget.Framebuffer, source);
+            void Attach(uint buffer, InternalFormat format, FramebufferAttachment attachment)
+            {
+                gl.BindRenderbuffer(RenderbufferTarget.Renderbuffer, buffer);
+                if (multisampled) gl.RenderbufferStorageMultisample(RenderbufferTarget.Renderbuffer, 4, format, 16, 16);
+                else gl.RenderbufferStorage(RenderbufferTarget.Renderbuffer, format, 16, 16);
+                gl.FramebufferRenderbuffer(FramebufferTarget.Framebuffer, attachment, RenderbufferTarget.Renderbuffer, buffer);
+            }
+            Attach(color, InternalFormat.Srgb8Alpha8, FramebufferAttachment.ColorAttachment0);
+            Attach(depth, InternalFormat.Depth24Stencil8, FramebufferAttachment.DepthStencilAttachment);
+            Assert.Equal(GLEnum.FramebufferComplete, gl.CheckFramebufferStatus(FramebufferTarget.Framebuffer));
+
+            // Seed exact encoded sRGB bytes (.6, .2, .4, 1) with FramebufferSrgb disabled.
+            gl.Disable(EnableCap.FramebufferSrgb);
+            gl.ClearColor(.6f, .2f, .4f, 1f);
+            gl.ClearDepth(.5);
+            gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
+
+            // Enable FramebufferSrgb like a caller rendering to an sRGB viewport before capture.
+            gl.Enable(EnableCap.FramebufferSrgb);
+            if (prepass)
+                scene.Render(16, 16, () => { }, () => capture.Capture(16, 16, true, true));
+            else
+                capture.Capture(16, 16, true, true);
+
+            Assert.True(gl.IsEnabled(EnableCap.FramebufferSrgb));
+            Assert.Equal(GLEnum.NoError, gl.GetError());
+
+            gl.Disable(EnableCap.FramebufferSrgb);
+            gl.BindFramebuffer(FramebufferTarget.Framebuffer, read);
+            gl.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment0,
+                TextureTarget.Texture2D, capture.ColorTexture, 0);
+            Assert.Equal(GLEnum.FramebufferComplete, gl.CheckFramebufferStatus(FramebufferTarget.Framebuffer));
+            float[] rgba = new float[16 * 16 * 4];
+            gl.ReadPixels(0, 0, 16, 16, PixelFormat.Rgba, PixelType.Float, rgba.AsSpan());
+            Assert.InRange(rgba[0], .6f - .01f, .6f + .01f);
+            Assert.InRange(rgba[1], .2f - .01f, .2f + .01f);
+            Assert.InRange(rgba[2], .4f - .01f, .4f + .01f);
+            Assert.Equal(GLEnum.NoError, gl.GetError());
+        }
+        finally
+        {
+            gl.Disable(EnableCap.FramebufferSrgb);
+            gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+            gl.BindRenderbuffer(RenderbufferTarget.Renderbuffer, 0);
+            gl.DeleteFramebuffer(read);
+            gl.DeleteFramebuffer(source);
+            gl.DeleteRenderbuffer(color);
+            gl.DeleteRenderbuffer(depth);
+        }
+    }
 }

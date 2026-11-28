@@ -125,19 +125,17 @@ namespace AssetsManager.Views.Controls.Monitor
 
             if (selectedEntry != null)
             {
+                string currentName = !string.IsNullOrWhiteSpace(selectedEntry.DisplayName)
+                    ? selectedEntry.DisplayName
+                    : selectedEntry.FileName;
                 var inputDialog = new InputDialog();
-                inputDialog.Initialize("Rename Entry", "Enter a new name for this entry:", selectedEntry.FileName);
+                inputDialog.Initialize("Rename Entry", "Enter a new name for this entry:", currentName);
                 inputDialog.Owner = Window.GetWindow(this);
 
-                if (inputDialog.ShowDialog() == true)
+                if (inputDialog.ShowDialog() == true && selectedEntry.Rename(inputDialog.InputText))
                 {
-                    string newName = inputDialog.InputText;
-                    if (!string.IsNullOrWhiteSpace(newName) && newName != selectedEntry.FileName)
-                    {
-                        selectedEntry.FileName = newName;
-                        AppSettings.Save();
-                        LogService.LogSuccess("Renamed successfully.");
-                    }
+                    AppSettings.Save();
+                    LogService.LogSuccess("Renamed successfully.");
                 }
             }
         }
