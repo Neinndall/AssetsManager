@@ -58,7 +58,19 @@ namespace AssetsManager.Views.Models.Dialogs
         public ImageMergerModel(ObservableRangeCollection<ImageMergerItem> items)
         {
             Items = items;
+            if (Items != null)
+            {
+                Items.CollectionChanged += (_, _) =>
+                {
+                    OnPropertyChanged(nameof(HasItems));
+                    OnPropertyChanged(nameof(CanExport));
+                };
+            }
         }
+
+        public bool HasItems => Items != null && Items.Count > 0;
+
+        public bool CanExport => PreviewImage != null && !IsProcessing;
 
         public int Columns
         {
@@ -81,13 +93,23 @@ namespace AssetsManager.Views.Models.Dialogs
         public BitmapSource PreviewImage
         {
             get => _previewImage;
-            set { _previewImage = value; OnPropertyChanged(); }
+            set
+            {
+                _previewImage = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(CanExport));
+            }
         }
 
         public bool IsProcessing
         {
             get => _isProcessing;
-            set { _isProcessing = value; OnPropertyChanged(); }
+            set
+            {
+                _isProcessing = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(CanExport));
+            }
         }
 
         public event PropertyChangedEventHandler PropertyChanged;

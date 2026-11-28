@@ -104,6 +104,7 @@
                 <ListBox x:Name="PlaylistListBox" 
                          ItemsSource="{Binding Service.Playlist}"
                          Background="Transparent" BorderThickness="0"
+                         MouseDoubleClick="PlaylistListBox_MouseDoubleClick"
                          ItemContainerStyle="{StaticResource ModernSelectableCardItemStyle}">
                     <ListBox.ItemTemplate>
                         <DataTemplate DataType="{x:Type audio:AudioPlaylistItem}">

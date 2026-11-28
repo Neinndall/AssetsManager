@@ -136,16 +136,21 @@ namespace AssetsManager.Views.Dialogs
 
         private void ImageDiffWindow_PreviewKeyDown(object sender, KeyEventArgs e)
         {
-            if (Keyboard.Modifiers == ModifierKeys.Alt)
+            if (Keyboard.Modifiers == ModifierKeys.Control)
             {
-                if (e.Key == Key.Right)
+                if (e.Key == Key.D0 || e.Key == Key.NumPad0)
                 {
-                    BtnNextFile_Click(null, null);
+                    ZoomResetBtn_Click(null, null);
                     e.Handled = true;
                 }
-                else if (e.Key == Key.Left)
+                else if (e.Key == Key.OemPlus || e.Key == Key.Add)
                 {
-                    BtnPrevFile_Click(null, null);
+                    ZoomTo(_currentZoom + 0.25);
+                    e.Handled = true;
+                }
+                else if (e.Key == Key.OemMinus || e.Key == Key.Subtract)
+                {
+                    ZoomTo(_currentZoom - 0.25);
                     e.Handled = true;
                 }
             }
@@ -345,6 +350,13 @@ namespace AssetsManager.Views.Dialogs
 
         private void ImageDiffWindow_MouseDown(object sender, MouseButtonEventArgs e)
         {
+            if (e.ChangedButton == MouseButton.Left && e.ClickCount == 2)
+            {
+                ZoomResetBtn_Click(null, null);
+                e.Handled = true;
+                return;
+            }
+
             if (e.ChangedButton == MouseButton.Left || e.ChangedButton == MouseButton.Middle)
             {
                 _isDragging = true;

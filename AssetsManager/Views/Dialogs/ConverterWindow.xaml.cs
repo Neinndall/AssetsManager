@@ -33,6 +33,22 @@ namespace AssetsManager.Views.Dialogs
             this.DataContext = ViewModel;
         }
 
+        private void DropArea_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            if (ViewModel.IsProcessing) return;
+
+            var dialog = new OpenFileDialog
+            {
+                Multiselect = true,
+                Filter = "Supported Files|*.dds;*.tex;*.wem;*.ogg;*.wav;*.mp3;*.flac;*.webm|All Files|*.*"
+            };
+
+            if (dialog.ShowDialog(this) == true && dialog.FileNames.Length > 0)
+            {
+                ProcessFiles(dialog.FileNames);
+            }
+        }
+
         private void DropArea_DragEnter(object sender, DragEventArgs e)
         {
             if (e.Data.GetDataPresent(DataFormats.FileDrop))

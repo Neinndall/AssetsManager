@@ -5,6 +5,13 @@ HOTFIX UPDATE
 New Features
 
 Improvements
+  - Audio Player / Auto-select the first track when pressing Play with nothing selected and allow double-clicking a track to play.
+  - Search / Press Escape in search boxes to clear the filter immediately.
+  - Image Merger / Disable Clear All and Export buttons when no images or preview are ready.
+  - Universal Converter / Disable Clear All when empty and allow clicking the drop zone to browse files.
+  - Image Diff / Add Ctrl+0, Ctrl++, Ctrl+- zoom shortcuts and double-click to reset zoom.
+  - Comparator / Support Escape to clear selection and Ctrl+C to copy selected paths in comparison results.
+  - 3D Studio / Allow middle-clicking workspace tabs to close them.
 
 Changes
 

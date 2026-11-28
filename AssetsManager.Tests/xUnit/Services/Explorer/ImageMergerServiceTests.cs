@@ -55,5 +55,30 @@ namespace AssetsManager.Tests.xUnit.Services.Explorer
             Assert.NotNull(model.PreviewImage);
             Assert.False(model.IsProcessing);
         }
+
+        [Fact]
+        public void ImageMergerModelTracksHasItemsAndCanExportState()
+        {
+            var service = new ImageMergerService(null, null, null);
+            var model = new ImageMergerModel(service.Items);
+            Assert.False(model.HasItems);
+            Assert.False(model.CanExport);
+
+            var bitmap = BitmapSource.Create(2, 2, 96, 96, PixelFormats.Bgra32, null, new byte[16], 8);
+            bitmap.Freeze();
+
+            service.Items.Add(new ImageMergerItem { Name = "a.png", Path = "a.png", Image = bitmap });
+            Assert.True(model.HasItems);
+            Assert.False(model.CanExport);
+
+            model.PreviewImage = bitmap;
+            Assert.True(model.CanExport);
+
+            model.IsProcessing = true;
+            Assert.False(model.CanExport);
+
+            model.IsProcessing = false;
+            Assert.True(model.CanExport);
+        }
     }
 }

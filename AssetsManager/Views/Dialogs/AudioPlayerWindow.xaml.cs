@@ -100,12 +100,24 @@ namespace AssetsManager.Views.Dialogs
         // Playback Controls
         // ──────────────────────────────────────────────────────────────────────
 
+        private void PlaylistListBox_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            if (PlaylistListBox.SelectedItem is not AudioPlaylistItem selectedItem) return;
+            if (ViewModel.CurrentTrackName == selectedItem.Name && ViewModel.IsPlaying) return;
+            PlayPause_Click(null, null);
+        }
+
         private async void PlayPause_Click(object sender, RoutedEventArgs e)
         {
             if (_isClosed || ViewModel.Service.Playlist.Count == 0) return;
 
             var selectedItem = PlaylistListBox.SelectedItem as AudioPlaylistItem;
-            if (selectedItem == null) return;
+            if (selectedItem == null)
+            {
+                PlaylistListBox.SelectedIndex = 0;
+                selectedItem = PlaylistListBox.SelectedItem as AudioPlaylistItem;
+                if (selectedItem == null) return;
+            }
 
             try
             {

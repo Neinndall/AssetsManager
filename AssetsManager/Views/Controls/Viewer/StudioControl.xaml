@@ -85,7 +85,7 @@
                                     <DataTemplate DataType="{x:Type models:StudioWorkspaceTab}">
                                         <Border x:Name="WorkspaceTabBorder" Margin="2,0" MinHeight="30"
                                                 Background="Transparent" BorderBrush="Transparent" BorderThickness="0,2,0,0"
-                                                CornerRadius="4,4,0,0" MouseLeftButtonDown="WorkspaceTab_MouseLeftButtonDown">
+                                                CornerRadius="4,4,0,0" MouseDown="WorkspaceTab_MouseDown">
                                             <StackPanel Orientation="Horizontal" Margin="8,4,4,4" VerticalAlignment="Center">
                                                 <materialIcons:MaterialIcon x:Name="WorkspaceTabIcon" Kind="PaletteOutline" Width="14" Height="14"
                                                                             Foreground="{StaticResource AccentBrush}" Margin="0,0,6,0"/>

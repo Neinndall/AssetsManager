@@ -44,7 +44,7 @@
                                 <TextBlock Text="Add" Margin="5,0,0,0" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>
-                        <Button Grid.Column="1" Style="{StaticResource SecondaryButton}" Click="ClearAll_Click" Padding="10,5" Margin="4,0,0,0" Content="Clear All" HorizontalContentAlignment="Center" VerticalContentAlignment="Center"/>
+                        <Button Grid.Column="1" Style="{StaticResource SecondaryButton}" Click="ClearAll_Click" IsEnabled="{Binding HasItems}" Padding="10,5" Margin="4,0,0,0" Content="Clear All" HorizontalContentAlignment="Center" VerticalContentAlignment="Center"/>
                     </Grid>
                 </StackPanel>
 
@@ -107,7 +107,7 @@
                     </Grid>
                     <Slider Value="{Binding Margin}" Minimum="0" Maximum="50" IsSnapToTickEnabled="True" TickFrequency="1" Margin="0,0,0,15" Style="{StaticResource HUDSliderStyle}"/>
 
-                    <Button Style="{StaticResource PrimaryButton}" Click="Export_Click" Height="40" Margin="0,10,0,0">
+                    <Button Style="{StaticResource PrimaryButton}" Click="Export_Click" IsEnabled="{Binding CanExport}" Height="40" Margin="0,10,0,0">
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
                             <icons:MaterialIcon Kind="ContentSave" Width="20" Height="20" VerticalAlignment="Center"/>
                             <TextBlock Text="EXPORT MERGED IMAGE" Margin="10,0,0,0" FontWeight="Bold" VerticalAlignment="Center"/>
