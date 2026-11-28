@@ -99,6 +99,22 @@ namespace AssetsManager.Services.Monitor
             return (true, null);
         }
 
+        private static Task RunOnUiThreadAsync(Action action)
+        {
+            if (Application.Current?.Dispatcher != null)
+            {
+                return Application.Current.Dispatcher.InvokeAsync(action).Task;
+            }
+
+            action();
+            return Task.CompletedTask;
+        }
+
+        private static SolidColorBrush TryGetBrush(string resourceKey)
+        {
+            return Application.Current?.TryFindResource(resourceKey) as SolidColorBrush;
+        }
+
         public async Task<(bool anyUpdated, List<string> updatedAssetNames)> CheckAssetsAsync(IEnumerable<MonitoredAsset> assets, bool silent = false)
         {
             if (assets == null || !assets.Any()) return (false, new List<string>());
@@ -106,6 +122,7 @@ namespace AssetsManager.Services.Monitor
             if (!silent) _logService.Log("Checking monitored assets for updates...");
 
             bool anyUpdated = false;
+            bool anyStateChanged = false;
             bool checkPerformed = false;
             bool baseDirWarningLogged = false;
             var updatedAssetNames = new List<string>();
@@ -118,16 +135,21 @@ namespace AssetsManager.Services.Monitor
                 try
                 {
                     // Don't overwrite pending check or updated status if we are already in that state in UI
-                    await Application.Current.Dispatcher.InvokeAsync(() =>
+                    await RunOnUiThreadAsync(() =>
                     {
                         if (asset.Status != AssetStatus.Updated)
                         {
                             asset.Status = AssetStatus.Pending;
-                            asset.StatusColor = (SolidColorBrush)Application.Current.FindResource("AccentBrush");
+                            asset.StatusColor = TryGetBrush("AccentBrush");
                         }
                     });
 
+                    string previousWadName = asset.WadName;
                     string fullWadPath = GetFullWadPath(asset);
+                    if (!string.Equals(previousWadName, asset.WadName, StringComparison.Ordinal))
+                    {
+                        anyStateChanged = true;
+                    }
                     
                     if (string.IsNullOrEmpty(fullWadPath) || !File.Exists(fullWadPath))
                     {
@@ -135,10 +157,10 @@ namespace AssetsManager.Services.Monitor
                         {
                             // It's an absolute path that really doesn't exist
                             _logService.LogWarning($"WAD file not found at path: {asset.WadName}");
-                            await Application.Current.Dispatcher.InvokeAsync(() =>
+                            await RunOnUiThreadAsync(() =>
                             {
                                 asset.Status = AssetStatus.Error;
-                                asset.StatusColor = (SolidColorBrush)Application.Current.FindResource("AccentRed");
+                                asset.StatusColor = TryGetBrush("AccentRed");
                             });
                         }
                         else if (!hasBaseDir)
@@ -149,20 +171,20 @@ namespace AssetsManager.Services.Monitor
                                 _logService.LogWarning("Some monitored assets have relative paths but PBE Client Directory is not configured in Settings.");
                                 baseDirWarningLogged = true;
                             }
-                            await Application.Current.Dispatcher.InvokeAsync(() =>
+                            await RunOnUiThreadAsync(() =>
                             {
                                 asset.Status = AssetStatus.Pending;
-                                asset.StatusColor = (SolidColorBrush)Application.Current.FindResource("TextMuted");
+                                asset.StatusColor = TryGetBrush("TextMuted");
                             });
                         }
                         else
                         {
                             // It's a relative path, we have a base dir, but still couldn't find the file
                             _logService.LogWarning($"Asset WAD not found in game directory: {asset.WadName}");
-                            await Application.Current.Dispatcher.InvokeAsync(() =>
+                            await RunOnUiThreadAsync(() =>
                             {
                                 asset.Status = AssetStatus.Error;
-                                asset.StatusColor = (SolidColorBrush)Application.Current.FindResource("AccentRed");
+                                asset.StatusColor = TryGetBrush("AccentRed");
                             });
                         }
                         continue;
@@ -175,10 +197,10 @@ namespace AssetsManager.Services.Monitor
                     if (!wadFile.Chunks.TryGetValue(pathHash, out var chunk))
                     {
                         _logService.LogWarning($"Asset '{asset.InternalPath}' not found inside WAD '{asset.WadName}'");
-                        await Application.Current.Dispatcher.InvokeAsync(() =>
+                        await RunOnUiThreadAsync(() =>
                         {
                             asset.Status = AssetStatus.Error;
-                            asset.StatusColor = (SolidColorBrush)Application.Current.FindResource("AccentRed");
+                            asset.StatusColor = TryGetBrush("AccentRed");
                         });
                         continue;
                     }
@@ -189,12 +211,14 @@ namespace AssetsManager.Services.Monitor
                     {
                         // First time adding, just save current state and extract initial version
                         await ProcessAssetUpdate(asset, wadFile, chunk, currentChecksum, true, fullWadPath);
+                        anyStateChanged = true;
                     }
                     else if (asset.LastKnownHash != currentChecksum)
                     {
                         // Change detected!
                         await ProcessAssetUpdate(asset, wadFile, chunk, currentChecksum, false, fullWadPath);
                         anyUpdated = true;
+                        anyStateChanged = true;
                         updatedAssetNames.Add(asset.Alias);
                     }
                     else
@@ -202,18 +226,18 @@ namespace AssetsManager.Services.Monitor
                         // No changes found in this check. 
                         // CRITICAL: Only set to UpToDate if it wasn't already marked as Updated 
                         // (prevents auto-resetting before user sees it)
-                        await Application.Current.Dispatcher.InvokeAsync(() =>
+                        await RunOnUiThreadAsync(() =>
                         {
                             if (!asset.HasChanges)
                             {
                                 asset.Status = AssetStatus.UpToDate;
-                                asset.StatusColor = (SolidColorBrush)Application.Current.FindResource("AccentGreen");
+                                asset.StatusColor = TryGetBrush("AccentGreen");
                             }
                             else
                             {
                                 // Keep Updated status until user acknowledges
                                 asset.Status = AssetStatus.Updated;
-                                asset.StatusColor = (SolidColorBrush)Application.Current.FindResource("AccentBlue");
+                                asset.StatusColor = TryGetBrush("AccentBlue");
                             }
                         });
                     }
@@ -221,19 +245,21 @@ namespace AssetsManager.Services.Monitor
                 catch (Exception ex)
                 {
                     _logService.LogError(ex, $"Error checking asset: {asset.AssetPath}");
-                    await Application.Current.Dispatcher.InvokeAsync(() =>
+                    await RunOnUiThreadAsync(() =>
                     {
                         asset.Status = AssetStatus.Error;
-                        asset.StatusColor = (SolidColorBrush)Application.Current.FindResource("AccentRed");
+                        asset.StatusColor = TryGetBrush("AccentRed");
                     });
                 }
             }
 
+            if (anyStateChanged)
+            {
+                _appSettings.Save();
+            }
+
             if (anyUpdated)
             {
-				// Necesita la otra llamada para evitar reload tree?
-				_appSettings.Save();
-				
                 if (!silent)
                 {
                     _logService.LogSuccess("Assets Watcher files are updated.");
@@ -328,13 +354,13 @@ namespace AssetsManager.Services.Monitor
                 }
             }
 
-            await Application.Current.Dispatcher.InvokeAsync(() =>
+            await RunOnUiThreadAsync(() =>
             {
                 asset.Version = currentVersion;
                 asset.LastKnownHash = checksum;
                 asset.LastUpdated = DateTime.Now;
                 asset.Status = isInitial ? AssetStatus.UpToDate : AssetStatus.Updated;
-                asset.StatusColor = (SolidColorBrush)Application.Current.FindResource(isInitial ? "AccentGreen" : "AccentBlue");
+                asset.StatusColor = TryGetBrush(isInitial ? "AccentGreen" : "AccentBlue");
                 asset.HasChanges = !isInitial;
                 asset.OldFilePath = oldPath;
                 asset.NewFilePath = newPath;
