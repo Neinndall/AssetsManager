@@ -72,34 +72,59 @@ namespace AssetsManager.Views.Controls.Monitor
         {
             if (e.NewValue is true)
             {
-                await RefreshTargetInstallationsAsync();
+                await RefreshTargetInstallationsSafeAsync();
             }
         }
 
-        private async void OnBackupsChanged() => await RefreshTargetInstallationsAsync();
+        private async void OnBackupsChanged() => await RefreshTargetInstallationsSafeAsync();
 
-        private async void OnConfigurationSaved(object sender, EventArgs e) => await RefreshTargetInstallationsAsync();
+        private async void OnConfigurationSaved(object sender, EventArgs e) => await RefreshTargetInstallationsSafeAsync();
+
+        private async Task RefreshTargetInstallationsSafeAsync()
+        {
+            try
+            {
+                await RefreshTargetInstallationsAsync();
+            }
+            catch (Exception ex)
+            {
+                LogService?.LogError(ex, "Failed to refresh target installations.");
+            }
+        }
 
         private async Task RefreshTargetInstallationsAsync()
         {
             if (_viewModel == null) return;
-            await Dispatcher.InvokeAsync(() => _viewModel.LoadTargetInstallationsAsync(BackupManager, AppSettings));
+            var loadTask = await Dispatcher.InvokeAsync(() => _viewModel.LoadTargetInstallationsAsync(BackupManager, AppSettings));
+            if (loadTask != null)
+            {
+                await loadTask;
+            }
         }
 
         private async void FetchVersions_Click(object sender, RoutedEventArgs e)
         {
             if (VersionService != null && LogService != null)
             {
-                var knownFileNames = _viewModel != null
-                    ? new HashSet<string>(_viewModel.AllLeagueClientVersions.Concat(_viewModel.AllLoLGameClientVersions).Select(f => f.FileName))
-                    : new HashSet<string>();
-
-                DateTime? manifestDate = _viewModel?.SelectedManifestDate?.Date;
-                await VersionService.FetchAllVersionsAsync(manifestDate);
-                if (_viewModel != null)
+                try
                 {
-                    await _viewModel.LoadVersionFilesAsync();
-                    _viewModel.MarkNewFiles(knownFileNames);
+                    var knownFileNames = _viewModel != null
+                        ? new HashSet<string>(_viewModel.AllLeagueClientVersions.Concat(_viewModel.AllLoLGameClientVersions).Select(f => f.FileName))
+                        : new HashSet<string>();
+
+                    DateTime? manifestDate = _viewModel?.SelectedManifestDate?.Date;
+                    await VersionService.FetchAllVersionsAsync(manifestDate);
+                    if (_viewModel != null)
+                    {
+                        await _viewModel.LoadVersionFilesAsync();
+                        _viewModel.MarkNewFiles(knownFileNames);
+                    }
+                }
+                catch (OperationCanceledException) { }
+                catch (Exception ex)
+                {
+                    LogService.LogError(ex, "Failed to fetch versions.");
+                    CustomMessageBoxService?.ShowError("Error", $"Failed to fetch versions: {ex.Message}", Window.GetWindow(this));
                 }
             }
             else

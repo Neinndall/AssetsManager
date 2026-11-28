@@ -140,7 +140,11 @@ namespace AssetsManager.Services.Monitor
                 }
                 finally
                 {
-                    if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true);
+                    try
+                    {
+                        if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true);
+                    }
+                    catch { }
                 }
             }
 

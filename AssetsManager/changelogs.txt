@@ -33,6 +33,7 @@ Bug Fixes
   - Asset Watcher / Prevent crashes when adding, removing, or clearing watched assets while an update check is running.
   - Asset Watcher / Store unique cache filenames per monitored asset path so files with identical names do not overwrite each other.
   - Manage Versions / Delete only the selected client category manifest file when League Client and Game Client share a version filename.
+  - Manage Versions / Guard version fetches, installation refreshes, and temp cleanup against unhandled async errors.
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
