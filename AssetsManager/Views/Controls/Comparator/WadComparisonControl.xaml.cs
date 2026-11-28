@@ -122,7 +122,18 @@ namespace AssetsManager.Views.Controls.Comparator
 
         private async void OnConfigurationSaved(object sender, EventArgs e)
         {
-            await Dispatcher.InvokeAsync(RefreshSourcesAsync).Task.Unwrap();
+            try
+            {
+                await Dispatcher.InvokeAsync(RefreshSourcesAsync).Task.Unwrap();
+            }
+            catch (TaskCanceledException)
+            {
+                // Control or dispatcher shutting down during refresh.
+            }
+            catch (Exception ex)
+            {
+                LogService?.LogError(ex, "Error refreshing comparison sources after configuration save.");
+            }
         }
 
 
@@ -246,110 +257,160 @@ namespace AssetsManager.Views.Controls.Comparator
 
         private async void BaseQuickSelect_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (!_isUpdatingSources && sender is ComboBox comboBox && comboBox.SelectedItem is BackupModel backup)
+            try
             {
-                string effectivePath = ViewModel.IsDirectoryMode
-                    ? ViewModel.ApplySyncSuffix(backup.Path)
-                    : backup.Path;
-                await ViewModel.UpdateMetadataFromPathAsync(true, effectivePath, VersionService, BackupManager);
-                if (ViewModel.IsFileMode)
+                if (!_isUpdatingSources && sender is ComboBox comboBox && comboBox.SelectedItem is BackupModel backup)
                 {
-                    await SyncWadFilePathsAsync(backup.Path);
+                    string effectivePath = ViewModel.IsDirectoryMode
+                        ? ViewModel.ApplySyncSuffix(backup.Path)
+                        : backup.Path;
+                    await ViewModel.UpdateMetadataFromPathAsync(true, effectivePath, VersionService, BackupManager);
+                    if (ViewModel.IsFileMode)
+                    {
+                        await SyncWadFilePathsAsync(backup.Path);
+                    }
                 }
+            }
+            catch (Exception ex)
+            {
+                LogService?.LogError(ex, "Error updating base comparison source.");
             }
         }
 
         private async void TargetQuickSelect_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (!_isUpdatingSources && sender is ComboBox comboBox && comboBox.SelectedItem is BackupModel backup)
+            try
             {
-                string effectivePath = ViewModel.IsDirectoryMode
-                    ? ViewModel.ApplySyncSuffix(backup.Path)
-                    : backup.Path;
-                await ViewModel.UpdateMetadataFromPathAsync(false, effectivePath, VersionService, BackupManager);
-
-                // --- DIRECTORY AUTO-SYNC ---
-                if (ViewModel.IsDirectoryMode && string.IsNullOrEmpty(ViewModel.OldDirectoryPath))
+                if (!_isUpdatingSources && sender is ComboBox comboBox && comboBox.SelectedItem is BackupModel backup)
                 {
-                    await SyncDirectoryBaseAsync(effectivePath);
+                    string effectivePath = ViewModel.IsDirectoryMode
+                        ? ViewModel.ApplySyncSuffix(backup.Path)
+                        : backup.Path;
+                    await ViewModel.UpdateMetadataFromPathAsync(false, effectivePath, VersionService, BackupManager);
+
+                    // --- DIRECTORY AUTO-SYNC ---
+                    if (ViewModel.IsDirectoryMode && string.IsNullOrEmpty(ViewModel.OldDirectoryPath))
+                    {
+                        await SyncDirectoryBaseAsync(effectivePath);
+                    }
                 }
+            }
+            catch (Exception ex)
+            {
+                LogService?.LogError(ex, "Error updating target comparison source.");
             }
         }
 
         private async void btnSelectOldLolPbeDirectory_Click(object sender, RoutedEventArgs e)
         {
-            if (ViewModel == null) return;
-            var folderBrowserDialog = new OpenFolderDialog { Title = "Select old directory", InitialDirectory = GetPreferredInitialDirectory() };
-            if (folderBrowserDialog.ShowDialog() == true)
+            try
             {
-                string oldPath = folderBrowserDialog.FolderName;
-                SetPathWithSync(true, oldPath);
-                await ViewModel.UpdateMetadataFromPathAsync(true, oldPath, VersionService, BackupManager);
+                if (ViewModel == null) return;
+                var folderBrowserDialog = new OpenFolderDialog { Title = "Select old directory", InitialDirectory = GetPreferredInitialDirectory() };
+                if (folderBrowserDialog.ShowDialog() == true)
+                {
+                    string oldPath = folderBrowserDialog.FolderName;
+                    SetPathWithSync(true, oldPath);
+                    await ViewModel.UpdateMetadataFromPathAsync(true, oldPath, VersionService, BackupManager);
+                }
+            }
+            catch (Exception ex)
+            {
+                LogService?.LogError(ex, "Error selecting base directory.");
             }
         }
 
         private async void btnSelectNewLolPbeDirectory_Click(object sender, RoutedEventArgs e)
         {
-            if (ViewModel == null) return;
-            var folderBrowserDialog = new OpenFolderDialog { Title = "Select new directory", InitialDirectory = GetPreferredInitialDirectory() };
-            if (folderBrowserDialog.ShowDialog() == true)
+            try
             {
-                string newPath = folderBrowserDialog.FolderName;
-                ViewModel.DirectorySyncSuffix = GetRelativeSubDirectory(newPath);
-                SetPathWithSync(false, newPath);
-                await ViewModel.UpdateMetadataFromPathAsync(false, newPath, VersionService, BackupManager);
-
-                // --- DIRECTORY AUTO-SYNC ---
-                if (string.IsNullOrEmpty(ViewModel.OldDirectoryPath))
+                if (ViewModel == null) return;
+                var folderBrowserDialog = new OpenFolderDialog { Title = "Select new directory", InitialDirectory = GetPreferredInitialDirectory() };
+                if (folderBrowserDialog.ShowDialog() == true)
                 {
-                    await SyncDirectoryBaseAsync(newPath);
+                    string newPath = folderBrowserDialog.FolderName;
+                    ViewModel.DirectorySyncSuffix = GetRelativeSubDirectory(newPath);
+                    SetPathWithSync(false, newPath);
+                    await ViewModel.UpdateMetadataFromPathAsync(false, newPath, VersionService, BackupManager);
+
+                    // --- DIRECTORY AUTO-SYNC ---
+                    if (string.IsNullOrEmpty(ViewModel.OldDirectoryPath))
+                    {
+                        await SyncDirectoryBaseAsync(newPath);
+                    }
                 }
+            }
+            catch (Exception ex)
+            {
+                LogService?.LogError(ex, "Error selecting target directory.");
             }
         }
 
         private async void btnSelectOldWadFile_Click(object sender, RoutedEventArgs e)
         {
-            if (ViewModel == null) return;
-            var openFileDialog = new OpenFileDialog { Filter = "WAD files (*.wad;*.wad.client)|*.wad;*.wad.client|All files (*.*)|*.*", Title = "Select old wad file", InitialDirectory = GetPreferredInitialDirectory() };
-            if (openFileDialog.ShowDialog() == true)
+            try
             {
-                ViewModel.OldWadFilePath = openFileDialog.FileName;
-                await ViewModel.UpdateMetadataFromPathAsync(true, ViewModel.OldWadFilePath, VersionService, BackupManager);
+                if (ViewModel == null) return;
+                var openFileDialog = new OpenFileDialog { Filter = "WAD files (*.wad;*.wad.client)|*.wad;*.wad.client|All files (*.*)|*.*", Title = "Select old wad file", InitialDirectory = GetPreferredInitialDirectory() };
+                if (openFileDialog.ShowDialog() == true)
+                {
+                    ViewModel.OldWadFilePath = openFileDialog.FileName;
+                    await ViewModel.UpdateMetadataFromPathAsync(true, ViewModel.OldWadFilePath, VersionService, BackupManager);
+                }
+            }
+            catch (Exception ex)
+            {
+                LogService?.LogError(ex, "Error selecting base WAD file.");
             }
         }
 
         private async void btnSelectNewWadFile_Click(object sender, RoutedEventArgs e)
         {
-            if (ViewModel == null) return;
-            var openFileDialog = new OpenFileDialog { Filter = "WAD files (*.wad;*.wad.client)|*.wad;*.wad.client|All files (*.*)|*.*", Title = "Select new wad file", InitialDirectory = GetPreferredInitialDirectory() };
-            
-            if (openFileDialog.ShowDialog() == true)
+            try
             {
-                string newPath = openFileDialog.FileName;
-                ViewModel.NewWadFilePath = newPath;
-                await ViewModel.UpdateMetadataFromPathAsync(false, newPath, VersionService, BackupManager);
+                if (ViewModel == null) return;
+                var openFileDialog = new OpenFileDialog { Filter = "WAD files (*.wad;*.wad.client)|*.wad;*.wad.client|All files (*.*)|*.*", Title = "Select new wad file", InitialDirectory = GetPreferredInitialDirectory() };
                 
-                // --- ROBUST AUTO-SYNC ENGINE ---
-                if (string.IsNullOrEmpty(ViewModel.OldWadFilePath))
+                if (openFileDialog.ShowDialog() == true)
                 {
-                    var (isPbe, _) = BackupManager.GetPathIdentification(newPath);
-
-                    var suggestedBackup = ViewModel.AvailableBackups
-                        .Where(b => !b.IsMainClient && b.IsPbe == isPbe)
-                        .OrderByDescending(b => b.CreationDate)
-                        .FirstOrDefault();
-
-                    if (suggestedBackup == null)
-                        suggestedBackup = ViewModel.AvailableBackups.FirstOrDefault(b => b.IsMainClient && b.IsPbe == !isPbe);
-
-                    if (suggestedBackup != null)
+                    string newPath = openFileDialog.FileName;
+                    ViewModel.NewWadFilePath = newPath;
+                    await ViewModel.UpdateMetadataFromPathAsync(false, newPath, VersionService, BackupManager);
+                    
+                    // --- ROBUST AUTO-SYNC ENGINE ---
+                    if (string.IsNullOrEmpty(ViewModel.OldWadFilePath))
                     {
-                        ViewModel.SelectedBaseBackup = suggestedBackup;
-                        await SyncWadFilePathsAsync(suggestedBackup.Path);
-                        return; 
+                        var (isPbe, _) = BackupManager.GetPathIdentification(newPath);
+
+                        var suggestedBackup = ViewModel.AvailableBackups
+                            .Where(b => !b.IsMainClient && b.IsPbe == isPbe)
+                            .OrderByDescending(b => b.CreationDate)
+                            .FirstOrDefault();
+
+                        if (suggestedBackup == null)
+                            suggestedBackup = ViewModel.AvailableBackups.FirstOrDefault(b => b.IsMainClient && b.IsPbe == !isPbe);
+
+                        if (suggestedBackup != null)
+                        {
+                            _isUpdatingSources = true;
+                            try
+                            {
+                                ViewModel.SelectedBaseBackup = suggestedBackup;
+                            }
+                            finally
+                            {
+                                _isUpdatingSources = false;
+                            }
+                            await SyncWadFilePathsAsync(suggestedBackup.Path);
+                            return; 
+                        }
                     }
+                    await SyncWadFilePathsAsync();
                 }
-                await SyncWadFilePathsAsync();
+            }
+            catch (Exception ex)
+            {
+                LogService?.LogError(ex, "Error selecting target WAD file.");
             }
         }
 

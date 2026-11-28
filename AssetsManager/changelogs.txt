@@ -49,6 +49,7 @@ Bug Fixes
   - Hash Guessing Lab / Refresh the BIN and RST unknown hash count immediately after a guessing run completes.
   - Hash Guessing Lab / Save resolved hashes to disk before removing them from the unknown list so matches are not lost on cancellation or save errors.
   - Formatting / Prevent the fast JavaScript formatter from inserting raw newlines inside string literals.
+  - Comparator / Guard source selection handlers against unhandled async errors and prevent duplicate base WAD auto-syncs.
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
