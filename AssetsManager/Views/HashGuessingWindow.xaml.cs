@@ -891,7 +891,6 @@ namespace AssetsManager.Views
                 _viewModel.IsProgressIndeterminate = false;
                 if (result.Matches.Count > 0)
                 {
-                    await Task.Run(() => _hashGuessingService.SaveMatchesAsync(result.Matches, CancellationToken.None));
                     _viewModel.StatusText = $"Completed in {elapsedTime}: {result.Matches.Count:N0} hashes resolved and saved.";
                 }
                 else

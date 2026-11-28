@@ -169,7 +169,7 @@ namespace AssetsManager.Services.Hashes
             var resultMatches = runResult.Item1;
             int processedChunks = runResult.Item2;
             var remainingUnknowns = runResult.Item3;
-            await PersistGuessingRunAsync(domain, remainingUnknowns, cancellationToken, scope);
+            await PersistRunResultsAsync(domain, resultMatches, remainingUnknowns, scope);
 
             _logService.LogSuccess($"Hash Lab {domain} GREP completed: {resultMatches.Count} paths resolved from {unknownHashes.Count + resultMatches.Count} unknown hashes.");
             return new HashGuessRunResult
@@ -219,13 +219,18 @@ namespace AssetsManager.Services.Hashes
             await _hashResolverService.ForceReloadHashesAsync();
         }
 
-        private async Task PersistGuessingRunAsync(
+        internal async Task PersistRunResultsAsync(
             HashGuessDomain domain,
+            IReadOnlyCollection<HashGuessMatch> matches,
             IEnumerable<ulong> remainingUnknowns,
-            CancellationToken cancellationToken,
             HashGuessScope scope = HashGuessScope.All)
         {
-            await _persistence.CommitPathRunAsync(domain, remainingUnknowns, cancellationToken, scope);
+            if (matches != null && matches.Count > 0)
+            {
+                await SaveMatchesAsync(matches, CancellationToken.None);
+            }
+
+            await _persistence.CommitPathRunAsync(domain, remainingUnknowns, CancellationToken.None, scope);
         }
 
         private async Task<T> RunWithCancellationPersistenceAsync<T>(
@@ -250,17 +255,18 @@ namespace AssetsManager.Services.Hashes
                     var matches = engine.Matches.Values.ToList();
                     if (sessionResolved != null)
                     {
+                        if (matches.Count > 0)
+                            await SaveMatchesAsync(matches, CancellationToken.None);
                         sessionResolved.UnionWith(matches.Select(match => match.Hash));
                     }
                     else
                     {
-                        await PersistGuessingRunAsync(
+                        await PersistRunResultsAsync(
                             domain,
+                            matches,
                             engine.UnknownHashes,
-                            CancellationToken.None, scope);
+                            scope);
                     }
-                    if (matches.Count > 0)
-                        await SaveMatchesAsync(matches, CancellationToken.None);
                 }
                 throw;
             }
@@ -449,10 +455,11 @@ namespace AssetsManager.Services.Hashes
             var matches = runResult.Item1;
             int checkedCandidates = runResult.Item2;
             var remainingUnknowns = runResult.Item3;
-            await PersistGuessingRunAsync(
+            await PersistRunResultsAsync(
                 HashGuessDomain.Game,
+                matches,
                 remainingUnknowns,
-                cancellationToken, scope);
+                scope);
             sessionResolved?.UnionWith(matches.Select(match => match.Hash));
             return new HashGuessRunResult
             {
@@ -604,10 +611,11 @@ namespace AssetsManager.Services.Hashes
             var matches = runResult.Item1;
             int checkedCandidates = runResult.Item2;
             var remainingUnknowns = runResult.Item3;
-            await PersistGuessingRunAsync(
+            await PersistRunResultsAsync(
                 HashGuessDomain.Lcu,
+                matches,
                 remainingUnknowns,
-                cancellationToken, scope);
+                scope);
             return new HashGuessRunResult
             {
                 Domain = HashGuessDomain.Lcu,
@@ -662,7 +670,7 @@ namespace AssetsManager.Services.Hashes
             var matches = runResult.Item1;
             long checkedCandidates = runResult.Item2;
             var remainingUnknowns = runResult.Item3;
-            await PersistGuessingRunAsync(HashGuessDomain.Lcu, remainingUnknowns, cancellationToken, scope);
+            await PersistRunResultsAsync(HashGuessDomain.Lcu, matches, remainingUnknowns, scope);
             return new HashGuessRunResult { Domain = HashGuessDomain.Lcu, UnknownHashesAtStart = initial, ScannedChunks = checkedCandidates, Matches = matches };
         }
 
@@ -689,7 +697,7 @@ namespace AssetsManager.Services.Hashes
             var matches = runResult.Item1;
             int checkedCandidates = runResult.Item2;
             var remainingUnknowns = runResult.Item3;
-            await PersistGuessingRunAsync(HashGuessDomain.Lcu, remainingUnknowns, cancellationToken, scope);
+            await PersistRunResultsAsync(HashGuessDomain.Lcu, matches, remainingUnknowns, scope);
             return new HashGuessRunResult { Domain = HashGuessDomain.Lcu, UnknownHashesAtStart = initial, ScannedChunks = checkedCandidates, Matches = matches };
         }
 
@@ -722,7 +730,7 @@ namespace AssetsManager.Services.Hashes
             var matches = runResult.Item1;
             int checkedCandidates = runResult.Item2;
             var remainingUnknowns = runResult.Item3;
-            await PersistGuessingRunAsync(HashGuessDomain.Lcu, remainingUnknowns, cancellationToken, scope);
+            await PersistRunResultsAsync(HashGuessDomain.Lcu, matches, remainingUnknowns, scope);
             return new HashGuessRunResult { Domain = HashGuessDomain.Lcu, UnknownHashesAtStart = initial, ScannedChunks = checkedCandidates, Matches = matches };
         }
 
@@ -767,7 +775,7 @@ namespace AssetsManager.Services.Hashes
             var matches = runResult.Item1;
             int checkedCandidates = runResult.Item2;
             var remainingUnknowns = runResult.Item3;
-            await PersistGuessingRunAsync(HashGuessDomain.Lcu, remainingUnknowns, cancellationToken, scope);
+            await PersistRunResultsAsync(HashGuessDomain.Lcu, matches, remainingUnknowns, scope);
             return new HashGuessRunResult { Domain = HashGuessDomain.Lcu, UnknownHashesAtStart = initial, ScannedChunks = checkedCandidates, Matches = matches };
         }
 
@@ -797,10 +805,11 @@ namespace AssetsManager.Services.Hashes
             var matches = runResult.Item1;
             int checkedCandidates = runResult.Item2;
             var remainingUnknowns = runResult.Item3;
-            await PersistGuessingRunAsync(
+            await PersistRunResultsAsync(
                 HashGuessDomain.Lcu,
+                matches,
                 remainingUnknowns,
-                cancellationToken, scope);
+                scope);
             return new HashGuessRunResult
             {
                 Domain = HashGuessDomain.Lcu,
@@ -833,7 +842,7 @@ namespace AssetsManager.Services.Hashes
             var matches = runResult.Item1;
             long checkedCandidates = runResult.Item2;
             var remainingUnknowns = runResult.Item3;
-            await PersistGuessingRunAsync(HashGuessDomain.Lcu, remainingUnknowns, cancellationToken, scope);
+            await PersistRunResultsAsync(HashGuessDomain.Lcu, matches, remainingUnknowns, scope);
             return new HashGuessRunResult { Domain = HashGuessDomain.Lcu, UnknownHashesAtStart = initial, ScannedChunks = checkedCandidates, Matches = matches };
         }
 
@@ -862,7 +871,7 @@ namespace AssetsManager.Services.Hashes
             var matches = runResult.Item1;
             int checkedCandidates = runResult.Item2;
             var remainingUnknowns = runResult.Item3;
-            await PersistGuessingRunAsync(HashGuessDomain.Game, remainingUnknowns, cancellationToken, scope);
+            await PersistRunResultsAsync(HashGuessDomain.Game, matches, remainingUnknowns, scope);
             return new HashGuessRunResult { Domain = HashGuessDomain.Game, UnknownHashesAtStart = initial, ScannedChunks = checkedCandidates, Matches = matches };
         }
 
@@ -889,7 +898,7 @@ namespace AssetsManager.Services.Hashes
             var matches = runResult.Item1;
             int checkedCandidates = runResult.Item2;
             var remainingUnknowns = runResult.Item3;
-            await PersistGuessingRunAsync(HashGuessDomain.Game, remainingUnknowns, cancellationToken, scope);
+            await PersistRunResultsAsync(HashGuessDomain.Game, matches, remainingUnknowns, scope);
             return new HashGuessRunResult { Domain = HashGuessDomain.Game, UnknownHashesAtStart = initial, ScannedChunks = checkedCandidates, Matches = matches };
         }
 
@@ -917,7 +926,7 @@ namespace AssetsManager.Services.Hashes
             var matches = runResult.Item1;
             int checkedCandidates = runResult.Item2;
             var remainingUnknowns = runResult.Item3;
-            await PersistGuessingRunAsync(HashGuessDomain.Game, remainingUnknowns, cancellationToken, scope);
+            await PersistRunResultsAsync(HashGuessDomain.Game, matches, remainingUnknowns, scope);
             return new HashGuessRunResult { Domain = HashGuessDomain.Game, UnknownHashesAtStart = initial, ScannedChunks = checkedCandidates, Matches = matches };
         }
 
