@@ -57,7 +57,7 @@ namespace AssetsManager.Services.Explorer
             string gameDataPath,
             CancellationToken cancellationToken = default)
         {
-            if (virtualPaths == null)
+            if (virtualPaths == null || string.IsNullOrWhiteSpace(gameDataPath) || !Directory.Exists(gameDataPath))
             {
                 return new Dictionary<string, FileSystemNodeModel>(StringComparer.OrdinalIgnoreCase);
             }

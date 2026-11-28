@@ -35,6 +35,7 @@ Bug Fixes
   - Manage Versions / Delete only the selected client category manifest file when League Client and Game Client share a version filename.
   - Manage Versions / Guard version fetches, installation refreshes, and temp cleanup against unhandled async errors.
   - Explorer / Handle malformed or unsupported audio banks safely without crashing or leaving nodes stuck on "Loading...".
+  - Explorer / Prevent image previews from failing when a configured LoL client directory is missing or moved.
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 

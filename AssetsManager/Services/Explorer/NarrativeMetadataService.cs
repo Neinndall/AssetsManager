@@ -188,7 +188,7 @@ namespace AssetsManager.Services.Explorer
 
             // 2. Try Global Preferred Client
             string globalDir = _appSettings.PreferredClient == PreferredClient.PBE ? _appSettings.LolPbeDirectory : _appSettings.LolLiveDirectory;
-            if (!string.IsNullOrEmpty(globalDir))
+            if (!string.IsNullOrEmpty(globalDir) && Directory.Exists(globalDir))
             {
                 var n = await _wadContentProvider.FindNodeByVirtualPathAsync(jsonVirtualPath, globalDir);
                 if (n != null) return await _wadContentProvider.GetVirtualFileBytesAsync(n);
@@ -196,7 +196,7 @@ namespace AssetsManager.Services.Explorer
 
             // 3. Final Fallback (Opposite client)
             string altDir = _appSettings.PreferredClient == PreferredClient.PBE ? _appSettings.LolLiveDirectory : _appSettings.LolPbeDirectory;
-            if (!string.IsNullOrEmpty(altDir) && altDir != globalDir)
+            if (!string.IsNullOrEmpty(altDir) && altDir != globalDir && Directory.Exists(altDir))
             {
                 var n = await _wadContentProvider.FindNodeByVirtualPathAsync(jsonVirtualPath, altDir);
                 if (n != null) return await _wadContentProvider.GetVirtualFileBytesAsync(n);
