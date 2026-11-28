@@ -376,7 +376,7 @@ public sealed class ManifestDownloader : IDisposable
             .ToDictionary(x => x.Id, x => x.Chunks);
 
         int completedChunks = 0;
-        int completedFilesCount = resizeOnlyFiles.Count;
+        int completedFilesCount = 0;
         int totalFilesToPatch = filesToPatchList.Count;
         int lastReportedChunks = -1;
         long lastUpdateProgressTimestamp = 0;
@@ -465,11 +465,11 @@ public sealed class ManifestDownloader : IDisposable
                     MaxDegreeOfParallelism = NetworkConcurrency,
                     CancellationToken = updateToken
                 },
-                async (bundleEntry, _) =>
+                async (bundleEntry, bodyToken) =>
                 {
                     try
                     {
-                        updateToken.ThrowIfCancellationRequested();
+                        bodyToken.ThrowIfCancellationRequested();
                         string url = $"{BundleBaseUrl}/{bundleEntry.Key:X16}.bundle";
                         var sorted = bundleEntry.Value.OrderBy(t => t.Chunk.BundleOffset).ToList();
 
@@ -499,14 +499,14 @@ public sealed class ManifestDownloader : IDisposable
                         Interlocked.Add(ref totalRequests, ranges.Count);
                         foreach (DownloadRange range in ranges)
                         {
-                            updateToken.ThrowIfCancellationRequested();
+                            bodyToken.ThrowIfCancellationRequested();
                             long start = range.Start;
                             long end = range.EndExclusive - 1;
 
                             using var req = new HttpRequestMessage(HttpMethod.Get, url);
                             req.Headers.Range = new RangeHeaderValue(start, end);
 
-                            using var resp = await _httpClient.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, updateToken);
+                            using var resp = await _httpClient.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, bodyToken);
                             resp.EnsureSuccessStatusCode();
                             if (resp.StatusCode != HttpStatusCode.PartialContent
                                 || resp.Content.Headers.ContentRange?.From != start
@@ -515,7 +515,7 @@ public sealed class ManifestDownloader : IDisposable
                                 throw new InvalidDataException($"Bundle server returned an invalid byte range for {bundleEntry.Key:X16}.");
                             }
 
-                            await using var responseStream = await resp.Content.ReadAsStreamAsync(updateToken);
+                            await using var responseStream = await resp.Content.ReadAsStreamAsync(bodyToken);
                             long currentStreamPos = start;
                             byte[] gapBuffer = range.GapBytes > 0
                                 ? ArrayPool<byte>.Shared.Rent(GapBufferSize)
@@ -525,14 +525,14 @@ public sealed class ManifestDownloader : IDisposable
                             {
                                 foreach (UniqueChunkTask t in range.Chunks)
                                 {
-                                    updateToken.ThrowIfCancellationRequested();
+                                    bodyToken.ThrowIfCancellationRequested();
                                     long gap = (long)t.Chunk.BundleOffset - currentStreamPos;
                                     if (gap < 0)
                                         throw new InvalidDataException($"Bundle range for {bundleEntry.Key:X16} overlaps a previous chunk.");
 
                                     if (gap > 0)
                                     {
-                                        await SkipExactlyAsync(responseStream, gap, gapBuffer, updateToken);
+                                        await SkipExactlyAsync(responseStream, gap, gapBuffer, bodyToken);
                                         Interlocked.Add(ref totalDownloaded, gap);
                                         Interlocked.Add(ref wastedBytes, gap);
                                         currentStreamPos += gap;
@@ -542,14 +542,14 @@ public sealed class ManifestDownloader : IDisposable
                                     byte[] comp = ArrayPool<byte>.Shared.Rent(compressedSize);
                                     try
                                     {
-                                        await ReadExactlyAsync(responseStream, comp.AsMemory(0, compressedSize), updateToken);
+                                        await ReadExactlyAsync(responseStream, comp.AsMemory(0, compressedSize), bodyToken);
                                         Interlocked.Add(ref totalDownloaded, compressedSize);
                                         currentStreamPos = (long)t.Chunk.BundleOffset + compressedSize;
 
-                                        await cpuSem.WaitAsync(updateToken);
+                                        await cpuSem.WaitAsync(bodyToken);
                                         try
                                         {
-                                            updateToken.ThrowIfCancellationRequested();
+                                            bodyToken.ThrowIfCancellationRequested();
                                             if (!_decompressorPool.TryPop(out var decompressor)) decompressor = new Decompressor();
                                             try
                                             {
@@ -589,7 +589,7 @@ public sealed class ManifestDownloader : IDisposable
                                                         }, LazyThreadSafetyMode.ExecutionAndPublication));
 
                                                         var handle = lazyHandle.Value;
-                                                        await RandomAccess.WriteAsync(handle, uncomp, (long)target.FileOffset, updateToken);
+                                                        await RandomAccess.WriteAsync(handle, uncomp, (long)target.FileOffset, bodyToken);
 
                                                         int currentDoneChunks = Interlocked.Increment(ref completedChunks);
                                                         int rem = pendingPerFile.AddOrUpdate(target.PhysicalPath, 0, (k, v) => v - 1);
