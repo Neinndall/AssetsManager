@@ -44,17 +44,6 @@ namespace AssetsManager.Views.Controls.Shared
             }
         }
 
-        private void SearchTextBox_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
-        {
-            if (e.Key == System.Windows.Input.Key.Escape && !string.IsNullOrEmpty(SearchTextBox.Text))
-            {
-                searchTimer.Stop();
-                SearchTextBox.Clear();
-                RaiseEvent(new RoutedEventArgs(SearchTextChangedEvent, string.Empty));
-                e.Handled = true;
-            }
-        }
-
         private void SearchTextBox_TextChanged(object sender, TextChangedEventArgs e)
         {
             searchTimer.Stop();

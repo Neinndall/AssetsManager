@@ -17,7 +17,6 @@
                  BorderThickness="0"
                  VerticalContentAlignment="Center"
                  TextChanged="SearchTextBox_TextChanged"
-                 PreviewKeyDown="SearchTextBox_PreviewKeyDown"
                  Tag="{Binding Tag, RelativeSource={RelativeSource AncestorType=UserControl}}"/>
     </Border>
 </UserControl>
