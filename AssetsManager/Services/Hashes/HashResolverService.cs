@@ -219,35 +219,66 @@ namespace AssetsManager.Services.Hashes
 
         public void ReloadBinRstHashes()
         {
-            _binXxh3Cache?.Dispose();
-            _binHashCache?.Dispose();
-            _binEntryCache?.Dispose();
-            _binFieldCache?.Dispose();
-            _binTypeCache?.Dispose();
-            _rstXxh3Cache?.Dispose();
-            _rstXxh64Cache?.Dispose();
+            _hashFileAccessLock.Wait();
+            try
+            {
+                var oldCaches = new[]
+                {
+                    _binXxh3Cache,
+                    _binHashCache,
+                    _binEntryCache,
+                    _binFieldCache,
+                    _binTypeCache,
+                    _rstXxh3Cache,
+                    _rstXxh64Cache
+                };
 
-            _binHashesLoaded = false;
-            _rstHashesLoaded = false;
-            _cachedRstXxh3Hashes = null;
-            _cachedRstXxh64Hashes = null;
+                _binXxh3Cache = null;
+                _binHashCache = null;
+                _binEntryCache = null;
+                _binFieldCache = null;
+                _binTypeCache = null;
+                _rstXxh3Cache = null;
+                _rstXxh64Cache = null;
 
-            LoadBinHashes();
-            LoadRstHashes();
+                foreach (var oldCache in oldCaches)
+                {
+                    oldCache?.Dispose();
+                }
+
+                _binHashesLoaded = false;
+                _rstHashesLoaded = false;
+                _cachedRstXxh3Hashes = null;
+                _cachedRstXxh64Hashes = null;
+
+                LoadBinHashes();
+                LoadRstHashes();
+            }
+            finally
+            {
+                _hashFileAccessLock.Release();
+            }
         }
 
-
-
-        public Task ForceReloadHashesAsync()
+        public async Task ForceReloadHashesAsync()
         {
-            Dispose();
-            _cachedRstXxh3Hashes = null;
-            _cachedRstXxh64Hashes = null;
-            _gameLcuHashesLoaded = false;
-            _binHashesLoaded = false;
-            _rstHashesLoaded = false;
-            _loadingTask = null; 
-            return LoadAllHashesAsync();
+            await _hashFileAccessLock.WaitAsync();
+            try
+            {
+                Dispose();
+                _cachedRstXxh3Hashes = null;
+                _cachedRstXxh64Hashes = null;
+                _gameLcuHashesLoaded = false;
+                _binHashesLoaded = false;
+                _rstHashesLoaded = false;
+                _loadingTask = null;
+            }
+            finally
+            {
+                _hashFileAccessLock.Release();
+            }
+
+            await LoadAllHashesAsync();
         }
 
         public void Dispose()

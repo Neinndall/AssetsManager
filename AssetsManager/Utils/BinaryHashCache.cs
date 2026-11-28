@@ -300,16 +300,29 @@ namespace AssetsManager.Utils
 
         public ulong GetHash(int index)
         {
-            if (index < 0 || index >= _count) return 0;
+            if (!_isLoaded || index < 0 || index >= _count) return 0;
             return _hashAccessor.ReadUInt64(index * 8);
         }
 
         public void Dispose()
         {
-            _hashAccessor?.Dispose();
-            _offsetAccessor?.Dispose();
-            _dataAccessor?.Dispose();
-            _mmf?.Dispose();
+            _isLoaded = false;
+            _count = 0;
+
+            var hashAccessor = _hashAccessor;
+            var offsetAccessor = _offsetAccessor;
+            var dataAccessor = _dataAccessor;
+            var mmf = _mmf;
+
+            _hashAccessor = null;
+            _offsetAccessor = null;
+            _dataAccessor = null;
+            _mmf = null;
+
+            hashAccessor?.Dispose();
+            offsetAccessor?.Dispose();
+            dataAccessor?.Dispose();
+            mmf?.Dispose();
         }
     }
 }
