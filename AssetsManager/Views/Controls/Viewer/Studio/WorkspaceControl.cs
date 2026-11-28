@@ -517,34 +517,19 @@ namespace AssetsManager.Views.Controls.Viewer
             }
         }
 
-        private void WorkspaceTab_MouseDown(object sender, MouseButtonEventArgs e)
+        private void WorkspaceTab_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            if ((sender as FrameworkElement)?.DataContext is not StudioWorkspaceTab tab)
+            if (e.ChangedButton != MouseButton.Left ||
+                (sender as FrameworkElement)?.DataContext is not StudioWorkspaceTab tab)
                 return;
-
-            if (e.ChangedButton == MouseButton.Middle)
-            {
-                CloseWorkspaceTab(tab);
-                e.Handled = true;
-                return;
-            }
-
-            if (e.ChangedButton == MouseButton.Left)
-            {
-                ActivateWorkspaceTab(tab);
-                e.Handled = true;
-            }
+            ActivateWorkspaceTab(tab);
+            e.Handled = true;
         }
 
         private void CloseWorkspaceTab_Click(object sender, RoutedEventArgs e)
         {
             e.Handled = true;
             if ((sender as FrameworkElement)?.DataContext is not StudioWorkspaceTab tab) return;
-            CloseWorkspaceTab(tab);
-        }
-
-        private void CloseWorkspaceTab(StudioWorkspaceTab tab)
-        {
 
             int index = _model.WorkspaceTabs.IndexOf(tab);
             bool wasSelected = ReferenceEquals(_model.SelectedWorkspaceTab, tab);
