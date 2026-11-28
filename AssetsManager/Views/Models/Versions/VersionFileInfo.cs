@@ -5,6 +5,7 @@ namespace AssetsManager.Views.Models.Versions
     public class VersionFileInfo : INotifyPropertyChanged
     {
         public string FileName { get; set; }
+        public string FilePath { get; set; }
         public string Content { get; set; }
         public string Date { get; set; }
         public string Category { get; set; } // To group files like 'league-client', 'lol-game-client'

@@ -46,7 +46,10 @@ namespace AssetsManager.Services.Monitor
             _manifestDownloader = manifestDownloader;
             _riotApiService = riotApiService;
 
-            _manifestDownloader.ProgressChanged += OnManifestProgressChanged;
+            if (_manifestDownloader != null)
+            {
+                _manifestDownloader.ProgressChanged += OnManifestProgressChanged;
+            }
         }
 
         private void OnManifestProgressChanged(string taskName, int current, int total, string fileName)
@@ -232,6 +235,7 @@ namespace AssetsManager.Services.Monitor
                             versionFiles.Add(new VersionFileInfo
                             {
                                 FileName = Path.GetFileName(filePath),
+                                FilePath = filePath,
                                 Content = File.ReadAllText(filePath),
                                 Category = category,
                                 Date = File.GetCreationTime(filePath).ToString("dd/MM/yyyy HH:mm:ss")
@@ -252,8 +256,24 @@ namespace AssetsManager.Services.Monitor
             {
                 try
                 {
-                    var paths = Directory.GetFiles(_directoriesCreator.VersionsPath, file.FileName, SearchOption.AllDirectories);
-                    if (paths.Length > 0) { File.Delete(paths[0]); successCount++; }
+                    string targetPath = null;
+                    if (!string.IsNullOrEmpty(file.FilePath) && File.Exists(file.FilePath))
+                    {
+                        targetPath = file.FilePath;
+                    }
+                    else if (!string.IsNullOrEmpty(file.FileName) && Directory.Exists(_directoriesCreator.VersionsPath))
+                    {
+                        var matches = Directory.GetFiles(_directoriesCreator.VersionsPath, file.FileName, SearchOption.AllDirectories);
+                        targetPath = !string.IsNullOrEmpty(file.Category)
+                            ? matches.FirstOrDefault(p => string.Equals(new DirectoryInfo(Path.GetDirectoryName(p)).Name, file.Category, StringComparison.OrdinalIgnoreCase))
+                            : matches.FirstOrDefault();
+                    }
+
+                    if (!string.IsNullOrEmpty(targetPath) && File.Exists(targetPath))
+                    {
+                        File.Delete(targetPath);
+                        successCount++;
+                    }
                 }
                 catch (Exception ex)
                 {
