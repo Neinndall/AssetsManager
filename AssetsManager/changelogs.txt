@@ -48,6 +48,7 @@ Bug Fixes
   - Settings / Include the default 60-minute interval in the Asset Tracker frequency selector and reset Data Export Format on Reset Defaults.
   - Hash Guessing Lab / Refresh the BIN and RST unknown hash count immediately after a guessing run completes.
   - Hash Guessing Lab / Save resolved hashes to disk before removing them from the unknown list so matches are not lost on cancellation or save errors.
+  - Formatting / Prevent the fast JavaScript formatter from inserting raw newlines inside string literals.
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 

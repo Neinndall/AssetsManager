@@ -240,10 +240,6 @@ namespace AssetsManager.Services.Formatting
                         {
                             break;
                         }
-                        else if (currentLineLength > hardMaxLineLength && (sc == ' ' || sc == ','))
-                        {
-                            AppendNewline();
-                        }
                         i++;
                     }
                     continue;
