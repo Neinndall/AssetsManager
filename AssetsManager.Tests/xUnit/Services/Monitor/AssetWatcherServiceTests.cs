@@ -131,5 +131,58 @@ namespace AssetsManager.Tests.xUnit.Services.Monitor
                 Environment.CurrentDirectory = previousCwd;
             }
         }
+
+        [Fact]
+        public async Task AssetsWithSameFilenameUseDistinctCacheFilesWithoutOverwriting()
+        {
+            using var bridge = new AssetsManagerTestBridge();
+            string wadDir = bridge.CreateDirectory("pbe");
+            string ahriWad = bridge.BakeWad(wadDir, "Ahri.wad.client", ("data/characters/ahri/skins/skin0.bin", "AHRI_DATA"));
+            string luxWad = bridge.BakeWad(wadDir, "Lux.wad.client", ("data/characters/lux/skins/skin0.bin", "LUX_DATA"));
+
+            string previousCwd = Environment.CurrentDirectory;
+            Environment.CurrentDirectory = bridge.RootPath;
+            try
+            {
+                var settings = AppSettings.GetDefaultSettings();
+                var ahriAsset = new MonitoredAsset
+                {
+                    AssetPath = "Game/Ahri.wad.client/data/characters/ahri/skins/skin0.bin",
+                    Alias = "skin0.bin",
+                    WadName = ahriWad,
+                    InternalPath = "data/characters/ahri/skins/skin0.bin",
+                    LastKnownHash = 0
+                };
+                var luxAsset = new MonitoredAsset
+                {
+                    AssetPath = "Game/Lux.wad.client/data/characters/lux/skins/skin0.bin",
+                    Alias = "skin0.bin",
+                    WadName = luxWad,
+                    InternalPath = "data/characters/lux/skins/skin0.bin",
+                    LastKnownHash = 0
+                };
+
+                var watcher = new AssetWatcherService(
+                    settings,
+                    bridge.LogService,
+                    bridge.Directories,
+                    wadContentProvider: null,
+                    versionService: null,
+                    backupManager: null);
+
+                await watcher.CheckAssetsAsync(new List<MonitoredAsset> { ahriAsset, luxAsset }, silent: true);
+
+                Assert.NotEqual(ahriAsset.NewFilePath, luxAsset.NewFilePath);
+                Assert.NotEqual(ahriAsset.OldFilePath, luxAsset.OldFilePath);
+                Assert.EndsWith("skin0.bin", ahriAsset.NewFilePath);
+                Assert.EndsWith("skin0.bin", luxAsset.NewFilePath);
+                Assert.Equal("AHRI_DATA", File.ReadAllText(ahriAsset.NewFilePath));
+                Assert.Equal("LUX_DATA", File.ReadAllText(luxAsset.NewFilePath));
+            }
+            finally
+            {
+                Environment.CurrentDirectory = previousCwd;
+            }
+        }
     }
 }

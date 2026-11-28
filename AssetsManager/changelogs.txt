@@ -31,6 +31,7 @@ Bug Fixes
   - Comparator / Guard hash reloads and diff launches against closed windows or unexpected errors.
   - Asset Watcher / Save the initial baseline hash to disk after the first check so updates are not missed after restarting.
   - Asset Watcher / Prevent crashes when adding, removing, or clearing watched assets while an update check is running.
+  - Asset Watcher / Store unique cache filenames per monitored asset path so files with identical names do not overwrite each other.
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 

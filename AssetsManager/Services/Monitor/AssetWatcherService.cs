@@ -274,11 +274,22 @@ namespace AssetsManager.Services.Monitor
             return (anyUpdated, updatedAssetNames);
         }
 
+        internal static string BuildCacheFileName(MonitoredAsset asset)
+        {
+            string cleanAlias = (asset.Alias ?? "asset").Replace("/", "_").Replace("\\", "_");
+            string identity = !string.IsNullOrWhiteSpace(asset.AssetPath)
+                ? asset.AssetPath
+                : $"{asset.WadName}|{asset.InternalPath}|{cleanAlias}";
+            ulong identityHash = XxHash64Ext.Hash(PathUtils.NormalizePath(identity));
+            return $"{identityHash:x16}_{cleanAlias}";
+        }
+
         private async Task ProcessAssetUpdate(MonitoredAsset asset, WadFile wadFile, WadChunk chunk, ulong checksum, bool isInitial, string fullWadPath)
         {
             string cleanAlias = asset.Alias.Replace("/", "_").Replace("\\", "_");
-            string oldPath = Path.Combine(_directoriesCreator.WatcherCacheOldPath, cleanAlias);
-            string newPath = Path.Combine(_directoriesCreator.WatcherCacheNewPath, cleanAlias);
+            string cacheFileName = BuildCacheFileName(asset);
+            string oldPath = Path.Combine(_directoriesCreator.WatcherCacheOldPath, cacheFileName);
+            string newPath = Path.Combine(_directoriesCreator.WatcherCacheNewPath, cacheFileName);
 
             _directoriesCreator.CreateDirectory(Path.GetDirectoryName(oldPath));
             _directoriesCreator.CreateDirectory(Path.GetDirectoryName(newPath));
@@ -300,10 +311,13 @@ namespace AssetsManager.Services.Monitor
             if (!isInitial)
             {
                 // DETECTED REAL UPDATE
-                // Move current "New" to "Old" to allow diffing
-                if (File.Exists(newPath))
+                // Move current "New" to "Old" to allow diffing (preserve legacy cache path if migrating)
+                string previousNewPath = File.Exists(newPath)
+                    ? newPath
+                    : (!string.IsNullOrEmpty(asset.NewFilePath) && File.Exists(asset.NewFilePath) ? asset.NewFilePath : null);
+                if (previousNewPath != null)
                 {
-                    File.Copy(newPath, oldPath, true);
+                    File.Copy(previousNewPath, oldPath, true);
                 }
                 else
                 {
