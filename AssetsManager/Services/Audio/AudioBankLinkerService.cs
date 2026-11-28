@@ -450,7 +450,6 @@ namespace AssetsManager.Services.Audio
             string sourceWadRelativePath = diff.SourceWadFile;
             string fileName = Path.GetFileName(diff.NewPath ?? diff.OldPath);
             string baseName = PathUtils.StripBankSuffix(fileName);
-            bool clickedIsEventsBnk = PathUtils.NormalizeBankFileName(fileName).EndsWith("_events.bnk", StringComparison.OrdinalIgnoreCase);
 
             string pathForStrategy = diff.NewPath ?? diff.OldPath;
             var binStrategy = GetBinFileSearchStrategy(pathForStrategy, sourceWadRelativePath);
@@ -469,18 +468,19 @@ namespace AssetsManager.Services.Audio
                     newPbePath, sourceWadRelativePath, fileName, binStrategy);
             }
 
-            if (clickedIsEventsBnk)
-            {
-                oldEventsBnk = oldEventsBnk ?? oldClickedBnk;
-                newEventsBnk = newEventsBnk ?? newClickedBnk;
-            }
-            else
-            {
-                oldAudioBnk = oldAudioBnk ?? oldClickedBnk;
-                newAudioBnk = newAudioBnk ?? newClickedBnk;
-            }
+            AssignClickedBankFallback(
+                fileName,
+                oldClickedBnk,
+                newClickedBnk,
+                ref oldEventsBnk,
+                ref newEventsBnk,
+                ref oldAudioBnk,
+                ref newAudioBnk,
+                ref oldWpk,
+                ref newWpk);
 
-            if (oldEventsBnk == null && oldAudioBnk == null && newEventsBnk == null && newAudioBnk == null)
+            if (oldEventsBnk == null && oldAudioBnk == null && oldWpk == null &&
+                newEventsBnk == null && newAudioBnk == null && newWpk == null)
             {
                 return (null, null);
             }
@@ -502,6 +502,34 @@ namespace AssetsManager.Services.Audio
             return (oldNodes, newNodes);
         }
 
+        internal static void AssignClickedBankFallback(
+            string fileName,
+            byte[] oldClicked,
+            byte[] newClicked,
+            ref byte[] oldEventsBnk,
+            ref byte[] newEventsBnk,
+            ref byte[] oldAudioBnk,
+            ref byte[] newAudioBnk,
+            ref byte[] oldWpk,
+            ref byte[] newWpk)
+        {
+            if (PathUtils.NormalizeBankFileName(fileName).EndsWith("_events.bnk", StringComparison.OrdinalIgnoreCase))
+            {
+                oldEventsBnk ??= oldClicked;
+                newEventsBnk ??= newClicked;
+            }
+            else if (fileName != null && fileName.EndsWith(".wpk", StringComparison.OrdinalIgnoreCase))
+            {
+                oldWpk ??= oldClicked;
+                newWpk ??= newClicked;
+            }
+            else
+            {
+                oldAudioBnk ??= oldClicked;
+                newAudioBnk ??= newClicked;
+            }
+        }
+
         // ARCHIVED mode entry point for comparisons saved in wad_chunks/:
         // resolves audio bank siblings (.bnk / .wpk / .bin) via the comparison's
         // dependency index, reads the bytes from the archived .chunk files via
@@ -518,7 +546,6 @@ namespace AssetsManager.Services.Audio
 
             string fileName = Path.GetFileName(diff.NewPath ?? diff.OldPath);
             string baseName = PathUtils.StripBankSuffix(fileName);
-            bool clickedIsEventsBnk = PathUtils.NormalizeBankFileName(fileName).EndsWith("_events.bnk", StringComparison.OrdinalIgnoreCase);
 
             var binStrategy = GetBinFileSearchStrategy(diff.NewPath ?? diff.OldPath, diff.SourceWadFile);
             byte[] oldEventsBnk = null, oldAudioBnk = null, oldWpk = null, oldBin = null;
@@ -548,18 +575,19 @@ namespace AssetsManager.Services.Audio
                 }
             }
 
-            if (clickedIsEventsBnk)
-            {
-                oldEventsBnk = oldEventsBnk ?? oldClickedBnk;
-                newEventsBnk = newEventsBnk ?? newClickedBnk;
-            }
-            else
-            {
-                oldAudioBnk = oldAudioBnk ?? oldClickedBnk;
-                newAudioBnk = newAudioBnk ?? newClickedBnk;
-            }
+            AssignClickedBankFallback(
+                fileName,
+                oldClickedBnk,
+                newClickedBnk,
+                ref oldEventsBnk,
+                ref newEventsBnk,
+                ref oldAudioBnk,
+                ref newAudioBnk,
+                ref oldWpk,
+                ref newWpk);
 
-            if (oldEventsBnk == null && oldAudioBnk == null && newEventsBnk == null && newAudioBnk == null)
+            if (oldEventsBnk == null && oldAudioBnk == null && oldWpk == null &&
+                newEventsBnk == null && newAudioBnk == null && newWpk == null)
             {
                 return (null, null);
             }

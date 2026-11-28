@@ -36,6 +36,7 @@ Bug Fixes
   - Manage Versions / Guard version fetches, installation refreshes, and temp cleanup against unhandled async errors.
   - Explorer / Handle malformed or unsupported audio banks safely without crashing or leaving nodes stuck on "Loading...".
   - Explorer / Prevent image previews from failing when a configured LoL client directory is missing or moved.
+  - Audio Diff / Route clicked .wpk packages as WPK audio instead of parsing them as BNK banks.
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
