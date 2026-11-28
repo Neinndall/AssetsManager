@@ -76,5 +76,60 @@ namespace AssetsManager.Tests.xUnit.Services.Monitor
                 Environment.CurrentDirectory = previousCwd;
             }
         }
+
+        [Fact]
+        public async Task CheckAssetsAsyncHandlesLiveCollectionMutationDuringCheck()
+        {
+            using var bridge = new AssetsManagerTestBridge();
+            string wadDir = bridge.CreateDirectory("pbe");
+            string wadPath = bridge.BakeWad(wadDir, "test.wad.client",
+                ("assets/first.json", "{\"v\":2}"),
+                ("assets/second.json", "{\"v\":2}"));
+
+            string previousCwd = Environment.CurrentDirectory;
+            Environment.CurrentDirectory = bridge.RootPath;
+            try
+            {
+                var settings = AppSettings.GetDefaultSettings();
+                var liveAssets = new AssetsManager.Utils.Framework.ObservableRangeCollection<MonitoredAsset>
+                {
+                    new MonitoredAsset
+                    {
+                        AssetPath = "Game/test.wad.client/assets/first.json",
+                        Alias = "first.json",
+                        WadName = wadPath,
+                        InternalPath = "assets/first.json",
+                        LastKnownHash = 1
+                    },
+                    new MonitoredAsset
+                    {
+                        AssetPath = "Game/test.wad.client/assets/second.json",
+                        Alias = "second.json",
+                        WadName = wadPath,
+                        InternalPath = "assets/second.json",
+                        LastKnownHash = 1
+                    }
+                };
+
+                var watcher = new AssetWatcherService(
+                    settings,
+                    bridge.LogService,
+                    bridge.Directories,
+                    wadContentProvider: null,
+                    versionService: null,
+                    backupManager: null);
+
+                watcher.AssetUpdated += _ => liveAssets.Clear();
+
+                var (anyUpdated, updatedNames) = await watcher.CheckAssetsAsync(liveAssets, silent: true);
+
+                Assert.True(anyUpdated);
+                Assert.Equal(2, updatedNames.Count);
+            }
+            finally
+            {
+                Environment.CurrentDirectory = previousCwd;
+            }
+        }
     }
 }

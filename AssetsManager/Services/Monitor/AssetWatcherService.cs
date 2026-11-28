@@ -117,7 +117,8 @@ namespace AssetsManager.Services.Monitor
 
         public async Task<(bool anyUpdated, List<string> updatedAssetNames)> CheckAssetsAsync(IEnumerable<MonitoredAsset> assets, bool silent = false)
         {
-            if (assets == null || !assets.Any()) return (false, new List<string>());
+            var assetList = assets?.ToList();
+            if (assetList == null || assetList.Count == 0) return (false, new List<string>());
 
             if (!silent) _logService.Log("Checking monitored assets for updates...");
 
@@ -130,7 +131,7 @@ namespace AssetsManager.Services.Monitor
             string baseDir = _appSettings.LolPbeDirectory;
             bool hasBaseDir = !string.IsNullOrEmpty(baseDir) && Directory.Exists(baseDir);
 
-            foreach (var asset in assets)
+            foreach (var asset in assetList)
             {
                 try
                 {

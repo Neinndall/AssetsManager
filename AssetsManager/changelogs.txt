@@ -30,6 +30,7 @@ Bug Fixes
   - Monitor / Guard API fetch and LCU polling handlers against stuck busy states and overlapping checks, and display GitHub rate-limit reset times in local time.
   - Comparator / Guard hash reloads and diff launches against closed windows or unexpected errors.
   - Asset Watcher / Save the initial baseline hash to disk after the first check so updates are not missed after restarting.
+  - Asset Watcher / Prevent crashes when adding, removing, or clearing watched assets while an update check is running.
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
