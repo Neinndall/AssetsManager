@@ -344,7 +344,17 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             if (!IsLoaded || !IsVisible || _root == null) return;
             if (e.OriginalSource is TreeViewItem { DataContext: ProjectBrowserFolder { FullPath: not null } folder })
-                await LoadFolderAsync(folder, TreeToken());
+            {
+                try
+                {
+                    await LoadFolderAsync(folder, TreeToken());
+                }
+                catch (OperationCanceledException) { }
+                catch (Exception ex)
+                {
+                    LogService?.LogError(ex, "Failed to expand project folder.");
+                }
+            }
         }
 
         private void Folders_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)

@@ -27,8 +27,19 @@ namespace AssetsManager.Views.Dialogs
         private readonly MediaPlayer _mediaPlayer = new MediaPlayer();
         private readonly DispatcherTimer _timer = new DispatcherTimer();
         private bool _isDragging = false;
+        private bool _isClosed = false;
+        private int _playbackRequestId = 0;
 
         public AudioPlayerModel ViewModel { get; }
+
+        internal static bool TryCreatePlaybackUri(string input, out Uri uri)
+        {
+            uri = null;
+            if (string.IsNullOrWhiteSpace(input))
+                return false;
+
+            return Uri.TryCreate(input.Trim(), UriKind.Absolute, out uri);
+        }
 
         public AudioPlayerWindow(AudioPlayerService audioService, CustomMessageBoxService customMessageBoxService, AppSettings settings)
         {
@@ -55,7 +66,10 @@ namespace AssetsManager.Views.Dialogs
         protected override void OnClosing(CancelEventArgs e)
         {
             base.OnClosing(e);
-            
+
+            _isClosed = true;
+            _playbackRequestId++;
+
             // Stop and cleanup when window closes to avoid "Zombie" player
             _timer.Stop();
             _mediaPlayer.Stop();
@@ -88,13 +102,17 @@ namespace AssetsManager.Views.Dialogs
 
         private async void PlayPause_Click(object sender, RoutedEventArgs e)
         {
-            if (ViewModel.Service.Playlist.Count == 0) return;
+            if (_isClosed || ViewModel.Service.Playlist.Count == 0) return;
 
             var selectedItem = PlaylistListBox.SelectedItem as AudioPlaylistItem;
-            if (selectedItem != null)
+            if (selectedItem == null) return;
+
+            try
             {
                 if (ViewModel.CurrentTrackName != selectedItem.Name)
                 {
+                    int requestId = ++_playbackRequestId;
+
                     // If it's a YouTube URL, check if it needs re-resolution (common for saved playlists)
                     string playUrl = selectedItem.Url;
                     if (selectedItem.OriginalUrl != null && (selectedItem.OriginalUrl.Contains("youtube.com") || selectedItem.OriginalUrl.Contains("youtu.be")))
@@ -116,7 +134,16 @@ namespace AssetsManager.Views.Dialogs
                         }
                     }
 
-                    _mediaPlayer.Open(new Uri(playUrl));
+                    if (_isClosed || requestId != _playbackRequestId)
+                        return;
+
+                    if (!TryCreatePlaybackUri(playUrl, out Uri playUri))
+                    {
+                        _customMessageBoxService.ShowError("Playback Error", "The selected track does not have a valid URL or file path.", this);
+                        return;
+                    }
+
+                    _mediaPlayer.Open(playUri);
                     ViewModel.CurrentTrackName = selectedItem.Name;
                     _mediaPlayer.Play();
                     ViewModel.IsPlaying = true;
@@ -133,6 +160,13 @@ namespace AssetsManager.Views.Dialogs
                         _mediaPlayer.Play();
                         ViewModel.IsPlaying = true;
                     }
+                }
+            }
+            catch (Exception ex)
+            {
+                if (!_isClosed)
+                {
+                    _customMessageBoxService.ShowError("Playback Error", $"Unable to play track: {ex.Message}", this);
                 }
             }
         }
@@ -172,6 +206,7 @@ namespace AssetsManager.Views.Dialogs
 
         private void StopMediaPlayer()
         {
+            _playbackRequestId++;
             _timer.Stop();
             _mediaPlayer.Stop();
             _mediaPlayer.Close();
@@ -192,19 +227,28 @@ namespace AssetsManager.Views.Dialogs
                     {
                         var youtube = YouTube.Default;
                         var video = await youtube.GetVideoAsync(url);
-                        if (video != null)
+                        if (!_isClosed && video != null)
                         {
                             ViewModel.Service.AddToPlaylist(video.FullName, video.Uri, url);
                         }
                     }
                     else
                     {
+                        if (!TryCreatePlaybackUri(url, out _))
+                        {
+                            _customMessageBoxService.ShowError("Invalid URL", "Please enter a valid absolute URL or local file path.", this);
+                            return;
+                        }
+
                         ViewModel.Service.AddToPlaylist(Path.GetFileName(url), url);
                     }
                 }
                 catch (Exception ex)
                 {
-                    _customMessageBoxService.ShowError("Error", $"Error processing URL: {ex.Message}", this);
+                    if (!_isClosed)
+                    {
+                        _customMessageBoxService.ShowError("Error", $"Error processing URL: {ex.Message}", this);
+                    }
                 }
             }
         }
@@ -278,9 +322,7 @@ namespace AssetsManager.Views.Dialogs
             if (sender is MenuItem menuItem && menuItem.Tag is AudioPlaylistPack pack)
             {
                 ViewModel.Service.LoadPlaylist(pack.Name);
-                ViewModel.ActivePackName = pack.Name;
-                ViewModel.IsPlaying = false;
-                _mediaPlayer.Stop();
+                StopMediaPlayer();
                 ViewModel.ResetToDefault();
                 ViewModel.ActivePackName = pack.Name;
             }

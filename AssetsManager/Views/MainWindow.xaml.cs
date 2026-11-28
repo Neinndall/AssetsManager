@@ -224,13 +224,13 @@ namespace AssetsManager.Views
             string toastTitle = NotificationTitleResolver.ResolveToastTitle(message, category, title, newsItem);
 
             // Show System Tray Balloon Notification if window is not visible
-            if (Visibility != Visibility.Visible)
+            Dispatcher.InvokeAsync(() =>
             {
-                Dispatcher.InvokeAsync(() =>
+                if (Visibility != Visibility.Visible)
                 {
                     TrayIcon.ShowBalloonTip(toastTitle, message, BalloonIcon.Info);
-                });
-            }
+                }
+            });
 
             // Always update internal notification system
             string notificationTitle = !string.IsNullOrEmpty(title) ? title : toastTitle;
@@ -241,11 +241,7 @@ namespace AssetsManager.Views
                     notificationTitle,
                     message,
                     NotificationType.Info,
-                    onClick: () =>
-                    {
-                        _newsService.SetPendingArticle(newsItem);
-                        LoadNewsWindow();
-                    },
+                    onClick: () => OpenNewsFromNotification(newsItem),
                     category: category,
                     actionText: "OPEN NEWS",
                     newsArticleUrl: newsItem?.ActionUrl,
@@ -271,6 +267,18 @@ namespace AssetsManager.Views
                     ShowNotification(true, message, category, notificationTitle);
                 }
             }
+        }
+
+        private void OpenNewsFromNotification(NewsItemModel newsItem)
+        {
+            var hubWindow = Application.Current?.Windows
+                .OfType<NotificationHubWindow>()
+                .FirstOrDefault();
+
+            hubWindow?.Close();
+            _newsService.SetPendingArticle(newsItem);
+            Sidebar.SelectNavigationItem("News");
+            LoadNewsWindow();
         }
 
         private async void OpenUpdatePrompt(Func<Window, Task> updateAction)

@@ -242,22 +242,10 @@ namespace AssetsManager.Services.Core
 
             if (!string.IsNullOrEmpty(logEntry.ClickablePath) && (File.Exists(logEntry.ClickablePath) || Directory.Exists(logEntry.ClickablePath)))
             {
-                string linkText = string.IsNullOrEmpty(logEntry.ClickableText) ? logEntry.ClickablePath : logEntry.ClickableText;
-                string fullMessage = logEntry.Message;
-
-                // Find where the clickable text/path should be inserted in the message
-                // For simplicity, we'll assume the clickable text is at the end of the message for now,
-                // or we'll just append it if not found.
-                int pathIndex = fullMessage.IndexOf(linkText, StringComparison.OrdinalIgnoreCase);
-                if (pathIndex == -1)
-                {
-                    pathIndex = fullMessage.IndexOf(logEntry.ClickablePath, StringComparison.OrdinalIgnoreCase);
-                }
-
-                if (pathIndex != -1)
+                if (TrySplitClickableMessage(logEntry.Message, logEntry.ClickablePath, logEntry.ClickableText, out string prefix, out string linkText, out string suffix))
                 {
                     // Text before the path
-                    paragraph.Inlines.Add(new Run(fullMessage.Substring(0, pathIndex)) { Foreground = GetBrush("TextPrimary") });
+                    paragraph.Inlines.Add(new Run(prefix) { Foreground = GetBrush("TextPrimary") });
 
                     // The hyperlink
                     var link = new Hyperlink(new Run(linkText));
@@ -278,12 +266,12 @@ namespace AssetsManager.Services.Core
                     paragraph.Inlines.Add(link);
 
                     // Text after the path
-                    paragraph.Inlines.Add(new Run(fullMessage.Substring(pathIndex + linkText.Length)) { Foreground = GetBrush("TextPrimary") });
+                    paragraph.Inlines.Add(new Run(suffix) { Foreground = GetBrush("TextPrimary") });
                 }
                 else
                 {
                     // If the linkText/ClickablePath is not found in the message, just append the message and the link
-                    paragraph.Inlines.Add(new Run(fullMessage + " ") { Foreground = GetBrush("TextPrimary") });
+                    paragraph.Inlines.Add(new Run(logEntry.Message + " ") { Foreground = GetBrush("TextPrimary") });
                     var link = new Hyperlink(new Run(linkText));
                     link.Foreground = GetBrush("AccentBrush");
                     link.NavigateUri = new Uri(Path.GetFullPath(logEntry.ClickablePath));
@@ -319,6 +307,37 @@ namespace AssetsManager.Services.Core
 
             _outputRichTextBox.Document.Blocks.Add(paragraph);
             _outputRichTextBox.ScrollToEnd();
+        }
+
+        internal static bool TrySplitClickableMessage(
+            string fullMessage,
+            string clickablePath,
+            string clickableText,
+            out string prefix,
+            out string linkText,
+            out string suffix)
+        {
+            linkText = string.IsNullOrEmpty(clickableText) ? clickablePath : clickableText;
+            prefix = null;
+            suffix = null;
+
+            if (string.IsNullOrEmpty(fullMessage) || string.IsNullOrEmpty(clickablePath))
+                return false;
+
+            int matchedLength = linkText.Length;
+            int pathIndex = fullMessage.IndexOf(linkText, StringComparison.OrdinalIgnoreCase);
+            if (pathIndex == -1)
+            {
+                pathIndex = fullMessage.IndexOf(clickablePath, StringComparison.OrdinalIgnoreCase);
+                matchedLength = clickablePath.Length;
+            }
+
+            if (pathIndex == -1)
+                return false;
+
+            prefix = fullMessage.Substring(0, pathIndex);
+            suffix = fullMessage.Substring(pathIndex + matchedLength);
+            return true;
         }
     }
 }

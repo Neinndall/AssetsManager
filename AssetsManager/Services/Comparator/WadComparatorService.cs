@@ -66,6 +66,7 @@ namespace AssetsManager.Services.Comparator
                     _completedChunksGlobal = 0;
                     NotifyComparisonStarted(0);
                     NotifyComparisonProgressChanged(0, Path.GetFileName(oldWadFile), false, "WAD file not found.");
+                    allDiffs = null;
                     return;
                 }
 
@@ -98,6 +99,7 @@ namespace AssetsManager.Services.Comparator
             }
             catch (Exception ex)
             {
+                allDiffs = null;
                 _logService.LogError(ex, "An error occurred during single WAD comparison.");
             }
             finally
@@ -264,6 +266,7 @@ namespace AssetsManager.Services.Comparator
             }
             catch (Exception ex)
             {
+                allDiffs = null;
                 _logService.LogError(ex, "An error occurred during WAD comparison.");
             }
             finally

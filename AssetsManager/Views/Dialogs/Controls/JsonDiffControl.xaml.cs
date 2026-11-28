@@ -603,6 +603,9 @@ namespace AssetsManager.Views.Dialogs.Controls
 
         private void WordLevelDiffButton_Click(object sender, RoutedEventArgs e)
         {
+            if (ViewModel.IsInlineMode || _originalDiffModel == null)
+                return;
+
             var modelToShow = ViewModel.HideUnchangedLines ? FilterDiffModel(_originalDiffModel) : _originalDiffModel;
             ApplyDiffHighlighting(modelToShow);
             OldJsonContent.TextArea.TextView.InvalidateLayer(KnownLayer.Background);

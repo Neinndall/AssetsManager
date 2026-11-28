@@ -125,7 +125,7 @@ namespace AssetsManager.Services.Explorer
                     try
                     {
                         BitmapSource bitmap = null;
-                        if (filePath.EndsWith(".tex") || filePath.EndsWith(".dds"))
+                        if (IsRiotTexturePath(filePath))
                         {
                             using (var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read))
                             {
@@ -178,9 +178,8 @@ namespace AssetsManager.Services.Explorer
                 currentCancellation = new CancellationTokenSource();
                 _renderCancellation = currentCancellation;
                 generation = ++_renderGeneration;
+                previousCancellation?.Cancel();
             }
-
-            previousCancellation?.Cancel();
 
             if (Items.Count == 0)
             {
@@ -226,17 +225,29 @@ namespace AssetsManager.Services.Explorer
 
         private void CompleteRender(ImageMergerModel viewModel, CancellationTokenSource cancellation, int generation)
         {
-            if (IsCurrentRender(cancellation, generation))
+            bool isCurrent;
+            lock (_renderLock)
             {
-                lock (_renderLock)
+                isCurrent = ReferenceEquals(_renderCancellation, cancellation) && _renderGeneration == generation;
+                if (isCurrent)
                 {
                     _renderCancellation = null;
                 }
 
-                viewModel.IsProcessing = false;
+                cancellation.Dispose();
             }
 
-            cancellation.Dispose();
+            if (isCurrent)
+            {
+                viewModel.IsProcessing = false;
+            }
+        }
+
+        internal static bool IsRiotTexturePath(string filePath)
+        {
+            return !string.IsNullOrEmpty(filePath) &&
+                   (filePath.EndsWith(".tex", StringComparison.OrdinalIgnoreCase) ||
+                    filePath.EndsWith(".dds", StringComparison.OrdinalIgnoreCase));
         }
 
         private static BitmapSource CreateMergedBitmap(IReadOnlyList<ImageMergerItem> items, int columns, int margin, CancellationToken cancellationToken)

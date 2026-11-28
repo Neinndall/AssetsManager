@@ -1,16 +1,34 @@
-AssetsManager - League of Legends | v4.1.0.12
+AssetsManager - League of Legends | v4.1.0.13
 
 HOTFIX UPDATE
 
 New Features
 
 Improvements
+
+Changes
+
+Bug Fixes
+  - Notifications / Dispatch tray alerts safely on the UI thread and close the Notification Hub while highlighting News when opening a news alert.
+  - Comparator / Report failed or missing-file WAD comparisons as errors instead of "no differences found".
+  - Audio Player / Validate track URLs, stop playback cleanly when loading playlists, and prevent audio from starting after closing the window.
+  - Diff Viewers / Prevent crashes when searching backward in empty documents or toggling Word-Level Diff in Inline mode.
+  - Logs / Fix clickable path slicing when the link label differs from the logged path.
+  - 3D Studio / Ignore cancelled folder expansions instead of crashing the project browser.
+  - Image Merger / Fix concurrent preview cancellation races and support uppercase .TEX and .DDS file extensions.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+AssetsManager - League of Legends | v4.1.0.12
+
+HOTFIX UPDATE
+This hotfix expands GAME and BIN hash guessing patterns in Hash Guessing Lab, fixes UI, audio, SVG diff, and monitoring issues across Explorer, Monitor, Image Diff, and History, and resolves spring physics, gizmo dragging, and particle rendering bugs in 3D Studio.
+
+Improvements
   - Hash Guessing Lab / Substitute synchronized year tokens across paths, project legacy .dds character assets to Jade .tex paths, strip Mat_ submesh prefixes, and cover multi-word esports banner sponsors.
   - Hash Guessing Lab / Pair submesh and sampler anchors with identifier terms from unresolved skin BINs to resolve compound skin and chroma textures.
   - Hash Guessing Lab / Resolve Stat Anvil entry paths with the BIN method.
   - Hash Guessing Lab / Discover compound shader names without separators, derive unknown BIN paths from resolved root entries, alternate zero-padded numbered prefixes, and combine BIN property terms with sibling textures to resolve glued texture names.
-
-Changes
 
 Bug Fixes
   - Universal Converter / Disable the Convert All button when no files are queued.

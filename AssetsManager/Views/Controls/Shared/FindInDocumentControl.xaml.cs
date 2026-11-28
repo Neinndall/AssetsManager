@@ -74,6 +74,42 @@ namespace AssetsManager.Views.Controls.Shared
             }
         }
 
+        internal static int FindMatchIndex(string text, string searchText, int caretOffset, int selectionStart, bool forward)
+        {
+            if (string.IsNullOrEmpty(text) || string.IsNullOrEmpty(searchText))
+                return -1;
+
+            int start = forward ? caretOffset : selectionStart - 1;
+            if (start < 0) start = 0;
+
+            if (forward)
+            {
+                if (start > text.Length)
+                    start = text.Length;
+
+                int index = text.IndexOf(searchText, start, StringComparison.OrdinalIgnoreCase);
+                if (index == -1) // Wrap around
+                {
+                    index = text.IndexOf(searchText, 0, StringComparison.OrdinalIgnoreCase);
+                }
+
+                return index;
+            }
+            else
+            {
+                if (start >= text.Length)
+                    start = text.Length - 1;
+
+                int index = text.LastIndexOf(searchText, start, StringComparison.OrdinalIgnoreCase);
+                if (index == -1) // Wrap around
+                {
+                    index = text.LastIndexOf(searchText, text.Length - 1, StringComparison.OrdinalIgnoreCase);
+                }
+
+                return index;
+            }
+        }
+
         private void Find(bool forward)
         {
             string searchText = SearchTextBox.Text;
@@ -88,30 +124,12 @@ namespace AssetsManager.Views.Controls.Shared
             if (TargetTextEditor.Document == null)
                 return;
 
-            int start = forward ? TargetTextEditor.CaretOffset : TargetTextEditor.SelectionStart - 1;
-            if (start < 0) start = 0;
-
-            int index = -1;
-            if (forward)
-            {
-                index = TargetTextEditor.Document.Text.IndexOf(searchText, start, StringComparison.OrdinalIgnoreCase);
-                if (index == -1) // Wrap around
-                {
-                    index = TargetTextEditor.Document.Text.IndexOf(searchText, 0, StringComparison.OrdinalIgnoreCase);
-                }
-            }
-            else
-            {
-                if (start >= TargetTextEditor.Document.Text.Length)
-                {
-                    start = TargetTextEditor.Document.Text.Length - 1;
-                }
-                index = TargetTextEditor.Document.Text.LastIndexOf(searchText, start, StringComparison.OrdinalIgnoreCase);
-                if (index == -1) // Wrap around
-                {
-                    index = TargetTextEditor.Document.Text.LastIndexOf(searchText, TargetTextEditor.Document.Text.Length - 1, StringComparison.OrdinalIgnoreCase);
-                }
-            }
+            int index = FindMatchIndex(
+                TargetTextEditor.Document.Text,
+                searchText,
+                TargetTextEditor.CaretOffset,
+                TargetTextEditor.SelectionStart,
+                forward);
 
             if (index != -1)
             {

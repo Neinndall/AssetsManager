@@ -207,6 +207,7 @@
                             </ToggleButton>
                             <ToggleButton x:Name="WordLevelDiffButton"
                                           IsChecked="{Binding IsWordLevelDiff}"
+                                          IsEnabled="{Binding IsInlineMode, Converter={StaticResource InverseBooleanConverter}}"
                                           Click="WordLevelDiffButton_Click"
                                           Style="{StaticResource TransparentIconToggleButton}"
                                           Width="30" Height="30"
